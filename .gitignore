@@ -1,0 +1,7 @@
+# 本地配置
+.claude/
+.agents/
+.vscode/
+
+# 技能锁定文件（个人环境）
+skills-lock.json
