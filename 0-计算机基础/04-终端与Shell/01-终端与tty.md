@@ -141,6 +141,63 @@ SSH服务器打开伪终端从设备 (pty slave)
 - 网络socket无法提供终端的完整行为
 - 伪终端让远程程序感觉像在本地终端运行
 
+## stty 命令
+
+stty 用于查看和设置终端参数：
+
+```bash
+# 查看当前终端设置
+stty -a
+# 输出: speed 38400 baud; rows 50; columns 120; lc ...
+
+# 常用设置
+stty erase ^H        # 设置退格键
+stty -echo           # 关闭回显（密码输入时）
+stty echo            # 开启回显
+stty -icanon          # 关闭规范模式（行缓冲）
+stty intr ^C          # 设置中断信号键
+stty susp ^Z          # 设置挂起信号键
+
+# 从命令行读取单个字符
+stty -icanon -echo
+char=$(dd bs=1 count=1 2>/dev/null)
+stty sane
+```
+
+## 终端控制字符
+
+终端行规程处理的特殊控制字符：
+
+```bash
+# 常用控制字符（Ctrl组合键）
+Ctrl+C   # SIGINT - 中断进程
+Ctrl+Z   # SIGTSTP - 挂起进程（bg/fg恢复）
+Ctrl+D   # EOF - 关闭输入
+Ctrl+S   # XOFF - 暂停输出
+Ctrl+Q   # XON - 恢复输出
+Ctrl+H   # 退格（Backspace）
+Ctrl+L   # 清屏
+
+# 查看所有控制字符
+stty -a | grep control
+```
+
+## 终端属性
+
+终端有丰富的属性控制行为：
+
+```bash
+# canonical模式（行缓冲）- 用户按回车才发送
+# 非canonical模式 - 立即发送（如vim、less）
+
+# echo模式
+# ispeed/ospeed - 输入/输出速度
+# rows/columns - 终端大小
+
+# 查看完整属性
+stty -a
+```
+
 ## 面试要点
 
 1. **终端 vs Shell**：终端是硬件/软件抽象，Shell是命令解释器
@@ -149,3 +206,5 @@ SSH服务器打开伪终端从设备 (pty slave)
 4. **标准流**：stdin/stdout/stderr的默认关联和重定向
 5. **伪终端**：SSH等远程会话的技术原理
 6. **行规程**：回显、CRLF转换、信号处理等
+7. **stty命令**：查看/设置终端属性，控制字符
+8. **控制字符**：Ctrl+C/S/Z/D等特殊键的作用

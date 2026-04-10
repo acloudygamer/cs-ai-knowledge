@@ -224,11 +224,174 @@ Get-Service
 Get-Process | Where-Object CPU -gt 100 | Sort-Object CPU
 ```
 
+## 进程与作业控制
+
+### 进程
+
+```bash
+# 查看进程
+ps aux              # 所有进程
+ps -ef              # 完整格式
+top                 # 动态查看
+
+# 子进程
+./script.sh &       # 后台运行
+./long_running.sh   # 前台运行
+
+# 进程替换：<(cmd)
+diff <(ps aux) <(ps aux | grep bash)
+```
+
+### 作业控制
+
+```bash
+# 后台任务
+./script.sh &        # 后台运行
+jobs                  # 查看后台任务
+bg %1                 # 将任务1切到后台
+fg %1                 # 将任务1切到前台
+
+# nohup - 忽略挂起信号
+nohup ./script.sh &
+
+# setsid - 新会话运行
+setsid ./script.sh
+```
+
+### 信号
+
+```bash
+# 常用信号
+SIGINT (2)    # Ctrl+C 中断
+SIGTERM (15)  # 优雅终止
+SIGKILL (9)   # 强制杀死
+SIGTSTP (20)  # Ctrl+Z 挂起
+SIGSTOP (19)  # 暂停
+
+# 发送信号
+kill -SIGTERM 1234
+kill -9 1234   # SIGKILL
+killall nginx  # 按名字杀
+```
+
+### exec 系统调用
+
+```bash
+# exec 用法
+exec > output.txt     # 将标准输出重定向到文件
+exec 2>&1            # 错误输出也重定向
+exec -a "newname" ls # 用新名字执行（替换当前shell）
+```
+
+## 环境与继承
+
+### 环境变量
+
+```bash
+# 查看环境变量
+env
+printenv HOME
+echo $PATH
+
+# 临时设置
+MY_VAR=value ./script.sh
+
+# 永久设置
+# ~/.bashrc 中添加:
+export MY_VAR=value
+
+# 传递给子进程
+export VAR="hello"
+bash -c 'echo $VAR'  # 输出 hello
+```
+
+### set 命令
+
+```bash
+# 内置选项
+set -u    # 未定义变量报错
+set -e    # 命令失败退出
+set -x    # 调试模式
+set -o vi # vi 模式编辑命令行
+set -o emacs # emacs 模式
+
+# 关闭选项
+set +u
+set +e
+```
+
+## Shell 高级特性
+
+### [[ ]] 扩展测试
+
+```bash
+# [[ ]] 优于 [ ]，支持更多特性
+[[ -f file ]] && echo "exists"
+
+# 正则匹配
+if [[ "$var" =~ ^hello[0-9]+$ ]]; then
+    echo "matches"
+fi
+
+# 逻辑组合
+if [[ -f file ]] && [[ -r file ]]; then
+    echo "readable file"
+fi
+
+# 模式匹配
+[[ "filename.txt" == *.txt ]] && echo "text file"
+```
+
+### 参数展开
+
+```bash
+# ${parameter:-word} - 默认值
+name=${1:-"Guest"}
+echo "Hello, $name"
+
+# ${parameter:=word} - 赋值默认值
+${count:=0}
+
+# ${parameter:?word} - 未定义时报错
+${var:? "var is not set"}
+
+# ${parameter:+word} - 已设置则替换
+${debug:+ "-v"}  # 如果debug设置了则返回 "-v"
+```
+
+### 数组高级操作
+
+```bash
+# 切片
+arr=(one two three four five)
+echo ${arr[@]:1:3}   # two three four
+
+# 追加
+arr+=(six seven)
+
+# 删除元素
+unset arr[2]
+
+# 索引数组转关联数组
+declare -A aa=([one]=1 [two]=2)
+
+# 遍历索引和值
+for i in "${!arr[@]}"; do
+    echo "$i: ${arr[$i]}"
+done
+```
+
 ## 面试要点
 
 1. **Shell vs 内核**：Shell是用户与内核的接口，通过系统调用通信
 2. **bash vs zsh vs fish**：特点差异，选择依据
-3. **命令执行流程**：Read-Eval-Print-Loop
+3. **命令执行流程**：Read-Eval-Print-Loop (REPL)
 4. **管道和重定向**：`|`和`>`的用法和区别
 5. **Shell脚本**：变量、条件、循环、函数
 6. **PowerShell特点**：对象管道，与传统Shell的区别
+7. **作业控制**：后台运行、fg/bg、nohup/setsid
+8. **信号处理**：SIGINT/SIGTERM/SIGKILL区别
+9. **[[ ]] vs [ ]**：`[[]]`支持正则和&&||逻辑
+10. **${var:-default}**：参数展开的多种形式
+11. **环境变量继承**：export与子进程关系
+12. **exec**：重定向和命令替换
