@@ -84,6 +84,30 @@
 | 4a21f67 | enhance(0-计算机基础): Agent team 并行增强所有文件 |
 | b80d9d2 | refactor: 移除面试要点，专注工程实践 |
 
+## 修正记录
+
+| 提交 | 说明 |
+|------|------|
+| ac32337 | fix: 修正各板块审查发现的问题（33个文件，96行新增） |
+
+### 本次修正的高优先级问题
+
+- Go: Griesemer 背景描述错误（误说参与 Java V8）
+- Go: `string(rune)` 语法错误
+- C++: const 方法锁定互斥锁 UB
+- C++: main 函数描述过于绝对
+- DSA: LRU 缓存 O(n) 改用 OrderedDict
+- CS: BPF 名称修正为 Berkeley Packet Filter
+
+### 本次修正的中优先级问题
+
+- Python: url 变量、Callable 导入、urllib 描述
+- Java: Spark 描述、OkHttp import、finalize 废弃
+- Java: break/continue 补充、全角空格修正
+- JS: 空文件删除、弱类型/动态类型分开
+- Go: 变量名统一、bytes import、sync.Map 警告
+- CS: Inteligator、Discord→ByteDance、二分搜索复杂度
+
 ## 待做
 
 - [ ] 各语言内容可能需要进一步深化
