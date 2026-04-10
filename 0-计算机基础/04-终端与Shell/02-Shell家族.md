@@ -381,17 +381,3 @@ for i in "${!arr[@]}"; do
 done
 ```
 
-## 面试要点
-
-1. **Shell vs 内核**：Shell是用户与内核的接口，通过系统调用通信
-2. **bash vs zsh vs fish**：特点差异，选择依据
-3. **命令执行流程**：Read-Eval-Print-Loop (REPL)
-4. **管道和重定向**：`|`和`>`的用法和区别
-5. **Shell脚本**：变量、条件、循环、函数
-6. **PowerShell特点**：对象管道，与传统Shell的区别
-7. **作业控制**：后台运行、fg/bg、nohup/setsid
-8. **信号处理**：SIGINT/SIGTERM/SIGKILL区别
-9. **[[ ]] vs [ ]**：`[[]]`支持正则和&&||逻辑
-10. **${var:-default}**：参数展开的多种形式
-11. **环境变量继承**：export与子进程关系
-12. **exec**：重定向和命令替换

@@ -262,11 +262,3 @@ readStream.on('data', (chunk) => { console.log('Received', chunk.length, 'bytes'
 | 调试 | --inspect, DevTools | DevTools |
 | 运行环境 | 服务器端 | 浏览器端 |
 
-## 面试要点
-
-1. **Node.js 架构**：V8（JS执行）+ libuv（I/O + 事件循环）+ Node API（系统能力）
-2. **事件循环**：阶段顺序（timers → poll → check）、微任务（Promise.then）在每个阶段结束后执行
-3. **线程池**：文件I/O、加密、DNS查询使用线程池（系统API不提供异步版本），默认4线程
-4. **非阻塞I/O**：单线程事件循环 + 异步I/O 模型，适合I/O密集型，不适合CPU密集型
-5. **与浏览器JavaScript的区别**：执行环境（服务器 vs 浏览器）、全局对象（process vs window）、文件系统、DOM
-6. **V8 优化**：热点代码 JIT 编译、隐藏类优化、内联缓存
