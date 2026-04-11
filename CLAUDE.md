@@ -80,16 +80,24 @@
 
 ## 工作流程
 
-### Reviewer 工作流
-1. 审查发现问题
-2. 报告给 Leader
-3. Leader 分配修正任务给对应 Section Agent
-4. Section Agent 修正完成后报告 Leader
-
 ### Brainstormer 工作流
-1. 提出内容想法或新方向
-2. 报告给 Leader
-3. Leader 评估并决定是否采纳
+1. 扩展各语言/CS/DSA 板块内容（发现缺口、提出扩展方向、补充详细内容）
+2. 报告 Leader
+
+### Reviewer 工作流
+1. 审查各板块内容（准确性、可运行性、概念清晰度）
+2. 报告 Leader（附问题清单）
+
+### Leader 工作流
+1. 评估 Brainstormer 提案，决定是否采纳
+2. 调度 Reviewer 审查任务
+3. 分配修正任务给对应 Section Agent
+4. 验收最终结果
+
+### Reviewer → Section Agent 直接协作
+1. Reviewer 发现问题后，可直接通知对应 Section Agent
+2. Section Agent 修正后通知 Reviewer 验证
+3. 验证通过后报告 Leader 验收
 
 ---
 
