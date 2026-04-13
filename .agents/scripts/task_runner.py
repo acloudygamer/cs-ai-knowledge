@@ -392,6 +392,9 @@ Or continue brainstorming for new content to add.
     def generate_summary(self) -> str:
         """汇总所有已完成任务的更新和发现，生成 CYCLE_STATUS.md 追加内容"""
         self.load_tasks()
+        if not self.tasks_data:
+            return "No completed tasks yet."
+
         all_tasks = self.get_all_tasks()
         completed = [t for t in all_tasks if t.get('status') == 'completed']
 
