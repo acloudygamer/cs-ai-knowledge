@@ -1,0 +1,131 @@
+{
+  "version": "1.1",
+  "updated": "2026-04-13",
+  "orchestrator": "Claude Code 主会话 (Leader)",
+  "sharedStorage": "tasks.json",
+  "workflows": {
+    "内容扩展": {
+      "name": "内容扩展工作流",
+      "description": "Brainstormer 并行扩展各语言/CS/DSA 板块内容",
+      "steps": [
+        {
+          "step": 1,
+          "actor": "Leader",
+          "action": "触发 Orchestrator",
+          "description": "执行 task_runner.py --once"
+        },
+        {
+          "step": 2,
+          "actor": "task_runner.py",
+          "action": "生成指令",
+          "description": "读取 tasks.json，生成所有无 blockedBy 的 pending 任务指令"
+        },
+        {
+          "step": 3,
+          "actor": "Leader",
+          "action": "并行调度 Agent",
+          "description": "Spawn 所有无依赖的任务 agent（可并行）"
+        },
+        {
+          "step": 4,
+          "actor": "Agent (agent-brainstormer)",
+          "action": "扩展内容",
+          "description": "发现缺口、提出扩展方向、补充详细内容"
+        },
+        {
+          "step": 5,
+          "actor": "Agent",
+          "action": "更新状态",
+          "description": "task_runner.py --update <id> completed <result> --findings '<issues>'"
+        }
+      ]
+    },
+    "内容实现": {
+      "name": "内容实现工作流",
+      "description": "Section Agent 根据 brainstorm 结果实现具体内容",
+      "steps": [
+        {
+          "step": 1,
+          "actor": "task_runner.py",
+          "action": "检测依赖",
+          "description": "brainstorm 完成后，act 任务的 blockedBy 全部满足，变成 pending"
+        },
+        {
+          "step": 2,
+          "actor": "Leader",
+          "action": "并行调度 Agent",
+          "description": "Spawn 所有已解除依赖的 act-* 任务（按 board 并行）"
+        },
+        {
+          "step": 3,
+          "actor": "Agent (agent-*)",
+          "action": "实现内容",
+          "description": "根据 brainstorm 提出的方向，实现具体内容"
+        },
+        {
+          "step": 4,
+          "actor": "Agent",
+          "action": "更新状态",
+          "description": "task_runner.py --update <id> completed <result>"
+        }
+      ]
+    },
+    "审查修正": {
+      "name": "审查修正工作流",
+      "description": "Reviewer 审查内容",
+      "steps": [
+        {
+          "step": 1,
+          "actor": "task_runner.py",
+          "action": "检测依赖",
+          "description": "act 完成后，review 任务的 blockedBy 全部满足，变成 pending"
+        },
+        {
+          "step": 2,
+          "actor": "Leader",
+          "action": "并行调度 Agent",
+          "description": "Spawn 所有已解除依赖的 review-* 任务"
+        },
+        {
+          "step": 3,
+          "actor": "Agent (agent-reviewer)",
+          "action": "审查内容",
+          "description": "检查准确性、代码可运行性、概念清晰度"
+        },
+        {
+          "step": 4,
+          "actor": "Agent",
+          "action": "更新状态",
+          "description": "task_runner.py --update <id> completed <result> --findings '<issues>'"
+        }
+      ]
+    }
+  },
+  "agentCommunication": {
+    "mechanism": "共享存储 (tasks.json) + 前置任务结果传递",
+    "protocol": [
+      "1. Agent 完成后写入: task_runner.py --update <id> completed <result> --findings '<issues>'",
+      "2. 下一个 Agent 读取: task_runner.py --once 查看前置任务结果",
+      "3. 结果传递: tasks.json 中的 result/findings 字段",
+      "4. 依赖解除: blockedBy 所有任务 completed 时自动解锁"
+    ],
+    "example": {
+      "chain": "brainstorm-py-001 → act-py-001 → review-py-001",
+      "step1": "agent-brainstormer 扩展 Python 内容 → result: '扩展了装饰器详解'",
+      "step2": "agent-python 读取 brainstorm-py-001 结果 → 实现具体内容",
+      "step3": "agent-reviewer 审查 → findings: ['代码示例缺少类型提示']"
+    }
+  },
+  "executionModel": {
+    "parallelism": "无 blockedBy 的任务自动并行",
+    "dependencyChain": "blockedBy 控制依赖链顺序",
+    "example": "7个 brainstorm 无依赖并行 → 各自完成后解锁对应的 act → 7个 act 并行 → 各自完成后解锁对应的 review → 7个 review 并行"
+  },
+  "statusTransitions": {
+    "pending": ["in_progress", "completed", "blocked"],
+    "in_progress": ["completed", "blocked", "failed"],
+    "completed": [],
+    "blocked": ["in_progress"],
+    "failed": ["pending"]
+  }
+}
