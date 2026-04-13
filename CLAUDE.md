@@ -1,124 +1,276 @@
 # CS/AI 知识库 Agent Team
 
-## 团队架构
+## 系统概述
 
-### Leader（你）
-协调、决策、任务分配
-
-### Section Agent（7个）
-各自板块的专家级内容设计与维护
-
-| Agent | 负责板块 | 版本追踪 |
-|-------|----------|----------|
-| agent-python | 2-Python/ | 3.11(稳定) / 3.13(最新) |
-| agent-java | 4-Java/ | 17(LTS) / 21(最新) |
-| agent-cpp | 3-C++/ | 20(稳定) / 23(最新) |
-| agent-js | 5-JavaScript/ | ES2022+ |
-| agent-go | 6-Go/ | 最新稳定版 |
-| agent-dsa | 1-数据结构与算法/ | - |
-| agent-cs | 0-计算机基础/ | - |
-
-### Reviewer（1个）
-跨板块内容质量审查，验证事实准确性、代码可运行性、概念清晰度。
-
-### Brainstormer（1个）
-发现内容缺口、识别跨板块联系、提出新主题方向。
-
----
-
-## Agent 定义位置
-
-`.agents/` 目录下：
 ```
-.agents/
-├── agent-python.md     # Python 专家
-├── agent-java.md       # Java 专家
-├── agent-cpp.md       # C++ 专家
-├── agent-js.md       # JavaScript 专家
-├── agent-go.md        # Go 专家
-├── agent-dsa.md       # 数据结构与算法专家
-├── agent-cs.md        # 计算机基础专家
-├── agent-reviewer.md   # 审查专家
-└── agent-brainstormer.md  # 头脑风暴专家
-```
-
-## Skills 位置
-
-`.agents/skills/` 目录下（加 `-pro` 后缀区分全局 skills）：
-```
-.agents/skills/
-├── python-patterns-pro/   # Python 最佳实践
-├── java-patterns-pro/    # Java 最佳实践
-├── cpp-patterns-pro/     # C++ 最佳实践
-├── js-patterns-pro/      # JavaScript 最佳实践
-├── go-patterns-pro/      # Go 最佳实践
-├── dsa-patterns-pro/     # 数据结构与算法
-├── cs-patterns-pro/      # 计算机基础概念
-├── reviewer-pro/         # 审查技能
-└── brainstormer-pro/    # 头脑风暴技能
+┌─────────────────────────────────────────────────────────┐
+│  Claude Code (Leader)                                   │
+│  读取 task_runner.py --once 生成的任务指令              │
+│  调度对应的 agent-*.md 规则文件执行                     │
+└───────────────────────┬─────────────────────────────────┘
+                        │
+                        ▼
+┌───────────────────────────────────────────────────────────┐
+│  task_runner.py (任务管理器)                              │
+│  读取 tasks.json，管理任务队列                             │
+│  生成供 Claude Code 阅读的 Markdown 指令                   │
+└───────────────────────┬───────────────────────────────────┘
+                        │
+                        ▼
+┌───────────────────────────────────────────────────────────┐
+│  tasks.json (任务队列)                                    │
+│  boards → tasks 结构                                      │
+│  存储所有任务的状态、依赖、结果                            │
+└───────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## 通信协议
+## 快速开始
 
-### Agent → Leader
-- 任务完成时主动报告
-- 遇到问题无法自行解决时报告
-- 需要决策时报告
+### 任务管理命令
 
-### Agent ↔ Agent
-- 跨板块问题直接沟通协调
-- 协商后仍无法解决再上报 Leader
+```bash
+# 生成待执行任务指令（供 Claude Code 阅读）
+python .agents/scripts/task_runner.py --once
 
-### Leader → Agent
-- 分配新任务
-- 提供反馈或指导
-- 提出问题要求澄清
+# 更新任务状态
+python .agents/scripts/task_runner.py --update <task_id> <status> <result>
+
+# 附加发现（findings）
+python .agents/scripts/task_runner.py --update <task_id> completed "结果描述" --findings "问题1" "问题2"
+
+# 生成执行报告
+python .agents/scripts/task_runner.py --report
+
+# 校验 agent 名字是否合法（新增）
+python .agents/scripts/task_runner.py --validate
+
+# 重置所有任务为 pending（测试用）
+python .agents/scripts/task_runner.py --reset
+```
+
+### 典型工作流
+
+```
+1. python task_runner.py --once
+   → 读取 pending 任务，生成 Markdown 指令
+
+2. Claude Code 根据指令调度 agent
+   → 读取对应的 .agents/agent-*.md 规则文件
+
+3. Agent 执行完成后
+   → python task_runner.py --update <id> completed "<结果>"
+
+4. 重复直到所有任务完成
+```
 
 ---
 
-## 工作流程
+## 任务生命周期
 
-### Brainstormer 工作流
-1. 扩展各语言/CS/DSA 板块内容（发现缺口、提出扩展方向、补充详细内容）
-2. 报告 Leader
+### 状态流转
 
-### Reviewer 工作流
-1. 审查各板块内容（准确性、可运行性、概念清晰度）
-2. 报告 Leader（附问题清单）
+```
+pending ──▶ in_progress ──▶ completed
+    │            │
+    │            ▼
+    │          blocked
+    │
+    └─────────────────────▶ failed ──▶ pending（重试）
+```
 
-### Leader 工作流
-1. 评估 Brainstormer 提案，决定是否采纳
-2. 调度 Reviewer 审查任务
-3. 分配修正任务给对应 Section Agent
-4. 验收最终结果
+### blockedBy 依赖
 
-### Reviewer → Section Agent 直接协作
-1. Reviewer 发现问题后，可直接通知对应 Section Agent
-2. Section Agent 修正后通知 Reviewer 验证
-3. 验证通过后报告 Leader 验收
+```json
+{
+  "id": "act-py-001",
+  "status": "pending",
+  "blockedBy": ["brainstorm-py-001"]
+}
+```
+
+- `blockedBy` 列出依赖的任务 ID
+- 只有所有前置任务 status=completed 时，当前任务才会被 `get_pending_tasks()` 返回
+
+### 三层依赖链
+
+tasks.json 的三个 board 形成完整的依赖链：
+
+```
+board: 内容扩展
+  brainstorm-py-001 ──┐
+  brainstorm-java-001 ─┼── 并行（无 blockedBy）
+  brainstorm-cpp-001 ──┘
+           │
+           ▼ all completed
+board: 内容实现
+  act-py-001 ──┐
+  act-java-001 ─┼── 并行（blockedBy 对应 brainstorm）
+  act-cpp-001 ──┘
+           │
+           ▼ all completed
+board: 审查修正
+  review-py-001 ──┐
+  review-java-001 ─┼── 并行（blockedBy 对应 act）
+  review-cpp-001 ──┘
+```
+
+### 执行模式
+
+- **并行**：无 blockedBy 依赖的任务（task_runner.py 自动识别并生成并行指令）
+- **串行**：有 blockedBy 依赖的任务（等待前置任务完成）
 
 ---
 
-## 内容质量标准
+## 故障排查
 
-- **准确性第一**：所有事实、技术描述、代码必须准确
-- **代码可运行**：代码示例必须能正确执行
-- **版本准确**：版本特性描述与官方一致
-- **最佳实践**：符合各语言/领域现代工程实践
-- **不套模板**：各语言按自身特点组织
+### 问题：--once 显示 "All Tasks Completed" 但还有任务未完成
+
+**原因**：任务状态不是 pending
+
+**处理**：
+```bash
+# 查看任务状态
+python .agents/scripts/task_runner.py --report
+
+# 如果任务卡在 in_progress，重置
+python .agents/scripts/task_runner.py --update <task_id> pending ""
+```
+
+### 问题：Agent 执行失败
+
+**处理**：
+```bash
+# 标记失败并记录结果
+python .agents/scripts/task_runner.py --update <task_id> failed "<错误信息>"
+```
+
+### 问题：Agent 名字拼写错误
+
+**现象**：--validate 报错 `unknown agent 'agent-xxx'`
+
+**处理**：检查 tasks.json 中该任务的 agent 字段，对照 .agents/agent-*.md 的 name 属性修正
+
+### 问题：并行任务没有真正并行
+
+**原因**：任务有 hidden blockedBy 依赖
+
+**处理**：检查 tasks.json 中该任务的 blockedBy 字段，确保前置任务已完成
+
+### 问题：前置任务结果没有传递
+
+**检查**：
+1. 前置任务是否 status=completed
+2. 前置任务是否有 result 字段
+3. 当前任务的 blockedBy 是否正确引用
+
+---
+
+## 配置文件说明
+
+### tasks.json（任务队列）
+
+| 字段 | 用途 |
+|------|------|
+| `boards` | 任务分组：内容扩展、内容实现、审查修正 |
+| `id` | 任务唯一标识 |
+| `agent` | 执行的 agent 名字（必须与 agent-*.md 的 name 一致） |
+| `status` | pending / in_progress / completed / failed / blocked |
+| `blockedBy` | 依赖的任务 ID 列表 |
+| `parallelGroup` | （已废弃，无需使用） |
+| `result` | 执行结果描述 |
+| `findings` | 发现的问题列表 |
+| `priority` | high / medium / low |
+
+### agent-manifest.json（Agent 注册表）
+
+定义所有 agent 的元数据：
+- name / description
+- capabilities（Read/Glob/Grep/Bash 等）
+- skills（对应 .agents/skills/ 下的 skill）
+- target（负责的目录）
+
+**注意**：`task_runner.py --once` 会自动注入 capabilities 和 skills 到生成的指令中。
+
+### workflow-schema.json（工作流定义）
+
+描述任务的工作流步骤，与 tasks.json 的 board 结构对应：
+- 内容扩展（brainstorm-*）
+- 内容实现（act-*）
+- 审查修正（review-*）
+
+**注意**：这是文档参考，task_runner.py 不解析此文件，但文档与实现保持同步。
+
+---
+
+## Agent 定义文件
+
+`.agents/` 目录下的 agent-*.md 是**规则文件**，定义 agent 的职责和行为。
+
+**命名规则**：
+- 文件名：`agent-<name>.md`
+- frontmatter `name` 属性：必须与 tasks.json 的 agent 字段一致
+
+**现有 Agent**：
+
+| 文件 | name | 职责 |
+|------|------|------|
+| agent-python.md | agent-python | Python 板块内容设计与维护 |
+| agent-java.md | agent-java | Java 板块内容设计与维护 |
+| agent-cpp.md | agent-cpp | C++ 板块内容设计与维护 |
+| agent-js.md | agent-js | JavaScript 板块内容设计与维护 |
+| agent-go.md | agent-go | Go 板块内容设计与维护 |
+| agent-dsa.md | agent-dsa | 数据结构与算法板块 |
+| agent-cs.md | agent-cs | 计算机基础板块 |
+| agent-reviewer.md | agent-reviewer | 跨板块内容审查 |
+| agent-brainstormer.md | agent-brainstormer | 发现内容缺口 |
+
+---
+
+## Skills
+
+`.agents/skills/` 目录下是各 agent 使用的 skill 定义。
+
+格式：`-pro` 后缀区分全局 skills
+
+| Skill | 对应 Agent |
+|-------|------------|
+| python-patterns-pro | agent-python |
+| java-patterns-pro | agent-java |
+| cpp-patterns-pro | agent-cpp |
+| js-patterns-pro | agent-js |
+| go-patterns-pro | agent-go |
+| dsa-patterns-pro | agent-dsa |
+| cs-patterns-pro | agent-cs |
+| reviewer-pro | agent-reviewer |
+| brainstormer-pro | agent-brainstormer |
 
 ---
 
 ## 项目目录
 
 ```
-├── 0-计算机基础/
-├── 1-数据结构与算法/
-├── 2-Python/
-├── 3-C++/
-├── 4-Java/
-├── 5-JavaScript/
-└── 6-Go/
+├── 0-计算机基础/     # agent-cs
+├── 1-数据结构与算法/ # agent-dsa
+├── 2-Python/        # agent-python
+├── 3-C++/           # agent-cpp
+├── 4-Java/          # agent-java
+├── 5-JavaScript/    # agent-js
+├── 6-Go/            # agent-go
+├── .agents/
+│   ├── agent-*.md   # Agent 规则文件
+│   ├── skills/      # Skill 定义
+│   ├── scripts/     # task_runner.py
+│   └── tasks/       # JSON 配置文件
+└── CLAUDE.md        # 本文件
 ```
+
+---
+
+## 内容质量标准
+
+- **准确性第一**：技术描述、版本特性必须与官方一致
+- **代码可运行**：示例代码必须能正确执行
+- **概念清晰**：术语正确，关系明确
+- **最佳实践**：符合各语言/领域的现代工程实践
