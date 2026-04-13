@@ -434,7 +434,8 @@ public User create(@RequestBody @Valid UserRequest request,
 
 ```java
 // Spring Boot 应用启动时：
-// 1. 从 META-INF/spring.factories 读取 AutoConfiguration 类
+// 1. 从 META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports 读取（Spring Boot 2.7+）
+//    或 META-INF/spring.factories（已弃用）读取 AutoConfiguration 类
 // 2. 按条件筛选符合条件的配置
 // 3. 使用 @Bean 定义 Bean 覆盖默认配置
 ```
