@@ -98,12 +98,22 @@ python .agents/scripts/task_runner.py --summary
 - Claude 根据汇总内容更新 PROJECT_STATUS.md
 - 完成后进入步骤 6
 
-**步骤 6：重置下一轮**
+**步骤 6：Git 提交**
+```bash
+git add .
+git commit -m "feat: 完成任务描述"
+git push
+```
+- 提交所有变更
+- 推送到远程
+- 完成后进入步骤 7
+
+**步骤 7：重置下一轮**
 ```bash
 python .agents/scripts/task_runner.py --resume
 ```
 - 所有任务状态改为 pending
-- 保留 result 和 findings（方便追踪历史）
+- 保留 result、findings 和 errors（方便追踪历史）
 - 如果想全新开始（清空结果）：用 `--reset`
 
 ### 循环示意图
@@ -122,7 +132,9 @@ python .agents/scripts/task_runner.py --resume
 │    ↓                                               │
 │ 5. --summary 汇总                                   │
 │    ↓                                               │
-│ 6. --resume 重置（保留结果）                         │
+│ 6. git add → git commit → git push                 │
+│    ↓                                               │
+│ 7. --resume 重置（保留结果）                         │
 └─────────────────────────────────────────────────────┘
 ```
 
@@ -176,6 +188,32 @@ board: 审查修正
   review-java-001 ─┼── 并行（blockedBy 对应 act）
   review-cpp-001 ──┘
 ```
+
+### Errors 机制（review → act 错误传递）
+
+review 完成后自动将其 findings 转为 act 任务的 errors：
+
+```
+review-py-001 完成 → findings 自动填入 act-py-001.errors → act-py-001 状态改 pending
+```
+
+**errors 格式**：
+```json
+{
+  "errors": [
+    {
+      "file": "2-Python/01-基础/06-面向对象.md",
+      "line": 136,
+      "problem": "distance_to方法公式错误"
+    }
+  ]
+}
+```
+
+**act 任务执行时**：
+1. 显示待修复的 errors 列表
+2. 修复后 errors 自动清空
+3. status 仍为 completed（正常完成）
 
 ### 执行模式
 
@@ -242,6 +280,7 @@ python .agents/scripts/task_runner.py --update <task_id> failed "<错误信息>"
 | `parallelGroup` | （已废弃，无需使用） |
 | `result` | 执行结果描述 |
 | `findings` | 发现的问题列表 |
+| `errors` | 待修复的错误列表（仅 act 任务，review 完成后自动填充） |
 | `priority` | high / medium / low |
 
 ### agent-manifest.json（Agent 注册表）
