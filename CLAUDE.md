@@ -90,12 +90,13 @@ python .agents/scripts/task_runner.py --once
 - 如果还有 pending 任务 → 返回步骤 1
 - 如果显示 "All Tasks Completed" → 进入步骤 5
 
-**步骤 5：生成汇总**
+**步骤 5：生成汇总并追加到 CYCLE_STATUS.md**
 ```bash
 python .agents/scripts/task_runner.py --summary
 ```
-- 把输出发给 Claude
-- Claude 根据汇总内容更新 PROJECT_STATUS.md
+- 阅读 summary 输出，了解本轮完成的任务和发现的问题
+- 将汇总内容（包含本轮修改的文件、修复的错误、完成的发现）**追加**到 `CYCLE_STATUS.md`
+  - 格式：循环标题 → 修改文件表格 → 完成的任务 → 待修复错误（如果有）
 - 完成后进入步骤 6
 
 **步骤 6：Git 提交**
@@ -130,7 +131,7 @@ python .agents/scripts/task_runner.py --resume
 │    ├─ 有 → 返回步骤 1                               │
 │    └─ 没有 → 步骤 5                                │
 │    ↓                                               │
-│ 5. --summary 汇总                                   │
+│ 5. --summary + 追加到 CYCLE_STATUS.md               │
 │    ↓                                               │
 │ 6. git add → git commit → git push                 │
 │    ↓                                               │
