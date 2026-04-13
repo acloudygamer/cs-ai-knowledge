@@ -54,9 +54,18 @@
 
 **工作流**：
 ```
-brainstorm-X → act-X → review-X
+brainstorm-X → act-X → review-X → (errors 传回 act-X)
 （7条线并行）
 ```
+
+**Errors 机制**：
+- review 发现问题 → 自动填入对应 act 任务的 `errors` 字段
+- act 下一轮自动显示待修复的 errors 列表
+- act 修复完成后清除 errors
+
+**循环状态**：
+- 每轮汇总记录在 [CYCLE_STATUS.md](CYCLE_STATUS.md)
+- 包含修改的文件、修复的错误、完成的发现
 
 详见 [CLAUDE.md](CLAUDE.md)
 
@@ -85,3 +94,4 @@ brainstorm-X → act-X → review-X
 - [ ] 完善各板块基础内容
 - [ ] 扩展高级用法章节
 - [ ] 代码示例可运行性验证
+- [ ] 利用 errors 机制追踪和修复 review 发现的问题
