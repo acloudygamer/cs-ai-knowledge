@@ -37,32 +37,93 @@ python .agents/scripts/task_runner.py --once
 # 更新任务状态
 python .agents/scripts/task_runner.py --update <task_id> <status> <result>
 
-# 附加发现（findings）
-python .agents/scripts/task_runner.py --update <task_id> completed "结果描述" --findings "问题1" "问题2"
+# 附加发现（JSON 格式）
+python .agents/scripts/task_runner.py --update <task_id> completed "结果描述" --findings '[{"problem":"问题","solution":"解决"}]'
 
 # 生成执行报告
 python .agents/scripts/task_runner.py --report
 
-# 校验 agent 名字是否合法（新增）
-python .agents/scripts/task_runner.py --validate
+# 汇总所有更新（用于更新 PROJECT_STATUS.md）
+python .agents/scripts/task_runner.py --summary
 
-# 重置所有任务为 pending（测试用）
+# 重置所有任务为 pending（清空结果，用于全新开始）
 python .agents/scripts/task_runner.py --reset
+
+# 重置所有任务为 pending（保留结果，用于下一轮执行）
+python .agents/scripts/task_runner.py --resume
+
+# 校验 agent 名字是否合法
+python .agents/scripts/task_runner.py --validate
 ```
 
-### 典型工作流
+---
+
+## 工作循环
+
+当你告诉 Claude "跑一轮" 或 "开始工作循环" 时，执行以下步骤：
+
+### 循环步骤
+
+**步骤 1：生成指令**
+```bash
+python .agents/scripts/task_runner.py --once
+```
+- 阅读输出的 Markdown 指令
+- 识别可并行的任务（无 blockedBy）
+- 识别有依赖的任务（blockedBy 未完成）
+
+**步骤 2：Spawn Agents 执行**
+- 对于无 blockedBy 的任务，同时 Spawn 多个 agent 并行执行
+- 每个 agent 读取对应的 `.agents/agent-*.md` 规则文件
+- 每个 agent 执行时记录：做了什么、发现了什么问题
+
+**步骤 3：更新任务状态**
+每个任务完成后立即更新：
+```bash
+python .agents/scripts/task_runner.py --update <task_id> completed "<结果>" --findings '[{"problem":"xxx","solution":"yyy"}]'
+```
+
+**步骤 4：检查是否还有 pending 任务**
+```bash
+python .agents/scripts/task_runner.py --once
+```
+- 如果还有 pending 任务 → 返回步骤 1
+- 如果显示 "All Tasks Completed" → 进入步骤 5
+
+**步骤 5：生成汇总**
+```bash
+python .agents/scripts/task_runner.py --summary
+```
+- 把输出发给 Claude
+- Claude 根据汇总内容更新 PROJECT_STATUS.md
+- 完成后进入步骤 6
+
+**步骤 6：重置下一轮**
+```bash
+python .agents/scripts/task_runner.py --resume
+```
+- 所有任务状态改为 pending
+- 保留 result 和 findings（方便追踪历史）
+- 如果想全新开始（清空结果）：用 `--reset`
+
+### 循环示意图
 
 ```
-1. python task_runner.py --once
-   → 读取 pending 任务，生成 Markdown 指令
-
-2. Claude Code 根据指令调度 agent
-   → 读取对应的 .agents/agent-*.md 规则文件
-
-3. Agent 执行完成后
-   → python task_runner.py --update <id> completed "<结果>"
-
-4. 重复直到所有任务完成
+┌─────────────────────────────────────────────────────┐
+│ 1. --once 生成指令                                  │
+│    ↓                                               │
+│ 2. Spawn agents 执行（可并行）                      │
+│    ↓                                               │
+│ 3. --update 记录结果 + findings                     │
+│    ↓                                               │
+│ 4. --once 还有任务？                                │
+│    ├─ 有 → 返回步骤 1                               │
+│    └─ 没有 → 步骤 5                                │
+│    ↓                                               │
+│ 5. --summary 汇总                                   │
+│    ↓                                               │
+│ 6. --resume 重置（保留结果）                         │
+└─────────────────────────────────────────────────────┘
 ```
 
 ---
