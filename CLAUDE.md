@@ -38,7 +38,7 @@ python .agents/scripts/task_runner.py --once
 python .agents/scripts/task_runner.py --update <task_id> <status> <result>
 
 # 附加发现（JSON 格式）
-python .agents/scripts/task_runner.py --update <task_id> completed "结果描述" --findings '[{"problem":"问题","solution":"解决"}]'
+python .agents/scripts/task_runner.py --update <task_id> completed "结果描述" --findings '[{"file":"文件路径","line":行号,"problem":"问题描述"}]'
 
 # 生成执行报告
 python .agents/scripts/task_runner.py --report
@@ -180,29 +180,6 @@ pending ──▶ in_progress ──▶ completed
 
 - `blockedBy` 列出依赖的任务 ID
 - 只有所有前置任务 status=completed 时，当前任务才会被 `get_pending_tasks()` 返回
-
-### 三层依赖链
-
-tasks.json 的三个 board 形成完整的依赖链：
-
-```
-board: 内容扩展
-  brainstorm-py-001 ──┐
-  brainstorm-java-001 ─┼── 并行（无 blockedBy）
-  brainstorm-cpp-001 ──┘
-           │
-           ▼ all completed
-board: 内容实现
-  act-py-001 ──┐
-  act-java-001 ─┼── 并行（blockedBy 对应 brainstorm）
-  act-cpp-001 ──┘
-           │
-           ▼ all completed
-board: 审查修正
-  review-py-001 ──┐
-  review-java-001 ─┼── 并行（blockedBy 对应 act）
-  review-cpp-001 ──┘
-```
 
 ### Errors 机制（review → act 错误传递）
 
