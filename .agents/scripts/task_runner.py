@@ -41,7 +41,6 @@ logger = logging.getLogger(__name__)
 SCRIPT_DIR = Path(__file__).parent
 TASKS_FILE = SCRIPT_DIR.parent / "tasks" / "tasks.json"
 AGENT_MANIFEST = SCRIPT_DIR.parent / "tasks" / "agent-manifest.json"
-WORKFLOW_SCHEMA = SCRIPT_DIR.parent / "tasks" / "workflow-schema.json"
 AGENT_DIR = SCRIPT_DIR.parent
 PROMPTS_DIR = SCRIPT_DIR.parent / "prompts"
 
@@ -52,11 +51,9 @@ class TaskRunner:
     def __init__(self):
         self.tasks_file = TASKS_FILE
         self.manifest_file = AGENT_MANIFEST
-        self.workflow_schema_file = WORKFLOW_SCHEMA
         self.agent_dir = AGENT_DIR
         self.tasks_data = None
         self._agent_manifest_cache = None
-        self._workflow_schema_cache = None
         self._registered_agents_cache = None
 
     def load_tasks(self) -> dict:
