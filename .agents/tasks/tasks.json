@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "updated": "2026-04-13T18:41:17.669501",
+  "updated": "2026-04-13T18:42:30.758495",
   "boards": {
     "内容扩展": {
       "description": "Brainstormer 扩展各语言/CS/DSA 板块内容",
@@ -9,7 +9,7 @@
           "id": "brainstorm-py-001",
           "agent": "agent-brainstormer",
           "target": "2-Python/",
-          "status": "completed",
+          "status": "pending",
           "priority": "high",
           "description": "扩展 Python 板块内容",
           "result": "已分析 Python 内容缺口，提出 6 个扩展方案：设计模式、测试实践、迭代器生成器、虚拟环境与包管理、打包分发、异步编程深入",
@@ -38,14 +38,13 @@
               "problem": "缺少异步编程深入专题",
               "solution": "新增 03-高级用法/10-异步编程深入.md，覆盖 asyncio 深入、事件循环、Task 调度、信号量、队列、异步上下文管理器等"
             }
-          ],
-          "updated": "2026-04-13T18:22:23.971468"
+          ]
         },
         {
           "id": "brainstorm-java-001",
           "agent": "agent-brainstormer",
           "target": "4-Java/",
-          "status": "completed",
+          "status": "pending",
           "priority": "high",
           "description": "扩展 Java 板块内容",
           "result": "已完成 Java 板块内容缺口分析。共发现 12 个内容缺口，包括 3 个文件过薄（数据结构 33 行、内存管理 47 行、控制流程 86 行），9 个主题完全缺失或需要扩展（面向对象、正则表达式、日期时间、异常处理深入、I/O系统、网络编程、Gradle、模块系统、注解处理器）。",
@@ -98,14 +97,13 @@
               "problem": "缺少注解处理器专题",
               "solution": "扩展03-高级用法/01-装饰器与元编程.md：@Repeatable、APT、运行时注解处理、元注解组合"
             }
-          ],
-          "updated": "2026-04-13T18:23:34.422199"
+          ]
         },
         {
           "id": "brainstorm-cpp-001",
           "agent": "agent-brainstormer",
           "target": "3-C++/",
-          "status": "completed",
+          "status": "pending",
           "priority": "high",
           "description": "扩展 C++ 板块内容",
           "result": "已分析 C++ 内容缺口，提出扩展方案。发现 8 个内容缺口：1) CMake 构建系统（完全缺失）；2) 单元测试框架（无 GoogleTest/Catch2）；3) 调试与诊断工具（无 GDB/Valgrind/Sanitizers）；4) 异常处理深入（noexcept/stack unwinding/友元异常）；5) 标准库工具深入（string_view/span/expected/format）；6) C++23 新特性；7) 移动语义深入（移动构造/移动赋值/返回值优化）；8) 性能优化深入（缓存/编译器优化/O3级别）",
@@ -142,14 +140,13 @@
               "problem": "性能优化内容过于简略，缓存/编译器优化选项/实测优化未覆盖",
               "solution": "扩展 03-高级用法/04-性能优化.md，新增 CPU 缓存友好代码、编译器优化选项（O2/O3/Ofast/LTO）、内联汇编、热点分析、SIMD 简介"
             }
-          ],
-          "updated": "2026-04-13T18:24:12.425449"
+          ]
         },
         {
           "id": "brainstorm-js-001",
           "agent": "agent-brainstormer",
           "target": "5-JavaScript/",
-          "status": "completed",
+          "status": "pending",
           "priority": "high",
           "description": "扩展 JavaScript 板块内容",
           "result": "已完成 JavaScript 板块内容缺口分析，提出 7 个扩展方向：Node.js 基础、正则表达式、单元测试、ES2023-2025新特性、前端工程化、浏览器API深入、数据结构专题。对比 Python/Java/C++/Go 发现 JavaScript 缺少服务端、测试、构建工具等核心工程化内容。",
@@ -182,14 +179,13 @@
               "problem": "缺少数据结构专题（Python/Java 都有专门的数据结构文件）",
               "solution": "新增 01-基础/09-数据结构.md，覆盖 JavaScript 内置数据结构（Array/Map/Set/Object）的深入使用、链表、树、图的 JavaScript 实现"
             }
-          ],
-          "updated": "2026-04-13T18:23:31.147545"
+          ]
         },
         {
           "id": "brainstorm-go-001",
           "agent": "agent-brainstormer",
           "target": "6-Go/",
-          "status": "completed",
+          "status": "pending",
           "priority": "high",
           "description": "扩展 Go 板块内容",
           "result": "扩展 Go 知识体系：识别出 5 个内容缺口（Go新特性、面向对象专题、设计模式、泛型深入、常用操作补充），已完成 README.md 更新，补充了 README 中缺失的数据库和测试目录索引",
@@ -218,14 +214,13 @@
               "problem": "README.md 未更新数据库和测试目录索引",
               "solution": "已更新 README.md，补充 04-测试/ 和 02-常用操作/05-数据库.md 的链接"
             }
-          ],
-          "updated": "2026-04-13T18:23:41.734760"
+          ]
         },
         {
           "id": "brainstorm-cs-001",
           "agent": "agent-brainstormer",
           "target": "0-计算机基础/",
-          "status": "completed",
+          "status": "pending",
           "priority": "high",
           "description": "扩展计算机基础板块内容",
           "result": "已分析计算机基础内容缺口，提出扩展方案。识别出9个内容缺口：1)文件系统 2)内存管理 3)系统引导 4)垃圾回收深入 5)数据库基础 6)API设计 7)认证授权 8)CI/CD 9)容器化基础。06-计算机网络/01-网络基础/01-网络分层模型.md文件已存在且内容完整(498行)。",
@@ -258,14 +253,13 @@
               "problem": "容器化基础缺失",
               "solution": "05-软件工程概念/07-容器化基础.md：覆盖Docker核心概念、镜像、容器、网络、卷、数据中心基础"
             }
-          ],
-          "updated": "2026-04-13T18:23:45.550315"
+          ]
         },
         {
           "id": "brainstorm-dsa-001",
           "agent": "agent-brainstormer",
           "target": "1-数据结构与算法/",
-          "status": "completed",
+          "status": "pending",
           "priority": "medium",
           "description": "扩展数据结构与算法板块内容",
           "result": "分析数据结构与算法内容缺口，提出以下扩展方向：1)单调队列专题 2)计数/桶/基数排序 3)B树与B+树 4)跳表 5)红黑树 6)前缀和与差分数组 7)字符串哈希与布隆过滤器 8)网络流算法 9)RMQ问题 10)递归与回溯深入",
@@ -310,8 +304,7 @@
               "problem": "递归专题缺失",
               "solution": "新增递归与分治专题"
             }
-          ],
-          "updated": "2026-04-13T18:22:56.020316"
+          ]
         }
       ]
     },
@@ -365,8 +358,7 @@
               "line": "112",
               "problem": "函数名拼写错误: flattern 应为 flatten"
             }
-          ],
-          "updated": "2026-04-13T18:32:40.670631"
+          ]
         },
         {
           "id": "act-java-001",
@@ -395,8 +387,7 @@
               "line": 80,
               "problem": "存在重复关键字 typo：opens opens com.example.deep 应该是 opens com.example.deep"
             }
-          ],
-          "updated": "2026-04-13T18:35:10.898427"
+          ]
         },
         {
           "id": "act-cpp-001",
@@ -434,8 +425,7 @@
               "line": 188,
               "problem": "std::flat_map 没有 get() 方法；标准 API 为 find() 返回 iterator，或 operator[] 返回 reference"
             }
-          ],
-          "updated": "2026-04-13T18:31:53.896167"
+          ]
         },
         {
           "id": "act-js-001",
@@ -493,8 +483,7 @@
               "line": 141,
               "problem": "expect({}).toBeEmpty() - Jest 没有 toBeEmpty() 匹配器，代码会运行失败"
             }
-          ],
-          "updated": "2026-04-13T18:36:34.481492"
+          ]
         },
         {
           "id": "act-go-001",
@@ -543,8 +532,7 @@
               "line": 119,
               "problem": "NamedGroups() 返回 map[string]int，注释 [0:4] 具有误导性，实际返回的是组索引(整数)而非切片"
             }
-          ],
-          "updated": "2026-04-13T18:32:21.729107"
+          ]
         },
         {
           "id": "act-cs-001",
@@ -573,8 +561,7 @@
               "line": "120-121",
               "problem": "GPT分区条目数量存在歧义：LBA 2-33分区条目描述'128字节×32'表述不清晰，标准GPT使用128个分区条目而非32个"
             }
-          ],
-          "updated": "2026-04-13T18:35:14.308838"
+          ]
         },
         {
           "id": "act-dsa-001",
@@ -639,8 +626,7 @@
               "line": 317,
               "problem": "B+树实现BUG: 使用了 BTreeNode(leaf=True) 而非 BPlusTreeNode(leaf=True)，类型不一致"
             }
-          ],
-          "updated": "2026-04-13T18:31:00.927972"
+          ]
         }
       ]
     },
@@ -651,7 +637,7 @@
           "id": "review-py-001",
           "agent": "agent-reviewer",
           "target": "2-Python/",
-          "status": "completed",
+          "status": "pending",
           "blockedBy": [
             "act-py-001"
           ],
@@ -688,14 +674,13 @@
               "line": "112",
               "problem": "函数名拼写错误: flattern 应为 flatten"
             }
-          ],
-          "updated": "2026-04-13T18:39:18.863898"
+          ]
         },
         {
           "id": "review-java-001",
           "agent": "agent-reviewer",
           "target": "4-Java/",
-          "status": "completed",
+          "status": "pending",
           "blockedBy": [
             "act-java-001"
           ],
@@ -712,14 +697,13 @@
               "line": 80,
               "problem": "存在重复关键字 typo：opens opens com.example.deep 应该是 opens com.example.deep"
             }
-          ],
-          "updated": "2026-04-13T18:38:10.465278"
+          ]
         },
         {
           "id": "review-cpp-001",
           "agent": "agent-reviewer",
           "target": "3-C++/",
-          "status": "completed",
+          "status": "pending",
           "blockedBy": [
             "act-cpp-001"
           ],
@@ -741,14 +725,13 @@
               "line": 188,
               "problem": "std::flat_map 没有 get() 方法；标准 API 为 find() 返回 iterator，或 operator[] 返回 reference"
             }
-          ],
-          "updated": "2026-04-13T18:38:55.368098"
+          ]
         },
         {
           "id": "review-js-001",
           "agent": "agent-reviewer",
           "target": "5-JavaScript/",
-          "status": "completed",
+          "status": "pending",
           "blockedBy": [
             "act-js-001"
           ],
@@ -770,14 +753,13 @@
               "line": 141,
               "problem": "expect({}).toBeEmpty() - Jest 没有 toBeEmpty() 匹配器，代码会运行失败"
             }
-          ],
-          "updated": "2026-04-13T18:38:21.363714"
+          ]
         },
         {
           "id": "review-go-001",
           "agent": "agent-reviewer",
           "target": "6-Go/",
-          "status": "completed",
+          "status": "pending",
           "blockedBy": [
             "act-go-001"
           ],
@@ -794,14 +776,13 @@
               "line": 119,
               "problem": "NamedGroups() 返回 map[string]int，注释 [0:4] 具有误导性，实际返回的是组索引(整数)而非切片"
             }
-          ],
-          "updated": "2026-04-13T18:39:51.171030"
+          ]
         },
         {
           "id": "review-cs-001",
           "agent": "agent-reviewer",
           "target": "0-计算机基础/",
-          "status": "completed",
+          "status": "pending",
           "blockedBy": [
             "act-cs-001"
           ],
@@ -818,14 +799,13 @@
               "line": "120-121",
               "problem": "GPT分区条目数量存在歧义：LBA 2-33分区条目描述'128字节×32'表述不清晰，标准GPT使用128个分区条目而非32个"
             }
-          ],
-          "updated": "2026-04-13T18:38:41.292961"
+          ]
         },
         {
           "id": "review-dsa-001",
           "agent": "agent-reviewer",
           "target": "1-数据结构与算法/",
-          "status": "completed",
+          "status": "pending",
           "blockedBy": [
             "act-dsa-001"
           ],
@@ -842,8 +822,7 @@
               "line": 317,
               "problem": "B+树实现BUG: 使用了 BTreeNode(leaf=True) 而非 BPlusTreeNode(leaf=True)，类型不一致"
             }
-          ],
-          "updated": "2026-04-13T18:41:17.667602"
+          ]
         }
       ]
     }

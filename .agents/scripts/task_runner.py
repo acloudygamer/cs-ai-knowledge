@@ -13,6 +13,11 @@ Orchestrator: Claude Code 主会话
 
 import json
 import sys
+import io
+
+# Windows 下设置 UTF-8 输出编码
+if sys.platform == 'win32':
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 import logging
 import re
 import glob
@@ -335,30 +340,34 @@ Or continue brainstorming for new content to add.
         # 检测无依赖的可并行任务数量
         parallel_count = sum(1 for t in pending if not t.get('blockedBy'))
 
-        lines.append("## Workflow")
+        lines.append("## 工作流程")
         if parallel_count > 1:
-            lines.append(f"**{parallel_count} tasks available - all can run in parallel!**")
-            lines.append(f"1. Spawn ALL {parallel_count} agents at once (parallel execution)")
-            lines.append("2. Each agent executes independently")
-            lines.append("3. After ALL complete, update each task:")
+            lines.append(f"**{parallel_count} 个任务可并行执行！**")
+            lines.append(f"1. **启动**：同时 Spawn 所有 {parallel_count} 个 agents 并行执行。")
+            lines.append("2. **执行（子 Agent 负责）**：Agents 独立执行，完成后自行更新任务状态。**（不要手动为他们运行 `--update` 命令）**")
+            lines.append("3. **等待**：等待 task notifications（异步）— 无需轮询。")
+            lines.append("4. **继续**：重新运行 `task_runner.py --once` 检查并触发下一批已解锁的任务。")
+            lines.append("")
+            lines.append("**子 Agent 任务完成后更新格式**：")
             lines.append("   ```bash")
             lines.append("   python .agents/scripts/task_runner.py \\")
             lines.append("     --update <task_id> completed \\")
-            lines.append("     --result '<what was done>' \\")
-            lines.append("     --findings '[{\"problem\":\"xxx\",\"solution\":\"yyy\"}]'")
+            lines.append("     --result '<执行结果>' \\")
+            lines.append("     --findings '[{\"file\":\"文件路径\",\"line\":行号,\"problem\":\"问题描述\"}]'")
             lines.append("   ```")
-            lines.append(f"4. Re-run `task_runner.py --once` for remaining tasks")
         else:
-            lines.append("1. Read the first pending task above")
-            lines.append("2. Spawn the specified Agent to execute the task")
-            lines.append("3. After Agent completes, update status:")
+            lines.append("1. **启动**：Spawn 指定 Agent 执行任务。")
+            lines.append("2. **执行（子 Agent 负责）**：Agent 独立执行，完成后自行更新任务状态。**（不要手动运行 `--update` 命令）**")
+            lines.append("3. **等待**：等待 task notification（异步）。")
+            lines.append("4. **继续**：重新运行 `task_runner.py --once`。")
+            lines.append("")
+            lines.append("**子 Agent 任务完成后更新格式**：")
             lines.append("   ```bash")
             lines.append("   python .agents/scripts/task_runner.py \\")
             lines.append("     --update <task_id> completed \\")
-            lines.append("     --result '<what was done>' \\")
-            lines.append("     --findings '[{\"problem\":\"xxx\",\"solution\":\"yyy\"}]'")
+            lines.append("     --result '<执行结果>' \\")
+            lines.append("     --findings '[{\"file\":\"文件路径\",\"line\":行号,\"problem\":\"问题描述\"}]'")
             lines.append("   ```")
-            lines.append("4. Continue with next task or re-run `task_runner.py --once`")
 
         return "\n".join(lines)
 

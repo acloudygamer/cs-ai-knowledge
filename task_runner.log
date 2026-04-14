@@ -75,3 +75,8 @@
 2026-04-13 18:39:51,171 - INFO - Errors propagated to act-go-001, status reset to pending
 2026-04-13 18:41:17,667 - INFO - 任务 review-dsa-001 -> completed
 2026-04-13 18:41:17,667 - INFO - Errors propagated to act-dsa-001, status reset to pending
+2026-04-13 18:47:37,040 - INFO - Registered agents: {'agent-go', 'agent-js', 'agent-reviewer', 'agent-java', 'agent-cs', 'agent-python', 'agent-cpp', 'agent-brainstormer', 'agent-dsa'}
+2026-04-14 13:33:48,972 - INFO - Registered agents: {'agent-java', 'agent-go', 'agent-reviewer', 'agent-dsa', 'agent-python', 'agent-cs', 'agent-brainstormer', 'agent-cpp', 'agent-js'}
+2026-04-14 14:15:05,556 - INFO - Registered agents: {'agent-js', 'agent-java', 'agent-reviewer', 'agent-python', 'agent-go', 'agent-cpp', 'agent-cs', 'agent-dsa', 'agent-brainstormer'}
+2026-04-14 14:15:13,258 - INFO - Registered agents: {'agent-go', 'agent-java', 'agent-cs', 'agent-cpp', 'agent-brainstormer', 'agent-python', 'agent-dsa', 'agent-js', 'agent-reviewer'}
+2026-04-14 14:17:05,409 - INFO - Registered agents: {'agent-go', 'agent-js', 'agent-cpp', 'agent-cs', 'agent-brainstormer', 'agent-dsa', 'agent-python', 'agent-reviewer', 'agent-java'}
