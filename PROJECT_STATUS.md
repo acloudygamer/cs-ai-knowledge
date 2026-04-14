@@ -73,17 +73,33 @@ brainstorm-X → act-X → review-X → (errors 传回 act-X)
 
 ## Agent Team
 
-| Agent | 职责 |
-|-------|------|
-| agent-brainstormer | 发现内容缺口、提出扩展方向 |
-| agent-python | Python 板块内容实现 |
-| agent-java | Java 板块内容实现 |
-| agent-cpp | C++ 板块内容实现 |
-| agent-js | JavaScript 板块内容实现 |
-| agent-go | Go 板块内容实现 |
-| agent-cs | 计算机基础板块内容实现 |
-| agent-dsa | 数据结构与算法板块内容实现 |
-| agent-reviewer | 跨板块内容审查 |
+| Agent | 职责 | Skill |
+|-------|------|-------|
+| agent-brainstormer | 发现内容缺口、提出扩展方向 | brainstormer-pro |
+| agent-python | Python 板块内容实现 | python-patterns-pro |
+| agent-java | Java 板块内容实现 | java-patterns-pro |
+| agent-cpp | C++ 板块内容实现 | cpp-patterns-pro |
+| agent-js | JavaScript 板块内容实现 | js-patterns-pro |
+| agent-go | Go 板块内容实现 | go-patterns-pro |
+| agent-cs | 计算机基础板块内容实现 | cs-patterns-pro |
+| agent-dsa | 数据结构与算法板块内容实现 | dsa-patterns-pro |
+| agent-reviewer | 跨板块内容审查 | reviewer-pro |
+
+### .agents 目录结构
+
+```
+.agents/
+├── agent-*.md              # Agent 规则文件
+├── prompts/                # Spawn Prompt 模板
+│   ├── brainstorm.md
+│   ├── act.md
+│   └── review.md
+├── skills/                 # Skill 定义
+├── scripts/task_runner.py   # 任务管理器
+└── tasks/                  # JSON 配置文件
+    ├── tasks.json          # 任务队列
+    └── agent-manifest.json  # Agent 注册表
+```
 
 详见 [CLAUDE.md](CLAUDE.md)
 
