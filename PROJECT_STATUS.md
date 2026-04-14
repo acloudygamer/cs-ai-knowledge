@@ -1,17 +1,5 @@
 # 项目状态
 
-## 项目目标
-
-整理计算机与人工智能知识体系，用于学习、复习、工程实践。
-
-**核心理念**：
-- 注重实用性和常用性
-- 概念关系连接，而非孤立罗列
-- 代码示例必须可运行
-- 技术描述必须准确
-
----
-
 ## 目录结构
 
 | 目录 | 负责 Agent | 状态 |
@@ -46,31 +34,6 @@
 └── 05-软件工程概念/         # 工程：前后端、UI、测试、算法
 ```
 
----
-
-## 当前阶段
-
-**任务控制系统**：JSON 任务队列 + task_runner.py 管理
-
-**工作流**：
-```
-brainstorm-X → act-X → review-X → (errors 传回 act-X)
-（7条线并行）
-```
-
-**Errors 机制**：
-- review 发现问题 → 自动填入对应 act 任务的 `errors` 字段
-- act 下一轮自动显示待修复的 errors 列表
-- act 修复完成后清除 errors
-
-**循环状态**：
-- 每轮汇总记录在 [CYCLE_STATUS.md](CYCLE_STATUS.md)
-- 包含修改的文件、修复的错误、完成的发现
-
-详见 [CLAUDE.md](CLAUDE.md)
-
----
-
 ## Agent Team
 
 | Agent | 职责 | Skill |
@@ -102,12 +65,3 @@ brainstorm-X → act-X → review-X → (errors 传回 act-X)
 ```
 
 详见 [CLAUDE.md](CLAUDE.md)
-
----
-
-## 待做
-
-- [ ] 完善各板块基础内容
-- [ ] 扩展高级用法章节
-- [ ] 代码示例可运行性验证
-- [ ] 利用 errors 机制追踪和修复 review 发现的问题
