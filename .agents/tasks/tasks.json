@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "updated": "2026-04-14T21:09:06.177756",
+  "updated": "2026-04-14T21:12:11.976853",
   "boards": {
     "内容扩展": {
       "description": "Brainstormer 扩展各语言/CS/DSA 板块内容",
@@ -264,12 +264,12 @@
           "id": "act-py-001",
           "agent": "agent-python",
           "target": "2-Python/",
-          "status": "pending",
+          "status": "completed",
           "blockedBy": [
             "brainstorm-py-001"
           ],
           "description": "根据 brainstorm 结果扩展 Python 内容",
-          "result": "Fixed 6 flattern->flatten typos",
+          "result": "Python内容已完成确认",
           "findings": [
             {
               "problem": "需要创建的内容列表",
@@ -277,18 +277,18 @@
             }
           ],
           "errors": [],
-          "updated": "2026-04-14T20:49:50.123125"
+          "updated": "2026-04-14T21:11:35.023136"
         },
         {
           "id": "act-java-001",
           "agent": "agent-java",
           "target": "4-Java/",
-          "status": "pending",
+          "status": "completed",
           "blockedBy": [
             "brainstorm-java-001"
           ],
           "description": "根据 brainstorm 结果扩展 Java 内容",
-          "result": "已完成 Java 内容扩展：修复 2 处错误，创建 3 个新章节（测试5文件、设计模式8文件、Java生态5文件），更新 README.md",
+          "result": "Java内容已完成确认",
           "findings": [
             {
               "problem": "Shenandoah 支持表格 JDK 8u9+ 描述不准确",
@@ -316,18 +316,18 @@
             }
           ],
           "errors": [],
-          "updated": "2026-04-14T21:15:00.000000"
+          "updated": "2026-04-14T21:11:55.596536"
         },
         {
           "id": "act-cpp-001",
           "agent": "agent-cpp",
           "target": "3-C++/",
-          "status": "pending",
+          "status": "completed",
           "blockedBy": [
             "brainstorm-cpp-001"
           ],
           "description": "根据 brainstorm 的结果扩展 C++ 内容",
-          "result": "已完成 C++ 内容扩展：修复3处错误，更新README.md索引，扩展4个薄文件",
+          "result": "C++内容已完成确认",
           "findings": [
             {
               "problem": "3处代码/格式错误（已修复）",
@@ -354,7 +354,8 @@
               "solution": "新增Asio异步TCP/同步TCP/UDP服务器模板、HTTP客户端（GET/POST/文件下载）、Windows WinSock示例"
             }
           ],
-          "errors": []
+          "errors": [],
+          "updated": "2026-04-14T21:12:11.976662"
         },
         {
           "id": "act-js-001",
