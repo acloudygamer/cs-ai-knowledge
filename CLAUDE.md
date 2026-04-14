@@ -307,15 +307,6 @@ Spawn Prompt 模板由子 agent 自己读取，`--once` 只输出任务摘要：
 | `{blocked_results}` | 前置任务结果 |
 | `{errors}` | 待修复错误（仅 act 任务） |
 
-### workflow-schema.json（工作流定义）
-
-描述任务的工作流步骤，与 tasks.json 的 board 结构对应：
-- 内容扩展（brainstorm-*）
-- 内容实现（act-*）
-- 审查修正（review-*）
-
-**注意**：这是文档参考，task_runner.py 不解析此文件，但文档与实现保持同步。
-
 ---
 
 ## Agent 定义文件
