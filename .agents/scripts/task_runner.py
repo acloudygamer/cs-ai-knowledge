@@ -27,12 +27,11 @@ from pathlib import Path
 from typing import Optional
 
 
-# 配置日志
+# 配置日志（仅 stdout，不写文件）
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s',
     handlers=[
-        logging.FileHandler('task_runner.log', encoding='utf-8'),
         logging.StreamHandler(sys.stdout)
     ]
 )
