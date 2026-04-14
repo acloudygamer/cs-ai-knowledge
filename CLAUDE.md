@@ -68,14 +68,14 @@ python .agents/scripts/task_runner.py --validate
 ```bash
 python .agents/scripts/task_runner.py --once
 ```
-- 阅读输出的 Markdown 指令（包括 Spawn Prompt）
+- 阅读输出的 Markdown 指令
 - 识别可并行的任务（无 blockedBy）
 - 识别有依赖的任务（blockedBy 未完成）
 - act 任务会显示 **Errors to Fix**（待修复错误）
 
 **步骤 2：Spawn Agents 执行**
 - 对于无 blockedBy 的任务，同时 Spawn 多个 agent 并行执行
-- 每个 agent 读取对应的 Spawn Prompt（固化在 `.agents/prompts/` 中）
+- 每个 agent spawn 后自己读取 `.agents/prompts/{type}.md` 获取指令
 - 每个 agent 执行时记录：做了什么、发现了什么问题
 - **子 Agent 自行更新任务状态**（不要手动运行 `--update`）
 
@@ -123,7 +123,7 @@ python .agents/scripts/task_runner.py --resume
 
 ```
 ┌─────────────────────────────────────────────────────┐
-│ 1. --once 生成指令（含 Spawn Prompt）               │
+│ 1. --once 生成指令                               │
 │    ↓                                               │
 │ 2. Spawn agents 执行（可并行）                      │
 │    ↓                                               │
@@ -289,7 +289,7 @@ python .agents/scripts/task_runner.py --update <task_id> pending ""
 
 ### Spawn Prompt 模板（.agents/prompts/）
 
-Spawn Prompt 固化在模板文件中，`--once` 输出直接包含：
+Spawn Prompt 模板由子 agent 自己读取，`--once` 只输出任务摘要：
 
 | 模板文件 | 对应任务类型 |
 |---------|-------------|

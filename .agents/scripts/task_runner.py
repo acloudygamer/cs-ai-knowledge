@@ -421,13 +421,17 @@ Or continue brainstorming for new content to add.
                                 else:
                                     lines.append(f"- {finding}")
 
-            # 生成 Spawn Prompt
-            spawn_prompt = self.render_spawn_prompt(task)
-            if spawn_prompt:
-                lines.append("\n### Spawn Prompt")
-                lines.append("```")
-                lines.append(spawn_prompt)
-                lines.append("```")
+            # 子 agent 读取的 prompt 模板路径
+            task_id = task['id']
+            if task_id.startswith('brainstorm-'):
+                prompt_file = "brainstorm.md"
+            elif task_id.startswith('act-'):
+                prompt_file = "act.md"
+            elif task_id.startswith('review-'):
+                prompt_file = "review.md"
+            else:
+                prompt_file = "brainstorm.md"
+            lines.append(f"- **Prompt**: `.agents/prompts/{prompt_file}`")
 
             lines.append("")  # 空行分隔
 
