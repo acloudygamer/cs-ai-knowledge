@@ -327,8 +327,9 @@ class TaskRunner:
                 for board_name, board_data in self.tasks_data["boards"].items():
                     for task in board_data["tasks"]:
                         if task.get("id") == act_id:
+                            # 先清除旧 errors，避免累积
+                            task['errors'] = []
                             # 将 findings 转换为 errors 格式
-                            task.setdefault('errors', [])
                             for f in findings:
                                 if isinstance(f, dict):
                                     task['errors'].append({
@@ -338,7 +339,7 @@ class TaskRunner:
                                     })
                             # 重置 act 为 pending，让其修复
                             task['status'] = 'pending'
-                            logger.info(f"Errors propagated to {act_id}, status reset to pending")
+                            logger.info(f"Errors propagated to {act_id}, status reset to pending, {len(findings)} errors")
                 self.save_tasks()
 
     def _clear_errors(self, act_id: str):
