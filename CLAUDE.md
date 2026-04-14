@@ -68,26 +68,28 @@ python .agents/scripts/task_runner.py --validate
 ```bash
 python .agents/scripts/task_runner.py --once
 ```
-- 阅读输出的 Markdown 指令
+- 阅读输出的 Markdown 指令（包括 Spawn Prompt）
 - 识别可并行的任务（无 blockedBy）
 - 识别有依赖的任务（blockedBy 未完成）
+- act 任务会显示 **Errors to Fix**（待修复错误）
 
 **步骤 2：Spawn Agents 执行**
 - 对于无 blockedBy 的任务，同时 Spawn 多个 agent 并行执行
-- 每个 agent 读取对应的 `.agents/agent-*.md` 规则文件
+- 每个 agent 读取对应的 Spawn Prompt（固化在 `.agents/prompts/` 中）
 - 每个 agent 执行时记录：做了什么、发现了什么问题
+- **子 Agent 自行更新任务状态**（不要手动运行 `--update`）
 
-**步骤 3：更新任务状态**
-每个任务完成后立即更新：
-```bash
-python .agents/scripts/task_runner.py --update <task_id> completed "<结果>" --findings '[{"problem":"xxx","solution":"yyy"}]'
-```
+**步骤 3：等待 + 自动更新**
+- 等待 task notifications（异步）
+- sub-agent 完成任务后会自动更新 tasks.json
+- review 完成后：errors 自动传给对应的 act 任务
 
 **步骤 4：检查是否还有 pending 任务**
 ```bash
 python .agents/scripts/task_runner.py --once
 ```
 - 如果还有 pending 任务 → 返回步骤 1
+- **重要**：如果有 act 任务因 errors 变成 pending，它们会显示 Errors to Fix
 - 如果显示 "All Tasks Completed" → 进入步骤 5
 
 **步骤 5：生成汇总并追加到 CYCLE_STATUS.md**
@@ -121,15 +123,16 @@ python .agents/scripts/task_runner.py --resume
 
 ```
 ┌─────────────────────────────────────────────────────┐
-│ 1. --once 生成指令                                  │
+│ 1. --once 生成指令（含 Spawn Prompt）               │
 │    ↓                                               │
 │ 2. Spawn agents 执行（可并行）                      │
 │    ↓                                               │
-│ 3. --update 记录结果 + findings                     │
+│ 3. 等待 task notifications                          │
 │    ↓                                               │
-│ 4. --once 还有任务？                                │
-│    ├─ 有 → 返回步骤 1                               │
-│    └─ 没有 → 步骤 5                                │
+│ 4. --once 检查 pending 任务                        │
+│    ├─ act 有 errors → 返回步骤 1（修复 errors）      │
+│    ├─ 其他 pending → 返回步骤 1                     │
+│    └─ 全部完成 → 步骤 5                           │
 │    ↓                                               │
 │ 5. --summary + 追加到 CYCLE_STATUS.md               │
 │    ↓                                               │
@@ -138,6 +141,17 @@ python .agents/scripts/task_runner.py --resume
 │ 7. --resume 重置（保留结果）                         │
 └─────────────────────────────────────────────────────┘
 ```
+
+**Errors 机制触发重执行**：
+```
+review 完成 → errors 传给 act → act 变 pending
+                    ↓
+            下一次 --once 显示 act 有 pending + Errors to Fix
+                    ↓
+            返回步骤 1，重新 spawn act 修复 errors
+```
+
+**注意**：`--resume` 会重置所有任务为 pending，**保留** result、findings 和 errors。如果在 errors 修复完成前执行 `--resume`，会导致 errors 丢失！
 
 ---
 
@@ -294,6 +308,26 @@ python .agents/scripts/task_runner.py --update <task_id> failed "<错误信息>"
 
 **注意**：`task_runner.py --once` 会自动注入 capabilities 和 skills 到生成的指令中。
 
+### Spawn Prompt 模板（.agents/prompts/）
+
+Spawn Prompt 固化在模板文件中，`--once` 输出直接包含：
+
+| 模板文件 | 对应任务类型 |
+|---------|-------------|
+| `brainstorm.md` | brainstorm-* |
+| `act.md` | act-* |
+| `review.md` | review-* |
+
+**模板变量**：
+| 变量 | 说明 |
+|------|------|
+| `{task_id}` | 任务 ID |
+| `{agent}` | Agent 名称 |
+| `{target}` | 目标目录 |
+| `{description}` | 任务描述 |
+| `{blocked_results}` | 前置任务结果 |
+| `{errors}` | 待修复错误（仅 act 任务） |
+
 ### workflow-schema.json（工作流定义）
 
 描述任务的工作流步骤，与 tasks.json 的 board 结构对应：
@@ -361,9 +395,13 @@ python .agents/scripts/task_runner.py --update <task_id> failed "<错误信息>"
 ├── 6-Go/            # agent-go
 ├── .agents/
 │   ├── agent-*.md   # Agent 规则文件
+│   ├── prompts/      # Spawn Prompt 模板
+│   │   ├── brainstorm.md
+│   │   ├── act.md
+│   │   └── review.md
 │   ├── skills/      # Skill 定义
-│   ├── scripts/     # task_runner.py
-│   └── tasks/       # JSON 配置文件
+│   ├── scripts/      # task_runner.py
+│   └── tasks/        # JSON 配置文件
 └── CLAUDE.md        # 本文件
 ```
 
