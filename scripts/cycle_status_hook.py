@@ -19,8 +19,8 @@ from pathlib import Path
 if sys.platform == 'win32':
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 
-SCRIPT_DIR = Path(__file__).parent.parent
-TASKS_FILE = SCRIPT_DIR / "tasks" / "tasks.json"
+SCRIPT_DIR = Path(__file__).parent
+TASKS_FILE = SCRIPT_DIR / "tasks.json"
 CYCLE_STATUS_FILE = SCRIPT_DIR.parent / "CYCLE_STATUS.md"
 
 
