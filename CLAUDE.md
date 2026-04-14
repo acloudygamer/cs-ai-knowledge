@@ -207,54 +207,56 @@ review-py-001 完成 → findings 自动填入 act-py-001.errors → act-py-001 
 2. 修复后 errors 自动清空
 3. status 仍为 completed（正常完成）
 
-### 执行模式
-
-- **并行**：无 blockedBy 依赖的任务（task_runner.py 自动识别并生成并行指令）
-- **串行**：有 blockedBy 依赖的任务（等待前置任务完成）
-
 ---
 
 ## 故障排查
 
-### 问题：--once 显示 "All Tasks Completed" 但还有任务未完成
+### 问题：--once 报错 "unknown agent"
 
-**原因**：任务状态不是 pending
+**原因**：tasks.json 中 agent 字段与 .agents/agent-*.md 的 name 不匹配
 
 **处理**：
 ```bash
-# 查看任务状态
+# 校验所有 agent 名字
+python .agents/scripts/task_runner.py --validate
+```
+
+### 问题：Spawn Prompt 模板不存在
+
+**原因**：.agents/prompts/ 下缺少对应任务类型的模板
+
+**处理**：检查 .agents/prompts/ 目录是否存在 brainstorm.md、act.md、review.md
+
+### 问题：review 完成后 act 没有显示 Errors to Fix
+
+**原因**：review 的 blockedBy 配置错误，或 findings 格式不对
+
+**检查**：
+1. review 任务 blockedBy 是否指向对应的 act 任务
+2. review findings 是否包含 file、line、problem 字段
+
+### 问题：act 任务执行失败
+
+**现象**：act 状态变成 failed
+
+**处理**：
+```bash
+# 查看失败原因
 python .agents/scripts/task_runner.py --report
 
-# 如果任务卡在 in_progress，重置
+# 重试任务
 python .agents/scripts/task_runner.py --update <task_id> pending ""
 ```
 
-### 问题：Agent 执行失败
+### 问题：--once 显示 "All Tasks Completed" 但还有任务未完成
+
+**原因**：任务状态不是 pending（如 in_progress 卡住）
 
 **处理**：
 ```bash
-# 标记失败并记录结果
-python .agents/scripts/task_runner.py --update <task_id> failed "<错误信息>"
+python .agents/scripts/task_runner.py --report
+python .agents/scripts/task_runner.py --update <task_id> pending ""
 ```
-
-### 问题：Agent 名字拼写错误
-
-**现象**：--validate 报错 `unknown agent 'agent-xxx'`
-
-**处理**：检查 tasks.json 中该任务的 agent 字段，对照 .agents/agent-*.md 的 name 属性修正
-
-### 问题：并行任务没有真正并行
-
-**原因**：任务有 hidden blockedBy 依赖
-
-**处理**：检查 tasks.json 中该任务的 blockedBy 字段，确保前置任务已完成
-
-### 问题：前置任务结果没有传递
-
-**检查**：
-1. 前置任务是否 status=completed
-2. 前置任务是否有 result 字段
-3. 当前任务的 blockedBy 是否正确引用
 
 ---
 
