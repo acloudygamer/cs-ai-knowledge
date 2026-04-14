@@ -13,13 +13,21 @@ if sys.platform == 'win32':
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 
 
-print("""# 会话开始 - 目录结构更新
+print("""# 会话开始 - 目录结构检查
 
-请检查 PROJECT_STATUS.md 中的目录结构是否与实际目录一致。
+请立即执行以下步骤：
 
-用 bash 探索各语言目录（如 `ls -la 2-Python/`），确认：
-1. 各语言目录下的子目录结构
-2. 是否有多余或缺失的目录
+1. 用 bash 探索各语言目录：
+   - ls -la 2-Python/
+   - ls -la 3-C++/
+   - ls -la 4-Java/
+   - ls -la 5-JavaScript/
+   - ls -la 6-Go/
+   - ls -la 0-计算机基础/
 
-如有变更，更新 PROJECT_STATUS.md 中的目录结构。
+2. 对比 PROJECT_STATUS.md 中的目录结构
+
+3. 如有差异，立即更新 PROJECT_STATUS.md
+
+注意：这是 SessionStart hook，必须立即执行目录结构检查和更新。
 """)
