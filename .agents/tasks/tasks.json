@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "updated": "2026-04-14T21:12:11.976853",
+  "updated": "2026-04-14T21:12:46.306533",
   "boards": {
     "内容扩展": {
       "description": "Brainstormer 扩展各语言/CS/DSA 板块内容",
@@ -9,7 +9,7 @@
           "id": "brainstorm-py-001",
           "agent": "agent-brainstormer",
           "target": "2-Python/",
-          "status": "completed",
+          "status": "pending",
           "priority": "high",
           "description": "扩展 Python 板块内容",
           "result": "Python板块扩展分析完成，原有6个缺口均已实现，新发现调试专题缺口",
@@ -42,14 +42,13 @@
               "problem": "缺少调试与诊断专题（新增）",
               "solution": "C++有04-测试/02-调试与诊断.md但Python无对应内容；因Python主要用IDE调试而非CLI工具，优先级较低"
             }
-          ],
-          "updated": "2026-04-14T20:47:08.704123"
+          ]
         },
         {
           "id": "brainstorm-java-001",
           "agent": "agent-brainstormer",
           "target": "4-Java/",
-          "status": "completed",
+          "status": "pending",
           "priority": "high",
           "description": "扩展 Java 板块内容",
           "result": "Java brainstorm complete. Found 3 new gaps: 1) Missing test chapter (04-测试/, Python 5 files, Go 3 files); 2) Missing design pattern chapter (04-设计模式/, Python 8 files); 3) Missing Java ecosystem topics (Spring Boot deep/JPA/Redis/Kafka/Docker). Previous thin files already expanded (274L/215L/291L).",
@@ -76,7 +75,7 @@
           "id": "brainstorm-cpp-001",
           "agent": "agent-brainstormer",
           "target": "3-C++/",
-          "status": "completed",
+          "status": "pending",
           "priority": "high",
           "description": "扩展 C++ 板块内容",
           "result": "C++ brainstorm复查完成。act-cpp-001已实现全部8个扩展项。新发现：README索引未更新，4个文件内容过薄（数据结构24行/JSON44行/文件操作51行/网络请求50行），另有数据库操作和模板元编程深度为新增缺口。",
@@ -101,14 +100,13 @@
               "problem": "02-常用操作/网络请求.md仅50行",
               "solution": "补充Asio网络库、HTTP客户端、TCP/UDP服务器模板、跨平台socket封装"
             }
-          ],
-          "updated": "2026-04-14T20:47:10.056789"
+          ]
         },
         {
           "id": "brainstorm-js-001",
           "agent": "agent-brainstormer",
           "target": "5-JavaScript/",
-          "status": "completed",
+          "status": "pending",
           "priority": "high",
           "description": "扩展 JavaScript 板块内容",
           "result": "JS content gaps: design patterns, TS advanced types, thin advanced files",
@@ -141,14 +139,13 @@
               "problem": "Missing coding standards section",
               "solution": "Add 06-CodingStandards/01-JSStandards.md with ESLint, Prettier, naming conventions"
             }
-          ],
-          "updated": "2026-04-14T20:47:36.502543"
+          ]
         },
         {
           "id": "brainstorm-go-001",
           "agent": "agent-brainstormer",
           "target": "6-Go/",
-          "status": "completed",
+          "status": "pending",
           "priority": "high",
           "description": "扩展 Go 板块内容",
           "result": "Analyzed Go content gaps",
@@ -185,14 +182,13 @@
               "problem": "No CGO topic",
               "solution": "Add CGO topic: C call Go, Go call C, cgo params"
             }
-          ],
-          "updated": "2026-04-14T20:47:09.359416"
+          ]
         },
         {
           "id": "brainstorm-cs-001",
           "agent": "agent-brainstormer",
           "target": "0-计算机基础/",
-          "status": "completed",
+          "status": "pending",
           "priority": "high",
           "description": "扩展计算机基础板块内容",
           "result": "已完成计算机基础板块内容缺口分析。06-计算机网络是最大缺口（仅2文件/730行，缺少HTTP深入/TCP-UDP专题/Socket编程），其他5个子目录内容充实。软件工程概念9个文件总计3781行，均已存在。原brainstorm findings中7项里有6项已实现：文件系统(351行)、内存管理(415行)、系统引导(451行)、垃圾回收(430行)、数据库基础(415行)、API设计(453行)、认证授权(456行)、CI_CD(467行)、容器化基础(560行)均已存在。",
@@ -219,7 +215,7 @@
           "id": "brainstorm-dsa-001",
           "agent": "agent-brainstormer",
           "target": "1-数据结构与算法/",
-          "status": "completed",
+          "status": "pending",
           "priority": "medium",
           "description": "扩展数据结构与算法板块内容",
           "result": "Analyze DSA content gaps propose 7 new expansion directions",
@@ -252,8 +248,7 @@
               "problem": "Missing HLD",
               "solution": "Add new file 11-HLD.md"
             }
-          ],
-          "updated": "2026-04-14T20:47:04.380281"
+          ]
         }
       ]
     },
@@ -264,7 +259,7 @@
           "id": "act-py-001",
           "agent": "agent-python",
           "target": "2-Python/",
-          "status": "completed",
+          "status": "pending",
           "blockedBy": [
             "brainstorm-py-001"
           ],
@@ -276,14 +271,13 @@
               "solution": "已创建所有文件：设计模式8个(singleton,factory,builder,strategy,observer,decorator,adapter,iterator)、测试5个(pytest,Mock,Fixture,参数化,覆盖率)、迭代器与生成器、虚拟环境与包管理、打包与分发、异步编程深入，README.md已更新"
             }
           ],
-          "errors": [],
-          "updated": "2026-04-14T21:11:35.023136"
+          "errors": []
         },
         {
           "id": "act-java-001",
           "agent": "agent-java",
           "target": "4-Java/",
-          "status": "completed",
+          "status": "pending",
           "blockedBy": [
             "brainstorm-java-001"
           ],
@@ -315,14 +309,13 @@
               "solution": "已添加测试、设计模式、Java生态章节链接"
             }
           ],
-          "errors": [],
-          "updated": "2026-04-14T21:11:55.596536"
+          "errors": []
         },
         {
           "id": "act-cpp-001",
           "agent": "agent-cpp",
           "target": "3-C++/",
-          "status": "completed",
+          "status": "pending",
           "blockedBy": [
             "brainstorm-cpp-001"
           ],
@@ -354,14 +347,13 @@
               "solution": "新增Asio异步TCP/同步TCP/UDP服务器模板、HTTP客户端（GET/POST/文件下载）、Windows WinSock示例"
             }
           ],
-          "errors": [],
-          "updated": "2026-04-14T21:12:11.976662"
+          "errors": []
         },
         {
           "id": "act-js-001",
           "agent": "agent-js",
           "target": "5-JavaScript/",
-          "status": "completed",
+          "status": "pending",
           "blockedBy": [
             "brainstorm-js-001"
           ],
@@ -413,14 +405,13 @@
               "solution": "补充设计模式、TypeScript 高级类型、Node.js 数据库/缓存/认证、代码规范章节链接"
             }
           ],
-          "errors": [],
-          "updated": "2026-04-14T20:59:50.236230"
+          "errors": []
         },
         {
           "id": "act-go-001",
           "agent": "agent-go",
           "target": "6-Go/",
-          "status": "completed",
+          "status": "pending",
           "blockedBy": [
             "brainstorm-go-001"
           ],
@@ -468,14 +459,13 @@
               "solution": "已创建 03-高级用法/08-CGO专题.md（约 420 行）"
             }
           ],
-          "errors": [],
-          "updated": "2026-04-14T21:07:49.714557"
+          "errors": []
         },
         {
           "id": "act-cs-001",
           "agent": "agent-cs",
           "target": "0-计算机基础/",
-          "status": "completed",
+          "status": "pending",
           "blockedBy": [
             "brainstorm-cs-001"
           ],
@@ -488,14 +478,13 @@
               "problem": "inode block addressing fixed"
             }
           ],
-          "errors": [],
-          "updated": "2026-04-14T21:08:19.238463"
+          "errors": []
         },
         {
           "id": "act-dsa-001",
           "agent": "agent-dsa",
           "target": "1-数据结构与算法/",
-          "status": "completed",
+          "status": "pending",
           "blockedBy": [
             "brainstorm-dsa-001"
           ],
@@ -535,8 +524,7 @@
               "solution": "添加新文件索引"
             }
           ],
-          "errors": [],
-          "updated": "2026-04-14T21:09:06.175935"
+          "errors": []
         }
       ]
     },
@@ -547,7 +535,7 @@
           "id": "review-py-001",
           "agent": "agent-reviewer",
           "target": "2-Python/",
-          "status": "completed",
+          "status": "pending",
           "blockedBy": [
             "act-py-001"
           ],
@@ -584,14 +572,13 @@
               "line": "112",
               "problem": "函数名拼写错误: flattern 应为 flatten"
             }
-          ],
-          "updated": "2026-04-14T21:01:31.935213"
+          ]
         },
         {
           "id": "review-java-001",
           "agent": "agent-reviewer",
           "target": "4-Java/",
-          "status": "completed",
+          "status": "pending",
           "blockedBy": [
             "act-java-001"
           ],
@@ -608,14 +595,13 @@
               "line": 80,
               "problem": "存在重复关键字 typo：opens opens com.example.deep 应该是 opens com.example.deep"
             }
-          ],
-          "updated": "2026-04-14T21:07:04.180272"
+          ]
         },
         {
           "id": "review-cpp-001",
           "agent": "agent-reviewer",
           "target": "3-C++/",
-          "status": "completed",
+          "status": "pending",
           "blockedBy": [
             "act-cpp-001"
           ],
@@ -637,14 +623,13 @@
               "line": 188,
               "problem": "std::flat_map 没有 get() 方法；标准 API 为 find() 返回 iterator，或 operator[] 返回 reference"
             }
-          ],
-          "updated": "2026-04-14T21:02:30.854222"
+          ]
         },
         {
           "id": "review-js-001",
           "agent": "agent-reviewer",
           "target": "5-JavaScript/",
-          "status": "completed",
+          "status": "pending",
           "blockedBy": [
             "act-js-001"
           ],
@@ -672,7 +657,7 @@
           "id": "review-go-001",
           "agent": "agent-reviewer",
           "target": "6-Go/",
-          "status": "completed",
+          "status": "pending",
           "blockedBy": [
             "act-go-001"
           ],
@@ -689,14 +674,13 @@
               "line": 131,
               "problem": "Quick nav wrong: 09-CGO should be 08-CGO"
             }
-          ],
-          "updated": "2026-04-14T21:03:14.922266"
+          ]
         },
         {
           "id": "review-cs-001",
           "agent": "agent-reviewer",
           "target": "0-计算机基础/",
-          "status": "completed",
+          "status": "pending",
           "blockedBy": [
             "act-cs-001"
           ],
@@ -708,14 +692,13 @@
               "line": 1,
               "problem": "README.md missing index for 4 new files"
             }
-          ],
-          "updated": "2026-04-14T21:02:14.116234"
+          ]
         },
         {
           "id": "review-dsa-001",
           "agent": "agent-reviewer",
           "target": "1-数据结构与算法/",
-          "status": "completed",
+          "status": "pending",
           "blockedBy": [
             "act-dsa-001"
           ],
@@ -747,8 +730,7 @@
               "line": 292,
               "problem": "critical_path predecessor iteration logic flawed"
             }
-          ],
-          "updated": "2026-04-14T21:05:06.932003"
+          ]
         }
       ]
     }
