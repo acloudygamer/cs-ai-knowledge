@@ -22,10 +22,10 @@ for dir in 0-计算机基础 1-数据结构与算法 2-Python 3-C++ 4-Java 5-Jav
 done
 ```
 
-### 第二步：扫描 .agents 目录结构
+### 第二步：扫描项目脚本与资源目录结构
 
 ```bash
-echo "### .agents 目录结构"; echo ""; echo '```'; ls -la .agents/ | tail -n +2 | awk '{print $NF}' | grep -v '^\.\.?$'; echo "---"; ls -la .agents/prompts/ | tail -n +2 | awk '{print $NF}' | grep -v '^\.\.?$'; echo "---"; ls -la .agents/scripts/ | tail -n +2 | awk '{print $NF}' | grep -v '^\.\.?$'; echo "---"; ls -la .agents/tasks/ | tail -n +2 | awk '{print $NF}' | grep -v '^\.\.?$' || echo "(tasks/为空)"; echo '```'
+echo "### 项目结构"; echo ""; echo '```'; ls -la .claude/agents/ | tail -n +2 | awk '{print $NF}' | grep -v '^\.\.?$'; echo "---"; ls -la prompts/ | tail -n +2 | awk '{print $NF}' | grep -v '^\.\.?$'; echo "---"; ls -la scripts/ | tail -n +2 | awk '{print $NF}' | grep -v '^\.\.?$'; echo "---"; ls scripts/tasks/ | tail -n +2 | awk '{print $NF}' | grep -v '^\.\.?$'; echo '```'
 ```
 
 ### 第三步：更新 PROJECT_STATUS.md
@@ -34,7 +34,7 @@ echo "### .agents 目录结构"; echo ""; echo '```'; ls -la .agents/ | tail -n 
 
 1. `## 目录结构` 下方的语言主表 — 保持不变（目录名和 Agent 映射关系固定）
 2. `### 0-计算机基础/` 到 `### 6-Go/` 的所有子目录表 — 替换为第一步输出
-3. `### .agents 目录结构` — 替换为第二步输出
+3. `### 项目结构` — 替换为第二步输出
 
 ### 第四步：提交变更
 

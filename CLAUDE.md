@@ -7,7 +7,7 @@ Claude Code (Leader) → task_runner.py --once → 生成 Markdown 指令 → Sp
 ```
 
 - `--once` 生成待执行任务指令，识别可并行任务和 blockedBy 依赖
-- 每个 agent spawn 后读取 `.agents/prompts/{type}.md` 获取指令
+- 每个 agent spawn 后读取 `prompts/{type}.md` 获取指令
 - 信息传递：brainstorm → act → review，findings 逐层传递
 - 错误传递：review findings → act.errors → 触发 act 重执行
 
@@ -27,12 +27,12 @@ Claude Code (Leader) → task_runner.py --once → 生成 Markdown 指令 → Sp
 
 **启动**：当你说 "跑一轮"、"开始工作循环" 或 "开始" 时，执行以下步骤：
 
-0. 创建定时 report 任务：`*/5 * * * *` 每 5 分钟触发 `python .agents/scripts/task_runner.py --report`，durable=true
-1. `python .agents/scripts/task_runner.py --once` 生成指令
+0. 创建定时 report 任务：`*/5 * * * *` 每 5 分钟触发 `python scripts/task_runner.py --report`，durable=true
+1. `python scripts/task_runner.py --once` 生成指令
 2. Spawn agents 执行（无 blockedBy 的任务可并行）
 3. 等待 task notifications
 4. `--once` 检查：
-   - act 有 errors → 返回步骤 1 修复
+   - act 有 errors → 重新 Spawn act agents 修复，完成后继续步骤 3
    - 其他 pending → 返回步骤 1
    - 全部完成 → 步骤 5
 5. `git add . && git commit -m "feat: ..." && git push`
@@ -92,22 +92,20 @@ act 修复 errors 后自动清空，status 仍为 completed。
 | `errors` | 待修复的错误列表（仅 act 任务） |
 | `priority` | high / medium / low |
 
-## .agents/ 目录
+## 任务与脚本
 
 ```
-.agents/
-├── agent-*.md        # Agent 规则文件
-├── prompts/          # Spawn 模板
-│   ├── brainstorm.md # brainstorm-* 任务
-│   ├── act.md        # act-* 任务
-│   └── review.md     # review-* 任务
-├── skills/           # Skill 定义
-├── scripts/
-│   ├── task_runner.py       # 任务管理器
-│   └── cycle_status_hook.py # SubagentStart/SubagentStop 钩子
-└── tasks/
-    ├── tasks.json       # 任务队列
-    └── agent-manifest.json  # Agent 注册表
+├── .claude/agents/       # Agent 规则文件（skills 注入生效）
+├── .claude/skills/       # Skill 定义
+├── prompts/              # Spawn 模板
+│   ├── brainstorm.md     # brainstorm-* 任务
+│   ├── act.md            # act-* 任务
+│   └── review.md         # review-* 任务
+└── scripts/
+    ├── task_runner.py       # 任务管理器
+    ├── cycle_status_hook.py # SubagentStart/SubagentStop 钩子
+    ├── tasks.json          # 任务队列
+    └── agent-manifest.json # Agent 注册表
 ```
 
 ### Spawn Prompt 模板变量

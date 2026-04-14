@@ -11,8 +11,8 @@
 
 ## 工作步骤
 
-1. 读取 `.agents/agent-brainstormer.md` 规则文件了解工作方式
-2. 读取 `.agents/skills/brainstormer-pro` 了解 brainstorm 方法论
+1. 读取 `.claude/agents/agent-brainstormer.md` 规则文件了解工作方式
+2. 读取 `.claude/skills/brainstormer-pro` 了解 brainstorm 方法论
 3. 扫描 `{target}` 目录，了解当前内容结构
 4. 对比目录结构规范，找出内容缺口
 5. 针对每个缺口，设计扩展方案（新增/细化/补充代码示例）
@@ -21,7 +21,7 @@
 ## 完成更新格式
 
 ```bash
-python .agents/scripts/task_runner.py \
+python scripts/task_runner.py \
   --update {task_id} completed \
   --result '<执行结果摘要>' \
   --findings '[{"problem":"问题描述","solution":"解决方案"}]'

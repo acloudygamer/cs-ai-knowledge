@@ -39,8 +39,8 @@ logger = logging.getLogger(__name__)
 
 # 路径配置
 SCRIPT_DIR = Path(__file__).parent
-TASKS_FILE = SCRIPT_DIR.parent / "tasks" / "tasks.json"
-AGENT_MANIFEST = SCRIPT_DIR.parent / "tasks" / "agent-manifest.json"
+TASKS_FILE = SCRIPT_DIR / "tasks.json"
+AGENT_MANIFEST = SCRIPT_DIR / "agent-manifest.json"
 AGENT_DIR = SCRIPT_DIR.parent
 PROMPTS_DIR = SCRIPT_DIR.parent / "prompts"
 
@@ -214,24 +214,25 @@ class TaskRunner:
         return template
 
     def get_registered_agents(self) -> set:
-        """扫描 .agents/agent-*.md，提取 frontmatter 的 name 字段"""
+        """扫描 .claude/agents/ 下的 agent-*.md，提取 frontmatter 的 name 字段"""
         if self._registered_agents_cache is not None:
             return self._registered_agents_cache
 
         registered = set()
-        pattern = str(self.agent_dir / "agent-*.md")
+        pattern = str(self.agent_dir / ".claude" / "agents" / "agent-*.md")
         for path in glob.glob(pattern):
-            try:
-                with open(path, 'r', encoding='utf-8') as f:
-                    content = f.read()
-                # 解析 YAML frontmatter
-                match = re.match(r'^---\n(.*?)\n---', content, re.DOTALL)
-                if match:
-                    fm = self._parse_yaml_simple(match.group(1))
-                    if fm and 'name' in fm:
-                        registered.add(fm['name'])
-            except Exception as e:
-                logger.warning(f"Failed to parse agent file {path}: {e}")
+            for path in glob.glob(pattern):
+                try:
+                    with open(path, 'r', encoding='utf-8') as f:
+                        content = f.read()
+                    # 解析 YAML frontmatter
+                    match = re.match(r'^---\n(.*?)\n---', content, re.DOTALL)
+                    if match:
+                        fm = self._parse_yaml_simple(match.group(1))
+                        if fm and 'name' in fm:
+                            registered.add(fm['name'])
+                except Exception as e:
+                    logger.warning(f"Failed to parse agent file {path}: {e}")
 
         self._registered_agents_cache = registered
         logger.info(f"Registered agents: {registered}")
@@ -427,7 +428,7 @@ Or continue brainstorming for new content to add.
                 prompt_file = "review.md"
             else:
                 prompt_file = "brainstorm.md"
-            lines.append(f"- **Prompt**: `.agents/prompts/{prompt_file}`")
+            lines.append(f"- **Prompt**: `prompts/{prompt_file}`")
 
             lines.append("")  # 空行分隔
 
@@ -444,7 +445,7 @@ Or continue brainstorming for new content to add.
             lines.append("")
             lines.append("**子 Agent 任务完成后更新格式**：")
             lines.append("   ```bash")
-            lines.append("   python .agents/scripts/task_runner.py \\")
+            lines.append("   python scripts/task_runner.py \\")
             lines.append("     --update <task_id> completed \\")
             lines.append("     --result '<执行结果>' \\")
             lines.append("     --findings '[{\"file\":\"文件路径\",\"line\":行号,\"problem\":\"问题描述\"}]'")
@@ -457,7 +458,7 @@ Or continue brainstorming for new content to add.
             lines.append("")
             lines.append("**子 Agent 任务完成后更新格式**：")
             lines.append("   ```bash")
-            lines.append("   python .agents/scripts/task_runner.py \\")
+            lines.append("   python scripts/task_runner.py \\")
             lines.append("     --update <task_id> completed \\")
             lines.append("     --result '<执行结果>' \\")
             lines.append("     --findings '[{\"file\":\"文件路径\",\"line\":行号,\"problem\":\"问题描述\"}]'")

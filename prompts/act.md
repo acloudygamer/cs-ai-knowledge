@@ -28,7 +28,7 @@
 ## 完成更新格式
 
 ```bash
-python .agents/scripts/task_runner.py \
+python scripts/task_runner.py \
   --update {task_id} completed \
   --result '<执行结果摘要>' \
   --findings '[{"problem":"实现内容描述","solution":"已创建的文件和内容"}]'

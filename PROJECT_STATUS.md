@@ -101,22 +101,21 @@
 | agent-dsa | 数据结构与算法板块内容实现 | dsa-patterns-pro |
 | agent-reviewer | 跨板块内容审查 | reviewer-pro |
 
-### .agents 目录结构
+### 项目结构
 
 ```
-.agents/
-├── agent-*.md           # Agent 规则文件 (9个)
-├── prompts/             # Spawn Prompt 模板
-│   ├── brainstorm.md
-│   ├── act.md
-│   └── review.md
-├── skills/              # Skill 定义
-├── scripts/
-│   ├── task_runner.py       # 任务管理器
-│   └── cycle_status_hook.py # SubagentStart/SubagentStop 钩子
-└── tasks/
-    ├── tasks.json          # 任务队列
-    └── agent-manifest.json  # Agent 注册表
+.claude/
+├── agents/            # Agent 规则文件（skills 注入生效）
+└── skills/           # Skill 定义
+prompts/              # Spawn Prompt 模板
+├── brainstorm.md
+├── act.md
+└── review.md
+scripts/
+├── task_runner.py       # 任务管理器
+├── cycle_status_hook.py # SubagentStart/SubagentStop 钩子
+├── tasks.json          # 任务队列
+└── agent-manifest.json # Agent 注册表
 ```
 
 详见 [CLAUDE.md](CLAUDE.md)

@@ -23,7 +23,7 @@
 ## 完成更新格式
 
 ```bash
-python .agents/scripts/task_runner.py \
+python scripts/task_runner.py \
   --update {task_id} completed \
   --result '<审查结果摘要>' \
   --findings '[{"file":"文件路径","line":行号,"problem":"问题描述"}]'

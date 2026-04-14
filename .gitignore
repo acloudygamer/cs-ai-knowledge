@@ -11,5 +11,5 @@ skills-lock.json
 __pycache__/
 *.pyc
 task_runner.log
-.agents/scripts/__pycache__/
-.agents/scripts/task_runner.log
+scripts/__pycache__/
+scripts/task_runner.log

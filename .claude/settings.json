@@ -12,7 +12,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python .agents/scripts/cycle_status_hook.py pre {agent_id}"
+            "command": "python scripts/cycle_status_hook.py pre {agent_id}"
           }
         ]
       }
@@ -22,7 +22,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python .agents/scripts/cycle_status_hook.py post {agent_id}"
+            "command": "python scripts/cycle_status_hook.py post {agent_id}"
           }
         ]
       }
