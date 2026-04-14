@@ -26,16 +26,6 @@
           }
         ]
       }
-    ],
-    "SessionStart": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "python .agents/scripts/directory_structure_hook.py"
-          }
-        ]
-      }
     ]
   }
 }

@@ -70,8 +70,9 @@ res.write('Hello ');
 res.write('World');
 res.end();  // 结束响应
 
-// JSON 响应
-res.json({ message: 'Hello' });  // 隐式设置 Content-Type
+// JSON 响应（原生 Node.js）
+res.writeHead(200, { 'Content-Type': 'application/json' });
+res.end(JSON.stringify({ message: 'Hello' }));
 ```
 
 ---
@@ -456,7 +457,7 @@ const fs = require('fs');
 
 const options = {
   key: fs.readFileSync('./key.pem'),
-  cert: fs.readFileSync('./cert.pem'
+  cert: fs.readFileSync('./cert.pem'),
 };
 
 const server = http2.createSecureServer(options, (req, res) => {

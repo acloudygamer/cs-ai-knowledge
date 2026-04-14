@@ -27,6 +27,7 @@ Claude Code (Leader) → task_runner.py --once → 生成 Markdown 指令 → Sp
 
 **启动**：当你说 "跑一轮"、"开始工作循环" 或 "开始" 时，执行以下步骤：
 
+0. 创建定时 report 任务：`*/5 * * * *` 每 5 分钟触发 `python .agents/scripts/task_runner.py --report`，durable=true
 1. `python .agents/scripts/task_runner.py --once` 生成指令
 2. Spawn agents 执行（无 blockedBy 的任务可并行）
 3. 等待 task notifications
@@ -102,7 +103,8 @@ act 修复 errors 后自动清空，status 仍为 completed。
 │   └── review.md     # review-* 任务
 ├── skills/           # Skill 定义
 ├── scripts/
-│   └── task_runner.py   # 任务管理器
+│   ├── task_runner.py       # 任务管理器
+│   └── cycle_status_hook.py # SubagentStart/SubagentStop 钩子
 └── tasks/
     ├── tasks.json       # 任务队列
     └── agent-manifest.json  # Agent 注册表
