@@ -492,85 +492,6 @@ Or continue brainstorming for new content to add.
                     })
         return errors
 
-    def generate_summary(self) -> str:
-        """汇总所有已完成任务的更新和发现，生成 CYCLE_STATUS.md 追加内容"""
-        self.load_tasks()
-        if not self.tasks_data:
-            return "No completed tasks yet."
-
-        all_tasks = self.get_all_tasks()
-        completed = [t for t in all_tasks if t.get('status') == 'completed']
-
-        if not completed:
-            return "No completed tasks yet."
-
-        # 获取本轮修改的文件
-        modified_files = self.get_git_diff_files()
-        errors = self.get_errors_summary()
-
-        lines = []
-        lines.append(f"## 循环 {datetime.now().strftime('%Y-%m-%d %H:%M')}\n")
-
-        # 本轮修改的文件
-        if modified_files:
-            lines.append("### 本轮修改的文件\n")
-            lines.append("| 文件 | 操作 |")
-            lines.append("|------|------|")
-            for f in modified_files:
-                if f.endswith('.md'):
-                    lines.append(f"| {f} | 修改 |")
-                elif f.endswith('.py'):
-                    lines.append(f"| {f} | 修改 |")
-            lines.append("")
-
-        # 按 board 分组显示完成的任务
-        boards_in_order = ['内容扩展', '内容实现', '审查修正']
-        board_labels = {
-            '内容扩展': 'brainstorm (内容扩展)',
-            '内容实现': 'act (内容实现)',
-            '审查修正': 'review (审查修正)'
-        }
-
-        for board_name in boards_in_order:
-            if board_name not in self.tasks_data.get('boards', {}):
-                continue
-            board_tasks = self.tasks_data['boards'][board_name].get('tasks', [])
-            board_completed = [t for t in board_tasks if t.get('status') == 'completed']
-            if not board_completed:
-                continue
-
-            lines.append(f"### {board_labels.get(board_name, board_name)}\n")
-            for task in board_completed:
-                lines.append(f"- **{task['id']}**: {task.get('result', '')[:80]}")
-                # review 任务显示发现的问题数量
-                if task['id'].startswith('review-') and task.get('findings'):
-                    lines.append(f"  - 发现 {len(task['findings'])} 个问题")
-            lines.append("")
-
-        # 待修复错误
-        if errors:
-            lines.append("### 待修复错误 (errors)\n")
-            tasks_with_errors = {}
-            for err in errors:
-                tid = err['task_id']
-                if tid not in tasks_with_errors:
-                    tasks_with_errors[tid] = []
-                tasks_with_errors[tid].append(err)
-
-            for task_id, task_errors in tasks_with_errors.items():
-                lines.append(f"- **{task_id}**: {len(task_errors)} 个错误待修复")
-                for err in task_errors:
-                    file_path = err.get('file', '')
-                    line = err.get('line', 0)
-                    problem = err.get('problem', '')
-                    if line:
-                        lines.append(f"  - {file_path}:{line} - {problem}")
-                    else:
-                        lines.append(f"  - {file_path} - {problem}")
-            lines.append("")
-
-        return "\n".join(lines)
-
     def generate_report(self) -> str:
         """生成执行报告"""
         self.load_tasks()
@@ -640,10 +561,6 @@ def main():
         help='生成执行报告'
     )
     parser.add_argument(
-        '--summary', '-s', action='store_true',
-        help='生成 CYCLE_STATUS.md 追加内容（包含修改文件、完成任务、待修复错误）'
-    )
-    parser.add_argument(
         '--reset', action='store_true',
         help='重置所有任务为 pending，清空结果（用于测试）'
     )
@@ -696,10 +613,6 @@ def main():
 
     if args.report:
         print(runner.generate_report())
-        return
-
-    if args.summary:
-        print(runner.generate_summary())
         return
 
     if args.update:

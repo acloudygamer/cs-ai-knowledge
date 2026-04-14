@@ -18,7 +18,6 @@ Claude Code (Leader) → task_runner.py --once → 生成 Markdown 指令 → Sp
 --update <task_id> <status> [result]  # 更新任务状态
 --update <task_id> completed "结果" --findings '[{"file":"路径","line":行号,"problem":"问题"}]'
 --report    # 生成执行报告
---summary   # 汇总所有更新
 --resume    # 重置任务为 pending（保留结果）
 --reset     # 重置任务为 pending（清空结果）
 --validate  # 校验 agent 名字是否合法
@@ -35,9 +34,8 @@ Claude Code (Leader) → task_runner.py --once → 生成 Markdown 指令 → Sp
    - act 有 errors → 返回步骤 1 修复
    - 其他 pending → 返回步骤 1
    - 全部完成 → 步骤 5
-5. `--summary` + 手动追加到 `CYCLE_STATUS.md`
-6. `git add . && git commit -m "feat: ..." && git push`
-7. `--resume` 重置下一轮
+5. `git add . && git commit -m "feat: ..." && git push`
+6. `--resume` 重置下一轮
 
 ## 任务依赖与信息传递
 
