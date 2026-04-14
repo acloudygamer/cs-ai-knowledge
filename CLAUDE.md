@@ -82,7 +82,12 @@ python .agents/scripts/task_runner.py --once
 **步骤 3：等待 + 自动更新**
 - 等待 task notifications（异步）
 - sub-agent 完成任务后会自动更新 tasks.json
-- review 完成后：errors 自动传给对应的 act 任务
+- **信息传递流程**：
+  1. brainstorm 完成 → result/findings 写入 tasks.json
+  2. act 读取 blockedBy 任务的 result/findings（通过 `--once` 的 Previous Task Results）
+  3. act 完成 → result/findings 写入 tasks.json
+  4. review 读取 blockedBy 任务的 result/findings
+  5. review 完成 → findings 转为 act.errors，触发 act 重执行
 
 **步骤 4：检查是否还有 pending 任务**
 ```bash
@@ -271,7 +276,6 @@ python .agents/scripts/task_runner.py --update <task_id> pending ""
 | `agent` | 执行的 agent 名字（必须与 agent-*.md 的 name 一致） |
 | `status` | pending / in_progress / completed / failed / blocked |
 | `blockedBy` | 依赖的任务 ID 列表 |
-| `parallelGroup` | （已废弃，无需使用） |
 | `result` | 执行结果描述 |
 | `findings` | 发现的问题列表 |
 | `errors` | 待修复的错误列表（仅 act 任务，review 完成后自动填充） |
@@ -317,61 +321,26 @@ Spawn Prompt 模板由子 agent 自己读取，`--once` 只输出任务摘要：
 - 文件名：`agent-<name>.md`
 - frontmatter `name` 属性：必须与 tasks.json 的 agent 字段一致
 
-**现有 Agent**：
-
-| 文件 | name | 职责 |
-|------|------|------|
-| agent-python.md | agent-python | Python 板块内容设计与维护 |
-| agent-java.md | agent-java | Java 板块内容设计与维护 |
-| agent-cpp.md | agent-cpp | C++ 板块内容设计与维护 |
-| agent-js.md | agent-js | JavaScript 板块内容设计与维护 |
-| agent-go.md | agent-go | Go 板块内容设计与维护 |
-| agent-dsa.md | agent-dsa | 数据结构与算法板块 |
-| agent-cs.md | agent-cs | 计算机基础板块 |
-| agent-reviewer.md | agent-reviewer | 跨板块内容审查 |
-| agent-brainstormer.md | agent-brainstormer | 发现内容缺口 |
-
 ---
 
 ## Skills
 
-`.agents/skills/` 目录下是各 agent 使用的 skill 定义。
-
-格式：`-pro` 后缀区分全局 skills
-
-| Skill | 对应 Agent |
-|-------|------------|
-| python-patterns-pro | agent-python |
-| java-patterns-pro | agent-java |
-| cpp-patterns-pro | agent-cpp |
-| js-patterns-pro | agent-js |
-| go-patterns-pro | agent-go |
-| dsa-patterns-pro | agent-dsa |
-| cs-patterns-pro | agent-cs |
-| reviewer-pro | agent-reviewer |
-| brainstormer-pro | agent-brainstormer |
+各 agent 使用的 skill 定义位于 `.agents/skills/` 目录，格式为 `-pro` 后缀。
 
 ---
 
 ## 项目目录
 
 ```
-├── 0-计算机基础/     # agent-cs
-├── 1-数据结构与算法/ # agent-dsa
-├── 2-Python/        # agent-python
-├── 3-C++/           # agent-cpp
-├── 4-Java/          # agent-java
-├── 5-JavaScript/    # agent-js
-├── 6-Go/            # agent-go
+├── 0-计算机基础/ ~ 6-Go/          # 各语言板块
 ├── .agents/
-│   ├── agent-*.md   # Agent 规则文件
-│   ├── prompts/      # Spawn Prompt 模板
-│   │   ├── brainstorm.md
-│   │   ├── act.md
-│   │   └── review.md
-│   ├── skills/      # Skill 定义
-│   ├── scripts/      # task_runner.py
-│   └── tasks/        # JSON 配置文件
+│   ├── agent-*.md                 # Agent 规则
+│   ├── prompts/                   # Spawn Prompt 模板
+│   ├── skills/                   # Skill 定义
+│   ├── scripts/task_runner.py     # 任务管理器
+│   └── tasks/                    # tasks.json, agent-manifest.json
+└── CLAUDE.md
+```
 └── CLAUDE.md        # 本文件
 ```
 
