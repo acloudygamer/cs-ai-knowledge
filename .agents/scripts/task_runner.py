@@ -44,6 +44,7 @@ TASKS_FILE = SCRIPT_DIR.parent / "tasks" / "tasks.json"
 AGENT_MANIFEST = SCRIPT_DIR.parent / "tasks" / "agent-manifest.json"
 WORKFLOW_SCHEMA = SCRIPT_DIR.parent / "tasks" / "workflow-schema.json"
 AGENT_DIR = SCRIPT_DIR.parent
+PROMPTS_DIR = SCRIPT_DIR.parent / "prompts"
 
 
 class TaskRunner:
@@ -131,6 +132,90 @@ class TaskRunner:
                     result["findings"] = task["findings"]
                 results.append(result)
         return results
+
+    def get_prompt_template(self, task_type: str) -> str:
+        """读取 prompt 模板"""
+        template_file = PROMPTS_DIR / f"{task_type}.md"
+        try:
+            with open(template_file, 'r', encoding='utf-8') as f:
+                return f.read()
+        except FileNotFoundError:
+            logger.warning(f"Prompt template not found: {template_file}")
+            return ""
+
+    def render_spawn_prompt(self, task: dict) -> str:
+        """渲染 spawn prompt 模板"""
+        task_id = task['id']
+        # 根据 task_id 前缀判断类型
+        if task_id.startswith('brainstorm-'):
+            task_type = 'brainstorm'
+        elif task_id.startswith('act-'):
+            task_type = 'act'
+        elif task_id.startswith('review-'):
+            task_type = 'review'
+        else:
+            task_type = 'brainstorm'
+
+        template = self.get_prompt_template(task_type)
+        if not template:
+            return ""
+
+        # 基础变量替换
+        replacements = {
+            '{task_id}': task_id,
+            '{agent}': task.get('agent', ''),
+            '{target}': task.get('target', ''),
+            '{description}': task.get('description', ''),
+        }
+
+        # 替换基础变量
+        for key, value in replacements.items():
+            template = template.replace(key, value)
+
+        # 渲染前置任务结果
+        blocked_by = task.get('blockedBy', [])
+        if blocked_by:
+            prev_results = self.get_blocked_results(blocked_by)
+            if prev_results:
+                results_lines = []
+                for prev in prev_results:
+                    results_lines.append(f"### {prev['task_id']} ({prev['status']})")
+                    if prev.get('result'):
+                        results_lines.append(f"**Result:** {prev['result']}")
+                    if prev.get('findings'):
+                        results_lines.append("**Findings:**")
+                        for finding in prev['findings']:
+                            if isinstance(finding, dict):
+                                problem = finding.get('problem', '')
+                                solution = finding.get('solution', '')
+                                if problem:
+                                    results_lines.append(f"- **{problem}**")
+                                if solution:
+                                    results_lines.append(f"  - Solution: {solution}")
+                            elif isinstance(finding, str):
+                                results_lines.append(f"- {finding}")
+                template = template.replace('{blocked_results}', '\n'.join(results_lines))
+            else:
+                template = template.replace('{blocked_results}', '（无前置任务结果）')
+        else:
+            template = template.replace('{blocked_results}', '（无前置任务结果）')
+
+        # 渲染 errors（仅 act 任务）
+        if task.get('errors'):
+            errors_lines = ["### Errors to Fix:"]
+            for err in task['errors']:
+                file_path = err.get('file', '')
+                line = err.get('line', 0)
+                problem = err.get('problem', '')
+                if line:
+                    errors_lines.append(f"- **{file_path}** line {line}: {problem}")
+                else:
+                    errors_lines.append(f"- **{file_path}**: {problem}")
+            template = template.replace('{errors}', '\n'.join(errors_lines))
+        else:
+            template = template.replace('{errors}', '（无待修复错误）')
+
+        return template
 
     def get_registered_agents(self) -> set:
         """扫描 .agents/agent-*.md，提取 frontmatter 的 name 字段"""
@@ -334,6 +419,14 @@ Or continue brainstorming for new content to add.
                                         lines.append(f"  - Solution: {finding['solution']}")
                                 else:
                                     lines.append(f"- {finding}")
+
+            # 生成 Spawn Prompt
+            spawn_prompt = self.render_spawn_prompt(task)
+            if spawn_prompt:
+                lines.append("\n### Spawn Prompt")
+                lines.append("```")
+                lines.append(spawn_prompt)
+                lines.append("```")
 
             lines.append("")  # 空行分隔
 
