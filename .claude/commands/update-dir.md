@@ -25,7 +25,7 @@ done
 ### 第二步：扫描项目脚本与资源目录结构
 
 ```bash
-echo "### 项目结构"; echo ""; echo '```'; ls -la .claude/agents/ | tail -n +2 | awk '{print $NF}' | grep -v '^\.\.?$'; echo "---"; ls -la prompts/ | tail -n +2 | awk '{print $NF}' | grep -v '^\.\.?$'; echo "---"; ls -la scripts/ | tail -n +2 | awk '{print $NF}' | grep -v '^\.\.?$'; echo "---"; ls scripts/tasks/ | tail -n +2 | awk '{print $NF}' | grep -v '^\.\.?$'; echo '```'
+echo "### 项目结构"; echo ""; echo '```'; ls -la .claude/agents/ | tail -n +2 | awk '{print $NF}' | grep -v '^\.\.?$'; echo "---"; ls -la .claude/skills/ | tail -n +2 | awk '{print $NF}' | grep -v '^\.\.?$'; echo "---"; ls -la scripts/ | tail -n +2 | awk '{print $NF}' | grep -v '^\.\.?$'; echo '```'
 ```
 
 ### 第三步：更新 PROJECT_STATUS.md

@@ -7,7 +7,7 @@ Claude Code (Leader) → task_runner.py --once → 生成 Markdown 指令 → Sp
 ```
 
 - `--once` 生成待执行任务指令，识别可并行任务和 blockedBy 依赖
-- 每个 agent spawn 后读取 `prompts/{type}.md` 获取指令
+- 每个 agent spawn 后读取 `.claude/agents/{agent}.md` 获取完整指令
 - 信息传递：brainstorm → act → review，findings 逐层传递
 - 错误传递：review findings → act.errors → 触发 act 重执行
 
@@ -97,24 +97,9 @@ act 修复 errors 后自动清空，status 仍为 completed。
 ```
 ├── .claude/agents/       # Agent 规则文件（skills 注入生效）
 ├── .claude/skills/       # Skill 定义
-├── prompts/              # Spawn 模板
-│   ├── brainstorm.md     # brainstorm-* 任务
-│   ├── act.md            # act-* 任务
-│   └── review.md         # review-* 任务
 └── scripts/
     ├── task_runner.py       # 任务管理器
     ├── cycle_status_hook.py # SubagentStart/SubagentStop 钩子
     ├── tasks.json          # 任务队列
     └── agent-manifest.json # Agent 注册表
 ```
-
-### Spawn Prompt 模板变量
-
-| 变量 | 说明 |
-|------|------|
-| `{task_id}` | 任务 ID |
-| `{agent}` | Agent 名称 |
-| `{target}` | 目标目录 |
-| `{description}` | 任务描述 |
-| `{blocked_results}` | 前置任务结果 |
-| `{errors}` | 待修复错误（仅 act 任务） |

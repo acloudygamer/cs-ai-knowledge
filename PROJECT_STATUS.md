@@ -107,10 +107,6 @@
 .claude/
 ├── agents/            # Agent 规则文件（skills 注入生效）
 └── skills/           # Skill 定义
-prompts/              # Spawn Prompt 模板
-├── brainstorm.md
-├── act.md
-└── review.md
 scripts/
 ├── task_runner.py       # 任务管理器
 ├── cycle_status_hook.py # SubagentStart/SubagentStop 钩子
