@@ -423,9 +423,18 @@ Or continue brainstorming for new content to add.
             lines.append("3. **等待**：等待 task notification（异步）。")
             lines.append("4. **继续**：重新运行 `task_runner.py --once`。")
 
-        # 按类型分组显示更新格式
-        types_in_parallel = set(task_type_map.values())
-        if 'brainstorm' in types_in_parallel:
+        # 按类型分组显示更新格式（基于所有 pending 任务）
+        all_pending_types = set()
+        for t in pending:
+            tid = t['id']
+            if tid.startswith('brainstorm-'):
+                all_pending_types.add('brainstorm')
+            elif tid.startswith('act-'):
+                all_pending_types.add('act')
+            elif tid.startswith('review-'):
+                all_pending_types.add('review')
+
+        if 'brainstorm' in all_pending_types:
             lines.append("")
             lines.append("**brainstorm 任务完成后更新格式**：")
             lines.append("   ```bash")
@@ -434,7 +443,13 @@ Or continue brainstorming for new content to add.
             lines.append("     --result '<执行结果摘要>' \\")
             lines.append("     --findings '[{\"problem\":\"问题描述\",\"solution\":\"解决方案\"}]'")
             lines.append("   ```")
-        if 'act' in types_in_parallel:
+        if 'act' in all_pending_types:
+            lines.append("")
+            lines.append("**act 任务开始时更新格式**：")
+            lines.append("   ```bash")
+            lines.append("   python scripts/task_runner.py \\")
+            lines.append("     --update <task_id> in_progress '<开始执行>'")
+            lines.append("   ```")
             lines.append("")
             lines.append("**act 任务完成后更新格式**：")
             lines.append("   ```bash")
@@ -443,7 +458,7 @@ Or continue brainstorming for new content to add.
             lines.append("     --result '<执行结果摘要>' \\")
             lines.append("     --findings '[{\"problem\":\"实现内容描述\",\"solution\":\"已创建的文件和内容\"}]'")
             lines.append("   ```")
-        if 'review' in types_in_parallel:
+        if 'review' in all_pending_types:
             lines.append("")
             lines.append("**review 任务完成后更新格式**：")
             lines.append("   ```bash")
