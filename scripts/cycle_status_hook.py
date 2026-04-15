@@ -25,16 +25,14 @@ CYCLE_STATUS_FILE = SCRIPT_DIR.parent / "CYCLE_STATUS.md"
 
 
 def get_agent_act_task(agent_name: str) -> dict | None:
-    """根据 agent 名称找到对应的 act 任务（只查找 act-* 任务）"""
+    """根据 agent 名称找到对应的 act 任务"""
     try:
         with open(TASKS_FILE, 'r', encoding='utf-8') as f:
             data = json.load(f)
 
-        # 只查找 act-* 任务，通过 agent 字段精确匹配
         for board_name, board_data in data.get("boards", {}).items():
             for task in board_data.get("tasks", []):
-                task_id = task.get("id", "")
-                if task_id.startswith("act-") and task.get("agent") == agent_name:
+                if task.get("id", "").startswith("act-") and task.get("agent") == agent_name:
                     return task
     except Exception as e:
         print(f"Error reading tasks.json: {e}", file=sys.stderr)
@@ -119,18 +117,31 @@ def _append_to_file(content: str):
 
 def main():
     if len(sys.argv) < 3:
-        print("Usage: cycle_status_hook.py <pre|post> <agent_name>", file=sys.stderr)
+        print("Usage: cycle_status_hook.py <pre|post> <agent_id>", file=sys.stderr)
         sys.exit(1)
 
     mode = sys.argv[1]
-    agent_name = sys.argv[2]
+    agent_id = sys.argv[2]
 
-    # 查找对应的 act 任务
-    task = get_agent_act_task(agent_name)
+    # agent_id 可能是 agent name 如 "agent-python" 或 task_id 如 "act-py-001"
+    # 先尝试作为 agent name 查找
+    task = get_agent_act_task(agent_id)
+
+    # 如果没找到，尝试作为 task_id 直接查找
+    if not task and agent_id.startswith("act-"):
+        try:
+            with open(TASKS_FILE, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+            for board_name, board_data in data.get("boards", {}).items():
+                for t in board_data.get("tasks", []):
+                    if t.get("id") == agent_id:
+                        task = t
+                        break
+        except Exception:
+            pass
 
     if not task:
-        # 非 act 任务，跳过（如 brainstorm、review）
-        print(f"No act task for {agent_name}, skipping", file=sys.stderr)
+        print(f"No act task found for {agent_id}", file=sys.stderr)
         sys.exit(0)
 
     if mode == "pre":
