@@ -61,6 +61,13 @@
       "capabilities": ["Read", "Glob", "Grep", "Bash"],
       "skills": ["brainstormer-pro"],
       "scope": "all"
+    },
+    "agent-structure-editor": {
+      "name": "agent-structure-editor",
+      "description": "结构编辑专家，负责循环前审查和循环后修复全局目录结构",
+      "capabilities": ["Read", "Glob", "Grep", "Edit", "Write", "Bash"],
+      "skills": ["structure-editor-pro"],
+      "scope": "all"
     }
   }
 }

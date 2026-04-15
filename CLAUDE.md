@@ -27,16 +27,18 @@ Claude Code (Leader) → task_runner.py --once → 生成 Markdown 指令 → Sp
 
 **启动**：当你说 "跑一轮"、"开始工作循环" 或 "开始" 时，执行以下步骤：
 
-0. 创建定时 report 任务：`*/5 * * * *` 每 5 分钟触发 `python scripts/task_runner.py --report`，durable=true
-1. `python scripts/task_runner.py --once` 生成指令
-2. Spawn agents 执行（无 blockedBy 的任务可并行）
-3. 等待 task notifications
-4. `--once` 检查：
-   - act 有 errors → 重新 Spawn act agents 修复，完成后继续步骤 3
-   - 其他 pending → 返回步骤 1
-   - 全部完成 → 步骤 5
-5. `git add . && git commit -m "feat: ..." && git push`
-6. `--resume` 重置下一轮
+0. 创建定时 report 任务：`*/10 * * * *` 每 10 分钟触发 `python scripts/task_runner.py --report`，durable=true
+1. **循环开始前审查**：Spawn agent-structure-editor 审查全局目录结构，记录基线状态
+2. `python scripts/task_runner.py --once` 生成指令
+3. Spawn agents 执行（无 blockedBy 的任务可并行）
+4. 等待 task notifications
+5. `--once` 检查：
+   - act 有 errors → 重新 Spawn act agents 修复，完成后继续步骤 4
+   - 其他 pending → 返回步骤 2
+   - 全部完成 → 步骤 6
+6. **循环结束后修复**：Spawn agent-structure-editor 修复结构问题和内容错误
+7. `git add . && git commit -m "feat: ..." && git push`
+8. `--resume` 重置下一轮
 
 ## 任务依赖与信息传递
 

@@ -100,6 +100,7 @@
 | agent-cs | 计算机基础板块内容实现 | cs-patterns-pro |
 | agent-dsa | 数据结构与算法板块内容实现 | dsa-patterns-pro |
 | agent-reviewer | 跨板块内容审查 | reviewer-pro |
+| agent-structure-editor | 循环前结构审查、循环后结构修复 | structure-editor-pro |
 
 ### 项目结构
 
