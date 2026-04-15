@@ -8,18 +8,18 @@
 @SpringBootApplication
     @EnableAutoConfiguration
         @Import(AutoConfigurationImportSelector.class)
-            → Spring factories → META-INF/spring.factories
+            → META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports (Spring Boot 3.x)
             → Auto Configuration Classes
 ```
 
-### spring.factories
+### AutoConfiguration 导入（Spring Boot 3.x 新方式）
 
 ```properties
-# META-INF/spring.factories
-org.springframework.boot.autoconfigure.EnableAutoConfiguration=\
-  org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration,\
-  org.springframework.boot.autoconfigure.orm.jpa.HibernateJpaAutoConfiguration,\
-  org.springframework.boot.autoconfigure.web.WebMvcAutoConfiguration
+# META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports
+# 替代了旧的 spring.factories 方式（Spring Boot 2.7 已弃用，Spring Boot 3.x 移除）
+org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration
+org.springframework.boot.autoconfigure.orm.jpa.HibernateJpaAutoConfiguration
+org.springframework.boot.autoconfigure.web.WebMvcAutoConfiguration
 ```
 
 ### @Conditional 条件注解

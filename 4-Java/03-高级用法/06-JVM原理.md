@@ -47,9 +47,8 @@ public int add(int a, int b) {
 // 字节码
 public int add(int, int);
   Code:
-    iconst_0       // 这行注释不对，实际上是 iload_1 iload_2
-    iload_1        // 加载参数 a
-    iload_2        // 加载参数 b
+    iload_1        // 加载参数 a（局部变量槽 1）
+    iload_2        // 加载参数 b（局部变量槽 2）
     iadd           // 相加
     ireturn        // 返回结果
 ```
@@ -69,8 +68,9 @@ public int add(int, int);
 public class ClassLoaderDemo {
     public static void main(String[] args) {
         // Bootstrap ClassLoader (C++ 实现，无法在 Java 中直接访问)
+        // 获取 Bootstrap ClassLoader 的方式：通过 String.class 间接获取
         ClassLoader bootstrapLoader = String.class.getClassLoader();
-        System.out.println(bootstrapLoader); // null
+        System.out.println(bootstrapLoader); // null（因为 Bootstrap ClassLoader 不是 Java 对象）
 
         // Extension ClassLoader
         ClassLoader extLoader = sun.reflect.DelegatingClassLoader.class.getClassLoader();

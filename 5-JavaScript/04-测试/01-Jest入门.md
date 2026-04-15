@@ -141,7 +141,7 @@ expect({ name: 'Alice', age: 25 }).toEqual(
 expect(Object.keys({})).toHaveLength(0);  // 检查空对象
 
 expect({ a: 1, b: 2 }).toHaveProperty('a');
-expect({ a: 1 }).toStrictEqual({ a: 1 });  // 严格相等（undefined 不同）
+expect({ a: 1 }).toEqual({ a: 1 });  // 严格相等（undefined 不同）
 ```
 
 ### 异常匹配器
