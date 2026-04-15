@@ -6,21 +6,14 @@
 Claude Code (Leader) → task_runner.py --once → 生成 Markdown 指令 → Spawn agents
 ```
 
-- `--once` 生成待执行任务指令，识别可并行任务和 blockedBy 依赖
-- 每个 agent spawn 后读取 `.claude/agents/{agent}.md` 获取完整指令
-- 信息传递：brainstorm → act → review，findings 逐层传递
-- 错误传递：review findings → act.errors → 触发 act 重执行
-
 ## 核心命令
 
 ```bash
 --once      # 生成待执行任务指令
 --update <task_id> <status> [result]  # 更新任务状态
---update <task_id> completed "结果" --findings '[{"file":"路径","line":行号,"problem":"问题"}]'
 --report    # 生成执行报告
 --resume    # 重置任务为 pending（保留结果）
 --reset     # 重置任务为 pending（清空结果）
---validate  # 校验 agent 名字是否合法
 ```
 
 ## 工作循环
@@ -40,36 +33,6 @@ Claude Code (Leader) → task_runner.py --once → 生成 Markdown 指令 → Sp
 7. `git add . && git commit -m "feat: ..." && git push`
 8. `--resume` 重置下一轮
 
-## 任务依赖与信息传递
-
-### blockedBy 依赖机制
-
-任务通过 `blockedBy` 声明依赖，只有所有前置任务 completed 时才执行：
-
-```json
-{
-  "id": "act-py-001",
-  "status": "pending",
-  "blockedBy": ["brainstorm-py-001"]
-}
-```
-
-### Errors 机制（review → act 错误传递）
-
-```
-review 完成 → findings 自动填入 act.errors → act 状态改 pending
-```
-
-act 修复 errors 后自动清空，status 仍为 completed。
-
-### 信息传递流程
-
-1. brainstorm 完成 → result/findings 写入 tasks.json
-2. act 读取 blockedBy 任务的 result/findings
-3. act 完成 → result/findings 写入 tasks.json
-4. review 读取 blockedBy 任务的 result/findings
-5. review 完成 → findings 转为 act.errors
-
 ## 任务状态
 
 | 状态 | 说明 |
@@ -80,27 +43,4 @@ act 修复 errors 后自动清空，status 仍为 completed。
 | failed | 失败 |
 | blocked | 被阻塞 |
 
-## tasks.json 字段说明
-
-| 字段 | 用途 |
-|------|------|
-| `boards` | 任务分组 |
-| `id` | 任务唯一标识 |
-| `agent` |执行的 agent 名字 |
-| `status` | pending / in_progress / completed / failed / blocked |
-| `blockedBy` | 依赖的任务 ID 列表 |
-| `result` | 执行结果描述 |
-| `findings` | 发现的问题列表（file, line, problem） |
-| `errors` | 待修复的错误列表（仅 act 任务） |
-| `priority` | high / medium / low |
-
-## 任务与脚本
-
-```
-├── .claude/agents/       # Agent 规则文件（skills 注入生效）
-├── .claude/skills/       # Skill 定义
-└── scripts/
-    ├── task_runner.py       # 任务管理器
-    ├── tasks.json          # 任务队列
-    └── agent-manifest.json # Agent 注册表
-```
+详见 [README.md](README.md)
