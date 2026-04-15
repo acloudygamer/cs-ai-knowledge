@@ -1,4 +1,4 @@
-# CS/AI 知识库 Agent Team
+# CS/AI 知识库
 
 ## 系统架构
 
@@ -37,10 +37,11 @@ Claude Code (Leader) → task_runner.py --once → 生成 Markdown 指令 → Sp
 
 | 状态 | 说明 |
 |------|------|
-| pending | 等待执行 |
-| in_progress | 执行中 |
-| completed | 完成 |
-| failed | 失败 |
-| blocked | 被阻塞 |
+| pending | 等待执行（被 blockedBy 阻塞的任务不会出现在待执行列表） |
+| in_progress | act 任务执行中（自动写入 CYCLE_STATUS.md pre） |
+| completed | 已完成 |
+| failed | act 连续失败 3 次后标记，循环结束后单独处理 |
+
+blockedBy 用于任务依赖，不作为状态存在。
 
 详见 [README.md](README.md)

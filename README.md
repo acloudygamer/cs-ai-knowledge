@@ -42,7 +42,7 @@
 
 ---
 
-## 三、Agent 团队
+## 三、Agent 架构
 
 ### 5 个 Section Agent
 

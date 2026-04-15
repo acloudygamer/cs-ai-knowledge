@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-任务循环脚本 - CS/AI 知识库 Agent Team
+任务循环脚本 - CS/AI 知识库多 Agent 协调
 
 功能：
 - --once: 生成待执行任务指令（供 Orchestrator 阅读）
@@ -45,57 +45,10 @@ AGENT_DIR = SCRIPT_DIR.parent
 CYCLE_STATUS_FILE = SCRIPT_DIR.parent / "CYCLE_STATUS.md"
 
 
-def write_act_status_md(task_id: str, mode: str, result: str = "", findings: list = None):
-    """写入 act 任务状态到 CYCLE_STATUS.md
-
-    Args:
-        task_id: 任务ID (如 act-py-001)
-        mode: 'pre' 或 'post'
-        result: 执行结果
-        findings: 发现列表
-    """
-    lines = []
-    timestamp = datetime.now().strftime('%Y-%m-%d %H:%M')
-
-    if mode == 'pre':
-        lines.append(f"## act pre: {task_id} ({timestamp})\n")
-        lines.append(f"### Errors to Fix (0)\n")
-        lines.append("(无待修复错误)\n")
-    else:  # post
-        lines.append(f"## act post: {task_id} ({timestamp})\n")
-        if result:
-            lines.append(f"### Result\n")
-            lines.append(f"{result}\n")
-            lines.append("")
-        if findings:
-            lines.append(f"### Findings ({len(findings)})\n")
-            for f in findings:
-                if isinstance(f, dict):
-                    problem = f.get("problem", "")
-                    solution = f.get("solution", "")
-                    if problem and solution:
-                        lines.append(f"- **{problem}**: {solution}")
-                    elif problem:
-                        lines.append(f"- {problem}")
-                else:
-                    lines.append(f"- {f}")
-            lines.append("")
-        else:
-            lines.append(f"### Findings (0)\n")
-            lines.append("(无 findings)\n")
-            lines.append("")
-
-    content = "\n".join(lines)
-    try:
-        with open(CYCLE_STATUS_FILE, 'a', encoding='utf-8') as f:
-            f.write(content)
-        logger.info(f"Wrote {mode} to CYCLE_STATUS.md for {task_id}")
-    except Exception as e:
-        logger.error(f"Failed to write to CYCLE_STATUS.md: {e}")
-
-
 class TaskRunner:
     """任务管理器 - 供 Orchestrator (Claude Code) 使用"""
+
+    MAX_RETRIES = 3  # act 连续失败次数上限
 
     def __init__(self):
         self.tasks_file = TASKS_FILE
@@ -242,6 +195,75 @@ class TaskRunner:
         manifest = self.load_agent_manifest()
         return manifest.get(agent_name, {})
 
+    def _write_act_status_md(self, task_id: str, mode: str):
+        """写入 act 任务状态到 CYCLE_STATUS.md
+
+        直接从 tasks_data 读取 errors 和 findings，格式稳定
+        """
+        task = self.get_task_by_id(task_id)
+        if not task:
+            logger.warning(f"Task {task_id} not found for CYCLE_STATUS write")
+            return
+
+        lines = []
+        timestamp = datetime.now().strftime('%Y-%m-%d %H:%M')
+
+        if mode == 'pre':
+            lines.append(f"## act pre: {task_id} ({timestamp})")
+            errors = task.get('errors', [])
+            if errors:
+                lines.append(f"\n### 待修复错误 ({len(errors)})")
+                lines.append("")
+                lines.append("| 文件 | 行号 | 问题 |")
+                lines.append("|------|------|------|")
+                for err in errors:
+                    file = err.get('file', '')
+                    line = err.get('line', '')
+                    problem = err.get('problem', '')
+                    lines.append(f"| {file} | {line} | {problem} |")
+            else:
+                lines.append(f"\n### 待修复错误 (0)")
+                lines.append("\n(无待修复错误)")
+            lines.append("")
+        else:  # post
+            lines.append(f"## act post: {task_id} ({timestamp})")
+            result = task.get('result', '')
+            if result:
+                lines.append(f"\n### 修复结果\n")
+                lines.append(f"{result}")
+            findings = task.get('findings', [])
+            if findings:
+                lines.append(f"\n### 本轮 findings ({len(findings)})")
+                lines.append("")
+                lines.append("| 问题 | 解决方案 |")
+                lines.append("|------|----------|")
+                for f in findings:
+                    problem = f.get('problem', '')
+                    solution = f.get('solution', '')
+                    lines.append(f"| {problem} | {solution} |")
+            lines.append("")
+
+        content = "\n".join(lines)
+
+        # 确保末尾有空行分隔
+        try:
+            with open(CYCLE_STATUS_FILE, 'r', encoding='utf-8') as f:
+                existing = f.read()
+            if existing and not existing.endswith('\n'):
+                content = '\n---\n\n' + content
+            elif existing:
+                content = '\n---\n\n' + content
+        except FileNotFoundError:
+            pass
+
+        try:
+            with open(CYCLE_STATUS_FILE, 'a', encoding='utf-8') as f:
+                f.write(content)
+                f.flush()
+            logger.info(f"Wrote {mode} to CYCLE_STATUS.md for {task_id}")
+        except Exception as e:
+            logger.error(f"Failed to write to CYCLE_STATUS.md: {e}")
+
     def update_task(self, task_id: str, new_status: str, result: str = "", findings: list | None = None):
         """更新任务状态和结果"""
         if not self.tasks_data:
@@ -252,7 +274,19 @@ class TaskRunner:
             if "tasks" in board_data:
                 for task in board_data["tasks"]:
                     if task.get("id") == task_id:
-                        task["status"] = new_status
+                        # act 任务失败时累计 retry_count
+                        if task_id.startswith('act-') and new_status == 'failed':
+                            retry_count = task.get('retry_count', 0) + 1
+                            task['retry_count'] = retry_count
+                            if retry_count >= self.MAX_RETRIES:
+                                task['status'] = 'failed'
+                                logger.info(f"Task {task_id} marked as FAILED after {retry_count} retries")
+                            else:
+                                task['status'] = 'pending'
+                                logger.info(f"Task {task_id} failed (retry {retry_count}/{self.MAX_RETRIES}), reset to pending")
+                        else:
+                            task["status"] = new_status
+
                         task["updated"] = datetime.now().isoformat()
                         if result:
                             task["result"] = result
@@ -261,12 +295,11 @@ class TaskRunner:
                         logger.info(f"任务 {task_id} -> {new_status}")
 
                         # act 任务状态变化时写入 CYCLE_STATUS.md
-                        if task_id.startswith('act-'):
-                            if new_status == 'in_progress':
-                                write_act_status_md(task_id, 'pre')
-                            elif new_status == 'completed':
-                                write_act_status_md(task_id, 'post', result, findings)
-                                self._clear_errors(task_id)
+                        if task_id.startswith('act-') and new_status == 'in_progress':
+                            self._write_act_status_md(task_id, 'pre')
+                        elif task_id.startswith('act-') and new_status == 'completed':
+                            self._write_act_status_md(task_id, 'post')
+                            self._clear_errors(task_id)
 
                         # review 完成后：自动传播 errors 到对应的 act 任务
                         if new_status == 'completed' and task_id.startswith('review-'):
@@ -555,6 +588,16 @@ Or continue brainstorming for new content to add.
             for t in all_tasks:
                 if t.get("status") == "pending":
                     lines.append(f"- [{t['id']}] {t.get('target', '')} ({t.get('agent', '')})")
+
+        if failed > 0:
+            lines.append("\n## Failed Tasks (需要人工处理)")
+            for t in all_tasks:
+                if t.get("status") == "failed":
+                    retry_count = t.get('retry_count', 0)
+                    errors = t.get('errors', [])
+                    lines.append(f"- [{t['id']}] {t.get('target', '')} (重试 {retry_count} 次)")
+                    for err in errors:
+                        lines.append(f"  - {err.get('file', '')}:{err.get('line', '')} - {err.get('problem', '')}")
 
         return "\n".join(lines)
 
