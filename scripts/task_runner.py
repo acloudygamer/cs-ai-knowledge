@@ -150,10 +150,10 @@ class TaskRunner:
                         if fm and 'name' in fm:
                             registered.add(fm['name'])
                 except Exception as e:
-                    logger.warning(f"Failed to parse agent file {path}: {e}")
+                    logger.warning(f"无法解析 agent 文件 {path}: {e}")
 
         self._registered_agents_cache = registered
-        logger.info(f"Registered agents: {registered}")
+        logger.info(f"已注册的 agents: {registered}")
         return registered
 
     def _parse_yaml_simple(self, yaml_str: str) -> dict:
@@ -202,7 +202,7 @@ class TaskRunner:
         """
         task = self.get_task_by_id(task_id)
         if not task:
-            logger.warning(f"Task {task_id} not found for CYCLE_STATUS write")
+            logger.warning(f"任务 {task_id} 未找到，无法写入 CYCLE_STATUS")
             return
 
         lines = []
@@ -260,9 +260,9 @@ class TaskRunner:
             with open(CYCLE_STATUS_FILE, 'a', encoding='utf-8') as f:
                 f.write(content)
                 f.flush()
-            logger.info(f"Wrote {mode} to CYCLE_STATUS.md for {task_id}")
+            logger.info(f"已写入 CYCLE_STATUS.md: {mode} {task_id}")
         except Exception as e:
-            logger.error(f"Failed to write to CYCLE_STATUS.md: {e}")
+            logger.error(f"写入 CYCLE_STATUS.md 失败: {e}")
 
     def update_task(self, task_id: str, new_status: str, result: str = "", findings: list | None = None):
         """更新任务状态和结果"""
@@ -280,10 +280,10 @@ class TaskRunner:
                             task['retry_count'] = retry_count
                             if retry_count >= self.MAX_RETRIES:
                                 task['status'] = 'failed'
-                                logger.info(f"Task {task_id} marked as FAILED after {retry_count} retries")
+                                logger.info(f"任务 {task_id} 连续失败 {retry_count} 次，已标记为 FAILED")
                             else:
                                 task['status'] = 'pending'
-                                logger.info(f"Task {task_id} failed (retry {retry_count}/{self.MAX_RETRIES}), reset to pending")
+                                logger.info(f"任务 {task_id} 执行失败（重试 {retry_count}/{self.MAX_RETRIES}），重置为 pending")
                         else:
                             task["status"] = new_status
 
@@ -338,7 +338,7 @@ class TaskRunner:
                                     })
                             # 重置 act 为 pending，让其修复
                             task['status'] = 'pending'
-                            logger.info(f"Errors propagated to {act_id}, status reset to pending, {len(findings)} errors")
+                            logger.info(f"已传播 {len(findings)} 个 errors 到 {act_id}，重置为 pending")
                 self.save_tasks()
 
     def _clear_errors(self, act_id: str):
@@ -351,7 +351,7 @@ class TaskRunner:
                     if 'errors' in task and task['errors']:
                         task['errors'] = []
                         self.save_tasks()
-                        logger.info(f"Errors cleared for {act_id}")
+                        logger.info(f"已清除 {act_id} 的 errors")
 
     def generate_instructions(self) -> str:
         """生成待执行任务的指令，供 Orchestrator (Claude Code) 阅读"""
@@ -359,30 +359,30 @@ class TaskRunner:
         pending = self.get_pending_tasks()
 
         if not pending:
-            return """# All Tasks Completed!
+            return """# 所有任务已完成！
 
-## Summary
-All tasks have been processed. You should now:
+## 摘要
+所有任务已处理完成，你现在应该：
 
-1. Run `git status` to review changes
-2. Run `git add .` to stage changes
-3. Run `git commit -m "feat: 完成任务描述"` to commit
-4. Run `git push` to push to remote
+1. 运行 `git status` 查看变更
+2. 运行 `git add .` 暂存变更
+3. 运行 `git commit -m "feat: 完成任务描述"` 提交
+4. 运行 `git push` 推送到远程
 
-Or continue brainstorming for new content to add.
+或者继续 brainstorming 添加新内容。
 """
 
-        lines = ["# Pending Tasks\n"]
+        lines = ["# 待执行任务\n"]
         lines.append(f"Generated at: {datetime.now().isoformat()}\n")
 
         for i, task in enumerate(pending, 1):
-            lines.append(f"## Task {i}: {task['id']}")
+            lines.append(f"## 任务 {i}: {task['id']}")
             lines.append(f"- **Agent**: `{task['agent']}`")
             # 从 agent-manifest 注入 capabilities 和 skills
             agent_info = self.get_agent_info(task['agent'])
             if agent_info.get('skills'):
                 skills_str = ', '.join(agent_info['skills'])
-                lines.append(f"- **Skills**: `{skills_str}` *(auto-injected via Agent tool)*")
+                lines.append(f"- **Skills**: `{skills_str}` *(通过 Agent tool 自动注入)*")
             if agent_info.get('capabilities'):
                 lines.append(f"- **Capabilities**: `{', '.join(agent_info['capabilities'])}`")
             lines.append(f"- **Target**: `{task['target']}`")
@@ -391,13 +391,13 @@ Or continue brainstorming for new content to add.
 
             # act 任务显示待修复的 errors
             if task['id'].startswith('act-') and task.get('errors'):
-                lines.append("\n### Errors to Fix:")
+                lines.append("\n### 待修复错误:")
                 for err in task['errors']:
                     file_path = err.get('file', '')
                     line = err.get('line', 0)
                     problem = err.get('problem', '')
                     if line:
-                        lines.append(f"- **{file_path}** line {line}: {problem}")
+                        lines.append(f"- **{file_path}** 第 {line} 行: {problem}")
                     else:
                         lines.append(f"- **{file_path}**: {problem}")
 
@@ -406,7 +406,7 @@ Or continue brainstorming for new content to add.
             if blocked_by:
                 prev_results = self.get_blocked_results(blocked_by)
                 if prev_results:
-                    lines.append(f"\n### Previous Task Results:")
+                    lines.append(f"\n### 前置任务结果:")
                     for prev in prev_results:
                         lines.append(f"\n#### {prev['task_id']} ({prev['status']}):")
                         if prev.get('result'):
@@ -417,12 +417,12 @@ Or continue brainstorming for new content to add.
                                 if isinstance(finding, dict):
                                     lines.append(f"- **{finding.get('problem', '')}**")
                                     if finding.get('solution'):
-                                        lines.append(f"  - Solution: {finding['solution']}")
+                                        lines.append(f"  - 解决方案: {finding['solution']}")
                                 else:
                                     lines.append(f"- {finding}")
 
             # 子 agent 读取的 agent 定义文件
-            lines.append(f"- **Agent File**: `.claude/agents/{task['agent']}.md`")
+            lines.append(f"- **Agent 文件**: `.claude/agents/{task['agent']}.md`")
 
             lines.append("")  # 空行分隔
 
@@ -553,7 +553,7 @@ Or continue brainstorming for new content to add.
         all_tasks = self.get_all_tasks()
 
         if not all_tasks:
-            return "No tasks found."
+            return "未找到任务。"
 
         total = len(all_tasks)
         completed = len([t for t in all_tasks if t.get("status") == "completed"])
@@ -563,28 +563,28 @@ Or continue brainstorming for new content to add.
 
         lines = [
             "=" * 50,
-            "Task Execution Report",
-            f"Generated at: {datetime.now().isoformat()}",
+            "任务执行报告",
+            f"生成时间: {datetime.now().isoformat()}",
             "=" * 50,
-            f"Total tasks:  {total}",
-            f"Completed:    {completed}",
-            f"In progress:  {in_progress}",
-            f"Pending:      {pending}",
-            f"Failed:       {failed}",
+            f"总任务数:  {total}",
+            f"已完成:    {completed}",
+            f"执行中:    {in_progress}",
+            f"待处理:    {pending}",
+            f"失败:      {failed}",
             "",
-            f"Completion:   {completed/total*100:.1f}%",
+            f"完成率:    {completed/total*100:.1f}%",
             "=" * 50,
         ]
 
         # 按状态分组显示
         if completed > 0:
-            lines.append("\n## Completed Tasks")
+            lines.append("\n## 已完成任务")
             for t in all_tasks:
                 if t.get("status") == "completed":
                     lines.append(f"- [{t['id']}] {t.get('target', '')} - {t.get('result', '')[:50]}...")
 
         if pending > 0:
-            lines.append("\n## Pending Tasks")
+            lines.append("\n## 待处理任务")
             for t in all_tasks:
                 if t.get("status") == "pending":
                     lines.append(f"- [{t['id']}] {t.get('target', '')} ({t.get('agent', '')})")
@@ -650,7 +650,7 @@ def main():
             if 'findings' in task:
                 del task['findings']
         runner.save_tasks()
-        print("All tasks reset to pending.")
+        print("所有任务已重置为 pending。")
         return
 
     if args.resume:
@@ -660,20 +660,20 @@ def main():
             if 'updated' in task:
                 del task['updated']
         runner.save_tasks()
-        print("All tasks resumed (status=pending, results preserved).")
+        print("所有任务已恢复（status=pending，结果保留）。")
         return
 
     if args.validate:
         runner.load_tasks()
         errors = runner.validate_tasks()
         if errors:
-            print("ERROR: Validation failed")
+            print("错误：校验失败")
             for err in errors:
                 print(f"  - {err}")
-            print(f"\nValidated {len(runner.get_all_tasks())} tasks, {len(errors)} errors")
+            print(f"\n已校验 {len(runner.get_all_tasks())} 个任务，发现 {len(errors)} 个错误")
             sys.exit(1)
         else:
-            print(f"Validated {len(runner.get_all_tasks())} tasks, all agents are valid.")
+            print(f"已校验 {len(runner.get_all_tasks())} 个任务，所有 agents 均有效。")
         return
 
     if args.report:
@@ -715,7 +715,7 @@ def main():
         # 自动校验 agent 名字
         errors = runner.validate_tasks()
         if errors:
-            print("ERROR: Validation failed - cannot generate instructions")
+            print("错误：校验失败，无法生成指令")
             for err in errors:
                 print(f"  - {err}")
             sys.exit(1)
