@@ -42,6 +42,56 @@ SCRIPT_DIR = Path(__file__).parent
 TASKS_FILE = SCRIPT_DIR / "tasks.json"
 AGENT_MANIFEST = SCRIPT_DIR / "agent-manifest.json"
 AGENT_DIR = SCRIPT_DIR.parent
+CYCLE_STATUS_FILE = SCRIPT_DIR.parent / "CYCLE_STATUS.md"
+
+
+def write_act_status_md(task_id: str, mode: str, result: str = "", findings: list = None):
+    """写入 act 任务状态到 CYCLE_STATUS.md
+
+    Args:
+        task_id: 任务ID (如 act-py-001)
+        mode: 'pre' 或 'post'
+        result: 执行结果
+        findings: 发现列表
+    """
+    lines = []
+    timestamp = datetime.now().strftime('%Y-%m-%d %H:%M')
+
+    if mode == 'pre':
+        lines.append(f"## act pre: {task_id} ({timestamp})\n")
+        lines.append(f"### Errors to Fix (0)\n")
+        lines.append("(无待修复错误)\n")
+    else:  # post
+        lines.append(f"## act post: {task_id} ({timestamp})\n")
+        if result:
+            lines.append(f"### Result\n")
+            lines.append(f"{result}\n")
+            lines.append("")
+        if findings:
+            lines.append(f"### Findings ({len(findings)})\n")
+            for f in findings:
+                if isinstance(f, dict):
+                    problem = f.get("problem", "")
+                    solution = f.get("solution", "")
+                    if problem and solution:
+                        lines.append(f"- **{problem}**: {solution}")
+                    elif problem:
+                        lines.append(f"- {problem}")
+                else:
+                    lines.append(f"- {f}")
+            lines.append("")
+        else:
+            lines.append(f"### Findings (0)\n")
+            lines.append("(无 findings)\n")
+            lines.append("")
+
+    content = "\n".join(lines)
+    try:
+        with open(CYCLE_STATUS_FILE, 'a', encoding='utf-8') as f:
+            f.write(content)
+        logger.info(f"Wrote {mode} to CYCLE_STATUS.md for {task_id}")
+    except Exception as e:
+        logger.error(f"Failed to write to CYCLE_STATUS.md: {e}")
 
 
 class TaskRunner:
@@ -210,13 +260,17 @@ class TaskRunner:
                             task["findings"] = findings
                         logger.info(f"任务 {task_id} -> {new_status}")
 
+                        # act 任务状态变化时写入 CYCLE_STATUS.md
+                        if task_id.startswith('act-'):
+                            if new_status == 'in_progress':
+                                write_act_status_md(task_id, 'pre')
+                            elif new_status == 'completed':
+                                write_act_status_md(task_id, 'post', result, findings)
+                                self._clear_errors(task_id)
+
                         # review 完成后：自动传播 errors 到对应的 act 任务
                         if new_status == 'completed' and task_id.startswith('review-'):
                             self._propagate_errors_to_act(task_id, findings or [])
-
-                        # act 完成后：清除自身的 errors（已修复）
-                        if new_status == 'completed' and task_id.startswith('act-'):
-                            self._clear_errors(task_id)
 
                         self.save_tasks()
                         return True
