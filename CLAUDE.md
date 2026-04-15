@@ -99,7 +99,6 @@ act 修复 errors 后自动清空，status 仍为 completed。
 ├── .claude/skills/       # Skill 定义
 └── scripts/
     ├── task_runner.py       # 任务管理器
-    ├── cycle_status_hook.py # SubagentStart/SubagentStop 钩子
     ├── tasks.json          # 任务队列
     └── agent-manifest.json # Agent 注册表
 ```

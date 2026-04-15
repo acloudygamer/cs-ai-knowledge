@@ -5,27 +5,5 @@
     "sequential-thinking",
     "github",
     "firecrawl"
-  ],
-  "hooks": {
-    "SubagentStart": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "python scripts/cycle_status_hook.py pre {agent_id}"
-          }
-        ]
-      }
-    ],
-    "SubagentStop": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "python scripts/cycle_status_hook.py post {agent_id}"
-          }
-        ]
-      }
-    ]
-  }
+  ]
 }
