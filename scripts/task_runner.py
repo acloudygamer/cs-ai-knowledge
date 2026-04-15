@@ -198,7 +198,9 @@ class TaskRunner:
     def _write_act_status_md(self, task_id: str, mode: str):
         """写入 act 任务状态到 CYCLE_STATUS.md
 
-        直接从 tasks_data 读取 errors 和 findings，格式稳定
+        直接从 tasks_data 读取，格式稳定
+        - pre: 写入前置任务结果（brainstorm findings）+ 待修复错误
+        - post: 写入修复结果 + 本轮 findings
         """
         task = self.get_task_by_id(task_id)
         if not task:
@@ -210,6 +212,24 @@ class TaskRunner:
 
         if mode == 'pre':
             lines.append(f"## act pre: {task_id} ({timestamp})")
+
+            # 写入前置任务结果（通常是 brainstorm 的 findings）
+            blocked_by = task.get('blockedBy', [])
+            if blocked_by:
+                prev_results = self.get_blocked_results(blocked_by)
+                for prev in prev_results:
+                    if prev.get('findings'):
+                        findings = prev['findings']
+                        lines.append(f"\n### 前置任务 findings ({len(findings)})")
+                        lines.append("")
+                        lines.append("| 问题 | 解决方案 |")
+                        lines.append("|------|----------|")
+                        for f in findings:
+                            problem = f.get('problem', '')
+                            solution = f.get('solution', '')
+                            lines.append(f"| {problem} | {solution} |")
+
+            # 写入待修复错误
             errors = task.get('errors', [])
             if errors:
                 lines.append(f"\n### 待修复错误 ({len(errors)})")
