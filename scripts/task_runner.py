@@ -437,7 +437,7 @@ class TaskRunner:
                         if prev.get('result'):
                             lines.append(f"```\n{prev['result']}\n```")
                         if prev.get('findings'):
-                            lines.append("**Findings:**")
+                            lines.append("**发现事项:**")
                             for finding in prev['findings']:
                                 if isinstance(finding, dict):
                                     lines.append(f"- **{finding.get('problem', '')}**")
@@ -528,7 +528,7 @@ class TaskRunner:
 
         # 添加 CRITICAL section
         lines.append("")
-        lines.append("### CRITICAL: 必须使用 Agent tool spawn")
+        lines.append("### 重要: 必须使用 Agent tool spawn")
         lines.append("")
         lines.append(f"**{parallel_count} 个任务可并行执行！**")
         lines.append("")
@@ -615,7 +615,7 @@ class TaskRunner:
                     lines.append(f"- [{t['id']}] {t.get('target', '')} ({t.get('agent', '')})")
 
         if failed > 0:
-            lines.append("\n## Failed Tasks (需要人工处理)")
+            lines.append("\n## 失败任务（需要人工处理）")
             for t in all_tasks:
                 if t.get("status") == "failed":
                     retry_count = t.get('retry_count', 0)
