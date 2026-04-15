@@ -1,6 +1,18 @@
 ---
 name: agent-java
-description: Java 专家工程师，负责 4-Java/ 目录的内容设计与维护。主动追踪 Java 17+ 最新稳定特性，确保工程实践符合现代 Java 最佳实践。
+description: |
+  Java 专家工程师，负责 4-Java/ 目录的内容设计与维护。主动追踪 Java 17+ 最新稳定特性，确保工程实践符合现代 Java 最佳实践。
+
+  <example>
+  user: "act-java-001 开始执行"
+  assistant: I'll use the agent-java agent to implement Java content expansion. Using Agent tool to spawn with java-patterns-pro skill injection.
+  </example>
+
+  <example>
+  user: "修复 Java 代码问题"
+  assistant: I'll use the agent-java agent to fix the identified issues. Using Agent tool to spawn with java-patterns-pro skill injection.
+  </example>
+
 tools: ["Read", "Glob", "Grep", "Edit", "Write", "Bash"]
 skills: ["java-patterns-pro"]
 model: sonnet

@@ -379,7 +379,8 @@ Or continue brainstorming for new content to add.
             # 从 agent-manifest 注入 capabilities 和 skills
             agent_info = self.get_agent_info(task['agent'])
             if agent_info.get('skills'):
-                lines.append(f"- **Skills**: `{', '.join(agent_info['skills'])}`")
+                skills_str = ', '.join(agent_info['skills'])
+                lines.append(f"- **Skills**: `{skills_str}` *(auto-injected via Agent tool)*")
             if agent_info.get('capabilities'):
                 lines.append(f"- **Capabilities**: `{', '.join(agent_info['capabilities'])}`")
             lines.append(f"- **Target**: `{task['target']}`")
@@ -434,6 +435,20 @@ Or continue brainstorming for new content to add.
 
         # 检测无依赖的可并行任务数量
         parallel_count = sum(1 for t in pending if not t.get('blockedBy'))
+        parallel_tasks = [t for t in pending if not t.get('blockedBy')]
+
+        # 根据任务类型确定 findings 格式
+        task_type_map = {}
+        for t in parallel_tasks:
+            tid = t['id']
+            if tid.startswith('brainstorm-'):
+                task_type_map[tid] = 'brainstorm'
+            elif tid.startswith('act-'):
+                task_type_map[tid] = 'act'
+            elif tid.startswith('review-'):
+                task_type_map[tid] = 'review'
+            else:
+                task_type_map[tid] = 'brainstorm'
 
         lines.append("## 工作流程")
         if parallel_count > 1:
@@ -442,27 +457,58 @@ Or continue brainstorming for new content to add.
             lines.append("2. **执行（子 Agent 负责）**：Agents 独立执行，完成后自行更新任务状态。**（不要手动为他们运行 `--update` 命令）**")
             lines.append("3. **等待**：等待 task notifications（异步）— 无需轮询。")
             lines.append("4. **继续**：重新运行 `task_runner.py --once` 检查并触发下一批已解锁的任务。")
-            lines.append("")
-            lines.append("**子 Agent 任务完成后更新格式**：")
-            lines.append("   ```bash")
-            lines.append("   python scripts/task_runner.py \\")
-            lines.append("     --update <task_id> completed \\")
-            lines.append("     --result '<执行结果>' \\")
-            lines.append("     --findings '[{\"file\":\"文件路径\",\"line\":行号,\"problem\":\"问题描述\"}]'")
-            lines.append("   ```")
         else:
             lines.append("1. **启动**：Spawn 指定 Agent 执行任务。")
             lines.append("2. **执行（子 Agent 负责）**：Agent 独立执行，完成后自行更新任务状态。**（不要手动运行 `--update` 命令）**")
             lines.append("3. **等待**：等待 task notification（异步）。")
             lines.append("4. **继续**：重新运行 `task_runner.py --once`。")
+
+        # 按类型分组显示更新格式
+        types_in_parallel = set(task_type_map.values())
+        if 'brainstorm' in types_in_parallel:
             lines.append("")
-            lines.append("**子 Agent 任务完成后更新格式**：")
+            lines.append("**brainstorm 任务完成后更新格式**：")
             lines.append("   ```bash")
             lines.append("   python scripts/task_runner.py \\")
             lines.append("     --update <task_id> completed \\")
-            lines.append("     --result '<执行结果>' \\")
+            lines.append("     --result '<执行结果摘要>' \\")
+            lines.append("     --findings '[{\"problem\":\"问题描述\",\"solution\":\"解决方案\"}]'")
+            lines.append("   ```")
+        if 'act' in types_in_parallel:
+            lines.append("")
+            lines.append("**act 任务完成后更新格式**：")
+            lines.append("   ```bash")
+            lines.append("   python scripts/task_runner.py \\")
+            lines.append("     --update <task_id> completed \\")
+            lines.append("     --result '<执行结果摘要>' \\")
+            lines.append("     --findings '[{\"problem\":\"实现内容描述\",\"solution\":\"已创建的文件和内容\"}]'")
+            lines.append("   ```")
+        if 'review' in types_in_parallel:
+            lines.append("")
+            lines.append("**review 任务完成后更新格式**：")
+            lines.append("   ```bash")
+            lines.append("   python scripts/task_runner.py \\")
+            lines.append("     --update <task_id> completed \\")
+            lines.append("     --result '<审查结果摘要>' \\")
             lines.append("     --findings '[{\"file\":\"文件路径\",\"line\":行号,\"problem\":\"问题描述\"}]'")
             lines.append("   ```")
+
+        # 添加 CRITICAL section
+        lines.append("")
+        lines.append("### CRITICAL: 必须使用 Agent tool spawn")
+        lines.append("")
+        lines.append(f"**{parallel_count} 个任务可并行执行！**")
+        lines.append("")
+        lines.append("**你必须使用 Agent tool 来 spawn 这些 agents，而不是仅仅文字回复。**")
+        lines.append("")
+        lines.append("**正确的 spawn 方式：**")
+        lines.append("1. 使用 Agent tool，指定 `agent` 参数为对应的 agent 名字")
+        lines.append("2. Agent tool 会自动从 `.claude/agents/agent-*.md` 文件中读取 `skills:` 字段并注入")
+        lines.append("3. 在 prompt 中包含任务的具体内容")
+        lines.append("")
+        lines.append("**Spawn 命令格式：**")
+        for task in parallel_tasks:
+            lines.append(f"- 使用 Agent tool，agent=\"{task['agent']}\"，prompt=<任务内容>")
 
         return "\n".join(lines)
 

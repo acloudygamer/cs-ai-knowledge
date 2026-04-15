@@ -1,6 +1,18 @@
 ---
 name: agent-dsa
-description: 数据结构与算法专家，负责 1-数据结构与算法/ 目录的内容设计与维护。确保算法复杂度描述准确，代码实现高效正确。
+description: |
+  数据结构与算法专家，负责 1-数据结构与算法/ 目录的内容设计与维护。确保算法复杂度描述准确，代码实现高效正确。
+
+  <example>
+  user: "act-dsa-001 开始执行"
+  assistant: I'll use the agent-dsa agent to implement DSA content expansion. Using Agent tool to spawn with dsa-patterns-pro skill injection.
+  </example>
+
+  <example>
+  user: "修复算法实现问题"
+  assistant: I'll use the agent-dsa agent to fix the identified issues. Using Agent tool to spawn with dsa-patterns-pro skill injection.
+  </example>
+
 tools: ["Read", "Glob", "Grep", "Edit", "Write", "Bash"]
 skills: ["dsa-patterns-pro"]
 model: sonnet

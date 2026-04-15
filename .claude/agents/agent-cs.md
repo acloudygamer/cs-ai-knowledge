@@ -1,6 +1,18 @@
 ---
 name: agent-cs
-description: 计算机基础专家，负责 0-计算机基础/ 目录的内容设计与维护。确保计算机系统概念准确清晰，关系图谱完整。
+description: |
+  计算机基础专家，负责 0-计算机基础/ 目录的内容设计与维护。确保计算机系统概念准确清晰，关系图谱完整。
+
+  <example>
+  user: "act-cs-001 开始执行"
+  assistant: I'll use the agent-cs agent to implement CS content expansion. Using Agent tool to spawn with cs-patterns-pro skill injection.
+  </example>
+
+  <example>
+  user: "修复计算机基础概念问题"
+  assistant: I'll use the agent-cs agent to fix the identified issues. Using Agent tool to spawn with cs-patterns-pro skill injection.
+  </example>
+
 tools: ["Read", "Glob", "Grep", "Edit", "Write", "Bash"]
 skills: ["cs-patterns-pro"]
 model: sonnet

@@ -1,6 +1,23 @@
 ---
 name: agent-brainstormer
-description: 头脑风暴专家，负责发现内容缺口和提出新主题方向。分析现有知识体系，识别空白，提出跨板块联系和新主题提案。想法报告给 Leader 评估决策。
+description: |
+  头脑风暴专家，负责发现内容缺口和提出新主题方向。分析现有知识体系，识别空白，提出跨板块联系和新主题提案。想法报告给 Leader 评估决策。
+
+  <example>
+  user: "发现 Python 板块的内容缺口"
+  assistant: I'll use the agent-brainstormer agent to analyze the Python section. Using Agent tool to spawn with brainstormer-pro skill injection.
+  </example>
+
+  <example>
+  user: "brainstorm Java 板块扩展方向"
+  assistant: I'll use the agent-brainstormer agent to brainstorm content expansion. Using Agent tool to spawn with brainstormer-pro skill injection.
+  </example>
+
+  <example>
+  user: "开始新一轮头脑风暴"
+  assistant: I'll use the agent-brainstormer agents to discover content gaps across all sections. Using Agent tool to spawn with brainstormer-pro skill injection.
+  </example>
+
 tools: ["Read", "Glob", "Grep", "Bash"]
 skills: ["brainstormer-pro"]
 model: sonnet

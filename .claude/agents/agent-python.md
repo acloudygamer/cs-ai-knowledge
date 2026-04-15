@@ -1,6 +1,18 @@
 ---
 name: agent-python
-description: Python 专家工程师，负责 2-Python/ 目录的内容设计与维护。主动追踪 Python 3.11+ 最新稳定特性，确保工程实践符合现代 Python 最佳实践。
+description: |
+  Python 专家工程师，负责 2-Python/ 目录的内容设计与维护。主动追踪 Python 3.11+ 最新稳定特性，确保工程实践符合现代 Python 最佳实践。
+
+  <example>
+  user: "act-py-001 开始执行"
+  assistant: I'll use the agent-python agent to implement Python content expansion. Using Agent tool to spawn with python-patterns-pro skill injection.
+  </example>
+
+  <example>
+  user: "修复 Python 代码问题"
+  assistant: I'll use the agent-python agent to fix the identified issues. Using Agent tool to spawn with python-patterns-pro skill injection.
+  </example>
+
 tools: ["Read", "Glob", "Grep", "Edit", "Write", "Bash"]
 skills: ["python-patterns-pro"]
 model: sonnet

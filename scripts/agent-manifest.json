@@ -39,23 +39,27 @@
     "agent-dsa": {
       "name": "agent-dsa",
       "description": "数据结构与算法专家，负责 1-数据结构与算法/ 目录",
-      "target": "1-数据结构与算法/"
+      "target": "1-数据结构与算法/",
+      "skills": ["dsa-patterns-pro"]
     },
     "agent-cs": {
       "name": "agent-cs",
       "description": "计算机基础专家，负责 0-计算机基础/ 目录",
-      "target": "0-计算机基础/"
+      "target": "0-计算机基础/",
+      "skills": ["cs-patterns-pro"]
     },
     "agent-reviewer": {
       "name": "agent-reviewer",
       "description": "跨板块内容质量审查",
       "capabilities": ["Read", "Glob", "Grep", "Bash"],
+      "skills": ["reviewer-pro"],
       "scope": "all"
     },
     "agent-brainstormer": {
       "name": "agent-brainstormer",
       "description": "发现内容缺口、识别跨板块联系、提出新主题方向",
       "capabilities": ["Read", "Glob", "Grep", "Bash"],
+      "skills": ["brainstormer-pro"],
       "scope": "all"
     }
   }

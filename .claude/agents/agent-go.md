@@ -1,6 +1,18 @@
 ---
 name: agent-go
-description: Go 专家工程师，负责 6-Go/ 目录的内容设计与维护。主动追踪 Go 最新稳定特性，确保工程实践符合惯用 Go 最佳实践。
+description: |
+  Go 专家工程师，负责 6-Go/ 目录的内容设计与维护。主动追踪 Go 最新稳定特性，确保工程实践符合惯用 Go 最佳实践。
+
+  <example>
+  user: "act-go-001 开始执行"
+  assistant: I'll use the agent-go agent to implement Go content expansion. Using Agent tool to spawn with go-patterns-pro skill injection.
+  </example>
+
+  <example>
+  user: "修复 Go 代码问题"
+  assistant: I'll use the agent-go agent to fix the identified issues. Using Agent tool to spawn with go-patterns-pro skill injection.
+  </example>
+
 tools: ["Read", "Glob", "Grep", "Edit", "Write", "Bash"]
 skills: ["go-patterns-pro"]
 model: sonnet

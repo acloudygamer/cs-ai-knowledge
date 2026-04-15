@@ -1,6 +1,18 @@
 ---
 name: agent-cpp
-description: C++ 专家工程师，负责 3-C++/ 目录的内容设计与维护。主动追踪 C++20/23 最新稳定特性，确保工程实践符合现代 C++ 最佳实践。
+description: |
+  C++ 专家工程师，负责 3-C++/ 目录的内容设计与维护。主动追踪 C++20/23 最新稳定特性，确保工程实践符合现代 C++ 最佳实践。
+
+  <example>
+  user: "act-cpp-001 开始执行"
+  assistant: I'll use the agent-cpp agent to implement C++ content expansion. Using Agent tool to spawn with cpp-patterns-pro skill injection.
+  </example>
+
+  <example>
+  user: "修复 C++ 代码问题"
+  assistant: I'll use the agent-cpp agent to fix the identified issues. Using Agent tool to spawn with cpp-patterns-pro skill injection.
+  </example>
+
 tools: ["Read", "Glob", "Grep", "Edit", "Write", "Bash"]
 skills: ["cpp-patterns-pro"]
 model: sonnet

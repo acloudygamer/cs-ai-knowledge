@@ -1,6 +1,18 @@
 ---
 name: agent-js
-description: JavaScript 专家工程师，负责 5-JavaScript/ 目录的内容设计与维护。主动追踪 ES2020+ 最新稳定特性，确保工程实践符合现代 JavaScript 最佳实践。
+description: |
+  JavaScript 专家工程师，负责 5-JavaScript/ 目录的内容设计与维护。主动追踪 ES2020+ 最新稳定特性，确保工程实践符合现代 JavaScript 最佳实践。
+
+  <example>
+  user: "act-js-001 开始执行"
+  assistant: I'll use the agent-js agent to implement JavaScript content expansion. Using Agent tool to spawn with js-patterns-pro skill injection.
+  </example>
+
+  <example>
+  user: "修复 JavaScript 代码问题"
+  assistant: I'll use the agent-js agent to fix the identified issues. Using Agent tool to spawn with js-patterns-pro skill injection.
+  </example>
+
 tools: ["Read", "Glob", "Grep", "Edit", "Write", "Bash"]
 skills: ["js-patterns-pro"]
 model: sonnet
