@@ -67,20 +67,21 @@
 ## 四、工作循环
 
 ```
-循环前审查 → --once生成指令 → Spawn agents → 循环后修复 → Git提交
-     ↓              ↓              ↓             ↓
- structure      并行任务        brainstorm     结构修复
- -editor      执行           → act → review    -editor
+并行审查 → --once生成指令 → Spawn agents → 并行修复 → Git提交
+    ↓              ↓              ↓            ↓
+ 7个editor      并行任务      brainstorm   7个editor
+ 目录0-6      执行           → act → review  目录0-6
 ```
 
 ### 8 个步骤
 
-1. **循环开始前审查**：Spawn agent-structure-editor 审查全局目录结构
+0. 创建定时 report 任务（每10分钟）
+1. **循环开始前审查**：并行 Spawn 7 个 agent-structure-editor，每个目录一个（0-6）
 2. **生成指令**：`python scripts/task_runner.py --once`
 3. **并行执行**：Spawn agents 执行（无 blockedBy 的任务可并行）
 4. **等待完成**：等待 task notifications
 5. **检查修复**：有 act errors → 重新 Spawn act 修复
-6. **循环结束修复**：Spawn agent-structure-editor 修复结构问题
+6. **循环结束修复**：与步骤1一致，并行 Spawn 7 个 agent-structure-editor 修复各自目录
 7. **Git 提交**：`git add . && git commit -m "feat: ..." && git push`
 8. **重置循环**：`--resume` 重置任务为 pending
 
