@@ -213,11 +213,16 @@ class TaskRunner:
         if mode == 'pre':
             lines.append(f"## act pre: {task_id} ({timestamp})")
 
-            # 写入前置任务结果（通常是 brainstorm 的 findings）
+            # 写入前置任务结果（通常是 brainstorm 的 result + findings）
             blocked_by = task.get('blockedBy', [])
             if blocked_by:
                 prev_results = self.get_blocked_results(blocked_by)
                 for prev in prev_results:
+                    # 先写前置任务的 result 摘要
+                    if prev.get('result'):
+                        lines.append(f"\n### 前置任务结果\n")
+                        lines.append(f"{prev['result']}")
+                    # 再写前置任务的 findings 详情
                     if prev.get('findings'):
                         findings = prev['findings']
                         lines.append(f"\n### 前置任务 findings ({len(findings)})")
