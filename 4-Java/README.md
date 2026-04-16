@@ -73,6 +73,7 @@ Java 8（Lambda/Stream）→ Java 11（HttpClient）→ Java 17（密封类）�
 - [虚拟线程深度](./03-高级用法/11-虚拟线程深度.md)
 - [函数式编程](./03-高级用法/12-函数式编程.md)
 - [Lombok](./03-高级用法/13-Lombok.md)
+- [GraalVM与NativeImage](./03-高级用法/14-GraalVM与NativeImage.md)
 
 ## 测试
 
@@ -101,5 +102,7 @@ Java 8（Lambda/Stream）→ Java 11（HttpClient）→ Java 17（密封类）�
 - [Kafka](./05-Java生态/04-Kafka.md)
 - [Docker与K8s](./05-Java生态/05-Docker与K8s.md)
 - [MyBatis](./05-Java生态/06-MyBatis.md)
-- [SpringSecurity](./05-Java生态/08-SpringSecurity.md)
 - [SpringCloud微服务](./05-Java生态/07-SpringCloud微服务.md)
+- [SpringSecurity](./05-Java生态/08-SpringSecurity.md)
+- [Elasticsearch与MongoDB](./05-Java生态/09-Elasticsearch与MongoDB.md)
+- [监控与链路追踪](./05-Java生态/10-监控与链路追踪.md)

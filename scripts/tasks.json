@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "updated": "2026-04-17T00:20:18.731966",
+  "updated": "2026-04-17T01:08:00.414655",
   "boards": {
     "内容扩展": {
       "description": "Brainstormer 扩展各语言/CS/DSA 板块内容",
@@ -12,35 +12,19 @@
           "status": "completed",
           "priority": "high",
           "description": "扩展 Python 板块内容",
-          "result": "brainstorm-completed",
+          "result": "brainstorm completed",
           "findings": [
             {
-              "problem": "缺少设计模式专题",
-              "solution": "已创建04-设计模式/目录，8个文件"
+              "problem": "Web开发专题缺失",
+              "solution": "新增FastAPI/Django/Flask专题"
             },
             {
-              "problem": "缺少测试实践专题",
-              "solution": "已创建04-测试/目录，5个文件"
+              "problem": "数据分析/ML专题缺失",
+              "solution": "新增pandas/NumPy基础专题"
             },
             {
-              "problem": "迭代器生成器内容简略",
-              "solution": "已创建01-基础/07-迭代器与生成器.md"
-            },
-            {
-              "problem": "缺少虚拟环境与包管理专题",
-              "solution": "已创建02-常用操作/08-虚拟环境与包管理.md"
-            },
-            {
-              "problem": "缺少打包与分发专题",
-              "solution": "已创建03-高级用法/09-打包与分发.md"
-            },
-            {
-              "problem": "异步编程不够深入",
-              "solution": "已创建03-高级用法/10-异步编程深入.md"
-            },
-            {
-              "problem": "缺少调试与诊断专题（新增）",
-              "solution": "C++有04-测试/02-调试与诊断.md但Python无对应内容；因Python主要用IDE调试而非CLI工具，优先级较低"
+              "problem": "代码质量工具专题缺失",
+              "solution": "新增ruff/black/isort专题"
             }
           ]
         },
@@ -54,44 +38,16 @@
           "result": "brainstorm completed",
           "findings": [
             {
-              "problem": "MyBatis 完全缺失 - 企业中与 JPA/Hibernate 并列的主流 ORM，没有独立文件",
-              "solution": "新增 05-Java生态/MyBatis.md 或在 JPA 文件中增加对比章节"
+              "problem": "Elasticsearch/MongoDB缺失",
+              "solution": "新增搜索/NoSQL专题"
             },
             {
-              "problem": "Spring Security 安全专题缺失 - 仅作为 starter 提及，无认证/授权/OAuth2/JWT 深度内容",
-              "solution": "新增 05-Java生态/SpringSecurity.md 或 03-高级用法/Spring安全编程.md"
+              "problem": "监控追踪内容缺失",
+              "solution": "新增Actuator/Micrometer/链路追踪专题"
             },
             {
-              "problem": "微服务架构内容缺失 - 无 Spring Cloud/服务注册/配置中心/熔断器/Gateway",
-              "solution": "新增 05-Java生态/SpringCloud微服务.md 或 03-高级用法/微服务架构.md"
-            },
-            {
-              "problem": "响应式编程未覆盖 - Project Reactor/RxJava/Spring WebFlux 完全缺失",
-              "solution": "新增 03-高级用法/响应式编程.md"
-            },
-            {
-              "problem": "设计模式覆盖不足 - 仅 8/23 种 GoF 模式，缺迭代器/备忘录/访问者/命令/解释器/组合/外观/代理/桥接/蝇量",
-              "solution": "在 06-设计模式/ 目录补充缺失模式"
-            },
-            {
-              "problem": "HTTP 客户端对比缺失 - HttpClient/WebClient/OkHttp 无横向对比和最佳实践",
-              "solution": "新增 02-常用操作/HTTP客户端对比.md"
-            },
-            {
-              "problem": "Jackson 序列化框架深度不足 - 仅 JSON 基础，缺注解/自定义序列化器/日期处理/泛型处理",
-              "solution": "在 02-常用操作/JSON处理.md 中增加 Jackson 深度章节"
-            },
-            {
-              "problem": "日志框架对比缺失 - SLF4J/Logback/Log4j2 配置和对比未覆盖",
-              "solution": "新增 03-高级用法/日志框架深度.md 或扩展现有日志框架文件"
-            },
-            {
-              "problem": "虚拟线程深度不足 - Structured Concurrency/Scoped Values 等 Java 21+ 高级特性未覆盖",
-              "solution": "扩展 03-高级用法/02-并发与异步.md 中的虚拟线程章节"
-            },
-            {
-              "problem": "SQL 注入与安全编码缺失 - 仅 JDBC 基础提及，无专门的 安全编程指南",
-              "solution": "新增 03-高级用法/安全编码实践.md"
+              "problem": "GraalVM/Native Image缺失",
+              "solution": "新增云原生Java专题"
             }
           ]
         },
@@ -105,52 +61,16 @@
           "result": "brainstorm completed",
           "findings": [
             {
-              "problem": "命名空间(namespace)完全缺失",
-              "solution": "创建01-基础/命名空间.md，覆盖using、嵌套命名空间、匿名命名空间、ADL"
+              "problem": "移动语义缺乏专门章节",
+              "solution": "新增移动语义深度专题"
             },
             {
-              "problem": "控制流程.md内容过薄",
-              "solution": "扩展控制流程.md，增加break/continue/goto/switch表达式详情"
+              "problem": "Lambda高级用法覆盖不足",
+              "solution": "扩展Lambda章节内容"
             },
             {
-              "problem": "模板元编程覆盖不足",
-              "solution": "在03-高级用法/装饰器与元编程.md增加部分特化、模板参数默认值的深度内容"
-            },
-            {
-              "problem": "预处理器和宏缺失",
-              "solution": "创建02-常用操作/预处理与宏.md，覆盖#define、#ifdef、条件编译、宏函数"
-            },
-            {
-              "problem": "RTTI缺失",
-              "solution": "在03-高级用法增加RTTI与类型信息.md，详解dynamic_cast、typeid、type_traits"
-            },
-            {
-              "problem": "异常处理深度不足",
-              "solution": "扩展02-常用操作/错误处理.md，增加异常安全保证级别、noexcept运算符详情"
-            },
-            {
-              "problem": "链接和ABI基础缺失",
-              "solution": "创建03-高级用法/链接与ABI基础.md，讲解name mangling、符号导出"
-            },
-            {
-              "problem": "静态分析和Sanitizers缺失",
-              "solution": "扩展04-测试/调试与诊断.md，增加clang-tidy/cppcheck及ASan/MSan/TSan内容"
-            },
-            {
-              "problem": "性能优化缺少LTO/PGO",
-              "solution": "在03-高级用法/性能优化.md增加链接时优化和配置文件优化"
-            },
-            {
-              "problem": "序列化主题缺失",
-              "solution": "创建02-常用操作/序列化.md，覆盖JSON/XML二进制序列化方案"
-            },
-            {
-              "problem": "std::expected和std::generator覆盖不足",
-              "solution": "在03-高级用法/C++23新特性.md增加std::expected和std::generator实战"
-            },
-            {
-              "problem": "移动语义分散",
-              "solution": "在03-高级用法增加移动语义深入.md，整合散布在各文件的内容"
+              "problem": "type_traits缺乏专门章节",
+              "solution": "新增type_traits专题"
             }
           ]
         },
@@ -164,40 +84,16 @@
           "result": "brainstorm completed",
           "findings": [
             {
-              "problem": "Web APIs深度不足 - Service Workers、PWA、WebSocket、IndexedDB等未覆盖",
-              "solution": "创建02-常用操作/08-Web存储API.md和02-常用操作/09-高级WebAPI.md"
+              "problem": "前端框架完全缺失",
+              "solution": "新增React/Vue基础专题"
             },
             {
-              "problem": "Proxy与Reflect完全缺失 - 元编程重要工具",
-              "solution": "在03-高级用法/下新增05-代理与反射.md"
+              "problem": "状态管理缺失",
+              "solution": "新增Redux/MobX专题"
             },
             {
-              "problem": "Symbol深度不足 - 仅在变量与类型中一笔带过",
-              "solution": "新增01-基础/11-Symbol详解.md"
-            },
-            {
-              "problem": "ArrayBuffer/SharedArrayBuffer/Atomics未覆盖",
-              "solution": "在03-高级用法/下新增06-二进制数据与Atomics.md"
-            },
-            {
-              "problem": "Node.js Streams、进程与集群、调试内容缺失",
-              "solution": "扩展05-Node.js/目录，新增相关文件"
-            },
-            {
-              "problem": "npm/yarn/pnpm包管理器内容分散",
-              "solution": "创建05-Node.js/06-包管理深入.md"
-            },
-            {
-              "problem": "安全内容缺失 - XSS、CSRF、CSP等",
-              "solution": "新增07-代码规范/02-Web安全指南.md"
-            },
-            {
-              "problem": "测试内容可扩展 - Testing Library、E2E测试、Vitest",
-              "solution": "扩展08-测试/目录，新增相关文件"
-            },
-            {
-              "problem": "Intl API完全缺失",
-              "solution": "新增02-常用操作/10-国际化API.md"
+              "problem": "TypeScript深度不足",
+              "solution": "新增工具类型专题"
             }
           ]
         },
@@ -211,32 +107,16 @@
           "result": "brainstorm completed",
           "findings": [
             {
-              "problem": "日志系统覆盖不足",
-              "solution": "添加日志最佳实践专题，补充 slog 深入使用、日志级别、输出格式、结构化日志、第三方库对比(zap、zerolog、logrus)等内容"
+              "problem": "Fuzz Testing缺失",
+              "solution": "新增Fuzz Testing专题"
             },
             {
-              "problem": "gRPC 和现代通信协议缺失",
-              "solution": "添加 gRPC 专题：Protocol Buffers、gRPC 服务定义、流式通信、拦截器、负载均衡，与现有网络请求内容形成互补"
+              "problem": "Go项目布局缺失",
+              "solution": "新增标准项目结构专题"
             },
             {
-              "problem": "os/exec、flag 等标准库未覆盖",
-              "solution": "添加命令参数解析和系统命令执行专题，覆盖 flag 标准库、os/exec 执行外部命令、cobra 框架等内容"
-            },
-            {
-              "problem": "插件系统仅有简介",
-              "solution": "扩展为完整的插件系统专题，涵盖 Go 插件机制、工作原理、使用场景、注意事项、替代方案如 RPC/接口模式"
-            },
-            {
-              "problem": "WebSocket 和 TCP/UDP 编程缺失",
-              "solution": "添加网络编程专题，补充 WebSocket 实时通信、TCP/UDP 套接字编程、聊天应用示例"
-            },
-            {
-              "problem": "依赖注入模式覆盖不足",
-              "solution": "添加依赖注入专题，对比构造函数注入、函数注入、接口注入等模式，结合 Google Wire 等工具"
-            },
-            {
-              "problem": "错误处理最佳实践深度不足",
-              "solution": "扩展错误处理专题，增加错误包装链、错误溯源、错误处理策略、第三方错误库(sarama、pkg/errors)使用"
+              "problem": "Race Condition模式缺失",
+              "solution": "新增并发模式专题"
             }
           ]
         },
@@ -250,28 +130,16 @@
           "result": "brainstorm completed",
           "findings": [
             {
-              "problem": "01-计算机体系: 缺少GPU/异构计算内容，现代AI/深度学习需要GPU编程基础",
-              "solution": "新增 04-GPU与异构计算.md，覆盖CUDA/OpenGL/异构架构"
+              "problem": "Git版本控制完全缺失",
+              "solution": "新增Git基础专题"
             },
             {
-              "problem": "02-系统软件层: 缺少中断与异常处理、设备驱动内容",
-              "solution": "扩展 内核与系统调用.md 或新增 08-中断与异常.md"
+              "problem": "文件系统深度不足",
+              "solution": "扩展inode/日志文件系统内容"
             },
             {
-              "problem": "05-软件工程概念: 数据库基础.md 存在但可能薄弱，需要检查深度",
-              "solution": "审查 数据库基础.md 深度，可能需要扩展SQL优化、事务隔离级别、ORM等内容"
-            },
-            {
-              "problem": "05-软件工程概念: 缺少 安全基础 主题",
-              "solution": "新增 10-安全基础.md，覆盖常见漏洞：缓冲区溢出、SQL注入、XSS、CSRF"
-            },
-            {
-              "problem": "06-计算机网络: Socket编程.md 可能较浅",
-              "solution": "审查 Socket编程.md，可能需要扩展粘包处理、Reactor/Proactor模型、零拷贝等内容"
-            },
-            {
-              "problem": "01-计算机体系: 缺少 并行与并发 基础",
-              "solution": "新增 04-并行与并发.md，作为多线程/分布式的前置基础"
+              "problem": "字节序与位运算未独立",
+              "solution": "新增字节序与位运算专题"
             }
           ]
         },
@@ -285,48 +153,16 @@
           "result": "brainstorm completed",
           "findings": [
             {
-              "problem": "单调队列深度不足",
-              "solution": "滑动窗口最大值是重要考点，当前仅在RMQ中简单提及单调队列实现，建议创建独立专题深入覆盖，包含窗口最大值、队列优化DP等"
+              "problem": "链表内容偏浅",
+              "solution": "扩展双向链表/循环链表内容"
             },
             {
-              "problem": "布隆过滤器仅有提及",
-              "solution": "哈希表章节列出了布隆过滤器但无实现和原理讲解，建议补充假阳性率、哈希函数数量公式、应用场景"
+              "problem": "滑动窗口专题缺失",
+              "solution": "新增滑动窗口算法专题"
             },
             {
-              "problem": "Link-Cut Tree完全缺失",
-              "solution": "动态树路径查询的重要数据结构，与HLD形成互补，HLD处理静态树，LCT处理动态操作"
-            },
-            {
-              "problem": "后缀数组/自动机未覆盖",
-              "solution": "字符串处理重要工具，与前缀树、KMP形成完整字符串索引体系，ACM竞赛常考"
-            },
-            {
-              "problem": "Aho-Corasick未覆盖",
-              "solution": "多模式字符串匹配算法，AC自动机与KMP结合，文本处理和前缀树扩展"
-            },
-            {
-              "problem": "BST删除操作未详解",
-              "solution": "树与二叉树章节只展示插入，删除操作（含递归非递归版本、3种情况处理）缺失"
-            },
-            {
-              "problem": "KD-Tree深度不足",
-              "solution": "文件较薄，缺少实际应用场景代码（GIS、近邻分类）、与R-Tree对比、维度灾难讨论"
-            },
-            {
-              "problem": "并查集应用不够深入",
-              "solution": "只含基础实现，缺少路径压缩+按秩合并复杂度分析、应用例题（如朋友圈、岛屿数量、食物链）"
-            },
-            {
-              "problem": "位运算技巧不够系统",
-              "solution": "仅基础位运算，缺少位运算经典套路总结（消x、提取位、位掩码DP）、算法题常用技巧"
-            },
-            {
-              "problem": "单调栈扩展应用未覆盖",
-              "solution": "股票最大利润、每日温度、构造数组等进阶应用未覆盖，仅基础括号匹配"
-            },
-            {
-              "problem": "前缀和扩展未深入",
-              "solution": "二维前缀和、差分数组原理和应用场景不够详细，未覆盖前缀最大值等变种"
+              "problem": "双指针专题缺失",
+              "solution": "新增双指针算法专题"
             }
           ]
         }
@@ -340,9 +176,7 @@
           "agent": "agent-python",
           "target": "2-Python/",
           "status": "completed",
-          "blockedBy": [
-            "brainstorm-py-001"
-          ],
+          "blockedBy": [],
           "description": "根据 brainstorm 结果扩展 Python 内容",
           "result": "错误已修复",
           "findings": [
@@ -382,9 +216,7 @@
           "agent": "agent-java",
           "target": "4-Java/",
           "status": "completed",
-          "blockedBy": [
-            "brainstorm-java-001"
-          ],
+          "blockedBy": [],
           "description": "根据 brainstorm 结果扩展 Java 内容",
           "result": "错误已修复",
           "findings": [
@@ -428,9 +260,7 @@
           "agent": "agent-cpp",
           "target": "3-C++/",
           "status": "completed",
-          "blockedBy": [
-            "brainstorm-cpp-001"
-          ],
+          "blockedBy": [],
           "description": "根据 brainstorm 的结果扩展 C++ 内容",
           "result": "错误已修复",
           "findings": [
@@ -454,9 +284,7 @@
           "agent": "agent-js",
           "target": "5-JavaScript/",
           "status": "completed",
-          "blockedBy": [
-            "brainstorm-js-001"
-          ],
+          "blockedBy": [],
           "description": "根据 brainstorm 的结果扩展 JavaScript 内容",
           "result": "错误已修复",
           "findings": [
@@ -483,9 +311,7 @@
           "agent": "agent-go",
           "target": "6-Go/",
           "status": "completed",
-          "blockedBy": [
-            "brainstorm-go-001"
-          ],
+          "blockedBy": [],
           "description": "根据 brainstorm 的结果扩展 Go 内容",
           "result": "错误已修复",
           "findings": [
@@ -533,9 +359,7 @@
           "agent": "agent-cs",
           "target": "0-计算机基础/",
           "status": "completed",
-          "blockedBy": [
-            "brainstorm-cs-001"
-          ],
+          "blockedBy": [],
           "description": "根据 brainstorm 的结果扩展计算机基础内容",
           "result": "错误已修复",
           "findings": [
@@ -607,9 +431,7 @@
           "agent": "agent-dsa",
           "target": "1-数据结构与算法/",
           "status": "completed",
-          "blockedBy": [
-            "brainstorm-dsa-001"
-          ],
+          "blockedBy": [],
           "description": "根据 brainstorm 的结果扩展数据结构与算法内容",
           "result": "错误已修复",
           "findings": [
@@ -638,9 +460,7 @@
           "agent": "agent-reviewer",
           "target": "2-Python/",
           "status": "completed",
-          "blockedBy": [
-            "act-py-001"
-          ],
+          "blockedBy": [],
           "description": "审查 Python 板块内容",
           "result": "审查完成",
           "findings": [
@@ -696,9 +516,7 @@
           "agent": "agent-reviewer",
           "target": "4-Java/",
           "status": "completed",
-          "blockedBy": [
-            "act-java-001"
-          ],
+          "blockedBy": [],
           "description": "审查 Java 板块内容",
           "result": "审查完成",
           "findings": [
@@ -749,9 +567,7 @@
           "agent": "agent-reviewer",
           "target": "3-C++/",
           "status": "completed",
-          "blockedBy": [
-            "act-cpp-001"
-          ],
+          "blockedBy": [],
           "description": "审查 C++ 板块内容",
           "result": "审查完成",
           "findings": [
@@ -777,9 +593,7 @@
           "agent": "agent-reviewer",
           "target": "5-JavaScript/",
           "status": "completed",
-          "blockedBy": [
-            "act-js-001"
-          ],
+          "blockedBy": [],
           "description": "审查 JavaScript 板块内容",
           "result": "审查完成",
           "findings": [
@@ -805,9 +619,7 @@
           "agent": "agent-reviewer",
           "target": "6-Go/",
           "status": "completed",
-          "blockedBy": [
-            "act-go-001"
-          ],
+          "blockedBy": [],
           "description": "审查 Go 板块内容",
           "result": "审查完成",
           "findings": [
@@ -868,9 +680,7 @@
           "agent": "agent-reviewer",
           "target": "0-计算机基础/",
           "status": "completed",
-          "blockedBy": [
-            "act-cs-001"
-          ],
+          "blockedBy": [],
           "description": "审查计算机基础板块内容",
           "result": "审查完成",
           "findings": [
@@ -926,9 +736,7 @@
           "agent": "agent-reviewer",
           "target": "1-数据结构与算法/",
           "status": "completed",
-          "blockedBy": [
-            "act-dsa-001"
-          ],
+          "blockedBy": [],
           "description": "审查数据结构与算法板块内容",
           "result": "审查完成",
           "findings": [
@@ -952,5 +760,5 @@
       ]
     }
   },
-  "cycle_summary_written": false
+  "cycle_summary_written": true
 }
