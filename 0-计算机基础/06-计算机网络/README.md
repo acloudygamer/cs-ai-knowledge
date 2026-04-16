@@ -18,6 +18,9 @@ DNS域名系统
 
 ### [06-HTTPS与TLS](./06-HTTPS与TLS.md)
 
+### [07-其他应用层协议](./07-其他应用层协议.md)
+邮件协议(SMTP/POP3/IMAP)、文件传输(FTP/SFTP/SCP)、远程访问(SSH/Telnet/RDP)、实时通信(WebSocket/SSE)
+
 ## 学习路径
 
 ### 第一阶段：网络基础（1-2周）
@@ -35,7 +38,7 @@ DNS域名系统
 ### 第三阶段：应用层协议（1-2周）
 1. HTTP/HTTPS 协议原理
 2. DNS 域名系统
-3. FTP、SMTP 等常见协议
+3. FTP、SMTP 等常见协议（见 07-其他应用层协议）
 4. WebSocket 和 HTTP/2、HTTP/3
 
 ## 网络体系结构
