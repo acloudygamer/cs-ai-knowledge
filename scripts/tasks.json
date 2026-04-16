@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "updated": "2026-04-16T23:14:18.525576",
+  "updated": "2026-04-16T23:19:08.637072",
   "boards": {
     "内容扩展": {
       "description": "Brainstormer 扩展各语言/CS/DSA 板块内容",
@@ -9,7 +9,7 @@
           "id": "brainstorm-py-001",
           "agent": "agent-brainstormer",
           "target": "2-Python/",
-          "status": "completed",
+          "status": "pending",
           "priority": "high",
           "description": "扩展 Python 板块内容",
           "result": "brainstorm completed",
@@ -42,14 +42,13 @@
               "problem": "缺少调试与诊断专题（新增）",
               "solution": "C++有04-测试/02-调试与诊断.md但Python无对应内容；因Python主要用IDE调试而非CLI工具，优先级较低"
             }
-          ],
-          "updated": "2026-04-16T22:57:52.266066"
+          ]
         },
         {
           "id": "brainstorm-java-001",
           "agent": "agent-brainstormer",
           "target": "4-Java/",
-          "status": "completed",
+          "status": "pending",
           "priority": "high",
           "description": "扩展 Java 板块内容",
           "result": "Java brainstorm completed",
@@ -70,14 +69,13 @@
               "problem": "Previous brainstorm thin files already expanded in prior sessions",
               "solution": "No action needed - 数据结构274L, 控制流程215L, 内存管理291L already expanded"
             }
-          ],
-          "updated": "2026-04-16T22:58:27.976077"
+          ]
         },
         {
           "id": "brainstorm-cpp-001",
           "agent": "agent-brainstormer",
           "target": "3-C++/",
-          "status": "completed",
+          "status": "pending",
           "priority": "high",
           "description": "扩展 C++ 板块内容",
           "result": "C++ brainstorm done",
@@ -102,14 +100,13 @@
               "problem": "02-常用操作/网络请求.md仅50行",
               "solution": "补充Asio网络库、HTTP客户端、TCP/UDP服务器模板、跨平台socket封装"
             }
-          ],
-          "updated": "2026-04-16T22:58:44.125743"
+          ]
         },
         {
           "id": "brainstorm-js-001",
           "agent": "agent-brainstormer",
           "target": "5-JavaScript/",
-          "status": "completed",
+          "status": "pending",
           "priority": "high",
           "description": "扩展 JavaScript 板块内容",
           "result": "JS brainstorming done - 8 proposals",
@@ -142,14 +139,13 @@
               "problem": "Missing coding standards section",
               "solution": "Add 06-CodingStandards/01-JSStandards.md with ESLint, Prettier, naming conventions"
             }
-          ],
-          "updated": "2026-04-16T22:58:20.939542"
+          ]
         },
         {
           "id": "brainstorm-go-001",
           "agent": "agent-brainstormer",
           "target": "6-Go/",
-          "status": "completed",
+          "status": "pending",
           "priority": "high",
           "description": "扩展 Go 板块内容",
           "result": "done",
@@ -186,14 +182,13 @@
               "problem": "No CGO topic",
               "solution": "Add CGO topic: C call Go, Go call C, cgo params"
             }
-          ],
-          "updated": "2026-04-16T22:58:36.955886"
+          ]
         },
         {
           "id": "brainstorm-cs-001",
           "agent": "agent-brainstormer",
           "target": "0-计算机基础/",
-          "status": "completed",
+          "status": "pending",
           "priority": "high",
           "description": "扩展计算机基础板块内容",
           "result": "brainstorm complete",
@@ -214,14 +209,13 @@
               "problem": "HTTPS与TLS仅在网络分层模型中简述（SSL握手约20行），缺少证书和端到端安全实践",
               "solution": "新增 06-计算机网络/01-网络基础/06-HTTPS与TLS.md，覆盖证书类型、证书链、TLS1.2 vs 1.3差异、端到端加密实践、常见安全配置"
             }
-          ],
-          "updated": "2026-04-16T22:58:43.189534"
+          ]
         },
         {
           "id": "brainstorm-dsa-001",
           "agent": "agent-brainstormer",
           "target": "1-数据结构与算法/",
-          "status": "completed",
+          "status": "pending",
           "priority": "medium",
           "description": "扩展数据结构与算法板块内容",
           "result": "brainstorm completed",
@@ -254,8 +248,7 @@
               "problem": "Missing HLD",
               "solution": "Add new file 11-HLD.md"
             }
-          ],
-          "updated": "2026-04-16T22:58:50.983973"
+          ]
         }
       ]
     },
@@ -278,8 +271,7 @@
               "solution": "Expanded with generator patterns +293 lines"
             }
           ],
-          "errors": [],
-          "updated": "2026-04-16T23:00:31.811362"
+          "errors": []
         },
         {
           "id": "act-java-001",
@@ -301,8 +293,7 @@
               "solution": "Deleted 03-Advanced/05-DesignPatterns.md and removed from README"
             }
           ],
-          "errors": [],
-          "updated": "2026-04-16T23:00:45.719909"
+          "errors": []
         },
         {
           "id": "act-cpp-001",
@@ -320,8 +311,7 @@
               "solution": "Added vcpkg Conan"
             }
           ],
-          "errors": [],
-          "updated": "2026-04-16T23:01:54.592203"
+          "errors": []
         },
         {
           "id": "act-js-001",
@@ -339,14 +329,13 @@
               "solution": "Fixed design patterns path in README"
             }
           ],
-          "errors": [],
-          "updated": "2026-04-16T23:00:44.323843"
+          "errors": []
         },
         {
           "id": "act-go-001",
           "agent": "agent-go",
           "target": "6-Go/",
-          "status": "completed",
+          "status": "pending",
           "blockedBy": [
             "brainstorm-go-001"
           ],
@@ -358,8 +347,7 @@
               "solution": "Created 03-高级用法/10-反射专题.md with 782 lines"
             }
           ],
-          "errors": [],
-          "updated": "2026-04-16T23:01:35.066743"
+          "errors": []
         },
         {
           "id": "act-cs-001",
@@ -377,8 +365,7 @@
               "solution": "4 files verified"
             }
           ],
-          "errors": [],
-          "updated": "2026-04-16T23:09:49.569628"
+          "errors": []
         },
         {
           "id": "act-dsa-001",
@@ -396,8 +383,7 @@
               "solution": "KD-Tree, Treap, HLD already complete"
             }
           ],
-          "errors": [],
-          "updated": "2026-04-16T23:00:59.319602"
+          "errors": []
         }
       ]
     },
@@ -408,7 +394,7 @@
           "id": "review-py-001",
           "agent": "agent-reviewer",
           "target": "2-Python/",
-          "status": "completed",
+          "status": "pending",
           "blockedBy": [
             "act-py-001"
           ],
@@ -425,14 +411,13 @@
               "line": 69,
               "problem": "Dog.__init__(name, age) missing self parameter"
             }
-          ],
-          "updated": "2026-04-16T23:14:18.524239"
+          ]
         },
         {
           "id": "review-java-001",
           "agent": "agent-reviewer",
           "target": "4-Java/",
-          "status": "completed",
+          "status": "pending",
           "blockedBy": [
             "act-java-001"
           ],
@@ -464,14 +449,13 @@
               "line": 276,
               "problem": "Object.finalize() 废弃版本描述不准确"
             }
-          ],
-          "updated": "2026-04-16T23:12:11.760445"
+          ]
         },
         {
           "id": "review-cpp-001",
           "agent": "agent-reviewer",
           "target": "3-C++/",
-          "status": "completed",
+          "status": "pending",
           "blockedBy": [
             "act-cpp-001"
           ],
@@ -483,14 +467,13 @@
               "line": 1,
               "problem": "Duplicate README.md entry in file list"
             }
-          ],
-          "updated": "2026-04-16T23:11:40.597988"
+          ]
         },
         {
           "id": "review-js-001",
           "agent": "agent-reviewer",
           "target": "5-JavaScript/",
-          "status": "completed",
+          "status": "pending",
           "blockedBy": [
             "act-js-001"
           ],
@@ -522,8 +505,7 @@
               "line": "144",
               "problem": "toStrictEqual matcher does not exist"
             }
-          ],
-          "updated": "2026-04-16T23:12:22.528386"
+          ]
         },
         {
           "id": "review-go-001",
@@ -552,7 +534,7 @@
           "id": "review-cs-001",
           "agent": "agent-reviewer",
           "target": "0-计算机基础/",
-          "status": "completed",
+          "status": "pending",
           "blockedBy": [
             "act-cs-001"
           ],
@@ -564,14 +546,13 @@
               "line": "309-312",
               "problem": "FCFS described as preemptive but it is non-preemptive"
             }
-          ],
-          "updated": "2026-04-16T23:11:50.261434"
+          ]
         },
         {
           "id": "review-dsa-001",
           "agent": "agent-reviewer",
           "target": "1-数据结构与算法/",
-          "status": "completed",
+          "status": "pending",
           "blockedBy": [
             "act-dsa-001"
           ],
@@ -603,8 +584,7 @@
               "line": 215,
               "problem": "TrieNode class duplicate defined at line 14"
             }
-          ],
-          "updated": "2026-04-16T23:12:49.702574"
+          ]
         }
       ]
     }

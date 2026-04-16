@@ -87,8 +87,8 @@
 
 ### 调试排查
 
-- **act 执行记录**：查看 `CYCLE_STATUS.md`
 - **任务状态**：`python scripts/task_runner.py --report`
+- **循环汇总**：`python scripts/task_runner.py --report` 时自动写入 `CYCLE_STATUS.md`
 - **act 错误**：`python scripts/task_runner.py --once` 输出中找 errors
 
 ---
@@ -113,7 +113,7 @@ python scripts/task_runner.py --reset     # 重置任务（清空结果）
 | 状态 | 说明 |
 |------|------|
 | pending | 等待执行（被 blockedBy 阻塞的任务不会出现在待执行列表） |
-| in_progress | act 任务执行中（自动写入 CYCLE_STATUS.md pre） |
+| in_progress | act 任务执行中 |
 | completed | 已完成 |
 | failed | act 连续失败 3 次后标记，循环结束后单独处理 |
 
@@ -152,5 +152,5 @@ scripts/
 ├── task_runner.py       # 任务管理器
 ├── tasks.json           # 任务队列
 └── agent-manifest.json  # Agent 注册表
-CYCLE_STATUS.md          # act 执行状态记录
+CYCLE_STATUS.md          # 循环汇总记录（--report 时自动生成）
 ```

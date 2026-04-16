@@ -21,24 +21,34 @@ Claude Code (Leader) → task_runner.py --once → 生成 Markdown 指令 → Sp
 **启动**：当你说 "跑一轮"、"开始工作循环" 或 "开始" 时，执行以下步骤：
 
 0. 创建定时 report 任务：`*/10 * * * *` 每 10 分钟触发 `python scripts/task_runner.py --report`，durable=true
-1. **循环开始前审查**：并行 Spawn 7 个 agent-structure-editor，每个目录一个（0-6）
-2. `python scripts/task_runner.py --once` 生成指令
-3. Spawn agents 执行（无 blockedBy 的任务可并行）
-4. 等待 task notifications
-5. `--once` 检查：
-   - act 有 errors → 重新 Spawn act agents 修复，完成后继续步骤 4
+
+1. **步骤1和2并行执行**：
+   - Spawn 7 个 agent-structure-editor 审查各自目录（0-6）
+   - 同时运行 `python scripts/task_runner.py --once` 生成指令
+
+2. 根据生成的指令 Spawn agents 执行（无 blockedBy 的任务可并行）
+
+3. 等待 task notifications
+
+4. `--once` 检查：
+   - act 有 errors → 重新 Spawn act agents 修复，完成后继续步骤 3
    - 其他 pending → 返回步骤 2
-   - 全部完成 → 步骤 6
-6. **循环结束后修复**：与步骤1一致，并行 Spawn 7 个 agent-structure-editor 修复各自目录
-7. `git add . && git commit -m "feat: ..." && git push`
-8. `--resume` 重置下一轮
+   - 全部 completed → 步骤 5
+
+5. **循环结束后修复**（仅在步骤4确认全部完成后执行）：
+   - 并行 Spawn 7 个 agent-structure-editor 修复各自目录
+   - 等待完成
+
+6. `git add . && git commit -m "feat: ..." && git push`
+
+7. `--resume` 重置下一轮
 
 ## 任务状态
 
 | 状态 | 说明 |
 |------|------|
 | pending | 等待执行（被 blockedBy 阻塞的任务不会出现在待执行列表） |
-| in_progress | act 任务执行中（自动写入 CYCLE_STATUS.md pre） |
+| in_progress | act 任务执行中 |
 | completed | 已完成 |
 | failed | act 连续失败 3 次后标记，循环结束后单独处理 |
 
