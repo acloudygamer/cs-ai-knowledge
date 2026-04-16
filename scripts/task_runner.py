@@ -426,13 +426,11 @@ class TaskRunner:
         for i, task in enumerate(pending, 1):
             lines.append(f"## 任务 {i}: {task['id']}")
             lines.append(f"- **Agent**: `{task['agent']}`")
-            # 从 agent-manifest 注入 capabilities 和 skills
+            # 从 agent-manifest 注入版本追踪信息
             agent_info = self.get_agent_info(task['agent'])
-            if agent_info.get('skills'):
-                skills_str = ', '.join(agent_info['skills'])
-                lines.append(f"- **Skills**: `{skills_str}` *(通过 Agent tool 自动注入)*")
-            if agent_info.get('capabilities'):
-                lines.append(f"- **Capabilities**: `{', '.join(agent_info['capabilities'])}`")
+            if agent_info.get('versionTracking'):
+                versions_str = ', '.join(agent_info['versionTracking'])
+                lines.append(f"- **版本追踪**: `{versions_str}`")
             lines.append(f"- **Target**: `{task['target']}`")
             lines.append(f"- **Description**: {task['description']}")
             lines.append(f"- **Priority**: {task.get('priority', 'medium')}")
