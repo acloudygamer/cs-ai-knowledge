@@ -45,6 +45,7 @@ Java 8（Lambda/Stream）→ Java 11（HttpClient）→ Java 17（密封类）�
 
 - [文件操作](./02-常用操作/01-文件操作.md)
 - [网络请求](./02-常用操作/02-网络请求.md)
+- [HTTP客户端对比](./02-常用操作/HTTP客户端对比.md)
 - [JSON处理](./02-常用操作/03-JSON处理.md)
 - [错误处理](./02-常用操作/04-错误处理.md)
 - [Stream API](./02-常用操作/05-Stream%20API.md)
@@ -67,6 +68,8 @@ Java 8（Lambda/Stream）→ Java 11（HttpClient）→ Java 17（密封类）�
 - [Spring入门](./03-高级用法/07-Spring入门.md)
 - [现代Java特性](./03-高级用法/08-现代Java特性.md)
 - [模块系统](./03-高级用法/05-模块系统.md)
+- [响应式编程](./03-高级用法/响应式编程.md)
+- [安全编码](./03-高级用法/安全编码.md)
 
 ## 测试
 
@@ -94,3 +97,6 @@ Java 8（Lambda/Stream）→ Java 11（HttpClient）→ Java 17（密封类）�
 - [Redis](./05-Java生态/03-Redis.md)
 - [Kafka](./05-Java生态/04-Kafka.md)
 - [Docker与K8s](./05-Java生态/05-Docker与K8s.md)
+- [MyBatis](./05-Java生态/MyBatis.md)
+- [SpringSecurity](./05-Java生态/SpringSecurity.md)
+- [SpringCloud微服务](./05-Java生态/SpringCloud微服务.md)

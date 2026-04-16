@@ -182,8 +182,161 @@ def k_nearest_neighbors(tree, target, k=1):
 | R-Tree | 2-3 维 | 高效 | 高效 |
 | 暴力搜索 | 任意 | O(n) | O(n) |
 
+## 维度灾难
+
+KD-Tree 的性能随维度增加而退化：
+
+- **理论**：在 d 维空间中，KD-Tree 的查询复杂度退化为 O(n^(1-1/d))
+- **经验法则**：当维度 d > 20 时，KD-Tree 的性能可能不如暴力搜索
+
+### 应对策略
+
+| 策略 | 说明 |
+|------|------|
+| PCA 降维 | 先用主成分分析降维 |
+| 局部敏感哈希 (LSH) | 适合高维近似最近邻 |
+| 分层可导航小世界图 (HNSW) | 更适合高维向量检索 |
+
+## 平衡 KD-Tree
+
+朴素构建可能导致树不平衡，需要采用平衡构建方法：
+
+```python
+class BalancedKDTree:
+    """使用中位数分割的平衡 KD-Tree"""
+
+    def __init__(self, k=2):
+        self.k = k
+        self.root = None
+
+    def build(self, points):
+        """平衡构建"""
+        def build_node(points, depth):
+            if not points:
+                return None
+
+            dim = depth % self.k
+
+            # 按维度排序，取中位数
+            points.sort(key=lambda x: x[dim])
+            mid = len(points) // 2
+
+            node = KDNode(points[mid], dim)
+            node.left = build_node(points[:mid], depth + 1)
+            node.right = build_node(points[mid + 1:], depth + 1)
+            return node
+
+        self.root = build_node(points, 0)
+        return self.root
+
+
+class KDTreeWithMedian:
+    """使用 nth_element 的高效平衡构建"""
+
+    def build(self, points):
+        """O(n) 期望时间构建"""
+        import random
+
+        def nth_element(arr, n, key):
+            random.shuffle(arr)  # 随机化避免最坏情况
+            return sorted(arr, key=key)[:n]
+
+        def build_node(points, depth):
+            if not points:
+                return None
+
+            dim = depth % self.k
+
+            # 分区：找中位数
+            points.sort(key=lambda x: x[dim])
+            mid = len(points) // 2
+
+            node = KDNode(points[mid], dim)
+            node.left = build_node(points[:mid], depth + 1)
+            node.right = build_node(points[mid + 1:], depth + 1)
+            return node
+
+        self.root = build_node(points, 0)
+```
+
+## 实战例题
+
+### 1. 二维平面最近点对
+
+```python
+def closest_pair(points):
+    """
+    找到二维平面中最近的点对
+    LeetCode 279 (变体)
+    方法：分治 + KD-Tree 优化
+    """
+    import math
+
+    def distance(p1, p2):
+        return math.sqrt((p1[0] - p2[0])**2 + (p1[1] - p2[1])**2)
+
+    # 使用 KD-Tree 加速最近邻查询
+    kdtree = KDTree()
+    kdtree.build(points)
+
+    min_dist = float('inf')
+    closest = None
+
+    for p in points:
+        # 找最近的点
+        neighbor = kdtree.search(p)
+        if neighbor:
+            d = distance(p, neighbor)
+            if 0 < d < min_dist:
+                min_dist = d
+                closest = (p, neighbor)
+
+    return closest, min_dist
+```
+
+### 2. K 近邻分类
+
+```python
+def knn_classify(train_data, test_point, k=5):
+    """
+    K 近邻分类器（使用 KD-Tree 加速）
+    train_data: [(point, label), ...]
+    """
+    points = [d[0] for d in train_data]
+    kdtree = KDTree()
+    kdtree.build(points)
+
+    neighbors = kdtree.k_nearest_neighbors(test_point, k)
+
+    # 投票
+    label_count = {}
+    for i, p in enumerate(neighbors):
+        idx = kdtree.root.search_index(p)  # 找到对应索引
+        label = train_data[idx][1]
+        label_count[label] = label_count.get(label, 0) + 1
+
+    return max(label_count, key=label_count.get)
+```
+
+### 3. 范围搜索 for 图像处理
+
+```python
+def range_search_image(points, query_box):
+    """
+    图像处理中的颜色空间搜索
+    points: [(r, g, b), ...]
+    query_box: [(r_min, g_min, b_min), (r_max, g_max, b_max)]
+    """
+    kdtree = KDTree(k=3)
+    kdtree.build(points)
+
+    lo, hi = query_box
+    return kdtree.range_query(lo, hi)
+```
+
 ## 局限性
 
 - 高维情况下效率退化（维度灾难）
 - 动态插入删除效率较低
 - 适合静态数据集或定期重建
+- 对于非常不均匀分布的数据，平衡可能变差

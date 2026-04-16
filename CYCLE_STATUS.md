@@ -119,3 +119,47 @@
 | review-dsa-001 | 02-高级数据结构/05-前缀树.md | 215 | TrieNode class duplicate defined at line 14 |
 
 ---
+
+
+---
+
+## 循环 2026-04-17
+
+### 本轮完成的任务
+
+**brainstorm（7个）**：
+| 任务 | 发现的缺口 |
+|------|-----------|
+| brainstorm-py-001 | 缺少设计模式专题、缺少测试实践专题、迭代器生成器内容简略、缺少虚拟环境与包管理专题、缺少打包与分发专题... |
+| brainstorm-java-001 | MyBatis 完全缺失 - 企业中与 JPA/Hibern、Spring Security 安全专题缺失 - 仅作为 s、微服务架构内容缺失 - 无 Spring Cloud/服务注、响应式编程未覆盖 - Project Reactor/RxJ、设计模式覆盖不足 - 仅 8/23 种 GoF 模式，缺迭代... |
+| brainstorm-cpp-001 | 命名空间(namespace)完全缺失、控制流程.md内容过薄、模板元编程覆盖不足、预处理器和宏缺失、RTTI缺失... |
+| brainstorm-js-001 | Web APIs深度不足 - Service Workers、Proxy与Reflect完全缺失 - 元编程重要工具、Symbol深度不足 - 仅在变量与类型中一笔带过、ArrayBuffer/SharedArrayBuffer/、Node.js Streams、进程与集群、调试内容缺失... |
+| brainstorm-go-001 | 日志系统覆盖不足、gRPC 和现代通信协议缺失、os/exec、flag 等标准库未覆盖、插件系统仅有简介、WebSocket 和 TCP/UDP 编程缺失... |
+| brainstorm-cs-001 | 01-计算机体系: 缺少GPU/异构计算内容，现代AI/深度、02-系统软件层: 缺少中断与异常处理、设备驱动内容、05-软件工程概念: 数据库基础.md 存在但可能薄弱，需要、05-软件工程概念: 缺少 安全基础 主题、06-计算机网络: Socket编程.md 可能较浅... |
+| brainstorm-dsa-001 | 单调队列深度不足、布隆过滤器仅有提及、Link-Cut Tree完全缺失、后缀数组/自动机未覆盖、Aho-Corasick未覆盖... |
+
+**act（7个）**：
+| 任务 | 实现内容 |
+|------|---------|
+| act-py-001 | 错误已修复... (7 findings) |
+| act-java-001 | 错误已修复... (8 findings) |
+| act-cpp-001 | 错误已修复... (3 findings) |
+| act-js-001 | 错误已修复... (3 findings) |
+| act-go-001 | 错误已修复... (9 findings) |
+| act-cs-001 | 错误已修复... (10 findings) |
+| act-dsa-001 | 错误已修复... (3 findings) |
+
+**review（7个）**：
+| 任务 | 发现问题数 | 示例问题 |
+|------|-----------|---------|
+| review-py-001 | 9 | 语法错误: def delete_all.force 应为 def delete |
+| review-java-001 | 8 | @EnumUtil注解不存在，MyBatis原生支持枚举无需注解 |
+| review-cpp-001 | 3 | 函数名包含中文字符 void外部_process 不是有效的 C++ 标识符 |
+| review-js-001 | 3 | 错误信息：注释说 Symbol.keyFor() 可以删除全局 Symbol，但 |
+| review-go-001 | 10 | slog.GroupValue 使用错误 - 这是一个接口而非构造函数，应使用  |
+| review-cs-001 | 9 | asyncio示例使用aiohttp但未导入，代码无法运行 |
+| review-dsa-001 | 3 | ACTrie 类 add_pattern 方法将整数索引存储在 self.nex |
+
+### 待修复错误（errors）
+
+(无)
