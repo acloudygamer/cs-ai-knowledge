@@ -32,6 +32,29 @@ Socket是应用程序与网络协议栈之间的接口，封装了TCP/UDP的复�
 - 服务器socket → **端口**：bind()绑定到特定端口
 - 客户端socket → **服务器**：connect()建立连接
 
+## Socket类型
+
+```python
+# 主要Socket类型
+socket_types = {
+    "SOCK_STREAM": {
+        "协议": "TCP",
+        "特性": "面向连接、可靠、字节流",
+        "应用": "HTTP、SSH、邮件"
+    },
+    "SOCK_DGRAM": {
+        "协议": "UDP",
+        "特性": "无连接、不可靠、数据报",
+        "应用": "DNS、视频流"
+    },
+    "SOCK_RAW": {
+        "协议": "原始套接字",
+        "特性": "直接访问IP层，可自定义协议",
+        "应用": "ping、traceroute"
+    }
+}
+```
+
 ## TCP Socket编程
 
 ### TCP服务器流程
@@ -66,66 +89,225 @@ Socket是应用程序与网络协议栈之间的接口，封装了TCP/UDP的复�
 └─────────────────────────────────────────────────────────────┘
 ```
 
-### Python TCP服务器/客户端
+### Go语言实现
+
+```go
+// TCP 服务端
+package main
+
+import (
+    "bufio"
+    "fmt"
+    "net"
+    "time"
+)
+
+func handleConnection(conn net.Conn) {
+    defer conn.Close()
+    addr := conn.RemoteAddr().String()
+    fmt.Printf("[%s] 客户端连接\n", addr)
+
+    reader := bufio.NewReader(conn)
+    for {
+        // 设置读超时
+        conn.SetReadDeadline(time.Now().Add(60 * time.Second))
+
+        message, err := reader.ReadString('\n')
+        if err != nil {
+            fmt.Printf("[%s] 客户端断开: %v\n", addr, err)
+            return
+        }
+
+        // 处理消息
+        message = message[:len(message)-1] // 去掉换行符
+        fmt.Printf("[%s] 收到: %s\n", addr, message)
+
+        // 发送响应
+        response := fmt.Sprintf("收到: %s\n", message)
+        conn.Write([]byte(response))
+    }
+}
+
+func main() {
+    listener, err := net.Listen("tcp", ":8080")
+    if err != nil {
+        fmt.Printf("监听失败: %v\n", err)
+        return
+    }
+    defer listener.Close()
+
+    fmt.Println("TCP服务器启动，监听 :8080")
+
+    for {
+        conn, err := listener.Accept()
+        if err != nil {
+            fmt.Printf("接受连接失败: %v\n", err)
+            continue
+        }
+
+        // 启动 goroutine 处理连接
+        go handleConnection(conn)
+    }
+}
+```
+
+```go
+// TCP 客户端
+package main
+
+import (
+    "bufio"
+    "fmt"
+    "net"
+    "os"
+    "time"
+)
+
+func main() {
+    // 连接服务器
+    conn, err := net.DialTimeout("tcp", "localhost:8080", 5*time.Second)
+    if err != nil {
+        fmt.Printf("连接服务器失败: %v\n", err)
+        return
+    }
+    defer conn.Close()
+
+    fmt.Println("已连接到服务器")
+
+    // 启动 goroutine 读取服务器响应
+    go func() {
+        reader := bufio.NewReader(conn)
+        for {
+            message, err := reader.ReadString('\n')
+            if err != nil {
+                fmt.Printf("读取响应失败: %v\n", err)
+                return
+            }
+            fmt.Print("服务器: ", message)
+        }
+    }()
+
+    // 从 stdin 读取并发送
+    scanner := bufio.NewScanner(os.Stdin)
+    for scanner.Scan() {
+        message := scanner.Text() + "\n"
+        _, err := conn.Write([]byte(message))
+        if err != nil {
+            fmt.Printf("发送消息失败: %v\n", err)
+            return
+        }
+    }
+}
+```
+
+### Python实现
 
 ```python
-# TCP服务器
+# TCP 服务端
 import socket
+import threading
 
-def start_server(host='0.0.0.0', port=8080):
-    # 创建TCP socket
-    server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    # 允许端口复用
-    server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+def handle_client(conn, addr):
+    print(f"[{addr}] 客户端连接")
+    try:
+        while True:
+            # 设置超时
+            conn.settimeout(60)
+
+            # 接收数据
+            data = conn.recv(1024)
+            if not data:
+                break
+
+            message = data.decode().strip()
+            print(f"[{addr}] 收到: {message}")
+
+            # 发送响应
+            response = f"收到: {message}\n"
+            conn.sendall(response.encode())
+
+    except socket.timeout:
+        print(f"[{addr}] 连接超时")
+    except Exception as e:
+        print(f"[{addr}] 错误: {e}")
+    finally:
+        conn.close()
+        print(f"[{addr}] 连接关闭")
+
+def main():
+    # 创建 socket
+    server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+
     # 绑定地址
-    server_socket.bind((host, port))
-    # 监听连接
-    server_socket.listen(5)
-    print(f"Server listening on {host}:{port}")
+    server.bind(('0.0.0.0', 8080))
 
-    while True:
-        # 接受连接（阻塞）
-        client_socket, client_addr = server_socket.accept()
-        print(f"Connection from {client_addr}")
-
-        # 处理请求
-        try:
-            while True:
-                data = client_socket.recv(1024)
-                if not data:
-                    break
-                print(f"Received: {data.decode()}")
-                # 回显
-                client_socket.sendall(data)
-        except Exception as e:
-            print(f"Error: {e}")
-        finally:
-            client_socket.close()
-
-    server_socket.close()
-
-# TCP客户端
-import socket
-
-def tcp_client(host='localhost', port=8080):
-    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    sock.connect((host, port))
-    print(f"Connected to {host}:{port}")
+    # 监听
+    server.listen(5)
+    print("TCP服务器启动，监听 :8080")
 
     try:
-        message = "Hello, Server!"
-        sock.sendall(message.encode())
-        print(f"Sent: {message}")
+        while True:
+            # 接受连接
+            conn, addr = server.accept()
+            # 启动线程处理
+            thread = threading.Thread(target=handle_client, args=(conn, addr))
+            thread.start()
+    except KeyboardInterrupt:
+        print("\n服务器关闭")
+    finally:
+        server.close()
 
-        data = sock.recv(1024)
-        print(f"Received: {data.decode()}")
+if __name__ == "__main__":
+    main()
+```
+
+```python
+# TCP 客户端
+import socket
+import threading
+import sys
+
+def receive_messages(sock):
+    """接收服务器消息"""
+    try:
+        while True:
+            data = sock.recv(1024)
+            if not data:
+                print("\n服务器断开连接")
+                break
+            print(f"\r服务器: {data.decode().strip()}\n> ", end="")
     except Exception as e:
-        print(f"Error: {e}")
+        print(f"\n接收错误: {e}")
+
+def main():
+    # 连接服务器
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    try:
+        sock.connect(('localhost', 8080))
+        print("已连接到服务器")
+    except Exception as e:
+        print(f"连接失败: {e}")
+        return
+
+    # 启动接收线程
+    recv_thread = threading.Thread(target=receive_messages, args=(sock,))
+    recv_thread.daemon = True
+    recv_thread.start()
+
+    # 发送消息
+    try:
+        while True:
+            message = input("> ")
+            if message.lower() in ('exit', 'quit'):
+                break
+            sock.sendall((message + "\n").encode())
+    except KeyboardInterrupt:
+        print("\n退出")
     finally:
         sock.close()
 
-if __name__ == '__main__':
-    start_server()
+if __name__ == "__main__":
+    main()
 ```
 
 ### C语言 TCP服务器/客户端
@@ -228,82 +410,105 @@ int main() {
 }
 ```
 
-### C++ TCP服务器 (面向对象)
+## UDP Socket编程
 
-```cpp
-// C++ TCP服务器类
-#include <iostream>
-#include <cstring>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <unistd.h>
+### Go语言实现
 
-class TCPServer {
-private:
-    int server_fd;
-    int port;
-    struct sockaddr_in address;
+```go
+// UDP 服务端
+package main
 
-public:
-    TCPServer(int port) : port(port), server_fd(-1) {}
+import (
+    "fmt"
+    "net"
+)
 
-    bool start() {
-        server_fd = socket(AF_INET, SOCK_STREAM, 0);
-        if (server_fd < 0) return false;
+func main() {
+    // 创建 UDP 地址
+    addr, err := net.ResolveUDPAddr("udp", ":8080")
+    if err != nil {
+        fmt.Printf("地址解析失败: %v\n", err)
+        return
+    }
 
-        int opt = 1;
-        setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
+    // 监听
+    conn, err := net.ListenUDP("udp", addr)
+    if err != nil {
+        fmt.Printf("监听失败: %v\n", err)
+        return
+    }
+    defer conn.Close()
 
-        address.sin_family = AF_INET;
-        address.sin_addr.s_addr = INADDR_ANY;
-        address.sin_port = htons(port);
+    fmt.Println("UDP服务器启动，监听 :8080")
 
-        if (bind(server_fd, (struct sockaddr*)&address, sizeof(address)) < 0) {
-            return false;
+    buffer := make([]byte, 1024)
+    for {
+        // 读取数据
+        n, clientAddr, err := conn.ReadFromUDP(buffer)
+        if err != nil {
+            fmt.Printf("读取失败: %v\n", err)
+            continue
         }
 
-        if (listen(server_fd, 5) < 0) {
-            return false;
-        }
+        message := string(buffer[:n])
+        fmt.Printf("[%s] 收到: %s\n", clientAddr, message)
 
-        return true;
+        // 发送响应
+        response := fmt.Sprintf("收到: %s", message)
+        conn.WriteToUDP([]byte(response), clientAddr)
     }
-
-    int acceptClient(struct sockaddr_in* client_addr) {
-        socklen_t len = sizeof(*client_addr);
-        return accept(server_fd, (struct sockaddr*)client_addr, &len);
-    }
-
-    void close() {
-        if (server_fd >= 0) {
-            ::close(server_fd);
-        }
-    }
-
-    ~TCPServer() {
-        close();
-    }
-};
-
-int main() {
-    TCPServer server(8080);
-    if (!server.start()) {
-        std::cerr << "Failed to start server" << std::endl;
-        return 1;
-    }
-    std::cout << "Server started on port 8080" << std::endl;
-
-    struct sockaddr_in client_addr;
-    int client_fd = server.acceptClient(&client_addr);
-    std::cout << "Client connected" << std::endl;
-
-    // 处理客户端...
-    close(client_fd);
-    return 0;
 }
 ```
 
-## UDP Socket编程
+```go
+// UDP 客户端
+package main
+
+import (
+    "fmt"
+    "net"
+    "time"
+)
+
+func main() {
+    // 连接服务器（UDP不需要真正的connect，这里解析地址）
+    addr, err := net.ResolveUDPAddr("udp", "localhost:8080")
+    if err != nil {
+        fmt.Printf("地址解析失败: %v\n", err)
+        return
+    }
+
+    conn, err := net.DialUDP("udp", nil, addr)
+    if err != nil {
+        fmt.Printf("连接失败: %v\n", err)
+        return
+    }
+    defer conn.Close()
+
+    fmt.Println("UDP客户端启动")
+
+    // 发送数据
+    message := "Hello UDP"
+    _, err = conn.Write([]byte(message))
+    if err != nil {
+        fmt.Printf("发送失败: %v\n", err)
+        return
+    }
+
+    fmt.Printf("已发送: %s\n", message)
+
+    // 接收响应
+    buffer := make([]byte, 1024)
+    conn.SetReadDeadline(time.Now().Add(5 * time.Second))
+    n, _, err := conn.ReadFromUDP(buffer)
+    if err != nil {
+        fmt.Printf("接收响应失败: %v\n", err)
+        return
+    }
+
+    fmt.Printf("服务器响应: %s\n", string(buffer[:n]))
+}
+```
 
 ### Python UDP服务器/客户端
 
@@ -415,6 +620,113 @@ int main() {
     close(sock_fd);
     return 0;
 }
+```
+
+## 常见问题
+
+### 粘包处理
+
+```python
+# TCP粘包问题需要自己处理
+import struct
+
+class MessageProtocol:
+    """TLV (Type-Length-Value) 协议"""
+
+    @staticmethod
+    def pack(message: str) -> bytes:
+        """打包消息：4字节长度 + 消息内容"""
+        data = message.encode('utf-8')
+        length = len(data)
+        # 打包为4字节无符号大端序整数
+        header = struct.pack('!I', length)
+        return header + data
+
+    @staticmethod
+    def unpack_one(buffer: bytearray) -> tuple[str | None, int]:
+        """
+        从缓冲区解包一条消息
+        返回：(消息内容, 已消耗字节数) 或 (None, 0)
+        """
+        if len(buffer) < 4:
+            return None, 0
+
+        # 读取长度
+        length = struct.unpack('!I', bytes(buffer[:4]))[0]
+
+        # 检查是否收到完整消息
+        total_len = 4 + length
+        if len(buffer) < total_len:
+            return None, 0
+
+        # 提取消息
+        message = buffer[4:total_len].decode('utf-8')
+
+        # 移除已处理数据
+        del buffer[:total_len]
+
+        return message, total_len
+
+
+def recv_messages(sock):
+    """接收完整消息流"""
+    buffer = bytearray()
+    while True:
+        data = sock.recv(4096)
+        if not data:
+            break
+        buffer.extend(data)
+
+        # 循环解包
+        while True:
+            msg, consumed = MessageProtocol.unpack_one(buffer)
+            if consumed == 0:
+                break
+            yield msg
+```
+
+### 心跳机制
+
+```python
+import threading
+import time
+
+class HeartbeatConnection:
+    """带心跳的连接"""
+
+    def __init__(self, conn, interval=30, timeout=90):
+        self.conn = conn
+        self.interval = interval  # 心跳间隔
+        self.timeout = timeout    # 超时时间
+        self.last_pong = time.time()
+        self.running = True
+
+    def start(self):
+        """启动心跳"""
+        self.recv_thread = threading.Thread(target=self._heartbeat_check)
+        self.recv_thread.daemon = True
+        self.recv_thread.start()
+
+    def _heartbeat_check(self):
+        """检查心跳是否超时"""
+        while self.running:
+            if time.time() - self.last_pong > self.timeout:
+                print("心跳超时，关闭连接")
+                self.conn.close()
+                break
+            time.sleep(1)
+
+    def send_ping(self):
+        """发送心跳"""
+        try:
+            self.conn.sendall(b"ping")
+        except Exception as e:
+            print(f"发送心跳失败: {e}")
+            self.conn.close()
+
+    def on_pong(self):
+        """收到pong"""
+        self.last_pong = time.time()
 ```
 
 ## 非阻塞与异步Socket
@@ -658,4 +970,32 @@ sock.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
 sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPIDLE, 60)
 sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPINTVL, 10)
 sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPCNT, 3)
+```
+
+## 网络字节序
+
+```python
+import struct
+
+# 字节序转换
+byte_order = {
+    "主机字节序": "小端（x86）或大端（网络）",
+    "网络字节序": "大端序（Big Endian）",
+    "原因": "网络协议统一使用大端序"
+}
+
+# Python转换函数
+def convert_byte_order():
+    # 主机序转网络序（大端）
+    # 4字节
+    network_int = socket.htonl(0x12345678)  # host to network long
+    network_short = socket.htons(0x1234)    # host to network short
+
+    # 网络序转主机序
+    host_int = socket.ntohl(network_int)    # network to host long
+    host_short = socket.ntohs(network_short) # network to host short
+
+    # struct模块也可
+    packed = struct.pack('!I', 0x12345678)  # ! 表示网络字节序
+    unpacked = struct.unpack('!I', packed)[0]
 ```

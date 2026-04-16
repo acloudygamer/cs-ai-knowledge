@@ -416,7 +416,7 @@ public final class DeleteCommand implements Command {
 | Text Blocks | 15 | 多行字符串 |
 | Sealed Classes | 17 | 限制继承层次 |
 | Record Patterns | 21 | Record 解构 |
-| String Templates | 21 | 字符串插值 |
+| String Templates | 21 | 字符串插值（预览特性，Java 22正式） |
 | Virtual Threads | 21 | 轻量级线程 |
 
 ## 版本选择建议

@@ -48,29 +48,26 @@ JDBC Driver Manager
 ## JDBC 基本步骤
 
 ```java
-// 1. 加载驱动（JDBC 4.0+ 自动加载，通常不需要手动调用）
-Class.forName("com.mysql.cj.jdbc.Driver");
-
-// 2. 获取连接
+// 1. 获取连接（JDBC 4.0+ 驱动自动加载，无需 Class.forName）
 String url = "jdbc:mysql://localhost:3306/mydb?useSSL=false&serverTimezone=UTC";
 String username = "root";
 String password = "password";
 Connection conn = DriverManager.getConnection(url, username, password);
 
-// 3. 创建语句
+// 2. 创建语句
 Statement stmt = conn.createStatement();
 
-// 4. 执行 SQL
+// 3. 执行 SQL
 ResultSet rs = stmt.executeQuery("SELECT * FROM users");
 
-// 5. 处理结果
+// 4. 处理结果
 while (rs.next()) {
     long id = rs.getLong("id");
     String name = rs.getString("name");
     System.out.println(id + ": " + name);
 }
 
-// 6. 关闭资源（倒序）
+// 5. 关闭资源（倒序）
 rs.close();
 stmt.close();
 conn.close();

@@ -39,11 +39,11 @@ import myModule from './myModule.mjs';
 ### 特殊全局变量
 
 ```javascript
-// __dirname：当前文件所在目录的绝对路径
-console.log(__dirname);  // /home/user/project/src
+// __dirname：当前文件所在目录的绝对路径（Windows 上为反斜杠）
+console.log(__dirname);  // D:\project\src (Windows) 或 /home/user/project/src (Linux/macOS)
 
 // __filename：当前文件的绝对路径
-console.log(__filename);  // /home/user/project/src/index.js
+console.log(__filename);  // D:\project\src\index.js (Windows) 或 /home/user/project/src/index.js (Linux/macOS)
 
 // require：加载模块（仅 CommonJS）
 const module = require('./module');

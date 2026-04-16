@@ -43,9 +43,9 @@ TCP和UDP是传输层的核心协议，TCP提供可靠连接，UDP提供无连�
 │  0                   1                   2                   │
 │  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1  │
 │ ┌─┬─┬─┬─┬─┬─┬─┬─┬─┬─┬─┬─┬─┬─┬─┬─┬─┬─┬─┬─┬─┬─┬─┬─┬─┬─┬─┬─┬─┬─┬─┐ │
-│ │S|D│E|U|A|P|R|S|F│                                │         │ │
-│ │r|c|E|A|C|S|S|Y|I│         Source Port            │         │ │
-│ │c|c|n|n|K|K|N|N|G│                                │         │ │
+│ │S|D│E│U│A│P│R│S│F│                                │         │ │
+│ │r│c│E│A│C│S│S│Y│I│         Source Port            │         │ │
+│ │c│c│n│n│K│K│N│N│G│                                │         │ │
 │ │ │ │ │ │ │ │ │ │ │                                │         │ │
 │ │1│1│1│1│1│1│1│1│1│         Destination Port       │         │ │
 │ └─┴─┴─┴─┴─┴─┴─┴─┴─┴─┴───────────────────────────────┴────────┘ │
@@ -181,6 +181,38 @@ FIN_WAIT_2                          LAST_ACK
  → 发送SACK告知只重传1001
 ```
 
+### TCP流量控制
+
+```python
+# 流量控制目的
+flow_control = {
+    "问题": "发送方发送太快，接收方处理不过来",
+    "解决": "接收方通过window字段告知剩余缓冲区",
+    "本质": "接收方控制发送方的发送速率"
+}
+
+# 零窗口问题
+zero_window = """
+接收方缓冲区满了：
+发送方 ──▶ [data] ──▶ 接收方（缓冲区满）
+发送方 ◀── [ack=xxx, window=0] ─── 接收方（告诉发送方停止）
+
+发送方停止发送，等待窗口更新：
+接收方 ──▶ 处理数据，缓冲区空闲
+接收方 ◀── [window=1000] ── 发送方（窗口探测）
+
+发送方恢复发送
+"""
+
+# 窗口探测
+zero_window_probe = {
+    "触发": "发送方收到零窗口通知后",
+    "策略": "定期发送小数据探测窗口",
+    "间隔": "指数退避（60秒内通常30-60秒一次）",
+    "超时": "持续零窗口导致连接超时"
+}
+```
+
 ### TCP拥塞控制
 
 #### 慢启动
@@ -234,6 +266,16 @@ cwnd
  └──────────────────────────────▶ time
          ssthresh
 ```
+
+#### TCP拥塞控制算法变种
+
+| 算法 | 特点 | 使用场景 |
+|------|------|----------|
+| Reno | 标准快速恢复 | 较新Linux默认 |
+| NewReno | 改进快速恢复 | 多个丢包场景 |
+| CUBIC | 高BDP网络 | Linux默认 |
+| BBR | 基于模型 | 高延迟高丢包 |
+| Westwood | 改进慢启动 | 无线网络 |
 
 ### TCP选项
 
@@ -439,6 +481,168 @@ HTTP/3 使用 QUIC (基于UDP)：
 - 多路复用避免队头阻塞
 - 0-RTT快速重连
 - 连接迁移支持
+```
+
+## TCP粘包问题
+
+### 粘包原因
+
+```python
+# 粘包场景
+packet_sticking = {
+    "原因1": "TCP是字节流协议，无消息边界",
+    "原因2": "Nagle算法合并小数据包",
+    "原因3": "接收方缓冲区一次读取多个消息"
+}
+
+# 粘包示例
+sticking_example = """
+发送方发送：
+消息A: "Hello"
+消息B: "World"
+
+可能接收到的形式：
+1. 正常：A和B分开收到
+2. 粘包："HelloWorld" 一起收到
+3. 半包："Hel" 先收到
+"""
+```
+
+### 粘包解决方案
+
+```python
+# 方案1：固定长度
+fixed_length = """
+每个消息固定长度，比如100字节
+不足的补空格或零
+缺点：浪费带宽
+"""
+
+# 方案2：分隔符（如换行符）
+delimiter_based = """
+消息用特定分隔符（如\n）区分
+缺点：消息内容不能包含分隔符
+"""
+
+# 方案3：长度前缀（推荐）
+length_prefix = """
+先发送4字节长度，再发送数据
+最常用，最灵活
+
+┌──────┬─────────────┐
+│ 长度  │    数据      │
+│ 4字节  │  N字节       │
+└──────┴─────────────┘
+"""
+```
+
+### 实际代码示例
+
+```python
+import struct
+
+def send_message(sock, data):
+    """发送消息（长度前缀）"""
+    # 先发送4字节长度
+    length = len(data)
+    sock.sendall(struct.pack('!I', length))
+    # 再发送数据
+    sock.sendall(data)
+
+def recv_message(sock):
+    """接收消息"""
+    # 先接收4字节长度
+    length_data = recv_exact(sock, 4)
+    length = struct.unpack('!I', length_data)[0]
+    # 再接收数据
+    return recv_exact(sock, length)
+
+def recv_exact(sock, n):
+    """确保接收n个字节"""
+    data = b''
+    while len(data) < n:
+        packet = sock.recv(n - len(data))
+        if not packet:
+            break
+        data += packet
+    return data
+```
+
+## TCP保活与心跳
+
+### TCP保活
+
+```python
+# TCP保活（Keep-Alive）
+tcp_keepalive = {
+    "作用": "检测连接是否仍然存活",
+    "默认": "关闭（2小时无数据才探测）",
+    "配置": [
+        "tcp_keepalive_time: 空闲多久开始探测",
+        "tcp_keepalive_intvl: 探测间隔",
+        "tcp_keepalive_probes: 探测次数"
+    ]
+}
+
+# 保活 vs 心跳
+keepalive_vs_heartbeat = {
+    "保活": {
+        "协议层": "TCP层",
+        "实现": "操作系统内核",
+        "可配置性": "有限",
+        "适用": "检测连接断开"
+    },
+    "心跳": {
+        "协议层": "应用层",
+        "实现": "应用程序",
+        "可配置性": "灵活",
+        "适用": "实时应用、业务逻辑"
+    }
+}
+```
+
+### 应用层心跳
+
+```python
+import threading
+import time
+
+class HeartbeatConnection:
+    """带心跳的连接"""
+
+    def __init__(self, conn, interval=30, timeout=90):
+        self.conn = conn
+        self.interval = interval  # 心跳间隔
+        self.timeout = timeout    # 超时时间
+        self.last_pong = time.time()
+        self.running = True
+
+    def start(self):
+        """启动心跳"""
+        self.recv_thread = threading.Thread(target=self._heartbeat_check)
+        self.recv_thread.daemon = True
+        self.recv_thread.start()
+
+    def _heartbeat_check(self):
+        """检查心跳是否超时"""
+        while self.running:
+            if time.time() - self.last_pong > self.timeout:
+                print("心跳超时，关闭连接")
+                self.conn.close()
+                break
+            time.sleep(1)
+
+    def send_ping(self):
+        """发送心跳"""
+        try:
+            self.conn.sendall(b"ping")
+        except Exception as e:
+            print(f"发送心跳失败: {e}")
+            self.conn.close()
+
+    def on_pong(self):
+        """收到pong"""
+        self.last_pong = time.time()
 ```
 
 ## 网络诊断

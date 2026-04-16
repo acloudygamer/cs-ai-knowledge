@@ -72,9 +72,9 @@ public class ClassLoaderDemo {
         ClassLoader bootstrapLoader = String.class.getClassLoader();
         System.out.println(bootstrapLoader); // null（因为 Bootstrap ClassLoader 不是 Java 对象）
 
-        // Extension ClassLoader
-        ClassLoader extLoader = sun.reflect.DelegatingClassLoader.class.getClassLoader();
-        System.out.println(extLoader); // null 或 ext loader
+        // Extension ClassLoader（JDK 8 及之前为 ExtClassLoader，JDK 9+ 为 PlatformClassLoader）
+        ClassLoader platformLoader = ClassLoader.getPlatformClassLoader();
+        System.out.println(platformLoader); // platformClassLoader
 
         // Application ClassLoader
         ClassLoader appLoader = ClassLoaderDemo.class.getClassLoader();
