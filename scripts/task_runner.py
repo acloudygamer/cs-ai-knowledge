@@ -29,6 +29,7 @@ logger = logging.getLogger(__name__)
 SCRIPT_DIR = Path(__file__).parent
 TASKS_FILE = SCRIPT_DIR / "tasks.json"
 VERSIONS_FILE = SCRIPT_DIR / "versions.json"
+PROMPTS_DIR = SCRIPT_DIR / "prompts"
 
 
 def load_versions() -> dict:
@@ -39,6 +40,13 @@ def load_versions() -> dict:
             return data.get("versions", {})
     except Exception:
         return {}
+
+
+def get_prompt_file(path: str) -> str:
+    """根据任务路径返回对应的 prompt 模板文件名"""
+    if path.startswith("0-计算机基础"):
+        return "计算机基础版本规则.md"
+    return ""
 
 
 class TaskRunner:
@@ -165,6 +173,10 @@ class TaskRunner:
                 lines.append(f"- 基础版本: `{parts[0]}`")
                 if len(parts) > 1:
                     lines.append(f"- 新版: `{' / '.join(parts[1:])}`")
+            # 关联 prompt 模板
+            prompt_file = get_prompt_file(path)
+            if prompt_file:
+                lines.append(f"- 参考文档: `scripts/prompts/{prompt_file}`")
             lines.append(f"- Agent: `Agent(subagent_type=\"agent-orchestrator\", prompt=\"...\")`")
             lines.append("")
 
