@@ -2,6 +2,27 @@
 
 多语言编程知识体系，覆盖计算机基础与 5 大编程语言。
 
+## 系统架构
+
+```
+task_runner.py --once → delete-reviewer agents (前置审查，阻塞)
+                  → agent-orchestrator agents (常规任务)
+```
+
+| Agent | 职责 | 触发条件 |
+|-------|------|----------|
+| delete-reviewer | 发现过时/冗余内容，删除/合并/迁移 | 前置审查任务 |
+| agent-orchestrator | 内容优化与新增 | 前置全部完成后 |
+
+## 核心文件
+
+| 文件 | 作用 |
+|------|------|
+| scripts/tasks.json | 任务列表 |
+| scripts/task_runner.py | 任务循环脚本 |
+| .claude/agents/delete-reviewer.md | 前置审查 Agent |
+| .claude/agents/agent-orchestrator.md | 常规任务 Agent |
+
 ## 内容概览
 
 | 目录 | 内容 |
