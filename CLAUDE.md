@@ -6,6 +6,14 @@
 Claude Code → task_runner.py --once → 生成指令 → agent-orchestrator 执行
 ```
 
+## 核心文件
+
+| 文件 | 作用 |
+|------|------|
+| scripts/tasks.json | 任务列表（按目录分组） |
+| scripts/versions.json | 版本追踪规则 |
+| scripts/task_runner.py | 任务循环脚本 |
+
 ## 核心命令
 
 ```bash

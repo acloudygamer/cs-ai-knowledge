@@ -30,17 +30,17 @@ logger = logging.getLogger(__name__)
 
 SCRIPT_DIR = Path(__file__).parent
 TASKS_FILE = SCRIPT_DIR / "tasks.json"
-AGENT_MANIFEST = SCRIPT_DIR / "agent-manifest.json"
+VERSIONS_FILE = SCRIPT_DIR / "versions.json"
 
-VERSION_MAP = {
-    "0-计算机基础/": "",
-    "1-数据结构与算法/": "",
-    "2-Python/": "Python 3.12 / 3.14",
-    "3-C++/": "C++ 20 / 23 / 26",
-    "4-Java/": "Java 21 / 25",
-    "5-JavaScript/": "JavaScript Node24+ES2024 / Node26+ES2026",
-    "6-Go/": "Go 1.24 / 1.26",
-}
+
+def load_versions() -> dict:
+    """从 versions.json 加载版本映射"""
+    try:
+        with open(VERSIONS_FILE, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+            return data.get("versions", {})
+    except Exception:
+        return {}
 
 
 class TaskRunner:
@@ -48,7 +48,6 @@ class TaskRunner:
 
     def __init__(self):
         self.tasks_file = TASKS_FILE
-        self.manifest_file = AGENT_MANIFEST
         self.tasks_data = None
 
     def load_tasks(self) -> dict:
@@ -123,6 +122,7 @@ class TaskRunner:
         """生成待执行任务的指令，供 Orchestrator 阅读"""
         self.load_tasks()
         pending = self.get_pending_tasks()
+        versions = load_versions()
 
         if not pending:
             return """# 所有任务已完成！
@@ -139,7 +139,7 @@ class TaskRunner:
         # 按目录分组输出
         for task in pending:
             target = task.get("target", "")
-            version = VERSION_MAP.get(target, "")
+            version = versions.get(target, "")
             lines.append(f"## {target}")
             lines.append(f"- **ID**: `{task.get('id', '')}`")
             lines.append(f"- **Description**: {task.get('description', '')}")
