@@ -3,11 +3,9 @@
 任务循环脚本 - CS/AI 知识库并行 Agent 协调
 
 功能：
-- --once: 生成待执行任务指令（供 Orchestrator 阅读）
+- --once: 生成待执行任务指令（全部完成后自动重置）
 - --update <key> <status> <result>: 更新任务状态和结果
 - --report: 生成执行报告
-- --resume: 重置所有任务为 pending（保留结果）
-- --reset: 重置所有任务为 pending（清空结果）
 """
 
 import json
@@ -118,9 +116,29 @@ class TaskRunner:
         logger.warning(f"任务 {task_id} 未找到")
         return False
 
+    def auto_reset(self):
+        """全部完成后自动重置所有任务为 pending"""
+        all_tasks = self.get_all_tasks()
+        if not all_tasks:
+            return False
+        completed = [t for t in all_tasks if t.get("status") == "completed"]
+        if len(completed) == len(all_tasks):
+            for task_info in self.tasks_data.get("tasks", {}).values():
+                task_info["status"] = "pending"
+                task_info["run_count"] = 0
+                task_info["last_result"] = None
+            self.save_tasks()
+            return True
+        return False
+
     def generate_instructions(self) -> str:
         """生成任务列表"""
         self.load_tasks()
+
+        # 检查是否全部完成，完成则自动重置
+        if self.auto_reset():
+            print("全部任务已完成，已自动重置为 pending。")
+
         pending = self.get_pending_tasks()
 
         if not pending:
@@ -192,34 +210,13 @@ def main():
     import argparse
 
     parser = argparse.ArgumentParser(description='CS/AI 知识库任务管理器')
-    parser.add_argument('--once', '-o', action='store_true', help='生成待执行任务指令')
+    parser.add_argument('--once', '-o', action='store_true', help='生成待执行任务指令（全部完成后自动重置）')
     parser.add_argument('--update', '-u', nargs=3, metavar=('KEY', 'STATUS', 'RESULT'), help='更新任务状态')
     parser.add_argument('--findings', '-f', metavar='FINDINGS_JSON', help='附加发现')
     parser.add_argument('--report', '-r', action='store_true', help='生成执行报告')
-    parser.add_argument('--reset', action='store_true', help='重置所有任务为 pending，清空结果')
-    parser.add_argument('--resume', action='store_true', help='重置所有任务为 pending，保留结果')
 
     args = parser.parse_args()
     runner = TaskRunner()
-
-    if args.reset:
-        runner.load_tasks()
-        for task_info in runner.tasks_data.get("tasks", {}).values():
-            task_info['status'] = 'pending'
-            task_info['run_count'] = 0
-            task_info['last_result'] = None
-        runner.save_tasks()
-        print("所有任务已重置为 pending（结果已清空）。")
-        return
-
-    if args.resume:
-        runner.load_tasks()
-        for task_info in runner.tasks_data.get("tasks", {}).values():
-            task_info['status'] = 'pending'
-            task_info.pop('updated', None)
-        runner.save_tasks()
-        print("所有任务已恢复（status=pending，结果保留）。")
-        return
 
     if args.report:
         print(runner.generate_report())

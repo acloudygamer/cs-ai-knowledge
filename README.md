@@ -17,10 +17,8 @@
 ## 核心命令
 
 ```bash
-python scripts/run_loop.py              # 长期循环模式（并行执行所有任务）
-python scripts/task_runner.py --once    # 生成待执行任务
+python scripts/task_runner.py --once    # 生成待执行任务（全部完成后自动重置）
 python scripts/task_runner.py --report  # 查看执行报告
-python scripts/run_loop.py --help       # 查看详细用法
 ```
 
 详见 [CLAUDE.md](CLAUDE.md)
