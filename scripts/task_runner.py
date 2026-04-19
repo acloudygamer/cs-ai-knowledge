@@ -148,6 +148,14 @@ class TaskRunner:
         if self.auto_reset():
             print("全部任务已完成，已自动重置为 pending。")
 
+        # 简易校验
+        issues = self.verify_tasks()
+        if issues:
+            print("⚠️ 任务状态异常:")
+            for issue in issues:
+                print(f"  - {issue}")
+            print()
+
         pending = self.get_pending_tasks()
 
         if not pending:
@@ -189,6 +197,22 @@ class TaskRunner:
         lines.append("每个任务区块的内容会作为 prompt 注入给对应的子 agent。")
 
         return "\n".join(lines)
+
+    def verify_tasks(self) -> list:
+        """校验任务状态一致性，返回问题列表"""
+        issues = []
+        for task_key, task_info in self.tasks_data.get("tasks", {}).items():
+            status = task_info.get("status")
+            run_count = task_info.get("run_count", 0)
+            result = task_info.get("result")
+
+            if status == "completed" and run_count == 0:
+                issues.append(f"{task_key}: completed 但 run_count=0（可能未通过 --update 更新）")
+            if status == "completed" and not result:
+                issues.append(f"{task_key}: completed 但无 result")
+            if status == "pending" and run_count >= 3:
+                issues.append(f"{task_key}: pending 但 run_count={run_count}（执行多次未完成）")
+        return issues
 
     def generate_report(self) -> str:
         """生成执行报告"""

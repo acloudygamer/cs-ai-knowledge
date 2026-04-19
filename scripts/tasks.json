@@ -1,11 +1,11 @@
 {
   "version": "3.0",
-  "updated": "2026-04-20T01:38:36.616294",
+  "updated": "2026-04-20T01:55:34.423646",
   "tasks": {
     "task_001": {
       "target": "计算机基础",
       "path": "0-计算机基础/",
-      "status": "completed",
+      "status": "pending",
       "run_count": 0,
       "last_result": null,
       "updated": "2026-04-20T01:36:19.465150",
@@ -14,7 +14,7 @@
     "task_002": {
       "target": "数据结构与算法",
       "path": "1-数据结构与算法/",
-      "status": "completed",
+      "status": "pending",
       "run_count": 0,
       "last_result": null,
       "updated": "2026-04-20T01:36:07.166260",
@@ -23,7 +23,7 @@
     "task_003": {
       "target": "Python",
       "path": "2-Python/",
-      "status": "completed",
+      "status": "pending",
       "run_count": 0,
       "last_result": null,
       "updated": "2026-04-20T01:37:22.762836",
@@ -32,7 +32,7 @@
     "task_004": {
       "target": "C++",
       "path": "3-C++/",
-      "status": "completed",
+      "status": "pending",
       "run_count": 0,
       "last_result": null,
       "updated": "2026-04-20T01:38:36.616105",
@@ -41,7 +41,7 @@
     "task_005": {
       "target": "Java",
       "path": "4-Java/",
-      "status": "completed",
+      "status": "pending",
       "run_count": 0,
       "last_result": null,
       "updated": "2026-04-20T01:37:18.080205",
@@ -50,7 +50,7 @@
     "task_006": {
       "target": "JavaScript",
       "path": "5-JavaScript/",
-      "status": "completed",
+      "status": "pending",
       "run_count": 0,
       "last_result": null,
       "updated": "2026-04-20T01:35:59.692509",
@@ -60,8 +60,10 @@
       "target": "Go",
       "path": "6-Go/",
       "status": "pending",
-      "run_count": 0,
-      "last_result": null
+      "run_count": 1,
+      "last_result": "",
+      "updated": "2026-04-20T01:54:32.395945",
+      "result": "完善 JSON 处理 omitzero 标签和泛型 cmp 包迁移"
     }
   }
 }
