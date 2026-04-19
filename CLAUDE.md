@@ -34,10 +34,11 @@ python scripts/task_runner.py --report  # 查看执行报告
 
 当你说"开始工作循环"或"开始"时：
 1. `python scripts/task_runner.py --once` 生成指令
-2. Spawn agents 并行执行
-3. 完成后 `git commit`
-4. 全部完成 → auto reset → 回到步骤1继续
-5. 直到你说"停止"
+2. **优先执行前置审查任务**（delete-reviewer agent）
+3. 前置任务全部 completed 后，执行常规任务（agent-orchestrator agent）
+4. 完成后 `git commit`
+5. auto reset → 回到步骤1继续
+6. 直到你说"停止"
 
 ### Context 管理
 

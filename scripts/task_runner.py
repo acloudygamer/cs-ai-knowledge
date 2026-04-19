@@ -95,6 +95,14 @@ class TaskRunner:
         """获取待处理任务"""
         return [t for t in self.get_all_tasks() if t.get("status") == "pending"]
 
+    def get_prereq_tasks(self) -> list:
+        """获取前置审查任务"""
+        return [t for t in self.get_all_tasks() if t.get("type") == "prereq_delete"]
+
+    def get_regular_tasks(self) -> list:
+        """获取常规任务"""
+        return [t for t in self.get_all_tasks() if t.get("type") != "prereq_delete"]
+
     def get_task_by_id(self, task_id: str):
         """根据 ID 获取任务"""
         for task in self.get_all_tasks():
@@ -157,6 +165,34 @@ class TaskRunner:
             print()
             return ""
 
+        # 优先检查前置任务
+        prereq_pending = [t for t in self.get_prereq_tasks() if t.get("status") == "pending"]
+
+        if prereq_pending:
+            # 只输出前置任务，阻塞常规任务
+            lines = ["# 前置审查任务（阻塞中）\n"]
+            lines.append(f"共 {len(prereq_pending)} 个模块待审查\n")
+            lines.append(f"Generated at: {datetime.now().isoformat()}\n")
+            lines.append("详见 .claude/agents/delete-reviewer.md\n")
+            lines.append("")
+
+            for task in prereq_pending:
+                target = task.get("target", "")
+                path = task.get('path', '')
+                lines.append(f"## {target}")
+                lines.append(f"- 路径: `{path}`")
+                lines.append(f"- Agent: `Agent(subagent_type=\"delete-reviewer\", prompt=\"...\")`")
+                lines.append("")
+
+            lines.append("---")
+            lines.append("")
+            lines.append("**并行执行：每个前置任务分配一个 delete-reviewer agent**")
+            lines.append("")
+            lines.append("每个任务区块的内容会作为 prompt 注入给对应的子 agent。")
+
+            return "\n".join(lines)
+
+        # 前置任务全部完成，输出常规任务
         pending = self.get_pending_tasks()
 
         if not pending:
