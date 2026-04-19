@@ -160,7 +160,11 @@ class TaskRunner:
             lines.append(f"## {target}")
             lines.append(f"- 路径: `{path}`")
             if version:
-                lines.append(f"- 版本: `{version}`")
+                # 格式: "基础版本 / 新版 / 最新版"
+                parts = [v.strip() for v in version.split('/')]
+                lines.append(f"- 基础版本: `{parts[0]}`")
+                if len(parts) > 1:
+                    lines.append(f"- 新版: `{' / '.join(parts[1:])}`")
             lines.append(f"- Agent: `Agent(subagent_type=\"agent-orchestrator\", prompt=\"...\")`")
             lines.append("")
 

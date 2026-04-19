@@ -3,10 +3,10 @@
   "versions": {
     "0-计算机基础/": "",
     "1-数据结构与算法/": "",
-    "2-Python/": "Python 3.12 / 3.14",
-    "3-C++/": "C++ 20 / 23 / 26",
-    "4-Java/": "Java 21 / 25",
-    "5-JavaScript/": "JavaScript Node24+ES2024 / Node26+ES2026",
-    "6-Go/": "Go 1.24 / 1.26"
+    "2-Python/": "Python 3.12 / Python 3.14",
+    "3-C++/": "C++ 20 / C++ 23 / C++ 26",
+    "4-Java/": "Java 21 / Java 25",
+    "5-JavaScript/": "JavaScript Node24+ES2024 / JavaScript Node26+ES2026",
+    "6-Go/": "Go 1.24 / Go 1.26"
   }
 }
