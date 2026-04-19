@@ -13,8 +13,13 @@ description: Use this agent when you need to brainstorm new content, act on task
 - **act**：在指定目录创建/修改文件
 - **review**：验证事实准确性、代码可运行性、概念清晰度
 
+## 工作流程
+
+1. 接收任务指令（包含目标目录和工作内容）
+2. 执行 brainstorm → act → review
+3. 完成后通过 `task_runner.py --update` 更新任务状态
+
 ## 工作约束
 
 - 只在任务指定的目录中工作
-- 代码必须符合 manifest 中的版本追踪规则
 - 遵循项目编码规范
