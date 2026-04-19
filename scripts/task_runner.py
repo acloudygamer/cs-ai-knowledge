@@ -42,7 +42,6 @@ SCRIPT_DIR = Path(__file__).parent
 TASKS_FILE = SCRIPT_DIR / "tasks.json"
 AGENT_MANIFEST = SCRIPT_DIR / "agent-manifest.json"
 AGENT_DIR = SCRIPT_DIR.parent
-CYCLE_STATUS_FILE = SCRIPT_DIR.parent / "CYCLE_STATUS.md"
 
 
 class TaskRunner:
@@ -193,126 +192,6 @@ class TaskRunner:
         """获取 agent 完整信息（capabilities, skills, tools 等）"""
         manifest = self.load_agent_manifest()
         return manifest.get(agent_name, {})
-
-    def _write_cycle_summary_md(self):
-        """检查并写入循环汇总到 CYCLE_STATUS.md
-
-        仅在所有 act 和 review 任务都 completed 时写入，
-        避免重复写入（检查文件中是否已有本轮的汇总）
-        """
-        all_tasks = self.get_all_tasks()
-        act_tasks = [t for t in all_tasks if t.get('id', '').startswith('act-')]
-        review_tasks = [t for t in all_tasks if t.get('id', '').startswith('review-')]
-
-        # 检查是否所有 review 都已完成
-        # 注意：act 可能会被 review 传播 errors 后重置为 pending（让 act 修复错误），
-        # 所以 act 不一定 completed，但 review completed 意味着本轮 review 已全部跑完，
-        # 此时 act 身上的 errors 正好记录了待修复的问题
-        all_done = (
-            all(t.get('status') == 'completed' for t in review_tasks) and
-            len(review_tasks) > 0
-        )
-        if not all_done:
-            return
-
-        # 检查是否已写过（防止多次写入）
-        if self.tasks_data.get('cycle_summary_written'):
-            return
-
-        today = datetime.now().strftime('%Y-%m-%d')
-
-        # 读取现有内容，用于追加时的分隔
-        existing = ""
-        try:
-            with open(CYCLE_STATUS_FILE, 'r', encoding='utf-8') as f:
-                existing = f.read()
-        except FileNotFoundError:
-            pass
-
-        # 收集 brainstorm 结果
-        brainstorm_tasks = [t for t in all_tasks if t.get('id', '').startswith('brainstorm-')]
-        brainstorm_lines = []
-        for t in brainstorm_tasks:
-            findings = t.get('findings', [])
-            if findings:
-                gaps = "、".join([f.get('problem', '')[:30] for f in findings[:5]])
-                if len(findings) > 5:
-                    gaps += "..."
-            else:
-                gaps = t.get('result', '')[:50]
-            brainstorm_lines.append(f"| {t['id']} | {gaps} |")
-
-        # 收集 act 结果
-        act_lines = []
-        for t in act_tasks:
-            result = t.get('result', '')[:60] if t.get('result') else ''
-            findings_count = len(t.get('findings', []))
-            act_lines.append(f"| {t['id']} | {result}... ({findings_count} findings) |")
-
-        # 收集 review 结果
-        review_lines = []
-        for t in review_tasks:
-            findings_count = len(t.get('findings', []))
-            if findings_count > 0:
-                first_problem = t.get('findings', [{}])[0].get('problem', '')[:40]
-                review_lines.append(f"| {t['id']} | {findings_count} | {first_problem} |")
-            else:
-                review_lines.append(f"| {t['id']} | 0 | - |")
-
-        # 收集待修复错误
-        errors = self.get_errors_summary()
-
-        # 生成汇总内容
-        lines = []
-        lines.append(f"## 循环 {today}")
-        lines.append("")
-        lines.append("### 本轮完成的任务")
-        lines.append("")
-        lines.append("**brainstorm（7个）**：")
-        lines.append("| 任务 | 发现的缺口 |")
-        lines.append("|------|-----------|")
-        lines.extend(brainstorm_lines if brainstorm_lines else ["| - | 无 |"])
-        lines.append("")
-        lines.append("**act（7个）**：")
-        lines.append("| 任务 | 实现内容 |")
-        lines.append("|------|---------|")
-        lines.extend(act_lines if act_lines else ["| - | 无 |"])
-        lines.append("")
-        lines.append("**review（7个）**：")
-        lines.append("| 任务 | 发现问题数 | 示例问题 |")
-        lines.append("|------|-----------|---------|")
-        lines.extend(review_lines if review_lines else ["| - | 0 | - |"])
-
-        if errors:
-            lines.append("")
-            lines.append("### 待修复错误（errors）")
-            lines.append("")
-            lines.append("| 任务 | 文件 | 行号 | 问题 |")
-            lines.append("|------|------|------|------|")
-            for err in errors:
-                lines.append(f"| {err['task_id']} | {err['file']} | {err['line']} | {err['problem'][:50]} |")
-        else:
-            lines.append("")
-            lines.append("### 待修复错误（errors）")
-            lines.append("")
-            lines.append("(无)")
-
-        content = "\n".join(lines)
-
-        # 确保与现有内容分隔
-        if existing:
-            content = "\n\n---\n\n" + content
-
-        try:
-            with open(CYCLE_STATUS_FILE, 'a', encoding='utf-8') as f:
-                f.write(content)
-                f.flush()
-            logger.info(f"已写入循环汇总到 CYCLE_STATUS.md")
-            # 标记已写过，防止重复写入
-            self.tasks_data['cycle_summary_written'] = True
-            self.save_tasks()
-        except Exception as e:
-            logger.error(f"写入 CYCLE_STATUS.md 失败: {e}")
 
     def update_task(self, task_id: str, new_status: str, result: str = "", findings: list | None = None):
         """更新任务状态和结果"""
@@ -644,9 +523,6 @@ class TaskRunner:
                     for err in errors:
                         lines.append(f"  - {err.get('file', '')}:{err.get('line', '')} - {err.get('problem', '')}")
 
-        # 检查是否需要写入循环汇总到 CYCLE_STATUS.md
-        self._write_cycle_summary_md()
-
         return "\n".join(lines)
 
 
@@ -751,8 +627,6 @@ def main():
                 ).strip()
                 if diff:
                     print(f"\nChanged files:\n{diff}")
-                    print("\nTo update PROJECT_STATUS.md, run:")
-                    print("   git diff --stat  # 查看详细变更")
             except Exception:
                 pass
         else:
