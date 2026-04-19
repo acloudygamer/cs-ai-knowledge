@@ -71,83 +71,6 @@ echo $SHELL
 chsh -s /bin/zsh
 ```
 
-## 命令执行
-
-### 基本命令
-```bash
-ls -la /home           # 列出目录
-cd /tmp && pwd         # 切换目录
-cat file.txt | grep pattern  # 管道
-```
-
-### 变量
-```bash
-# 定义变量
-name="Alice"
-age=25
-
-# 使用变量（注意：等号两边不能有空格）
-echo $name
-echo "${name}'s age is ${age}"
-
-# 环境变量
-export EDITOR=vim
-echo $PATH
-```
-
-### 条件判断
-```bash
-# if 语句
-if [ -f "file.txt" ]; then
-    echo "File exists"
-elif [ -d "dir" ]; then
-    echo "Directory exists"
-else
-    echo "Not found"
-fi
-
-# test 命令常用选项
-# -f 文件存在
-# -d 目录存在
-# -z 字符串为空
-# -eq 数字相等
-```
-
-### 循环
-```bash
-# for 循环
-for i in 1 2 3 4 5; do
-    echo "Number: $i"
-done
-
-# while 循环
-count=0
-while [ $count -lt 5 ]; do
-    echo $count
-    count=$((count + 1))
-done
-```
-
-### 函数
-```bash
-# 定义函数
-greet() {
-    echo "Hello, $1!"
-}
-
-# 调用函数
-greet "Alice"
-
-# 返回值
-get_sum() {
-    local result=$(( $1 + $2 ))
-    echo $result
-}
-
-sum=$(get_sum 10 20)
-echo $sum  # 30
-```
-
 ## 环境配置
 
 ### 配置文件
@@ -178,27 +101,6 @@ export PATH=$PATH:/usr/local/bin
 
 # 提示符
 PS1='\[\033[01;32m\]\u@\h\[\033[00m\]:\[\033[01;34m\]\w\[\033[00m\]\$ '
-```
-
-## Shell 脚本
-
-```bash
-#!/bin/bash
-# shebang: 指定脚本解释器
-
-# 脚本参数
-echo "Script name: $0"
-echo "First arg: $1"
-echo "All args: $@"
-
-# 退出码
-if [ $? -eq 0 ]; then
-    echo "Previous command succeeded"
-fi
-
-# 运行脚本
-chmod +x script.sh
-./script.sh
 ```
 
 ## Windows Shell
@@ -239,9 +141,6 @@ top                 # 动态查看
 # 子进程
 ./script.sh &       # 后台运行
 ./long_running.sh   # 前台运行
-
-# 进程替换：<(cmd)
-diff <(ps aux) <(ps aux | grep bash)
 ```
 
 ### 作业控制
@@ -361,7 +260,7 @@ ${var:? "var is not set"}
 ${debug:+ "-v"}  # 如果debug设置了则返回 "-v"
 ```
 
-### 数组高级操作
+### 数组操作
 
 ```bash
 # 切片
@@ -370,12 +269,6 @@ echo ${arr[@]:1:3}   # two three four
 
 # 追加
 arr+=(six seven)
-
-# 删除元素
-unset arr[2]
-
-# 索引数组转关联数组 (bash 4+)
-declare -A aa=([one]=1 [two]=2)  # 需要 bash 4+
 
 # 遍历索引和值
 for i in "${!arr[@]}"; do

@@ -1,146 +1,146 @@
 {
   "version": "3.0",
-  "updated": "2026-04-20T03:21:43.576423",
+  "updated": "2026-04-20T03:45:42.009584",
   "tasks": {
     "task_001_prereq": {
       "target": "计算机基础-删除审查",
       "path": "0-计算机基础/",
       "type": "prereq_delete",
-      "status": "pending",
-      "run_count": 1,
-      "last_result": "",
-      "updated": "2026-04-20T03:06:07.041875",
-      "result": "删除了日志文件系统.md"
+      "status": "completed",
+      "run_count": 2,
+      "last_result": "删除了日志文件系统.md",
+      "updated": "2026-04-20T03:41:42.629706",
+      "result": "审查完成：无删除建议"
     },
     "task_001": {
       "target": "计算机基础",
       "path": "0-计算机基础/",
       "type": "regular",
-      "status": "pending",
-      "run_count": 1,
-      "last_result": "",
-      "updated": "2026-04-20T03:10:27.537650",
-      "result": "计算机基础 review 完成。发现并修复1处版本标注问题：脚本编程.md 版本说明更新。所有文件结构完整，内容质量良好。"
+      "status": "completed",
+      "run_count": 2,
+      "last_result": "计算机基础 review 完成。发现并修复1处版本标注问题：脚本编程.md 版本说明更新。所有文件结构完整，内容质量良好。",
+      "updated": "2026-04-20T03:45:37.607289",
+      "result": "删除重复内容：02-Shell家族.md 删220行脚本重复内容，04-并行与并发.md 删360行进程线程重复内容，模块结构更清晰"
     },
     "task_002_prereq": {
       "target": "数据结构与算法-删除审查",
       "path": "1-数据结构与算法/",
       "type": "prereq_delete",
-      "status": "pending",
-      "run_count": 2,
-      "last_result": "审查完成：无删除建议，发现2处内容冗余建议合并（栈与队列.md的单调栈部分、RMQ问题.md的滑动窗口部分）",
-      "updated": "2026-04-20T03:06:11.487874",
-      "result": "建议合并单调栈，保守处理"
+      "status": "completed",
+      "run_count": 3,
+      "last_result": "建议合并单调栈，保守处理",
+      "updated": "2026-04-20T03:41:47.040546",
+      "result": "审查完成：无删除建议"
     },
     "task_002": {
       "target": "数据结构与算法",
       "path": "1-数据结构与算法/",
       "type": "regular",
-      "status": "pending",
-      "run_count": 1,
-      "last_result": "",
-      "updated": "2026-04-20T03:20:31.408643",
-      "result": "已添加8个文件的LeetCode链接"
+      "status": "completed",
+      "run_count": 2,
+      "last_result": "已添加8个文件的LeetCode链接",
+      "updated": "2026-04-20T03:44:28.844525",
+      "result": "去重完成：移除 01-数组与字符串.md 中的双指针和滑动窗口（38行），移除 03-栈与队列.md 中的单调栈和单调队列（218行），修复排序.md 重复题号912，更新 README.md 描述"
     },
     "task_003_prereq": {
       "target": "Python-删除审查",
       "path": "2-Python/",
       "type": "prereq_delete",
-      "status": "pending",
-      "run_count": 2,
-      "last_result": "Python删除审查完成 - 仅发现 OrderedDict 段落过时，建议删除；版本标注需从 3.10+ 更新为 3.12+",
-      "updated": "2026-04-20T03:06:15.975934",
-      "result": "删除OrderedDict过时内容，更新版本标注"
+      "status": "completed",
+      "run_count": 3,
+      "last_result": "删除OrderedDict过时内容，更新版本标注",
+      "updated": "2026-04-20T03:41:51.480116",
+      "result": "删除Python3.11过时内容"
     },
     "task_003": {
       "target": "Python",
       "path": "2-Python/",
       "type": "regular",
-      "status": "pending",
-      "run_count": 1,
-      "last_result": "",
-      "updated": "2026-04-20T03:11:32.529270",
-      "result": "Python 3.14 新特性文档更新：1) 新增尾调用解释器(Tail-Call Interpreter)章节 - 重要的性能优化特性；2) 修正自由线程模式PEP引用从PEP 779改为PEP 703(最初在3.13引入)；3) 更新目录和总结表格以反映最新变更；4) 修正版本选择建议"
+      "status": "completed",
+      "run_count": 2,
+      "last_result": "Python 3.14 新特性文档更新：1) 新增尾调用解释器(Tail-Call Interpreter)章节 - 重要的性能优化特性；2) 修正自由线程模式PEP引用从PEP 779改为PEP 703(最初在3.13引入)；3) 更新目录和总结表格以反映最新变更；4) 修正版本选择建议",
+      "updated": "2026-04-20T03:45:42.009386",
+      "result": "Python模块优化完成：1) 移除重复的版本选择建议表（3.13和3.14文件），在3.12文件保留权威版本推荐；2) 精简10-异步编程深入.md（701→331行），删除与02-并发与异步.md重复的基础内容（async/await基础、TaskGroup、锁与同步、队列等），保留独有进阶内容（异步上下文管理器、异步迭代器/生成器进阶、资源池模式）；3) 精简07-迭代器与生成器.md（515→467行），移除已在02中覆盖的异步生成器章节；修复了3.13文件推荐3.14为新项目但又说学习用3.13的前后矛盾问题"
     },
     "task_004_prereq": {
       "target": "C++-删除审查",
       "path": "3-C++/",
       "type": "prereq_delete",
-      "status": "pending",
-      "run_count": 2,
-      "last_result": "C++删除审查完成：1) 删除02-语言特点.md中冗余的运算符重载和移动语义章节（约132行）；2) 删除01-基础/06-面向对象.md中重复的运算符重载章节（约35行）；3) 更新版本信息，在01-语言简介.md、06-学习路线.md和README.md中添加C++26",
-      "updated": "2026-04-20T03:06:20.362316",
-      "result": "删除运算符重载/移动语义重复章节，更新C++26版本"
+      "status": "completed",
+      "run_count": 3,
+      "last_result": "删除运算符重载/移动语义重复章节，更新C++26版本",
+      "updated": "2026-04-20T03:41:55.858478",
+      "result": "删除协程Generator过时实现"
     },
     "task_004": {
       "target": "C++",
       "path": "3-C++/",
       "type": "regular",
-      "status": "pending",
-      "run_count": 1,
-      "last_result": "",
-      "updated": "2026-04-20T03:10:46.176588",
-      "result": "增强 C++26 新特性内容：1) 扩展 std::execution 发送方/接收方模式、调度器类型、发送方算法组合、并行计算示例；2) 扩展 std::meta 反射的成员信息查询、编译期代码生成、自动比较运算符；3) 添加版本标记到 C++20/C++23/C++26 文件；4) 更新编译器支持表格和迁移指南"
+      "status": "completed",
+      "run_count": 2,
+      "last_result": "增强 C++26 新特性内容：1) 扩展 std::execution 发送方/接收方模式、调度器类型、发送方算法组合、并行计算示例；2) 扩展 std::meta 反射的成员信息查询、编译期代码生成、自动比较运算符；3) 添加版本标记到 C++20/C++23/C++26 文件；4) 更新编译器支持表格和迁移指南",
+      "updated": "2026-04-20T03:44:28.760074",
+      "result": "C++模块优化完成。删除了2个冗余文件(02-语言特点.md, 03-应用场景.md)，它们的内容与01-语言简介.md重复。精简了04-函数.md，移除了过长的Lambda和移动语义内容(保留基础+交叉引用)，详细内容由专门的Lambda高级用法和移动语义深入文件承载。更新了README.md移除已删除文件的链接。"
     },
     "task_005_prereq": {
       "target": "Java-删除审查",
       "path": "4-Java/",
       "type": "prereq_delete",
-      "status": "pending",
-      "run_count": 2,
-      "last_result": "Java删除审查完成 - 3个候选：1.[DELETE] 02-网络请求.md(冗余) 2.[REWRITE] 01-装饰器与元编程.md(标题误导) 3.[RESTRUCTURE] 07-Spring入门.md(结构错误)",
-      "updated": "2026-04-20T03:06:24.768461",
-      "result": "删除冗余网络请求文件，重命名装饰器，重迁Spring入门"
+      "status": "completed",
+      "run_count": 3,
+      "last_result": "删除冗余网络请求文件，重命名装饰器，重迁Spring入门",
+      "updated": "2026-04-20T03:42:00.352198",
+      "result": "审查完成：无删除建议"
     },
     "task_005": {
       "target": "Java",
       "path": "4-Java/",
       "type": "regular",
-      "status": "pending",
-      "run_count": 1,
-      "last_result": "",
-      "updated": "2026-04-20T03:10:36.322072",
-      "result": "Java 25 content gaps filled: updated version tables in 4 files (语言简介, 语言特点, 学习路线, README), added version annotation for Java 22 Stream Gatherers"
+      "status": "completed",
+      "run_count": 2,
+      "last_result": "Java 25 content gaps filled: updated version tables in 4 files (语言简介, 语言特点, 学习路线, README), added version annotation for Java 22 Stream Gatherers",
+      "updated": "2026-04-20T03:44:58.566574",
+      "result": "Java模块分析完成。发现以下问题：1) 结构性缺失：03-高级用法/目录缺少07-*.md文件（编号从06跳至08）；2) 大文件问题：6个文件超过700行，其中函数式编程959行、Elasticsearch与MongoDB 936行、监控与链路追踪868行、并发与异步815行，建议拆分；3) 内容重叠：虚拟线程在并发与异步和虚拟线程深度两处均有覆盖（系有意设计：概览vs深入）；4) Java 25内容覆盖良好，主要集中在现代Java特性文件。建议优先处理大文件拆分和补充07号缺失内容。"
     },
     "task_006_prereq": {
       "target": "JavaScript-删除审查",
       "path": "5-JavaScript/",
       "type": "prereq_delete",
-      "status": "pending",
-      "run_count": 1,
-      "last_result": "",
-      "updated": "2026-04-20T03:06:29.199297",
-      "result": "合并装饰器与元编程到ES2026新特性"
+      "status": "completed",
+      "run_count": 2,
+      "last_result": "合并装饰器与元编程到ES2026新特性",
+      "updated": "2026-04-20T03:42:04.764962",
+      "result": "删除导入断言和惰性求值"
     },
     "task_006": {
       "target": "JavaScript",
       "path": "5-JavaScript/",
       "type": "regular",
-      "status": "pending",
-      "run_count": 1,
-      "last_result": "",
-      "updated": "2026-04-20T03:11:21.186408",
-      "result": "JavaScript版本升级完成：1) README移除不存在的装饰器文件引用；2) Node版本从18/20升级到26/28；3) npm版本要求从9.0升级到10.0；4) 更新所有GitHub Actions配置中的node-version"
+      "status": "completed",
+      "run_count": 2,
+      "last_result": "JavaScript版本升级完成：1) README移除不存在的装饰器文件引用；2) Node版本从18/20升级到26/28；3) npm版本要求从9.0升级到10.0；4) 更新所有GitHub Actions配置中的node-version",
+      "updated": "2026-04-20T03:44:16.555004",
+      "result": "JavaScript模块审查完成。发现并修复3个问题：1) 修复面试高频README中typo '实现红交换' → '实现红黑树交换'；2) 移除ES2022新特性表中错误收录的groupBy(ES2024特性)；3) 清除ES2023-ES2026文件中ES2026部分的重复内容(Object.groupBy增强、导入属性with、正则v标志均重复自ES2024部分)"
     },
     "task_007_prereq": {
       "target": "Go-删除审查",
       "path": "6-Go/",
       "type": "prereq_delete",
-      "status": "pending",
-      "run_count": 1,
-      "last_result": "",
-      "updated": "2026-04-20T03:06:33.624682",
-      "result": "删除重复的开发环境文件"
+      "status": "completed",
+      "run_count": 2,
+      "last_result": "删除重复的开发环境文件",
+      "updated": "2026-04-20T03:42:09.152112",
+      "result": "修复Ordered+补充版本历史"
     },
     "task_007": {
       "target": "Go",
       "path": "6-Go/",
       "type": "regular",
-      "status": "pending",
-      "run_count": 1,
-      "last_result": "",
-      "updated": "2026-04-20T03:10:51.450487",
-      "result": "Go模块改进：创建缺失的04-开发环境.md，添加go fix文档(Go 1.26)，完善crypto/hpke和errors.AsType示例"
+      "status": "completed",
+      "run_count": 2,
+      "last_result": "Go模块改进：创建缺失的04-开发环境.md，添加go fix文档(Go 1.26)，完善crypto/hpke和errors.AsType示例",
+      "updated": "2026-04-20T03:43:58.905363",
+      "result": "Go模块审查完成。发现以下问题：1) 内容重复：04-开发环境.md与01-安装与环境.md高度重叠；2) 内容重复：05-数据结构.md与06-面向对象.md在struct/interface上有重复；3) 内容重复：02-并发与异步.md与06-Context专题.md中context内容重叠；4) defer在函数.md和错误处理.md中都有讲解；5) 函数式选项模式在函数.md和装饰器.md中重复；6) 部分文件过于简短（如01-文件操作.md仅约100行）。建议合并重复内容，优化结构。"
     }
   }
 }
