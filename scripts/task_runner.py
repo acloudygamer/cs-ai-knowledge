@@ -113,11 +113,13 @@ class TaskRunner:
             task_info = tasks[task_id]
             task_info["status"] = new_status
             task_info["updated"] = datetime.now().isoformat()
+            task_info["run_count"] = task_info.get("run_count", 0) + 1
+            task_info["last_result"] = task_info.get("result", "")
             if result:
                 task_info["result"] = result
             if findings:
                 task_info["findings"] = findings
-            logger.info(f"任务 {task_id} -> {new_status}")
+            logger.info(f"任务 {task_id} -> {new_status} (run_count: {task_info['run_count']})")
             self.save_tasks()
             return True
 
@@ -133,8 +135,6 @@ class TaskRunner:
         if len(completed) == len(all_tasks):
             for task_info in self.tasks_data.get("tasks", {}).values():
                 task_info["status"] = "pending"
-                task_info["run_count"] = 0
-                task_info["last_result"] = None
             self.save_tasks()
             return True
         return False

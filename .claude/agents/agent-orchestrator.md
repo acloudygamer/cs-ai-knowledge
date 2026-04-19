@@ -116,3 +116,12 @@ T add(T a, T b) { return a + b; }
 - 只在任务指定的目录中工作
 - 遵循项目编码规范
 
+## 完成汇报
+
+完成后执行：
+```bash
+python scripts/task_runner.py --update <task_id> completed "<result>"
+```
+
+`<task_id>` 从 tasks.json 中获取（如 task_001），`<result>` 为简短描述。
+
