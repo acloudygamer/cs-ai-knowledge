@@ -1,5 +1,41 @@
 {
   "version": "2.0",
   "updated": "2026-04-19",
-  "tasks": []
+  "tasks": {
+    "0-计算机基础/": {
+      "id": "cs-001",
+      "description": "扩展计算机基础内容",
+      "status": "pending"
+    },
+    "1-数据结构与算法/": {
+      "id": "dsa-001",
+      "description": "扩展数据结构与算法内容",
+      "status": "pending"
+    },
+    "2-Python/": {
+      "id": "py-001",
+      "description": "扩展 Python 内容",
+      "status": "pending"
+    },
+    "3-C++/": {
+      "id": "cpp-001",
+      "description": "扩展 C++ 内容",
+      "status": "pending"
+    },
+    "4-Java/": {
+      "id": "java-001",
+      "description": "扩展 Java 内容",
+      "status": "pending"
+    },
+    "5-JavaScript/": {
+      "id": "js-001",
+      "description": "扩展 JavaScript 内容",
+      "status": "pending"
+    },
+    "6-Go/": {
+      "id": "go-001",
+      "description": "扩展 Go 内容",
+      "status": "pending"
+    }
+  }
 }

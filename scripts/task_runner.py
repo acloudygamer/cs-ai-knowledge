@@ -14,7 +14,6 @@ import json
 import sys
 import io
 
-# Windows 下设置 UTF-8 输出编码
 if sys.platform == 'win32':
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 import logging
@@ -33,6 +32,16 @@ SCRIPT_DIR = Path(__file__).parent
 TASKS_FILE = SCRIPT_DIR / "tasks.json"
 AGENT_MANIFEST = SCRIPT_DIR / "agent-manifest.json"
 
+VERSION_MAP = {
+    "0-计算机基础/": "",
+    "1-数据结构与算法/": "",
+    "2-Python/": "Python 3.12 / 3.14",
+    "3-C++/": "C++ 20 / 23 / 26",
+    "4-Java/": "Java 21 / 25",
+    "5-JavaScript/": "JavaScript Node24+ES2024 / Node26+ES2026",
+    "6-Go/": "Go 1.24 / 1.26",
+}
+
 
 class TaskRunner:
     """任务管理器"""
@@ -41,7 +50,6 @@ class TaskRunner:
         self.tasks_file = TASKS_FILE
         self.manifest_file = AGENT_MANIFEST
         self.tasks_data = None
-        self._agent_manifest_cache = None
 
     def load_tasks(self) -> dict:
         """加载任务队列"""
@@ -68,27 +76,19 @@ class TaskRunner:
             logger.error(f"保存任务队列失败: {e}")
 
     def get_all_tasks(self) -> list:
-        """获取所有任务"""
-        if self.tasks_data and "tasks" in self.tasks_data:
-            return self.tasks_data["tasks"]
-        return []
+        """获取所有任务（转为列表格式）"""
+        if not self.tasks_data or "tasks" not in self.tasks_data:
+            return []
+        tasks_list = []
+        for target, task_info in self.tasks_data["tasks"].items():
+            t = dict(task_info)
+            t["target"] = target
+            tasks_list.append(t)
+        return tasks_list
 
     def get_pending_tasks(self) -> list:
-        """获取待处理任务（排除被阻塞的）"""
-        all_tasks = self.get_all_tasks()
-        pending = []
-
-        for task in all_tasks:
-            if task.get("status") == "pending":
-                blocked_by = task.get("blockedBy", [])
-                if blocked_by:
-                    completed_ids = [t.get("id") for t in all_tasks if t.get("status") == "completed"]
-                    if all(bid in completed_ids for bid in blocked_by):
-                        pending.append(task)
-                else:
-                    pending.append(task)
-
-        return pending
+        """获取待处理任务"""
+        return [t for t in self.get_all_tasks() if t.get("status") == "pending"]
 
     def get_task_by_id(self, task_id: str):
         """根据 ID 获取任务"""
@@ -97,34 +97,21 @@ class TaskRunner:
                 return task
         return None
 
-    def load_agent_manifest(self) -> dict:
-        """读取 agent-manifest.json"""
-        if self._agent_manifest_cache is not None:
-            return self._agent_manifest_cache
-
-        try:
-            with open(self.manifest_file, 'r', encoding='utf-8') as f:
-                data = json.load(f)
-                self._agent_manifest_cache = data.get('agents', {})
-                return self._agent_manifest_cache
-        except Exception as e:
-            logger.warning(f"Failed to load agent manifest: {e}")
-            return {}
-
     def update_task(self, task_id: str, new_status: str, result: str = "", findings: list | None = None):
         """更新任务状态和结果"""
         if not self.tasks_data:
             logger.error("任务数据未加载")
             return False
 
-        for task in self.tasks_data.get("tasks", []):
-            if task.get("id") == task_id:
-                task["status"] = new_status
-                task["updated"] = datetime.now().isoformat()
+        tasks = self.tasks_data.get("tasks", {})
+        for target, task_info in tasks.items():
+            if task_info.get("id") == task_id:
+                task_info["status"] = new_status
+                task_info["updated"] = datetime.now().isoformat()
                 if result:
-                    task["result"] = result
+                    task_info["result"] = result
                 if findings:
-                    task["findings"] = findings
+                    task_info["findings"] = findings
                 logger.info(f"任务 {task_id} -> {new_status}")
                 self.save_tasks()
                 return True
@@ -149,39 +136,22 @@ class TaskRunner:
         lines = ["# 待执行任务\n"]
         lines.append(f"Generated at: {datetime.now().isoformat()}\n")
 
-        manifest = self.load_agent_manifest()
-        orchestrator_info = manifest.get('agent-orchestrator', {})
-        if orchestrator_info.get('versionTracking'):
-            lines.append("## 版本追踪规则")
-            for vt in orchestrator_info['versionTracking']:
-                lines.append(f"- {vt}")
-            lines.append("")
-
-        for i, task in enumerate(pending, 1):
-            lines.append(f"## 任务 {i}: {task['id']}")
-            lines.append(f"- **Agent**: `{task.get('agent', 'agent-orchestrator')}`")
-            lines.append(f"- **Target**: `{task.get('target', '')}`")
+        # 按目录分组输出
+        for task in pending:
+            target = task.get("target", "")
+            version = VERSION_MAP.get(target, "")
+            lines.append(f"## {target}")
+            lines.append(f"- **ID**: `{task.get('id', '')}`")
             lines.append(f"- **Description**: {task.get('description', '')}")
-            lines.append(f"- **Priority**: {task.get('priority', 'medium')}")
+            if version:
+                lines.append(f"- **Version**: `{version}`")
             lines.append("")
 
         lines.append("## 工作流程")
-        lines.append("1. **Spawn**：`agent-orchestrator` 执行任务。")
-        lines.append("2. **执行**：直接完成 brainstorm + act + review。")
-        lines.append("3. **等待**：task notification（异步）。")
-        lines.append("4. **继续**：`python scripts/task_runner.py --once` 检查下一批。")
-
+        lines.append("1. Spawn `agent-orchestrator` 执行任务")
+        lines.append("2. 直接完成 brainstorm + act + review")
+        lines.append("3. `python scripts/task_runner.py --update <id> completed --result '<结果>'`")
         lines.append("")
-        lines.append("**任务更新格式**：")
-        lines.append("```bash")
-        lines.append("python scripts/task_runner.py \\")
-        lines.append("  --update <task_id> completed \\")
-        lines.append("  --result '<结果摘要>' \\")
-        lines.append("  --findings '[{\"problem\":\"问题\",\"solution\":\"方案\"}]'")
-        lines.append("```")
-
-        lines.append("")
-        lines.append("### 必须使用 Agent tool spawn")
         lines.append("使用 Agent tool，agent=\"agent-orchestrator\"，prompt=<任务内容>")
 
         return "\n".join(lines)
@@ -197,8 +167,6 @@ class TaskRunner:
         total = len(all_tasks)
         completed = len([t for t in all_tasks if t.get("status") == "completed"])
         pending = len([t for t in all_tasks if t.get("status") == "pending"])
-        in_progress = len([t for t in all_tasks if t.get("status") == "in_progress"])
-        failed = len([t for t in all_tasks if t.get("status") == "failed"])
 
         lines = [
             "=" * 50,
@@ -207,9 +175,7 @@ class TaskRunner:
             "=" * 50,
             f"总任务数:  {total}",
             f"已完成:    {completed}",
-            f"执行中:    {in_progress}",
             f"待处理:    {pending}",
-            f"失败:      {failed}",
             "",
             f"完成率:    {completed/total*100:.1f}%",
             "=" * 50,
@@ -219,18 +185,12 @@ class TaskRunner:
             lines.append("\n## 已完成任务")
             for t in all_tasks:
                 if t.get("status") == "completed":
-                    lines.append(f"- [{t['id']}] {t.get('target', '')} - {t.get('result', '')[:50]}...")
+                    lines.append(f"- [{t['id']}] {t.get('target', '')}")
 
         if pending > 0:
             lines.append("\n## 待处理任务")
             for t in all_tasks:
                 if t.get("status") == "pending":
-                    lines.append(f"- [{t['id']}] {t.get('target', '')}")
-
-        if failed > 0:
-            lines.append("\n## 失败任务")
-            for t in all_tasks:
-                if t.get("status") == "failed":
                     lines.append(f"- [{t['id']}] {t.get('target', '')}")
 
         return "\n".join(lines)
@@ -242,30 +202,29 @@ def main():
     parser = argparse.ArgumentParser(description='CS/AI 知识库任务管理器')
     parser.add_argument('--once', '-o', action='store_true', help='生成待执行任务指令')
     parser.add_argument('--update', '-u', nargs=3, metavar=('ID', 'STATUS', 'RESULT'), help='更新任务状态')
-    parser.add_argument('--findings', '-f', metavar='FINDINGS_JSON', help='附加发现（JSON 数组）')
+    parser.add_argument('--findings', '-f', metavar='FINDINGS_JSON', help='附加发现')
     parser.add_argument('--report', '-r', action='store_true', help='生成执行报告')
     parser.add_argument('--reset', action='store_true', help='重置所有任务为 pending，清空结果')
     parser.add_argument('--resume', action='store_true', help='重置所有任务为 pending，保留结果')
-    parser.add_argument('--validate', action='store_true', help='校验 agent 名字是否合法')
 
     args = parser.parse_args()
     runner = TaskRunner()
 
     if args.reset:
         runner.load_tasks()
-        for task in runner.get_all_tasks():
-            task['status'] = 'pending'
-            task.pop('result', None)
-            task.pop('findings', None)
+        for task_info in runner.tasks_data.get("tasks", {}).values():
+            task_info['status'] = 'pending'
+            task_info.pop('result', None)
+            task_info.pop('findings', None)
         runner.save_tasks()
         print("所有任务已重置为 pending。")
         return
 
     if args.resume:
         runner.load_tasks()
-        for task in runner.get_all_tasks():
-            task['status'] = 'pending'
-            task.pop('updated', None)
+        for task_info in runner.tasks_data.get("tasks", {}).values():
+            task_info['status'] = 'pending'
+            task_info.pop('updated', None)
         runner.save_tasks()
         print("所有任务已恢复（status=pending，结果保留）。")
         return

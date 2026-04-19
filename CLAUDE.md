@@ -25,12 +25,4 @@ python scripts/task_runner.py --reset  # 重置任务（清空结果）
 4. 有 pending → 返回步骤 1；全部完成 → `git add . && git commit -m "feat: ..." && git push`
 5. `python scripts/task_runner.py --resume` 重置下一轮
 
-## 任务状态
-
-| 状态 | 说明 |
-|------|------|
-| pending | 等待执行 |
-| completed | 已完成 |
-| failed | 执行失败 |
-
 详见 [README.md](README.md)
