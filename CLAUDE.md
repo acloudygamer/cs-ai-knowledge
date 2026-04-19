@@ -22,6 +22,8 @@ python scripts/task_runner.py --report  # 查看执行报告
 
 ## 工作循环
 
+每个模块有 **前置审查任务** 和 **常规任务**，硬链接：前置未完成则常规任务不执行。
+
 ### 跑一轮
 
 当你说"跑一轮"时：
@@ -34,8 +36,8 @@ python scripts/task_runner.py --report  # 查看执行报告
 
 当你说"开始工作循环"或"开始"时：
 1. `python scripts/task_runner.py --once` 生成指令
-2. **优先执行前置审查任务**（delete-reviewer agent）
-3. 前置任务全部 completed 后，执行常规任务（agent-orchestrator agent）
+2. **前置审查任务**（delete-reviewer agent）- 硬链接阻塞
+3. 前置全部 completed → 常规任务（agent-orchestrator agent）
 4. 完成后 `git commit`
 5. auto reset → 回到步骤1继续
 6. 直到你说"停止"
