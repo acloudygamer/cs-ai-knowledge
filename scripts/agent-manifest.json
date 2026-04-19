@@ -1,16 +1,15 @@
 {
-  "version": "1.1",
+  "version": "2.0",
   "updated": "2026-04-19",
   "agents": {
-    "agent-python":         { "versionTracking": ["3.12", "3.14"] },
-    "agent-java":          { "versionTracking": ["21", "25"] },
-    "agent-cpp":           { "versionTracking": ["20", "23", "26"] },
-    "agent-js":            { "versionTracking": ["Node24+ES2024", "Node26+ES2026"] },
-    "agent-go":            { "versionTracking": ["1.24", "1.26"] },
-    "agent-dsa":           { "versionTracking": [] },
-    "agent-cs":            { "versionTracking": [] },
-    "agent-brainstormer":  { "versionTracking": [] },
-    "agent-reviewer":      { "versionTracking": [] },
-    "agent-structure-editor": { "versionTracking": [] }
+    "agent-orchestrator": {
+      "versionTracking": [
+        "Python: 3.12 / 3.14",
+        "Java: 21 / 25",
+        "C++: 20 / 23 / 26",
+        "JavaScript: Node24+ES2024 / Node26+ES2026",
+        "Go: 1.24 / 1.26"
+      ]
+    }
   }
 }

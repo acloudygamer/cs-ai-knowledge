@@ -22,26 +22,19 @@ Claude Code (Leader) → task_runner.py --once → 生成 Markdown 指令 → Sp
 
 0. 创建定时 report 任务：`*/10 * * * *` 每 10 分钟触发 `python scripts/task_runner.py --report`，durable=true
 
-1. **步骤1和2并行执行**：
-   - Spawn 7 个 agent-structure-editor 审查各自目录（0-6）
-   - 同时运行 `python scripts/task_runner.py --once` 生成指令
+1. 运行 `python scripts/task_runner.py --once` 生成指令
 
-2. 根据生成的指令 Spawn agents 执行（无 blockedBy 的任务可并行）
+2. Spawn `agent-orchestrator` 执行任务（brainstorm + act + review 全流程）
 
 3. 等待 task notifications
 
 4. `--once` 检查：
-   - act 有 errors → 重新 Spawn act agents 修复，完成后继续步骤 3
-   - 其他 pending → 返回步骤 2
+   - 有 pending → 返回步骤 2
    - 全部 completed → 步骤 5
 
-5. **循环结束后修复**（仅在步骤4确认全部完成后执行）：
-   - 并行 Spawn 7 个 agent-structure-editor 修复各自目录
-   - 等待完成
+5. `git add . && git commit -m "feat: ..." && git push`
 
-6. `git add . && git commit -m "feat: ..." && git push`
-
-7. `--resume` 重置下一轮
+6. `--resume` 重置下一轮
 
 ## 任务状态
 

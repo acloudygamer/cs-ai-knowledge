@@ -131,28 +131,8 @@ class TaskRunner:
         return results
 
     def get_registered_agents(self) -> set:
-        """扫描 .claude/agents/ 下的 agent-*.md，提取 frontmatter 的 name 字段"""
-        if self._registered_agents_cache is not None:
-            return self._registered_agents_cache
-
-        registered = set()
-        pattern = str(self.agent_dir / ".claude" / "agents" / "agent-*.md")
-        for path in glob.glob(pattern):
-            try:
-                with open(path, 'r', encoding='utf-8') as f:
-                    content = f.read()
-                # 解析 YAML frontmatter
-                match = re.match(r'^---\n(.*?)\n---', content, re.DOTALL)
-                if match:
-                    fm = self._parse_yaml_simple(match.group(1))
-                    if fm and 'name' in fm:
-                        registered.add(fm['name'])
-            except Exception as e:
-                logger.warning(f"无法解析 agent 文件 {path}: {e}")
-
-        self._registered_agents_cache = registered
-        logger.info(f"已注册的 agents: {registered}")
-        return registered
+        """返回已注册的 agents 集合（单一 Agent 架构）"""
+        return {'agent-orchestrator'}
 
     def _parse_yaml_simple(self, yaml_str: str) -> dict:
         """简单 YAML frontmatter 解析（支持 name: value 格式）"""
@@ -222,62 +202,11 @@ class TaskRunner:
                         if findings:
                             task["findings"] = findings
                         logger.info(f"任务 {task_id} -> {new_status}")
-
-                        # act 任务 completed 时清除 errors
-                        if task_id.startswith('act-') and new_status == 'completed':
-                            self._clear_errors(task_id)
-
-                        # review 完成后：自动传播 errors 到对应的 act 任务
-                        if new_status == 'completed' and task_id.startswith('review-'):
-                            self._propagate_errors_to_act(task_id, findings or [])
-
                         self.save_tasks()
                         return True
 
         logger.warning(f"任务 {task_id} 未找到")
         return False
-
-    def _propagate_errors_to_act(self, review_id: str, findings: list):
-        """review 完成后，将其 findings 作为 errors 传给对应的 act 任务"""
-        if not self.tasks_data:
-            return
-        review_task = self.get_task_by_id(review_id)
-        if not review_task:
-            return
-
-        # review blockedBy act，所以 act 在 blockedBy 列表中
-        blocked_by = review_task.get('blockedBy', [])
-        for act_id in blocked_by:
-            if act_id.startswith('act-'):
-                for board_name, board_data in self.tasks_data["boards"].items():
-                    for task in board_data["tasks"]:
-                        if task.get("id") == act_id:
-                            # 先清除旧 errors，避免累积
-                            task['errors'] = []
-                            # 将 findings 转换为 errors 格式
-                            for f in findings:
-                                if isinstance(f, dict):
-                                    task['errors'].append({
-                                        'file': f.get('file', ''),
-                                        'line': f.get('line', 0),
-                                        'problem': f.get('problem', '')
-                                    })
-                            # 重置 act 为 pending，让其修复
-                            task['status'] = 'pending'
-                            logger.info(f"已传播 {len(findings)} 个 errors 到 {act_id}，重置为 pending")
-                self.save_tasks()
-
-    def _clear_errors(self, act_id: str):
-        """act 完成后清除自身的 errors"""
-        if not self.tasks_data:
-            return
-        for board_name, board_data in self.tasks_data["boards"].items():
-            for task in board_data["tasks"]:
-                if task.get("id") == act_id:
-                    if 'errors' in task and task['errors']:
-                        task['errors'] = []
-                        self.save_tasks()
-                        logger.info(f"已清除 {act_id} 的 errors")
 
     def generate_instructions(self) -> str:
         """生成待执行任务的指令，供 Orchestrator (Claude Code) 阅读"""
@@ -295,37 +224,29 @@ class TaskRunner:
 3. 运行 `git commit -m "feat: 完成任务描述"` 提交
 4. 运行 `git push` 推送到远程
 
-或者继续 brainstorming 添加新内容。
+或者继续 brainstorm 添加新内容。
 """
 
         lines = ["# 待执行任务\n"]
         lines.append(f"Generated at: {datetime.now().isoformat()}\n")
 
+        # 显示全局版本追踪信息
+        manifest = self.load_agent_manifest()
+        orchestrator_info = manifest.get('agent-orchestrator', {})
+        if orchestrator_info.get('versionTracking'):
+            lines.append("## 版本追踪规则")
+            for vt in orchestrator_info['versionTracking']:
+                lines.append(f"- {vt}")
+            lines.append("")
+
         for i, task in enumerate(pending, 1):
             lines.append(f"## 任务 {i}: {task['id']}")
             lines.append(f"- **Agent**: `{task['agent']}`")
-            # 从 agent-manifest 注入版本追踪信息
-            agent_info = self.get_agent_info(task['agent'])
-            if agent_info.get('versionTracking'):
-                versions_str = ', '.join(agent_info['versionTracking'])
-                lines.append(f"- **版本追踪**: `{versions_str}`")
             lines.append(f"- **Target**: `{task['target']}`")
             lines.append(f"- **Description**: {task['description']}")
             lines.append(f"- **Priority**: {task.get('priority', 'medium')}")
 
-            # act 任务显示待修复的 errors
-            if task['id'].startswith('act-') and task.get('errors'):
-                lines.append("\n### 待修复错误:")
-                for err in task['errors']:
-                    file_path = err.get('file', '')
-                    line = err.get('line', 0)
-                    problem = err.get('problem', '')
-                    if line:
-                        lines.append(f"- **{file_path}** 第 {line} 行: {problem}")
-                    else:
-                        lines.append(f"- **{file_path}**: {problem}")
-
-            # 传递前置任务的结果（Agent 间通信）
+            # 传递前置任务的结果
             blocked_by = task.get('blockedBy', [])
             if blocked_by:
                 prev_results = self.get_blocked_results(blocked_by)
@@ -345,102 +266,41 @@ class TaskRunner:
                                 else:
                                     lines.append(f"- {finding}")
 
-            # 子 agent 读取的 agent 定义文件
-            lines.append(f"- **Agent 文件**: `.claude/agents/{task['agent']}.md`")
-
             lines.append("")  # 空行分隔
 
         # 检测无依赖的可并行任务数量
         parallel_count = sum(1 for t in pending if not t.get('blockedBy'))
         parallel_tasks = [t for t in pending if not t.get('blockedBy')]
 
-        # 根据任务类型确定 findings 格式
-        task_type_map = {}
-        for t in parallel_tasks:
-            tid = t['id']
-            if tid.startswith('brainstorm-'):
-                task_type_map[tid] = 'brainstorm'
-            elif tid.startswith('act-'):
-                task_type_map[tid] = 'act'
-            elif tid.startswith('review-'):
-                task_type_map[tid] = 'review'
-            else:
-                task_type_map[tid] = 'brainstorm'
-
         lines.append("## 工作流程")
         if parallel_count > 1:
             lines.append(f"**{parallel_count} 个任务可并行执行！**")
-            lines.append(f"1. **启动**：同时 Spawn 所有 {parallel_count} 个 agents 并行执行。")
-            lines.append("2. **执行（子 Agent 负责）**：Agents 独立执行，完成后自行更新任务状态。**（不要手动为他们运行 `--update` 命令）**")
-            lines.append("3. **等待**：等待 task notifications（异步）— 无需轮询。")
-            lines.append("4. **继续**：重新运行 `task_runner.py --once` 检查并触发下一批已解锁的任务。")
+            lines.append("1. **Spawn**：同时 Spawn `agent-orchestrator` 执行所有任务。")
+            lines.append("2. **执行**：Agent 直接完成 brainstorm + act + review 全流程。")
+            lines.append("3. **等待**：等待 task notifications（异步）。")
+            lines.append("4. **继续**：重新运行 `task_runner.py --once` 检查下一批任务。")
         else:
-            lines.append("1. **启动**：Spawn 指定 Agent 执行任务。")
-            lines.append("2. **执行（子 Agent 负责）**：Agent 独立执行，完成后自行更新任务状态。**（不要手动运行 `--update` 命令）**")
+            lines.append("1. **Spawn**：Spawn `agent-orchestrator` 执行任务。")
+            lines.append("2. **执行**：Agent 直接完成 brainstorm + act + review 全流程。")
             lines.append("3. **等待**：等待 task notification（异步）。")
             lines.append("4. **继续**：重新运行 `task_runner.py --once`。")
 
-        # 按类型分组显示更新格式（基于所有 pending 任务）
-        all_pending_types = set()
-        for t in pending:
-            tid = t['id']
-            if tid.startswith('brainstorm-'):
-                all_pending_types.add('brainstorm')
-            elif tid.startswith('act-'):
-                all_pending_types.add('act')
-            elif tid.startswith('review-'):
-                all_pending_types.add('review')
+        lines.append("")
+        lines.append("**任务更新格式**：")
+        lines.append("   ```bash")
+        lines.append("   python scripts/task_runner.py \\")
+        lines.append("     --update <task_id> completed \\")
+        lines.append("     --result '<执行结果摘要>' \\")
+        lines.append("     --findings '[{\"problem\":\"问题描述\",\"solution\":\"解决方案\"}]'")
+        lines.append("   ```")
 
-        if 'brainstorm' in all_pending_types:
-            lines.append("")
-            lines.append("**brainstorm 任务完成后更新格式**：")
-            lines.append("   ```bash")
-            lines.append("   python scripts/task_runner.py \\")
-            lines.append("     --update <task_id> completed \\")
-            lines.append("     --result '<执行结果摘要>' \\")
-            lines.append("     --findings '[{\"problem\":\"问题描述\",\"solution\":\"解决方案\"}]'")
-            lines.append("   ```")
-        if 'act' in all_pending_types:
-            lines.append("")
-            lines.append("**act 任务开始时更新格式**：")
-            lines.append("   ```bash")
-            lines.append("   python scripts/task_runner.py \\")
-            lines.append("     --update <task_id> in_progress '<开始执行>'")
-            lines.append("   ```")
-            lines.append("")
-            lines.append("**act 任务完成后更新格式**：")
-            lines.append("   ```bash")
-            lines.append("   python scripts/task_runner.py \\")
-            lines.append("     --update <task_id> completed \\")
-            lines.append("     --result '<执行结果摘要>' \\")
-            lines.append("     --findings '[{\"problem\":\"实现内容描述\",\"solution\":\"已创建的文件和内容\"}]'")
-            lines.append("   ```")
-        if 'review' in all_pending_types:
-            lines.append("")
-            lines.append("**review 任务完成后更新格式**：")
-            lines.append("   ```bash")
-            lines.append("   python scripts/task_runner.py \\")
-            lines.append("     --update <task_id> completed \\")
-            lines.append("     --result '<审查结果摘要>' \\")
-            lines.append("     --findings '[{\"file\":\"文件路径\",\"line\":行号,\"problem\":\"问题描述\"}]'")
-            lines.append("   ```")
-
-        # 添加 CRITICAL section
         lines.append("")
         lines.append("### 重要: 必须使用 Agent tool spawn")
         lines.append("")
-        lines.append(f"**{parallel_count} 个任务可并行执行！**")
+        lines.append("**你必须使用 Agent tool 来 spawn `agent-orchestrator`，而不是仅仅文字回复。**")
         lines.append("")
-        lines.append("**你必须使用 Agent tool 来 spawn 这些 agents，而不是仅仅文字回复。**")
-        lines.append("")
-        lines.append("**正确的 spawn 方式：**")
-        lines.append("1. 使用 Agent tool，指定 `agent` 参数为对应的 agent 名字")
-        lines.append("2. Agent tool 会自动从 `.claude/agents/agent-*.md` 文件中读取 `skills:` 字段并注入")
-        lines.append("3. 在 prompt 中包含任务的具体内容")
-        lines.append("")
-        lines.append("**Spawn 命令格式：**")
-        for task in parallel_tasks:
-            lines.append(f"- 使用 Agent tool，agent=\"{task['agent']}\"，prompt=<任务内容>")
+        lines.append("**Spawn 命令格式**：")
+        lines.append(f"- 使用 Agent tool，agent=\"agent-orchestrator\"，prompt=<任务内容>")
 
         return "\n".join(lines)
 
