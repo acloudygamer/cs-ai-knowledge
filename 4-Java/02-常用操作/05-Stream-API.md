@@ -323,6 +323,52 @@ List<String> result = stream.collect(Collectors.toList());
 System.out.println("After terminal operation");
 ```
 
+## Stream Gatherers (Java 22)
+
+`Stream.gather()` 支持自定义中间操作器的中间操作。
+
+### 基本用法
+
+```java
+import java.util.stream.Gatherer;
+
+// 自定义 Gatherer：展开嵌套列表
+Gatherer<List<Integer>, ?, Integer> flattener = Gatherer.of(
+    (state, element, downstream) -> {
+        for (var item : element) {
+            if (!downstream.push(item)) {
+                return false;
+            }
+        }
+        return true;
+    }
+);
+
+List<List<Integer>> nested = List.of(
+    List.of(1, 2),
+    List.of(3, 4, 5),
+    List.of(6)
+);
+
+List<Integer> flat = nested.stream()
+    .gather(flattener)
+    .toList();  // [1, 2, 3, 4, 5, 6]
+```
+
+### 内置 Gatherers (Java 22)
+
+```java
+// 使用内置的 fold（左折叠）
+List<Integer> summed = Stream.of(1, 2, 3, 4, 5)
+    .gather(Gatherer.foldLeft(Integer::sum))
+    .findFirst()  // 15
+
+// 使用 scan（左扫描，保留中间结果）
+List<Integer> runningSum = Stream.of(1, 2, 3, 4)
+    .gather(Gatherer.scanLeft(Integer::sum))
+    .toList();  // [1, 3, 6, 10]
+```
+
 ## 最佳实践
 
 ### 1. 避免修改外部变量

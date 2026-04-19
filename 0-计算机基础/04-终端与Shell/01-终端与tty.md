@@ -1,5 +1,7 @@
 # 终端与tty
 
+> **版本说明**: tty/pts 是 Unix/Linux 概念。Windows Terminal (Windows 11) 提供类似功能但使用不同机制。
+
 ## 概念
 
 **终端**是输入输出设备的抽象概念，**tty** (teletypewriter) 是Unix/Linux对终端设备的抽象。

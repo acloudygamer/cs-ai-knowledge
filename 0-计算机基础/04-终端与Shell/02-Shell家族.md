@@ -1,5 +1,7 @@
 # Shell家族
 
+> **版本说明**: 本文中 bash 4+ 特性会标注。环境: GNU Bash 5.2 (WSL/MINGW64), PowerShell 7.6.0, Ubuntu 24.04, Windows 11。
+
 ## 概念
 
 **Shell**是命令行解释器，是用户与操作系统内核之间的桥梁。
@@ -372,8 +374,8 @@ arr+=(six seven)
 # 删除元素
 unset arr[2]
 
-# 索引数组转关联数组
-declare -A aa=([one]=1 [two]=2)
+# 索引数组转关联数组 (bash 4+)
+declare -A aa=([one]=1 [two]=2)  # 需要 bash 4+
 
 # 遍历索引和值
 for i in "${!arr[@]}"; do

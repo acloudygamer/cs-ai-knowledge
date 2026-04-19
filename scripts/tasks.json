@@ -1,48 +1,60 @@
 {
   "version": "3.0",
-  "updated": "2026-04-19T22:50:53.845378",
+  "updated": "2026-04-20T01:38:36.616294",
   "tasks": {
     "task_001": {
       "target": "计算机基础",
       "path": "0-计算机基础/",
-      "status": "pending",
+      "status": "completed",
       "run_count": 0,
-      "last_result": null
+      "last_result": null,
+      "updated": "2026-04-20T01:36:19.465150",
+      "result": "计算机基础内容审核完成：添加版本标注（bash 4+特性、平台差异）"
     },
     "task_002": {
       "target": "数据结构与算法",
       "path": "1-数据结构与算法/",
-      "status": "pending",
+      "status": "completed",
       "run_count": 0,
-      "last_result": null
+      "last_result": null,
+      "updated": "2026-04-20T01:36:07.166260",
+      "result": "修复数据结构和算法目录：1) 修复动态规划.md中缺失的代码 fence；2) 更新 README.md 添加缺失的滑动窗口和双指针章节；3) 更新 versions.json 添加版本信息"
     },
     "task_003": {
       "target": "Python",
       "path": "2-Python/",
-      "status": "pending",
+      "status": "completed",
       "run_count": 0,
-      "last_result": null
+      "last_result": null,
+      "updated": "2026-04-20T01:37:22.762836",
+      "result": "Added Python 3.14 新特性.md"
     },
     "task_004": {
       "target": "C++",
       "path": "3-C++/",
-      "status": "pending",
+      "status": "completed",
       "run_count": 0,
-      "last_result": null
+      "last_result": null,
+      "updated": "2026-04-20T01:38:36.616105",
+      "result": "C++知识库更新：1) 新增 C++26新特性.md (312行)，涵盖 std::execution、std::meta反射、constexpr改进等；2) 清理 C++20新特性.md 中重复的 C++23 内容；3) 更新 README.md 索引"
     },
     "task_005": {
       "target": "Java",
       "path": "4-Java/",
-      "status": "pending",
+      "status": "completed",
       "run_count": 0,
-      "last_result": null
+      "last_result": null,
+      "updated": "2026-04-20T01:37:18.080205",
+      "result": "Updated Java knowledge base with Java 25 features: Instance Main Methods, Module Import, Flexible Constructor Body; Fixed String Templates version annotation; Added Stream Gatherers (Java 22); Updated version recommendations"
     },
     "task_006": {
       "target": "JavaScript",
       "path": "5-JavaScript/",
-      "status": "pending",
+      "status": "completed",
       "run_count": 0,
-      "last_result": null
+      "last_result": null,
+      "updated": "2026-04-20T01:35:59.692509",
+      "result": "JavaScript task: Added ES2026 support, cleaned up misplaced ES2024 content from ES2022 file, restructured version features"
     },
     "task_007": {
       "target": "Go",

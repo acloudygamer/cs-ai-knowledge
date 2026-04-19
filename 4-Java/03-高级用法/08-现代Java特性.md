@@ -402,6 +402,166 @@ public final class DeleteCommand implements Command {
 }
 ```
 
+## Instance Main Methods (Java 25)
+
+实例主方法简化 Java 程序入口，无需类声明。
+
+### 基本用法
+
+```java
+// 传统方式：需要类声明
+public class Hello {
+    public static void main(String[] args) {
+        System.out.println("Hello");
+    }
+}
+
+// Java 25：直接 void main()
+void main() {
+    System.out.println("Hello, Java 25!");
+}
+```
+
+### 自动导入
+
+```java
+// java.lang 中的类自动导入
+void main() {
+    // System、String、Integer 等无需 import
+    var list = new ArrayList<String>();  // ArrayList 需要 import
+    IO.println("Hello");  // java.lang.IO 自动导入 (Java 25)
+}
+```
+
+### 约束
+
+```java
+// 必须是 void main()
+// 不能是 static
+// 不能有参数或其他返回类型
+// void main(String[] args) 也允许
+```
+
+## Module Import Declaration (Java 25)
+
+`import module` 一次性导入模块所有公共类。
+
+### 基本用法
+
+```java
+// 传统方式：逐个导入
+import java.util.List;
+import java.util.ArrayList;
+import java.util.Map;
+import java.util.HashMap;
+
+// Java 25：导入整个模块
+import module java.util;
+
+// 现在可以直接使用 List、ArrayList、Map、HashMap 等
+List<String> list = new ArrayList<>();
+Map<String, Integer> map = new HashMap<>();
+```
+
+### 应用场景
+
+```java
+// 大量使用某模块的类时，代码更简洁
+import module java.io;
+
+void main() {
+    var file = new File("test.txt");
+    var reader = new FileReader(file);
+    var writer = new PrintWriter(System.out);
+}
+
+// 对比传统方式
+import java.io.File;
+import java.io.FileReader;
+import java.io.PrintWriter;
+```
+
+## Flexible Constructor Body (Java 25)
+
+允许在构造函数中 super()/this() 调用前执行初始化逻辑。
+
+### 传统限制
+
+```java
+// 传统 Java：this() 或 super() 必须是第一条语句
+class User {
+    private String id;
+    private String name;
+
+    User(String rawId, String name) {
+        this.id = validate(rawId);  // 必须在 this()/super() 之前，但传统不允许
+        this.name = name;
+    }
+
+    User(String rawId) {
+        this(rawId, "Anonymous");  // this() 必须是第一条语句
+    }
+
+    private static String validate(String id) {
+        if (id == null || id.isBlank()) {
+            throw new IllegalArgumentException("Invalid ID");
+        }
+        return id;
+    }
+}
+```
+
+### Java 25 新方式
+
+```java
+class User {
+    private String id;
+    private String name;
+
+    User(String rawId, String name) {
+        this.id = validate(rawId);  // Java 25 允许：可在 super()/this() 之前
+        this.name = name;
+    }
+
+    User(String rawId) {
+        this(rawId, "Anonymous");  // this() 仍然是第一条语句
+    }
+
+    private static String validate(String id) {
+        if (id == null || id.isBlank()) {
+            throw new IllegalArgumentException("Invalid ID");
+        }
+        return id;
+    }
+}
+```
+
+### 实际应用
+
+```java
+class Order {
+    private final String id;
+    private final List<Item> items;
+    private final BigDecimal total;
+
+    Order(String id, List<Item> items) {
+        this.id = id;
+        this.items = List.copyOf(items);  // 防御性复制
+        this.total = calculateTotal(items);
+    }
+
+    Order(String id) {
+        this(id, List.of());  // 调用另一个构造函数
+    }
+
+    private static BigDecimal calculateTotal(List<Item> items) {
+        return items.stream()
+            .map(Item::getPrice)
+            .reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+}
+```
+
 ## 快速特性一览
 
 | 特性 | 版本 | 说明 |
@@ -416,13 +576,17 @@ public final class DeleteCommand implements Command {
 | Text Blocks | 15 | 多行字符串 |
 | Sealed Classes | 17 | 限制继承层次 |
 | Record Patterns | 21 | Record 解构 |
-| String Templates | 21 | 字符串插值（预览特性，Java 22正式） |
+| String Templates | 23 | 字符串插值（Java 21-22 预览，Java 23 正式） |
 | Virtual Threads | 21 | 轻量级线程 |
+| Instance Main Methods | 25 | 简化的程序入口 |
+| Module Import | 25 | import module 语法 |
+| Flexible Constructor Body | 25 | 构造函数初始化顺序增强 |
+| Key Derivation Function API | 25 | 密码学密钥派生标准 API |
 
 ## 版本选择建议
 
 ```
-生产环境：Java 17 (LTS) 或 Java 21 (LTS)
-新项目：  Java 21（享受最新特性）
-学习：   Java 17 或 21
+生产环境：Java 21 (LTS) 或 Java 25 (LTS)
+新项目：  Java 25（享受最新特性）
+学习：   Java 21 或 25
 ```
