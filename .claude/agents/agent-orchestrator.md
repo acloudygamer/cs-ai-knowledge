@@ -22,21 +22,10 @@ description: 当你需要头脑风暴新内容、执行任务（创建/修改文
 
 | 能力 | 触发条件 | 动作 |
 |------|----------|------|
-| 删除 | 内容过时、冗余、重复 | 向 Leader 汇报，等待确认 |
-| 合并 | 同一概念多处出现 | 向 Leader 汇报，等待确认 |
-| 重写 | 表述不清、冗余 | 向 Leader 汇报，等待确认 |
-| 重塑 | 结构混乱、顺序不合理 | 向 Leader 汇报，等待确认 |
-
-**删除意向汇报**（供 Leader 决策）：
-```markdown
-## 删除意向
-- [delete] `path/file.md` - 原因：...
-- [merge] `src.md` + `dst.md` - 原因：...
-- [rewrite] `path/file.md` - 「XX」章节 - 原因：...
-- [restructure] `path/file.md` - 原因：...
-```
-
-**等待 Leader 确认后再执行删除/合并/重写/重塑操作。**
+| 删除 | 内容过时、冗余、重复 | 直接删除，汇报结果 |
+| 合并 | 同一概念多处出现 | 直接执行 |
+| 重写 | 表述不清、冗余 | 直接执行 |
+| 重塑 | 结构混乱、顺序不合理 | 直接执行 |
 
 - 按 target 目录工作
 - 生成"概念 + 问题"结构的文档
@@ -125,5 +114,5 @@ T add(T a, T b) { return a + b; }
 python scripts/task_runner.py --update <task_id> completed "<result>"
 ```
 
-`<task_id>` 从 tasks.json 中获取（如 task_001），`<result>` 为简短描述。
+`<task_id>` 从 tasks.json 中获取（如 task_001），`<result>` 需包含删除结果（如「删除了XX、合并了YY到ZZ」）。
 
