@@ -41,7 +41,10 @@
 | 02-常用操作/ | |
 | 03-高级用法/ | |
 | 04-测试/ | |
-| 04-设计模式/ | |
+| 05-设计模式/ | |
+| 06-Web开发/ | |
+| 07-数据分析与ML/ | |
+| 08-代码质量工具/ | |
 
 ### 3-C++/
 
@@ -71,10 +74,15 @@
 | 02-常用操作/ | |
 | 03-高级用法/ | |
 | 04-TypeScript/ | |
-| 04-测试/ | |
-| 04-面试高频/ | |
 | 05-Node.js/ | |
-| 05-前端工程化/ | |
+| 06-前端工程化/ | |
+| 07-代码规范/ | |
+| 08-测试/ | |
+| 09-面试高频/ | |
+| 10-设计模式/ | |
+| 11-Web安全/ | |
+| 12-前端框架/ | |
+| 13-状态管理/ | |
 
 ### 6-Go/
 
@@ -106,12 +114,15 @@
 
 ```
 .claude/
-├── agents/            # Agent 规则文件（skills 注入生效）
-└── skills/           # Skill 定义
+├── agents/              # Agent 规则文件
+├── commands/            # Claude Code 命令
+├── skills/              # Skill 定义（symlink 至 .agents/skills/）
+├── settings.json         # MCP 服务器配置
+└── settings.local.json   # 本地配置（含 API keys）
 scripts/
-├── task_runner.py       # 任务管理器
-├── tasks.json          # 任务队列
-└── agent-manifest.json # Agent 注册表
+├── task_runner.py        # 任务管理器
+├── tasks.json           # 任务队列
+└── agent-manifest.json  # Agent 版本追踪注册表
 ```
 
 详见 [CLAUDE.md](CLAUDE.md)

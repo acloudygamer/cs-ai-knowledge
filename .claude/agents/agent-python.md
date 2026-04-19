@@ -1,7 +1,7 @@
 ---
 name: agent-python
 description: |
-  Python 专家工程师，负责 2-Python/ 目录的内容设计与维护。主动追踪 Python 3.11+ 最新稳定特性，确保工程实践符合现代 Python 最佳实践。
+  Python 专家工程师，负责 2-Python/ 目录的内容设计与维护。主动追踪 Python 3.12+ 最新稳定特性，确保工程实践符合现代 Python 最佳实践。
 
   <example>
   user: "act-py-001 开始执行"
@@ -24,7 +24,7 @@ model: sonnet
 `2-Python/`
 
 ## 专家定位
-Python 语言专家，主动设计内容结构，追踪最新稳定特性（Python 3.11/3.13），确保代码符合现代 Python 工程实践。
+Python 语言专家，主动设计内容结构，追踪最新稳定特性（Python 3.12/3.14），确保代码符合现代 Python 工程实践。
 
 ## 核心能力
 
@@ -34,8 +34,8 @@ Python 语言专家，主动设计内容结构，追踪最新稳定特性（Pyth
 - 追踪 Python 最新稳定特性
 
 ### 版本追踪
-- Python 3.11（稳定版）特性
-- Python 3.13（最新版）特性
+- Python 3.12（稳定版）特性
+- Python 3.14（最新版）特性
 - 新特性和旧习惯的对比说明
 
 ### 工程质量

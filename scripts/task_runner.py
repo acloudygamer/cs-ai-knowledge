@@ -139,18 +139,17 @@ class TaskRunner:
         registered = set()
         pattern = str(self.agent_dir / ".claude" / "agents" / "agent-*.md")
         for path in glob.glob(pattern):
-            for path in glob.glob(pattern):
-                try:
-                    with open(path, 'r', encoding='utf-8') as f:
-                        content = f.read()
-                    # 解析 YAML frontmatter
-                    match = re.match(r'^---\n(.*?)\n---', content, re.DOTALL)
-                    if match:
-                        fm = self._parse_yaml_simple(match.group(1))
-                        if fm and 'name' in fm:
-                            registered.add(fm['name'])
-                except Exception as e:
-                    logger.warning(f"无法解析 agent 文件 {path}: {e}")
+            try:
+                with open(path, 'r', encoding='utf-8') as f:
+                    content = f.read()
+                # 解析 YAML frontmatter
+                match = re.match(r'^---\n(.*?)\n---', content, re.DOTALL)
+                if match:
+                    fm = self._parse_yaml_simple(match.group(1))
+                    if fm and 'name' in fm:
+                        registered.add(fm['name'])
+            except Exception as e:
+                logger.warning(f"无法解析 agent 文件 {path}: {e}")
 
         self._registered_agents_cache = registered
         logger.info(f"已注册的 agents: {registered}")

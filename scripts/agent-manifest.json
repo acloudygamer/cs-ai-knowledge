@@ -1,13 +1,16 @@
 {
   "version": "1.1",
-  "updated": "2026-04-17",
+  "updated": "2026-04-19",
   "agents": {
-    "agent-python": { "versionTracking": ["3.12", "3.14"] },
-    "agent-java":   { "versionTracking": ["21", "25"] },
-    "agent-cpp":    { "versionTracking": ["20", "23", "26"] },
-    "agent-js":     { "versionTracking": ["Node24+ES2024", "Node26+ES2026"] },
-    "agent-go":     { "versionTracking": ["1.24", "1.26"] },
-    "agent-dsa":    { "versionTracking": [] },
-    "agent-cs":     { "versionTracking": [] }
+    "agent-python":         { "versionTracking": ["3.12", "3.14"] },
+    "agent-java":          { "versionTracking": ["21", "25"] },
+    "agent-cpp":           { "versionTracking": ["20", "23", "26"] },
+    "agent-js":            { "versionTracking": ["Node24+ES2024", "Node26+ES2026"] },
+    "agent-go":            { "versionTracking": ["1.24", "1.26"] },
+    "agent-dsa":           { "versionTracking": [] },
+    "agent-cs":            { "versionTracking": [] },
+    "agent-brainstormer":  { "versionTracking": [] },
+    "agent-reviewer":      { "versionTracking": [] },
+    "agent-structure-editor": { "versionTracking": [] }
   }
 }
