@@ -155,6 +155,7 @@ class TaskRunner:
             for issue in issues:
                 print(f"  - {issue}")
             print()
+            return ""
 
         pending = self.get_pending_tasks()
 
