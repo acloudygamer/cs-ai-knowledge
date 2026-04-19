@@ -14,12 +14,13 @@
 | 5-JavaScript/ | JavaScript 语言特性、Node.js、前端工程 |
 | 6-Go/ | Go 语言特性、并发、工具链 |
 
-## 常用命令
+## 核心命令
 
 ```bash
+python scripts/run_loop.py              # 长期循环模式（并行执行所有任务）
 python scripts/task_runner.py --once    # 生成待执行任务
-python scripts/task_runner.py --report   # 查看执行报告
-python scripts/task_runner.py --resume   # 重置任务（保留结果）
+python scripts/task_runner.py --report  # 查看执行报告
+python scripts/run_loop.py --help       # 查看详细用法
 ```
 
 详见 [CLAUDE.md](CLAUDE.md)

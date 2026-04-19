@@ -1,41 +1,55 @@
 {
-  "version": "2.0",
-  "updated": "2026-04-19",
+  "version": "3.0",
+  "updated": "2026-04-19T22:29:59.551971",
   "tasks": {
-    "0-计算机基础/": {
-      "id": "cs-001",
-      "description": "扩展计算机基础内容",
-      "status": "pending"
+    "task_001": {
+      "target": "计算机基础",
+      "path": "0-计算机基础/",
+      "status": "pending",
+      "run_count": 0,
+      "last_result": null
     },
-    "1-数据结构与算法/": {
-      "id": "dsa-001",
-      "description": "扩展数据结构与算法内容",
-      "status": "pending"
+    "task_002": {
+      "target": "数据结构与算法",
+      "path": "1-数据结构与算法/",
+      "status": "pending",
+      "run_count": 0,
+      "last_result": null
     },
-    "2-Python/": {
-      "id": "py-001",
-      "description": "扩展 Python 内容",
-      "status": "pending"
+    "task_003": {
+      "target": "Python",
+      "path": "2-Python/",
+      "status": "pending",
+      "run_count": 0,
+      "last_result": null
     },
-    "3-C++/": {
-      "id": "cpp-001",
-      "description": "扩展 C++ 内容",
-      "status": "pending"
+    "task_004": {
+      "target": "C++",
+      "path": "3-C++/",
+      "status": "pending",
+      "run_count": 0,
+      "last_result": null
     },
-    "4-Java/": {
-      "id": "java-001",
-      "description": "扩展 Java 内容",
-      "status": "pending"
+    "task_005": {
+      "target": "Java",
+      "path": "4-Java/",
+      "status": "pending",
+      "run_count": 0,
+      "last_result": null
     },
-    "5-JavaScript/": {
-      "id": "js-001",
-      "description": "扩展 JavaScript 内容",
-      "status": "pending"
+    "task_006": {
+      "target": "JavaScript",
+      "path": "5-JavaScript/",
+      "status": "pending",
+      "run_count": 0,
+      "last_result": null
     },
-    "6-Go/": {
-      "id": "go-001",
-      "description": "扩展 Go 内容",
-      "status": "pending"
+    "task_007": {
+      "target": "Go",
+      "path": "6-Go/",
+      "status": "pending",
+      "run_count": 0,
+      "last_result": null
     }
   }
 }

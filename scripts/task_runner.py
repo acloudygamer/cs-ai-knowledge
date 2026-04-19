@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """
-任务循环脚本 - CS/AI 知识库单一 Agent 协调
+任务循环脚本 - CS/AI 知识库并行 Agent 协调
 
 功能：
 - --once: 生成待执行任务指令（供 Orchestrator 阅读）
-- --update <id> <status> <result>: 更新任务状态和结果
+- --update <key> <status> <result>: 更新任务状态和结果
 - --report: 生成执行报告
 - --resume: 重置所有任务为 pending（保留结果）
 - --reset: 重置所有任务为 pending（清空结果）
@@ -79,9 +79,9 @@ class TaskRunner:
         if not self.tasks_data or "tasks" not in self.tasks_data:
             return []
         tasks_list = []
-        for target, task_info in self.tasks_data["tasks"].items():
+        for task_key, task_info in self.tasks_data["tasks"].items():
             t = dict(task_info)
-            t["target"] = target
+            t["_key"] = task_key
             tasks_list.append(t)
         return tasks_list
 
@@ -92,7 +92,7 @@ class TaskRunner:
     def get_task_by_id(self, task_id: str):
         """根据 ID 获取任务"""
         for task in self.get_all_tasks():
-            if task.get("id") == task_id:
+            if task.get("_key") == task_id:
                 return task
         return None
 
@@ -103,17 +103,17 @@ class TaskRunner:
             return False
 
         tasks = self.tasks_data.get("tasks", {})
-        for target, task_info in tasks.items():
-            if task_info.get("id") == task_id:
-                task_info["status"] = new_status
-                task_info["updated"] = datetime.now().isoformat()
-                if result:
-                    task_info["result"] = result
-                if findings:
-                    task_info["findings"] = findings
-                logger.info(f"任务 {task_id} -> {new_status}")
-                self.save_tasks()
-                return True
+        if task_id in tasks:
+            task_info = tasks[task_id]
+            task_info["status"] = new_status
+            task_info["updated"] = datetime.now().isoformat()
+            if result:
+                task_info["result"] = result
+            if findings:
+                task_info["findings"] = findings
+            logger.info(f"任务 {task_id} -> {new_status}")
+            self.save_tasks()
+            return True
 
         logger.warning(f"任务 {task_id} 未找到")
         return False
@@ -122,7 +122,6 @@ class TaskRunner:
         """生成任务列表"""
         self.load_tasks()
         pending = self.get_pending_tasks()
-        versions = load_versions()
 
         if not pending:
             return """# 无待执行任务
@@ -132,16 +131,20 @@ class TaskRunner:
 
         lines = ["# 待执行任务\n"]
         lines.append(f"Generated at: {datetime.now().isoformat()}\n")
+        lines.append("详见 .claude/agents/agent-orchestrator.md\n")
+        lines.append("")
 
         for task in pending:
             target = task.get("target", "")
-            version = versions.get(target, "")
+            path = task.get('path', '')
             lines.append(f"## {target}")
-            lines.append(f"- **ID**: `{task.get('id', '')}`")
-            lines.append(f"- **Description**: {task.get('description', '')}")
-            if version:
-                lines.append(f"- **Version**: `{version}`")
+            lines.append(f"- 路径: `{path}`")
+            lines.append(f"- Agent tool: `Agent(subagent_type=\"agent-orchestrator\", prompt=\"...\")`")
             lines.append("")
+
+        lines.append("---")
+        lines.append("")
+        lines.append("**并行执行：每个任务分配一个 agent-orchestrator agent**")
 
         return "\n".join(lines)
 
@@ -174,13 +177,13 @@ class TaskRunner:
             lines.append("\n## 已完成任务")
             for t in all_tasks:
                 if t.get("status") == "completed":
-                    lines.append(f"- [{t['id']}] {t.get('target', '')}")
+                    lines.append(f"- {t.get('target', '')}")
 
         if pending > 0:
             lines.append("\n## 待处理任务")
             for t in all_tasks:
                 if t.get("status") == "pending":
-                    lines.append(f"- [{t['id']}] {t.get('target', '')}")
+                    lines.append(f"- {t.get('target', '')}")
 
         return "\n".join(lines)
 
@@ -190,7 +193,7 @@ def main():
 
     parser = argparse.ArgumentParser(description='CS/AI 知识库任务管理器')
     parser.add_argument('--once', '-o', action='store_true', help='生成待执行任务指令')
-    parser.add_argument('--update', '-u', nargs=3, metavar=('ID', 'STATUS', 'RESULT'), help='更新任务状态')
+    parser.add_argument('--update', '-u', nargs=3, metavar=('KEY', 'STATUS', 'RESULT'), help='更新任务状态')
     parser.add_argument('--findings', '-f', metavar='FINDINGS_JSON', help='附加发现')
     parser.add_argument('--report', '-r', action='store_true', help='生成执行报告')
     parser.add_argument('--reset', action='store_true', help='重置所有任务为 pending，清空结果')
@@ -203,10 +206,10 @@ def main():
         runner.load_tasks()
         for task_info in runner.tasks_data.get("tasks", {}).values():
             task_info['status'] = 'pending'
-            task_info.pop('result', None)
-            task_info.pop('findings', None)
+            task_info['run_count'] = 0
+            task_info['last_result'] = None
         runner.save_tasks()
-        print("所有任务已重置为 pending。")
+        print("所有任务已重置为 pending（结果已清空）。")
         return
 
     if args.resume:
