@@ -15,7 +15,7 @@ python scripts/task_runner.py --report  # 查看执行报告
 
 当你说"跑一轮"时：
 1. `python scripts/task_runner.py --once` 生成指令
-2. Spawn agents 并行执行
+2. Spawn agents 并行执行（使用 `team_name` 创建 team）
 3. 完成后 `git commit`
 4. 结束，不继续
 
@@ -28,6 +28,16 @@ python scripts/task_runner.py --report  # 查看执行报告
 4. 完成后 `git commit`
 5. auto reset → 回到步骤1继续
 6. 直到你说"停止"
+
+### Agent 使用规范
+
+**统一使用 agent team**：
+- 使用 `TeamCreate` 创建 team
+- 使用 `Agent` 的 `team_name` 和 `name` 参数指定归属
+- 使用 `SendMessage` 与 agents 通信
+- 完成后用 `TeamDelete` 清理
+
+**不推荐**：直接 spawn agents 不加 team_name（无法通信和统一管理）
 
 **阻塞机制**：`--once` 输出时，若有 pending 的 `prereq_delete` 任务，只输出前置任务列表，常规任务不输出。
 
