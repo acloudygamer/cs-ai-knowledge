@@ -119,24 +119,20 @@ class TaskRunner:
         return False
 
     def generate_instructions(self) -> str:
-        """生成待执行任务的指令，供 Orchestrator 阅读"""
+        """生成任务列表"""
         self.load_tasks()
         pending = self.get_pending_tasks()
         versions = load_versions()
 
         if not pending:
-            return """# 所有任务已完成！
+            return """# 无待执行任务
 
-1. `git status` 查看变更
-2. `git add . && git commit -m "feat: ..." && git push`
-
-或者继续 brainstorm 添加新内容。
+运行 `python scripts/task_runner.py --once` 查看任务列表。
 """
 
         lines = ["# 待执行任务\n"]
         lines.append(f"Generated at: {datetime.now().isoformat()}\n")
 
-        # 按目录分组输出
         for task in pending:
             target = task.get("target", "")
             version = versions.get(target, "")
@@ -146,13 +142,6 @@ class TaskRunner:
             if version:
                 lines.append(f"- **Version**: `{version}`")
             lines.append("")
-
-        lines.append("## 工作流程")
-        lines.append("1. Spawn `agent-orchestrator` 执行任务")
-        lines.append("2. 直接完成 brainstorm + act + review")
-        lines.append("3. `python scripts/task_runner.py --update <id> completed --result '<结果>'`")
-        lines.append("")
-        lines.append("使用 Agent tool，agent=\"agent-orchestrator\"，prompt=<任务内容>")
 
         return "\n".join(lines)
 
