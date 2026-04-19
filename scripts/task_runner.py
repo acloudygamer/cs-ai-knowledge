@@ -179,9 +179,14 @@ class TaskRunner:
             for task in prereq_pending:
                 target = task.get("target", "")
                 path = task.get('path', '')
+                version = versions.get(path, "")
                 lines.append(f"## {target}")
                 lines.append(f"- 路径: `{path}`")
-                lines.append(f"- Agent: `Agent(subagent_type=\"delete-reviewer\", prompt=\"...\")`")
+                if version:
+                    parts = [v.strip() for v in version.split('/')]
+                    lines.append(f"- 基础版本: `{parts[0]}`")
+                    if len(parts) > 1:
+                        lines.append(f"- 新版: `{' / '.join(parts[1:])}`")
                 lines.append("")
 
             lines.append("---")
