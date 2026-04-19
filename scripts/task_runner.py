@@ -188,7 +188,6 @@ class TaskRunner:
                 lines.append(f"- 参考文档: `scripts/prompts/{prompt_file}`")
             if path.startswith("0-计算机基础"):
                 lines.append("- 说明：内容为主，版本为辅。版本敏感度排序：Shell > 系统软件 > 其他。Shell脚本关注版本差异；系统软件注意平台差异；计算机体系/编程运行环境/软件工程/网络则核心概念不变。")
-            lines.append(f"- Agent: `Agent(subagent_type=\"agent-orchestrator\", prompt=\"...\")`")
             lines.append("")
 
         lines.append("---")
