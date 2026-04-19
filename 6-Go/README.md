@@ -75,7 +75,7 @@
 | [并发与异步](./03-高级用法/02-并发与异步.md) | goroutine、channel、锁、sync.Map、context |
 | [内存管理](./03-高级用法/03-内存管理.md) | 逃逸分析、GC、sync.Pool、pprof |
 | [性能优化](./03-高级用法/04-性能优化.md) | 切片、字符串拼接、反射、基准测试、pprof、race detector |
-| [Go新特性](./03-高级用法/05-Go新特性.md) | Go 1.21/1.22/1.23 新特性、iter、slog |
+| [Go新特性](./03-高级用法/05-Go新特性.md) | Go 1.21~1.26 新特性、iter、slog |
 | [Context专题](./03-高级用法/06-Context专题.md) | WithCancel/Timeout/Value、取消信号、请求作用域 |
 | [RaceCondition模式](./03-高级用法/14-RaceCondition模式.md) | 常见race pattern、修复方法、诊断工具 |
 | [网络编程专题](./03-高级用法/11-网络编程专题.md) | TCP/UDP/WebSocket、连接池、粘包处理、TLS |

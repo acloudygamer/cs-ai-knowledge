@@ -356,6 +356,6 @@ print(f"Import time: {time.perf_counter() - start:.4f}s")
 | 场景 | 推荐版本 | 原因 |
 |------|----------|------|
 | 生产环境 | Python 3.11 LTS | 稳定，3.12 较新 |
-| 新项目 | Python 3.12 | 性能好，类型提示完善 |
+| 新项目 | Python 3.14 | 最新版本，性能最佳 |
 | 学习/实验 | Python 3.13 | 最新特性 |
 | AI/ML 框架 | Python 3.10-3.12 | 确认框架兼容性 |
