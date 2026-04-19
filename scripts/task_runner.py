@@ -187,6 +187,12 @@ class TaskRunner:
                     lines.append(f"- 基础版本: `{parts[0]}`")
                     if len(parts) > 1:
                         lines.append(f"- 新版: `{' / '.join(parts[1:])}`")
+                # 关联 prompt 模板
+                prompt_file = get_prompt_file(path)
+                if prompt_file:
+                    lines.append(f"- 参考文档: `scripts/prompts/{prompt_file}`")
+                if path.startswith("0-计算机基础"):
+                    lines.append("- 说明：内容为主，版本为辅。版本敏感度排序：Shell > 系统软件 > 其他。Shell脚本关注版本差异；系统软件注意平台差异；计算机体系/编程运行环境/软件工程/网络则核心概念不变。")
                 lines.append("")
 
             lines.append("---")
