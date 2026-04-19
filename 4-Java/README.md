@@ -17,7 +17,7 @@
 
 ### 学习路线
 
-Java 8（Lambda/Stream）→ Java 11（HttpClient）→ Java 17（密封类）→ Java 21（虚拟线程）
+Java 8（Lambda/Stream）→ Java 11（HttpClient）→ Java 17（密封类）→ Java 21（虚拟线程）→ Java 25（简化Main/模块导入）
 详细学习路径：[点击查看](./00-简介/06-学习路线.md)
 
 ---
@@ -44,7 +44,6 @@ Java 8（Lambda/Stream）→ Java 11（HttpClient）→ Java 17（密封类）�
 ## 常用操作
 
 - [文件操作](./02-常用操作/01-文件操作.md)
-- [网络请求](./02-常用操作/02-网络请求.md)
 - [HTTP客户端对比](./02-常用操作/14-HTTP客户端对比.md)
 - [JSON处理](./02-常用操作/03-JSON处理.md)
 - [错误处理](./02-常用操作/04-错误处理.md)
@@ -60,13 +59,12 @@ Java 8（Lambda/Stream）→ Java 11（HttpClient）→ Java 17（密封类）�
 
 ## 高级用法
 
-- [注解、反射与动态代理](./03-高级用法/01-装饰器与元编程.md)
+- [注解、反射与动态代理](./03-高级用法/01-注解、反射与动态代理.md)
 - [并发与异步](./03-高级用法/02-并发与异步.md)
 - [内存管理](./03-高级用法/03-内存管理.md)
 - [性能优化](./03-高级用法/04-性能优化.md)
 - [模块系统](./03-高级用法/05-模块系统.md)
 - [JVM原理](./03-高级用法/06-JVM原理.md)
-- [Spring入门](./03-高级用法/07-Spring入门.md)
 - [现代Java特性](./03-高级用法/08-现代Java特性.md)
 - [响应式编程](./03-高级用法/09-响应式编程.md)
 - [安全编码](./03-高级用法/10-安全编码.md)
@@ -102,6 +100,7 @@ Java 8（Lambda/Stream）→ Java 11（HttpClient）→ Java 17（密封类）�
 - [Kafka](./05-Java生态/04-Kafka.md)
 - [Docker与K8s](./05-Java生态/05-Docker与K8s.md)
 - [MyBatis](./05-Java生态/06-MyBatis.md)
+- [Spring入门](./05-Java生态/Spring入门.md)
 - [SpringCloud微服务](./05-Java生态/07-SpringCloud微服务.md)
 - [SpringSecurity](./05-Java生态/08-SpringSecurity.md)
 - [Elasticsearch与MongoDB](./05-Java生态/09-Elasticsearch与MongoDB.md)
