@@ -134,6 +134,7 @@ class TaskRunner:
     def generate_instructions(self) -> str:
         """生成任务列表"""
         self.load_tasks()
+        versions = load_versions()
 
         # 检查是否全部完成，完成则自动重置
         if self.auto_reset():
@@ -155,9 +156,12 @@ class TaskRunner:
         for task in pending:
             target = task.get("target", "")
             path = task.get('path', '')
+            version = versions.get(path, "")
             lines.append(f"## {target}")
             lines.append(f"- 路径: `{path}`")
-            lines.append(f"- Agent tool: `Agent(subagent_type=\"agent-orchestrator\", prompt=\"...\")`")
+            if version:
+                lines.append(f"- 版本: `{version}`")
+            lines.append(f"- Agent: `Agent(subagent_type=\"agent-orchestrator\", prompt=\"...\")`")
             lines.append("")
 
         lines.append("---")
