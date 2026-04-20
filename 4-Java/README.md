@@ -100,7 +100,7 @@ Java 8（Lambda/Stream）→ Java 11（HttpClient）→ Java 17（密封类）�
 - [Kafka](./05-Java生态/04-Kafka.md)
 - [Docker与K8s](./05-Java生态/05-Docker与K8s.md)
 - [MyBatis](./05-Java生态/06-MyBatis.md)
-- [Spring入门](./05-Java生态/Spring入门.md)
+- [Spring入门](./05-Java生态/00-Spring入门.md)
 - [SpringCloud微服务](./05-Java生态/07-SpringCloud微服务.md)
 - [SpringSecurity](./05-Java生态/08-SpringSecurity.md)
 - [Elasticsearch与MongoDB](./05-Java生态/09-Elasticsearch与MongoDB.md)

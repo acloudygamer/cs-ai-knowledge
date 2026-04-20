@@ -1,6 +1,6 @@
 {
   "version": "3.0",
-  "updated": "2026-04-20T15:09:31.260356",
+  "updated": "2026-04-20T15:10:12.670101",
   "tasks": {
     "task_001_prereq": {
       "target": "计算机基础-删除审查",
@@ -116,11 +116,11 @@
       "target": "JavaScript",
       "path": "5-JavaScript/",
       "type": "regular",
-      "status": "pending",
-      "run_count": 2,
-      "last_result": "JavaScript版本升级完成：1) README移除不存在的装饰器文件引用；2) Node版本从18/20升级到26/28；3) npm版本要求从9.0升级到10.0；4) 更新所有GitHub Actions配置中的node-version",
-      "updated": "2026-04-20T03:44:16.555004",
-      "result": "JavaScript模块审查完成。发现并修复3个问题：1) 修复面试高频README中typo '实现红交换' → '实现红黑树交换'；2) 移除ES2022新特性表中错误收录的groupBy(ES2024特性)；3) 清除ES2023-ES2026文件中ES2026部分的重复内容(Object.groupBy增强、导入属性with、正则v标志均重复自ES2024部分)"
+      "status": "completed",
+      "run_count": 3,
+      "last_result": "JavaScript模块审查完成。发现并修复3个问题：1) 修复面试高频README中typo '实现红交换' → '实现红黑树交换'；2) 移除ES2022新特性表中错误收录的groupBy(ES2024特性)；3) 清除ES2023-ES2026文件中ES2026部分的重复内容(Object.groupBy增强、导入属性with、正则v标志均重复自ES2024部分)",
+      "updated": "2026-04-20T15:10:12.669857",
+      "result": "合并ES特性文件(07+09→07)、修正TC39装饰器语法、删除重复适用场景内容、修复面试README错别字"
     },
     "task_007_prereq": {
       "target": "Go-删除审查",

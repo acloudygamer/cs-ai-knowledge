@@ -480,4 +480,3 @@ public class App { }
 | `spring-boot-starter-validation` | 参数校验 |
 | `spring-boot-starter-actuator` | 应用监控 |
 | `spring-boot-starter-test` | 测试 |
-| `spring-boot-starter-actuator` | 端点监控 |
