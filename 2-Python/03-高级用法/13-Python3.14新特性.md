@@ -24,13 +24,14 @@
 Python 3.14 引入了模板字符串（t-strings），这是继 f-strings 之后字符串处理能力的又一次重要升级：
 
 ```python
-from string.templatelib import Template
-
 # t-string 返回 Template 对象，而非普通字符串
 name = "World"
 template = t"Hello {name}!"
 
-print(type(template))  # <class 'string.templatelib.Template'>
+print(type(template))  # <class 'str'>
+print(template)  # Hello World
+
+# 通过 .strings 和 .interpolations 访问模板结构
 print(template.strings)  # ('Hello ', '!')
 print(template.interpolations[0].value)  # 'World'
 ```
@@ -58,23 +59,34 @@ print(template.substitute(context2))  # Hello Charlie, you are 35 years old.
 
 ### 安全性提升
 
-t-string 解决了 f-string 在处理用户输入时的安全隐患：
+t-string 返回 Template 对象，支持后续安全处理：
 
 ```python
-# f-string 可能导致安全问题
+# t-string 返回模板对象，延迟求值
 user_input = "<script>alert('xss')</script>"
-html = f"<div>{user_input}</div>"  # 直接插入，可能导致 XSS
-
-# t-string 提供更安全的处理方式
-from string.templatelib import html_escape
 template = t"<div>{user_input}</div>"
 
-# 在 substitute 时可以自定义处理方式
-def safe_substitute(template, **kwargs):
-    escaped = {k: html_escape(v) for k, v in kwargs.items()}
-    return template.substitute(**escaped)
+# 获取插值信息
+print(template.strings)        # ('<div>', '</div>')
+print(template.interpolations) # (Interpolation(value=..., ...),)
 
-result = safe_substitute(template, user_input=user_input)
+# 安全处理示例
+import html
+
+def safe_render(template, **kwargs):
+    """安全渲染模板"""
+    escaped = {k: html.escape(str(v)) for k, v in kwargs.items()}
+    parts = []
+    strings = template.strings
+    interpolations = template.interpolations
+
+    for i, interp in enumerate(interpolations):
+        parts.append(strings[i])
+        parts.append(escaped.get(interp.name, ''))
+    parts.append(strings[-1])
+    return ''.join(parts)
+
+result = safe_render(template, user_input=user_input)
 # <div>&lt;script&gt;alert(&#x27;xss&#x27;)&lt;/script&gt;</div>
 ```
 
@@ -322,16 +334,16 @@ print(f"Best: {len(compressed_best)} bytes")
 
 ### PEP 758 - except* 表达式省略括号
 
-Python 3.14 允许在 `except*` 表达式中省略括号：
+Python 3.14 允许在 `except*` 表达式中省略括号，并支持不带 `as` 子句：
 
 ```python
-# 之前
+# 之前（Python 3.11+）
 try:
     await task
-except* (ErrorA, ErrorB):
+except* (ErrorA, ErrorB) as e:
     print("ErrorA or ErrorB occurred")
 
-# 现在
+# Python 3.14：括号可选
 try:
     await task
 except* ErrorA, ErrorB:
@@ -342,12 +354,16 @@ except* ErrorA, ErrorB:
 
 ```python
 # Python 3.14 改进了多异常捕获语法
-# 使用逗号分隔多个异常类型
+# 括号变为可选，使用逗号分隔多个异常类型
 
-try:
-    result = risky_operation()
-except ErrorA, ErrorB, ErrorC:
-    handle_error()
+async def demo():
+    try:
+        async with asyncio.TaskGroup() as tg:
+            tg.create_task(risky_task())
+    except* ValueError, TypeError:
+        print("Caught ValueError or TypeError from task group")
+    except* OSError:
+        print("Caught OSError from task group")
 ```
 
 ---
@@ -526,10 +542,10 @@ asyncio.run(main())
 
 ### 尾调用解释器 (Tail-Call Interpreter)
 
-Python 3.14 引入了实验性的尾调用解释器，可在某些情况下提升 Python 代码运行速度 3%~30%：
+Python 3.14 引入了实验性的尾调用解释器（需要自定义编译）：
 
 ```bash
-# 需要使用 Clang 19+ 编译器手动编译
+# 实验性功能，需要自定义编译
 # 配置时添加 --with-tail-call-interp 参数
 ./configure --with-tail-call-interp && make
 ```
@@ -547,7 +563,7 @@ def tail_sum(n, total=0):
 # 尾调用解释器：复用当前栈帧，避免栈空间消耗
 ```
 
-注意：目前仅支持 Clang 19 编译器，GCC 尚未支持此优化。
+> 注意：尾调用解释器是实验性功能，需要使用支持该编译选项的编译器手动编译 Python。默认构建不包含此优化。
 
 ### 性能提升
 
