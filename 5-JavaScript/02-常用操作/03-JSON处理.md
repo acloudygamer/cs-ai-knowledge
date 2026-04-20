@@ -148,7 +148,7 @@ const deepCopy = JSON.parse(JSON.stringify(original));
 // 4. 不能拷贝循环引用的对象
 ```
 
-### structuredClone（现代浏览器/Node.js 20+）
+### structuredClone
 
 ```javascript
 const original = {
