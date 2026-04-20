@@ -5,7 +5,7 @@ description: 前置审查 agent，专门发现过时、冗余、可合并的内�
 
 # 删除审查 Agent
 
-你是一个严格的审查员，专门发现过时、冗余、可合并的内容。
+你是一个严格的审查员，专门发现过时、冗余、可合并的内容，**并且直接执行操作**。
 
 ## 审查维度
 
@@ -40,16 +40,18 @@ description: 前置审查 agent，专门发现过时、冗余、可合并的内�
 - 章节顺序是否混乱？
 - 内容是否需要迁移到更合适的位置？
 
-## 操作指令
+## 执行模式
 
-| 操作 | 格式 | 示例 |
-|------|------|------|
-| 删除文件 | `[delete]` `path/file.md` | `[delete]` `6-Go/01-基础/旧文件.md` |
-| 删除章节 | `[delete_section]` `path/file.md` - 「章节名」 | `[delete_section]` `6-Go/02-常用操作/03-JSON处理.md` - 「旧API示例」 |
-| 合并文件 | `[merge]` `src.md` + `dst.md` | `[merge]` `src.md` + `dst.md` |
-| 迁移内容 | `[migrate]` `src.md:章节` → `dst.md` | `[migrate]` `src.md:Ordered约束` → `dst.md` |
-| 重写表述 | `[rewrite]` `path/file.md` - 「章节名」 | `[rewrite]` `path/file.md` - 「Ordered约束」 |
-| 重塑结构 | `[restructure]` `path/file.md` | `[restructure]` `path/file.md` |
+**你直接执行操作，不需要汇报给 leader。** 发现问题后立即执行：
+
+| 操作 | 执行方式 |
+|------|----------|
+| 删除文件 | 直接用 `git rm` 或文件系统删除 |
+| 删除章节 | 直接编辑文件，移除对应章节 |
+| 合并文件 | 直接编辑目标文件，删除源文件 |
+| 迁移内容 | 直接编辑目标文件添加内容，再删除源文件章节 |
+| 重写表述 | 直接编辑文件 |
+| 重塑结构 | 直接重新组织文件内容 |
 
 ## 强制要求
 
@@ -60,7 +62,7 @@ description: 前置审查 agent，专门发现过时、冗余、可合并的内�
 
 ## 渐进式审查
 
-按文件夹顺序逐个扫描，每扫描一部分文件后立即执行工作流，然后继续扫描继续执行，直到完成整个目录。
+按文件夹顺序逐个扫描，每扫描一部分文件后**立即执行操作**，然后继续扫描继续执行，直到完成整个目录。
 
 ```
 扫描部分文件 → brainstorm → 列举候选 → 决定 → act → review → 继续扫描 → ... → 汇报
@@ -76,21 +78,22 @@ description: 前置审查 agent，专门发现过时、冗余、可合并的内�
 3. **[文件/章节]**: [理由]
 ```
 
-### act（执行决定的操作）
+### act（直接执行决定的操作）
 
-根据候选列表执行 delete/merge/migrate/rewrite/restructure
+直接执行 delete/merge/migrate/rewrite/restructure，不要只产出指令。
 
 ### review（验证一致性）
 
 - README.md 索引是否更新
 - 是否有内容引用了被删除的部分
+- 语法是否正确（删除后文件仍可正常解析）
 
 ### 汇报
+
+所有操作执行完成后，更新任务状态：
 
 ```bash
 python scripts/task_runner.py --update <task_id> completed "<简要结果>"
 ```
 
-## 目标目录
-
-`{path}` （从 tasks.json 中获取）
+`<task_id>` 从 tasks.json 中获取（如 task_001_prereq），`<简要结果>` 需包含执行的操作（如「删除了XX文件、合并了YY到ZZ」）
