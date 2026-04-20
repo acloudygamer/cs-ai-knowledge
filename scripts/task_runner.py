@@ -116,7 +116,7 @@ class TaskRunner:
     def update_task(self, task_id: str, new_status: str, result: str = "", findings: list | None = None):
         """更新任务状态和结果"""
         if new_status not in ("pending", "working", "completed"):
-            logger.error(f"无效状态: {new_status}，必须是 pending/working/completed 之一")
+            logger.error(f"无效状态: {new_status}，必须是 pending/working/completed 之一，请重新 update")
             return False
 
         if not self.tasks_data:
@@ -225,6 +225,7 @@ class TaskRunner:
         total = len(all_tasks)
         completed = len([t for t in all_tasks if t.get("status") == "completed"])
         pending = len([t for t in all_tasks if t.get("status") == "pending"])
+        working = len([t for t in all_tasks if t.get("status") == "working"])
 
         lines = [
             "=" * 50,
@@ -233,6 +234,7 @@ class TaskRunner:
             "=" * 50,
             f"总任务数:  {total}",
             f"已完成:    {completed}",
+            f"执行中:    {working}",
             f"待处理:    {pending}",
             "",
             f"完成率:    {completed/total*100:.1f}%",
@@ -243,6 +245,12 @@ class TaskRunner:
             lines.append("\n## 已完成任务")
             for t in all_tasks:
                 if t.get("status") == "completed":
+                    lines.append(f"- {t.get('target', '')}")
+
+        if working > 0:
+            lines.append("\n## 执行中")
+            for t in all_tasks:
+                if t.get("status") == "working":
                     lines.append(f"- {t.get('target', '')}")
 
         if pending > 0:
