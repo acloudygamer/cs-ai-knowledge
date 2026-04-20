@@ -122,7 +122,7 @@ function debounce(fn, delay) {
 ### 第四类：异步编程
 - 手写 Promise（基本结构、all、race）
 - 手写 async/await 原理
-- 实现红黑树交换
+- 手写事件循环
 
 ## 相关资源
 

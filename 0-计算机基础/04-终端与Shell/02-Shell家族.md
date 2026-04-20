@@ -1,24 +1,168 @@
 # Shell家族
 
-> **版本说明**: 本文中 bash 4+ 特性会标注。环境: GNU Bash 5.2 (WSL/MINGW64), PowerShell 7.6.0, Ubuntu 24.04, Windows 11。
+> **版本说明**: bash 4+ 特性已标注版本。环境: GNU Bash 5.2 (WSL/MINGW64), PowerShell 7.6.0, Ubuntu 24.04, Windows 11。
 
-## 概念
+## 解决什么问题
 
-**Shell**是命令行解释器，是用户与操作系统内核之间的桥梁。
+人机交互需要一种方式将用户命令转换为系统操作。Shell作为命令解释器，提供文本界面让用户高效地与操作系统交互，适用于自动化脚本、远程管理、文本处理等场景。
 
+## 核心概念
+
+- Shell是用户与内核之间的命令解释器
+- 交互模式：读取→解析→执行→等待→显示结果的循环
+- 脚本是Shell可执行的文本文件，扩展了命令行能力
+- 各Shell语法不完全兼容，bash是Linux默认
+
+## 怎么用
+
+```bash
+# 查看当前Shell
+echo $SHELL
+
+# 查看可用Shell
+cat /etc/shells
+
+# 切换默认Shell (zsh)
+chsh -s /bin/zsh
 ```
-用户输入命令 → Shell解析 → 系统调用 → 内核 → 硬件
-                 ↓
-           显示结果给用户
+
+### Shell执行流程
+
+```bash
+# REPL循环
+1. 读取输入 (Read)
+2. 解析命令 (Evaluate) - 分离命令、参数、管道、重定向
+3. 在PATH中查找可执行文件
+4. 创建子进程执行 (Fork + Exec)
+5. 等待进程结束 (Wait)
+6. 打印输出 (Print)
+7. 回到步骤1 (Loop)
 ```
 
-## 关系
+## 主要Shell类型
 
-**关键连接**：
-- Shell → **内核**：通过系统调用与内核通信
-- Shell ↔ **终端**：Shell的标准输入/输出连接到终端
-- Shell → **进程**：执行命令时创建新进程
-- 脚本 → **Shell**：Shell脚本是Shell可执行的文本文件
+| Shell | 开发年份 | 特点 | 默认系统 |
+|-------|----------|------|----------|
+| sh (Bourne) | 1977 | 最早标准，语法基础 | Solaris |
+| bash | 1989 | Linux默认，兼容sh | Linux |
+| zsh | 1990 | 兼容bash，插件丰富 | macOS (新) |
+| fish | 2005 | 开箱即用，语法高亮 | - |
+| PowerShell | 2006 | 对象管道，跨平台 | Windows |
+
+### bash
+
+```bash
+# bash配置
+~/.bashrc        # 每次打开新终端执行
+~/.bash_profile  # 登录shell执行
+```
+
+### zsh
+
+```bash
+# zsh配置
+~/.zshrc         # 主配置
+```
+
+### PowerShell
+
+```powershell
+# 变量（$开头）
+$name = "Alice"
+
+# 命令
+Get-Process | Where-Object CPU -gt 100
+```
+
+## 环境配置
+
+### 常见配置
+
+```bash
+# 别名
+alias ll='ls -la'
+alias gs='git status'
+
+# PATH
+export PATH=$PATH:/usr/local/bin
+```
+
+## 进程与作业控制
+
+### 基本命令
+
+```bash
+ps aux              # 查看所有进程
+./script.sh &       # 后台运行
+jobs                # 查看后台任务
+```
+
+### 信号
+
+```bash
+SIGINT (2)    # Ctrl+C 中断
+SIGTERM (15)  # 优雅终止
+SIGKILL (9)   # 强制杀死
+SIGTSTP (20)  # Ctrl+Z 挂起
+
+kill -9 1234   # 强制杀死进程
+```
+
+### exec系统调用
+
+```bash
+exec > output.txt     # 重定向标准输出
+exec -a "newname" ls # 替换当前shell执行
+```
+
+## 环境变量
+
+```bash
+env                  # 查看所有环境变量
+echo $PATH           # 查看特定变量
+export VAR="hello"   # 设置变量
+bash -c 'echo $VAR'  # 继承环境变量
+```
+
+### set选项
+
+```bash
+set -u    # 未定义变量报错
+set -e    # 命令失败退出
+set -x    # 调试模式
+set -o vi # vi模式编辑
+```
+
+## 高级特性
+
+### [[ ]] 条件测试
+
+```bash
+# 正则匹配
+if [[ "$var" =~ ^hello[0-9]+$ ]]; then
+    echo "matches"
+fi
+
+# 模式匹配
+[[ "file.txt" == *.txt ]] && echo "text file"
+```
+
+### 参数展开
+
+```bash
+name=${1:-"Guest"}       # 默认值
+${count:=0}              # 赋值默认值
+${var:? "error" }        # 未定义时报错
+${debug:+ "-v"}           # 已设置则替换
+```
+
+### 数组操作
+
+```bash
+arr=(one two three)
+echo ${arr[@]:1:3}    # 切片
+arr+=(four five)      # 追加
+```
 
 ## Shell 工作原理
 

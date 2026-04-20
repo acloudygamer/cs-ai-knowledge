@@ -16,7 +16,6 @@ Range Minimum/Maximum Query（区间最值查询）：在数组上快速回答�
 | 暴力 | O(1) | O(n) | O(1) | 单次查询 |
 | 稀疏表 | O(n log n) | O(1) | O(n log n) | 静态数据 |
 | 线段树 | O(n) | O(log n) | O(n) | 动态数据 |
-| ST表 | O(n log n) | O(1) | O(n log n) | RMQ |
 
 ## 稀疏表（Sparse Table）
 
@@ -97,10 +96,10 @@ print(st.query(2, 6)) # 1 (区间 [2,7,9,5,1] 的最小值)
 
 ## LeetCode 实战
 
-### 剑指 Offer II 065. 最短的单词编码（变体）
+### RMQ 实战应用
 
 ```python
-# RMQ 应用：区间最小值位置
+# 区间最小值位置
 def rmq_min_index(arr, left, right):
     """返回 [left, right] 区间内最小值的位置"""
     st = SparseTable(arr, key=lambda x: x[1])  # 按值比较
@@ -108,80 +107,11 @@ def rmq_min_index(arr, left, right):
     return arr.index(min_val) if isinstance(min_val, tuple) else min_val
 
 
-# 例：求区间最大值及其位置
+# 区间最大值及其位置
 def query_max_with_index(arr, left, right):
     """返回 [left, right] 区间内最大值的(位置, 值)"""
     table = SparseTable(arr, max)
     return table.query(left, right)
-```
-
-### LeetCode 239. 滑动窗口最大值
-
-```python
-def max_sliding_window(nums, k):
-    """
-    方法1：单调队列（最优 O(n)）
-    方法2：稀疏表 O(n log k)
-    方法3：线段树 O(n log k)
-    """
-    # 单调队列解法（最优）
-    from collections import deque
-    dq = deque()
-    result = []
-
-    for i in range(len(nums)):
-        # 移除不在窗口的
-        while dq and dq[0] < i - k + 1:
-            dq.popleft()
-        # 保持递减
-        while dq and nums[dq[-1]] < nums[i]:
-            dq.pop()
-        dq.append(i)
-
-        if i >= k - 1:
-            result.append(nums[dq[0]])
-
-    return result
-
-
-def max_sliding_window_sparse_table(nums, k):
-    """稀疏表解法 - O(n log k) 预处理，O(1) 查询"""
-    st = SparseTable(nums, max)
-    result = []
-    for i in range(len(nums) - k + 1):
-        result.append(st.query(i, i + k - 1))
-    return result
-```
-
-### LeetCode 面试题 17.15. 最长公共前缀（变体）
-
-```python
-# RMQ 在字符串问题中的应用
-def longest_common_prefix_sliding_window(strings, window_size):
-    """
-    滑动窗口内字符串的最长公共前缀
-    使用字符串哈希 + RMQ
-    """
-    if not strings or window_size <= 0:
-        return ""
-
-    if window_size == 1:
-        return strings[0]
-
-    # 简化为两两比较
-    result = strings[0]
-    for i in range(1, window_size):
-        result = lcp(result, strings[i])
-        if not result:
-            break
-    return result
-
-def lcp(s1, s2):
-    """计算两个字符串的最长公共前缀"""
-    i = 0
-    while i < len(s1) and i < len(s2) and s1[i] == s2[i]:
-        i += 1
-    return s1[:i]
 ```
 
 ## 其他 RMQ 变体
