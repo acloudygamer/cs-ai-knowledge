@@ -1,12 +1,12 @@
 {
   "version": "4.0",
-  "updated": "2026-04-20T19:39:49.842150",
+  "updated": "2026-04-20T19:40:49.434502",
   "tasks": {
     "task_001_prereq": {
       "target": "计算机基础-删除审查",
       "path": "0-计算机基础/",
       "agent": "delete-reviewer",
-      "status": "completed",
+      "status": "pending",
       "run_count": 14,
       "last_result": "开始处理 0-计算机基础/ 目录",
       "updated": "2026-04-20T19:32:26.835896",
@@ -19,7 +19,7 @@
       "blockedBy": [
         "task_001_prereq"
       ],
-      "status": "completed",
+      "status": "pending",
       "run_count": 14,
       "last_result": "开始处理计算机基础优化",
       "updated": "2026-04-20T19:35:54.153997",
@@ -29,7 +29,7 @@
       "target": "数据结构与算法-删除审查",
       "path": "1-数据结构与算法/",
       "agent": "delete-reviewer",
-      "status": "completed",
+      "status": "pending",
       "run_count": 15,
       "last_result": "开始处理",
       "updated": "2026-04-20T19:32:30.538192",
@@ -42,7 +42,7 @@
       "blockedBy": [
         "task_002_prereq"
       ],
-      "status": "completed",
+      "status": "pending",
       "run_count": 14,
       "last_result": "开始处理数据结构与算法优化",
       "updated": "2026-04-20T19:35:45.305267",
@@ -52,7 +52,7 @@
       "target": "Python-删除审查",
       "path": "2-Python/",
       "agent": "delete-reviewer",
-      "status": "completed",
+      "status": "pending",
       "run_count": 15,
       "last_result": "开始处理",
       "updated": "2026-04-20T19:33:33.454892",
@@ -65,7 +65,7 @@
       "blockedBy": [
         "task_003_prereq"
       ],
-      "status": "completed",
+      "status": "pending",
       "run_count": 13,
       "last_result": "开始处理 Python 知识库优化",
       "updated": "2026-04-20T19:35:41.901148",
@@ -75,7 +75,7 @@
       "target": "C++-删除审查",
       "path": "3-C++/",
       "agent": "delete-reviewer",
-      "status": "completed",
+      "status": "pending",
       "run_count": 15,
       "last_result": "开始执行 C++ 删除审查",
       "updated": "2026-04-20T19:32:32.101900",
@@ -88,7 +88,7 @@
       "blockedBy": [
         "task_004_prereq"
       ],
-      "status": "completed",
+      "status": "pending",
       "run_count": 14,
       "last_result": "开始处理 3-C++/",
       "updated": "2026-04-20T19:36:20.569120",
@@ -98,7 +98,7 @@
       "target": "Java-删除审查",
       "path": "4-Java/",
       "agent": "delete-reviewer",
-      "status": "completed",
+      "status": "pending",
       "run_count": 15,
       "last_result": "开始处理 4-Java/",
       "updated": "2026-04-20T19:33:31.524668",
@@ -111,7 +111,7 @@
       "blockedBy": [
         "task_005_prereq"
       ],
-      "status": "completed",
+      "status": "pending",
       "run_count": 13,
       "last_result": "开始处理 Java 21 到 Java 25 版本优化",
       "updated": "2026-04-20T19:36:57.556515",
@@ -121,7 +121,7 @@
       "target": "JavaScript-删除审查",
       "path": "5-JavaScript/",
       "agent": "delete-reviewer",
-      "status": "completed",
+      "status": "pending",
       "run_count": 13,
       "last_result": "JavaScript 删除审查进行中",
       "updated": "2026-04-20T19:32:06.050830",
@@ -134,7 +134,7 @@
       "blockedBy": [
         "task_006_prereq"
       ],
-      "status": "completed",
+      "status": "pending",
       "run_count": 13,
       "last_result": "开始处理 JavaScript 知识库优化",
       "updated": "2026-04-20T19:36:05.164535",
@@ -144,7 +144,7 @@
       "target": "Go-删除审查",
       "path": "6-Go/",
       "agent": "delete-reviewer",
-      "status": "completed",
+      "status": "pending",
       "run_count": 14,
       "last_result": "开始审查 6-Go 目录",
       "updated": "2026-04-20T19:36:47.689615",
@@ -157,7 +157,7 @@
       "blockedBy": [
         "task_007_prereq"
       ],
-      "status": "completed",
+      "status": "pending",
       "run_count": 14,
       "last_result": "开始处理 Go 1.26 版本优化",
       "updated": "2026-04-20T19:39:49.841949",
