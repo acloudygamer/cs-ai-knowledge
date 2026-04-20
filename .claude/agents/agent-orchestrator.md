@@ -136,22 +136,35 @@ brainstorm → act → review → (继续?) → brainstorm → ...
 
 **好示例**：
 ```markdown
-## C++ Concepts
+## Python 装饰器
 
 ### 解决什么问题
-约束模板参数，让模板错误信息更清晰。函数重载时尤其有用。
+给函数或类添加通用行为（日志、缓存、权限检查），无需修改其内部代码。
 
 ### 核心概念
-- Concepts 是 C++ 20 引入的模板约束（C++ 23 扩展了更多）
-- 用 `requires` 关键字指定约束条件
+- 装饰器本质是接受 callable 并返回 callable 的函数
+- `@decorator` 语法只是语法糖，`f = decorator(f)`
+- 被装饰函数的 `__name__`、`__doc__` 等元信息可能改变，需用 `@wraps` 保存
+- 可以叠加使用，从下往上执行
 
 ### 怎么用
-```cpp
-template <typename T>
-requires std::integral<T>  // 约束 T 必须支持加法
-T add(T a, T b) { return a + b; }
+```python
+from functools import wraps
+
+def logged(func):
+    @wraps(func)  # 保留原函数元信息
+    def wrapper(*args, **kwargs):
+        print(f"Calling {func.__name__}")
+        return func(*args, **kwargs)
+    return wrapper
+
+@logged
+def add(a, b):
+    """两数相加"""
+    return a + b
 ```
-```
+（省略了 wraps 会导致 `add.__name__` 变成 `"wrapper"`）
+
 
 ## 工作约束
 
