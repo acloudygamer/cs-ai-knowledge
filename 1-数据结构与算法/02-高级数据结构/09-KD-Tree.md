@@ -199,65 +199,7 @@ KD-Tree 的性能随维度增加而退化：
 
 ## 平衡 KD-Tree
 
-朴素构建可能导致树不平衡，需要采用平衡构建方法：
-
-```python
-class BalancedKDTree:
-    """使用中位数分割的平衡 KD-Tree"""
-
-    def __init__(self, k=2):
-        self.k = k
-        self.root = None
-
-    def build(self, points):
-        """平衡构建"""
-        def build_node(points, depth):
-            if not points:
-                return None
-
-            dim = depth % self.k
-
-            # 按维度排序，取中位数
-            points.sort(key=lambda x: x[dim])
-            mid = len(points) // 2
-
-            node = KDNode(points[mid], dim)
-            node.left = build_node(points[:mid], depth + 1)
-            node.right = build_node(points[mid + 1:], depth + 1)
-            return node
-
-        self.root = build_node(points, 0)
-        return self.root
-
-
-class KDTreeWithMedian:
-    """使用 nth_element 的高效平衡构建"""
-
-    def build(self, points):
-        """O(n) 期望时间构建"""
-        import random
-
-        def nth_element(arr, n, key):
-            random.shuffle(arr)  # 随机化避免最坏情况
-            return sorted(arr, key=key)[:n]
-
-        def build_node(points, depth):
-            if not points:
-                return None
-
-            dim = depth % self.k
-
-            # 分区：找中位数
-            points.sort(key=lambda x: x[dim])
-            mid = len(points) // 2
-
-            node = KDNode(points[mid], dim)
-            node.left = build_node(points[:mid], depth + 1)
-            node.right = build_node(points[mid + 1:], depth + 1)
-            return node
-
-        self.root = build_node(points, 0)
-```
+上述 `KDTree.build` 已使用中位数分割保证平衡，每层按维度排序取中间点，使树高为 O(log n)。
 
 ## 实战例题
 

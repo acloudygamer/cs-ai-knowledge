@@ -188,54 +188,7 @@ def lcp(s1, s2):
 
 ### 1. 支持更新的 RMQ（线段树）
 
-```python
-class RMQSegmentTree:
-    """
-    线段树实现的 RMQ，支持点更新
-    """
-
-    def __init__(self, arr):
-        self.n = len(arr)
-        self.tree = [0] * (4 * self.n)
-        self._build(arr, 1, 0, self.n - 1)
-
-    def _build(self, arr, node, left, right):
-        if left == right:
-            self.tree[node] = arr[left]
-            return
-        mid = (left + right) // 2
-        self._build(arr, node * 2, left, mid)
-        self._build(arr, node * 2 + 1, mid + 1, right)
-        self.tree[node] = max(self.tree[node * 2], self.tree[node * 2 + 1])
-
-    def query(self, ql, qr):
-        return self._query(1, 0, self.n - 1, ql, qr)
-
-    def _query(self, node, left, right, ql, qr):
-        if ql <= left and right <= qr:
-            return self.tree[node]
-        mid = (left + right) // 2
-        result = float('-inf')
-        if ql <= mid:
-            result = max(result, self._query(node * 2, left, mid, ql, qr))
-        if qr > mid:
-            result = max(result, self._query(node * 2 + 1, mid + 1, right, ql, qr))
-        return result
-
-    def update(self, idx, value):
-        self._update(1, 0, self.n - 1, idx, value)
-
-    def _update(self, node, left, right, idx, value):
-        if left == right:
-            self.tree[node] = value
-            return
-        mid = (left + right) // 2
-        if idx <= mid:
-            self._update(node * 2, left, mid, idx, value)
-        else:
-            self._update(node * 2 + 1, mid + 1, right, idx, value)
-        self.tree[node] = max(self.tree[node * 2], self.tree[node * 2 + 1])
-```
+线段树支持点更新和区间查询，详见 [线段树与树状数组](./06-线段树与树状数组.md)。
 
 ### 2. Cartesian Tree + RMQ
 

@@ -32,7 +32,7 @@ class HLD:
         self.parent = [-1] * n
         self.depth = [0] * n
         self.size = [0] * n
-        self heavy = [-1] * n
+        self.heavy = [-1] * n
 
         self._dfs_size(root, root)
 

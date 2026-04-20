@@ -309,26 +309,19 @@ String html = """
     """;
 ```
 
-### 字符串插值
+### 字符串格式化
 
 ```java
-// Java 21+ 支持字符串模板
 String name = "Alice";
 int age = 30;
 
-// 使用 String.format 模拟
+// 使用 String.format 或 formatted()
 String info = String.format("Name: %s, Age: %d", name, age);
 
-// 或者使用 indent() + replace()
 String template = """
     Name: %s
     Age: %d
     """.formatted(name, age);
-
-String template = """
-    Name: \{name}
-    Age: \{age}
-    """;
 ```
 
 ## Local-Variable Type Inference (var)
@@ -576,7 +569,6 @@ class Order {
 | Text Blocks | 15 | 多行字符串 |
 | Sealed Classes | 17 | 限制继承层次 |
 | Record Patterns | 21 | Record 解构 |
-| String Templates | 23 | 字符串插值（Java 21-22 预览，Java 23 正式） |
 | Virtual Threads | 21 | 轻量级线程 |
 | Instance Main Methods | 25 | 简化的程序入口 |
 | Module Import | 25 | import module 语法 |
