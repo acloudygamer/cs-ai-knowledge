@@ -82,7 +82,6 @@
 ## Node.js
 - [Node.js基础](05-Node.js/01-Node.js基础.md)
 - [HTTP服务](05-Node.js/02-HTTP服务.md)
-- [包管理](05-Node.js/03-包管理.md)
 - [数据库操作](05-Node.js/04-数据库操作.md)
 - [缓存与认证](05-Node.js/05-缓存与认证.md)
 - [二进制数据与Atomics](05-Node.js/06-二进制数据与Atomics.md)
