@@ -435,7 +435,7 @@ void main() {
 // void main(String[] args) 也允许
 ```
 
-## Module Import Declaration (Java 25)
+## Module Import Declaration (Java 25, 预览)
 
 `import module` 一次性导入模块所有公共类。
 
@@ -572,9 +572,10 @@ class Order {
 | Virtual Threads | 21 | 轻量级线程 |
 | Primitive Types in Patterns | 25 | 模式匹配支持基本类型（第三预览）|
 | Instance Main Methods | 25 | 简化的程序入口 |
-| Module Import | 25 | import module 语法 |
+| Module Import | 25 (预览) | import module 语法 |
 | Flexible Constructor Body | 25 | 构造函数初始化顺序增强 |
 | Key Derivation Function API | 25 | 密码学密钥派生标准 API |
+| Scoped Values | 25 | 轻量级线程作用域变量 |
 
 ## 已撤回/未发布特性
 

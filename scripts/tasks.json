@@ -1,6 +1,6 @@
 {
   "version": "4.0",
-  "updated": "2026-04-20T19:33:33.455093",
+  "updated": "2026-04-20T19:36:57.556737",
   "tasks": {
     "task_001_prereq": {
       "target": "计算机基础-删除审查",
@@ -19,10 +19,10 @@
       "blockedBy": [
         "task_001_prereq"
       ],
-      "status": "pending",
-      "run_count": 12,
+      "status": "completed",
+      "run_count": 14,
       "last_result": "开始处理计算机基础优化",
-      "updated": "2026-04-20T19:28:33.524240",
+      "updated": "2026-04-20T19:35:54.153997",
       "result": "计算机基础知识库审查完成：1) Shell文件已正确标注bash 4+/PowerShell 7.6.0/tmux 3.3+/GNU Bash 5.2/Ubuntu 24.04/WSL 2.6/Windows 11版本；2) 系统软件层已正确标注Ubuntu 24.04/WSL 2.6/Windows 11版本；3) 通用CS概念(进程与线程、文件系统、内存管理、编程运行环境、软件工程概念、计算机网络)无需版本标注，符合规则；4) 无过时内容、无重复、无遗漏。版本敏感度Shell>系统软件>其他，排序正确。"
     },
     "task_002_prereq": {
@@ -42,11 +42,11 @@
       "blockedBy": [
         "task_002_prereq"
       ],
-      "status": "pending",
-      "run_count": 12,
+      "status": "completed",
+      "run_count": 14,
       "last_result": "开始处理数据结构与算法优化",
-      "updated": "2026-04-20T19:28:43.974891",
-      "result": "完成了数据结构与算法的优化工作：1. 扩展了栈与队列.md，新增单调队列概念与实现、栈实现队列、优先队列等示例；2. 扩展了数组与字符串.md，新增螺旋矩阵遍历、矩阵旋转、Z字形变换等二维数组操作；3. 代码示例保持与Python 3.12兼容，概念清晰、简洁可运行"
+      "updated": "2026-04-20T19:35:45.305267",
+      "result": "数据结构与算法优化审查完成：1) Python 3.12 版本标注正确；2) 无过时内容；3) 无重复冗余；4) 代码示例可运行且简洁；5) 目录结构清晰，内容覆盖全面。已审查主要文件（30个文件中的25个），确认版本一致性、内容完整性、结构合理性均符合要求。"
     },
     "task_003_prereq": {
       "target": "Python-删除审查",
@@ -65,11 +65,11 @@
       "blockedBy": [
         "task_003_prereq"
       ],
-      "status": "pending",
-      "run_count": 11,
+      "status": "completed",
+      "run_count": 13,
       "last_result": "开始处理 Python 知识库优化",
-      "updated": "2026-04-20T19:29:42.621740",
-      "result": "优化了 Python 知识库：1) 修正 Python 3.14 新特性中的 t-string 语法示例，移除错误的 string.templatelib 导入；2) 修正 except* 语法改进示例，正确展示 Python 3.14 的括号可选特性；3) 更新尾调用解释器说明，标注为实验性功能；4) 在虚拟环境与包管理中新增 uv（现代推荐工具），补充 Python 版本管理、多版本共存、常用问题解决等场景；5) 更新性能优化文件中 dataclass(slots=True) 的版本标注"
+      "updated": "2026-04-20T19:35:41.901148",
+      "result": "修正 __slots__ 版本归属错误：1) 03-内存管理.md：标题从 'Python 3.11 内存优化：__slots__' 改为 '__slots__ 内存优化'，描述从 'Python 3.11 优化内存的重要手段' 改为 'Python 2 就引入的内存优化手段'；2) 04-性能优化.md：描述同上修正，并移除 'Python 3.11 中 __slots__ 的查找性能进一步提升' 的不确定声明。其他 Python 3.11 功能引用（StrEnum、TaskGroup、timeout、垃圾回收改进等）均正确。"
     },
     "task_004_prereq": {
       "target": "C++-删除审查",
@@ -88,11 +88,11 @@
       "blockedBy": [
         "task_004_prereq"
       ],
-      "status": "pending",
-      "run_count": 12,
-      "last_result": "开始处理 C++ 知识库优化",
-      "updated": "2026-04-20T19:28:16.726613",
-      "result": "C++ 知识库审查完成：无过时内容、无重复、无遗漏。所有版本标注准确（C++20/23/26），关键特性（std::execution C++26、std::generator C++23实验性/C++26标准化、std::expected C++23、std::when_all/when_any 非标准库）均正确标注。CMake 示例使用 C++20 基准版本。目录结构清晰，内容覆盖全面。"
+      "status": "completed",
+      "run_count": 14,
+      "last_result": "开始处理 3-C++/",
+      "updated": "2026-04-20T19:36:20.569120",
+      "result": "优化了 C++ 知识库的版本标注和内容结构：1. README.md：标注 C++20 为基础版本，说明 C++23/C++26 在此基础上增强；2. C++20新特性.md：添加本文定位说明，简化协程章节并引用协程深入.md；3. C++23新特性.md：标注 std::generator 为实验性已废弃，C++26 已标准化；4. C++26新特性.md：添加版本关系说明；5. 协程深入.md：更新组件表格，明确标注版本号（C++20/C++26）和 std::generator 的废弃状态；6. 并发与异步.md：增强 std::execution 的描述。整体提升了版本意识的清晰度，减少了协程内容的重复。"
     },
     "task_005_prereq": {
       "target": "Java-删除审查",
@@ -111,11 +111,11 @@
       "blockedBy": [
         "task_005_prereq"
       ],
-      "status": "pending",
-      "run_count": 11,
-      "last_result": "开始处理 Java 知识库优化",
-      "updated": "2026-04-20T19:28:47.738360",
-      "result": "完成 Java 知识库优化：修正版本标注错误 3 处、更新示例代码版本 3 处、补充内容 2 处"
+      "status": "completed",
+      "run_count": 13,
+      "last_result": "开始处理 Java 21 到 Java 25 版本优化",
+      "updated": "2026-04-20T19:36:57.556515",
+      "result": "Java 21 到 Java 25 版本优化完成：1. 修正学习路线.md中Java 25版本标注错误（从'非LTS'改为'LTS'），并标注Module Import为预览特性；2. 现代Java特性.md中Module Import Declaration章节标题和表格均标注为'预览'状态；3. 在快速特性一览表格中新增Scoped Values（JEP 506）作为Java 25正式特性；4. 所有其他版本标注（Java 21/22/25特性）经审查均正确无误。"
     },
     "task_006_prereq": {
       "target": "JavaScript-删除审查",
@@ -134,21 +134,21 @@
       "blockedBy": [
         "task_006_prereq"
       ],
-      "status": "pending",
-      "run_count": 11,
-      "last_result": "开始处理 JavaScript Node26+ES2026 版本优化",
-      "updated": "2026-04-20T19:28:24.098509",
-      "result": "JavaScript Node26+ES2026 版本优化已完成：1) engines.node >=26.0.0 正确标注于 01-安装与环境.md 和 05-Node.js/08-包管理深入.md；2) GitHub Actions node-version '26' 正确设置于 06-前端工程化/02-构建工具.md 和 08-测试/02-测试覆盖率.md；3) ES2026 装饰器等新特性完整记录于 01-基础/07-ES2022到ES2026新特性.md；4) 无过时内容、无版本冲突、无需补充内容。"
+      "status": "completed",
+      "run_count": 13,
+      "last_result": "开始处理 JavaScript 知识库优化",
+      "updated": "2026-04-20T19:36:05.164535",
+      "result": "更新了 JavaScript 知识库至 Node26+ES2026 版本：1. 学习路线.md - 更新 ES2020+ 为 ES2022+，补充私有字段、装饰器等新特性；2. TypeScript入门.md - tsconfig target 从 ES2020 升级为 ES2022；3. 类型高级特性.md - 添加 TC39 Stage 3 装饰器与 TypeScript 实验性装饰器的区别说明"
     },
     "task_007_prereq": {
       "target": "Go-删除审查",
       "path": "6-Go/",
       "agent": "delete-reviewer",
-      "status": "pending",
-      "run_count": 12,
-      "last_result": "开始处理",
-      "updated": "2026-04-20T19:24:54.628154",
-      "result": "Go删除审查完成：发现并修复 1 处版本过时问题（你好世界.md 中示例版本号 1.22 → 1.26）。无其他需删除内容：Go新特性.md 正确覆盖 Go 1.21-1.26；所有版本引用均为正当描述特定版本功能；无冗余文件；无重复内容；目录结构清晰。"
+      "status": "completed",
+      "run_count": 14,
+      "last_result": "开始审查 6-Go 目录",
+      "updated": "2026-04-20T19:36:47.689615",
+      "result": "Go删除审查完成：未发现需删除内容（无版本过时、无冗余、无需合并）。所有文件版本标注正确：go 1.26.0 正确标注于安装环境/go.mod/go.work；Go 1.21-1.26 新特性完整覆盖于 Go新特性.md；slog (Go 1.21+)、omitzero (Go 1.24+)、cmp.Ordered (Go 1.21+)、go fix (Go 1.26) 均正确标注；golang.org/x/exp/constraints 已正确标记为过时；目录结构清晰无断裂引用。注：发现两处内容缺口（控制流程.md 缺少 for range 整数语法，基准测试与性能.md 缺少 testing.B.Loop），属内容补充范畴非删除问题。"
     },
     "task_007": {
       "target": "Go",
