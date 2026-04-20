@@ -1,6 +1,6 @@
 {
   "version": "3.0",
-  "updated": "2026-04-20T15:01:20.156825",
+  "updated": "2026-04-20T15:09:31.260356",
   "tasks": {
     "task_001_prereq": {
       "target": "计算机基础-删除审查",
@@ -96,11 +96,11 @@
       "target": "Java",
       "path": "4-Java/",
       "type": "regular",
-      "status": "pending",
-      "run_count": 2,
-      "last_result": "Java 25 content gaps filled: updated version tables in 4 files (语言简介, 语言特点, 学习路线, README), added version annotation for Java 22 Stream Gatherers",
-      "updated": "2026-04-20T03:44:58.566574",
-      "result": "Java模块分析完成。发现以下问题：1) 结构性缺失：03-高级用法/目录缺少07-*.md文件（编号从06跳至08）；2) 大文件问题：6个文件超过700行，其中函数式编程959行、Elasticsearch与MongoDB 936行、监控与链路追踪868行、并发与异步815行，建议拆分；3) 内容重叠：虚拟线程在并发与异步和虚拟线程深度两处均有覆盖（系有意设计：概览vs深入）；4) Java 25内容覆盖良好，主要集中在现代Java特性文件。建议优先处理大文件拆分和补充07号缺失内容。"
+      "status": "completed",
+      "run_count": 3,
+      "last_result": "Java模块分析完成。发现以下问题：1) 结构性缺失：03-高级用法/目录缺少07-*.md文件（编号从06跳至08）；2) 大文件问题：6个文件超过700行，其中函数式编程959行、Elasticsearch与MongoDB 936行、监控与链路追踪868行、并发与异步815行，建议拆分；3) 内容重叠：虚拟线程在并发与异步和虚拟线程深度两处均有覆盖（系有意设计：概览vs深入）；4) Java 25内容覆盖良好，主要集中在现代Java特性文件。建议优先处理大文件拆分和补充07号缺失内容。",
+      "updated": "2026-04-20T15:08:57.126012",
+      "result": "去重：删除00-简介中版本表/应用场景/学习资源重复内容，重命名Spring入门.md为00-Spring入门.md并修复重复starters行，更新README"
     },
     "task_006_prereq": {
       "target": "JavaScript-删除审查",
@@ -136,11 +136,11 @@
       "target": "Go",
       "path": "6-Go/",
       "type": "regular",
-      "status": "pending",
-      "run_count": 2,
-      "last_result": "Go模块改进：创建缺失的04-开发环境.md，添加go fix文档(Go 1.26)，完善crypto/hpke和errors.AsType示例",
-      "updated": "2026-04-20T03:43:58.905363",
-      "result": "Go模块审查完成。发现以下问题：1) 内容重复：04-开发环境.md与01-安装与环境.md高度重叠；2) 内容重复：05-数据结构.md与06-面向对象.md在struct/interface上有重复；3) 内容重复：02-并发与异步.md与06-Context专题.md中context内容重叠；4) defer在函数.md和错误处理.md中都有讲解；5) 函数式选项模式在函数.md和装饰器.md中重复；6) 部分文件过于简短（如01-文件操作.md仅约100行）。建议合并重复内容，优化结构。"
+      "status": "completed",
+      "run_count": 3,
+      "last_result": "Go模块审查完成。发现以下问题：1) 内容重复：04-开发环境.md与01-安装与环境.md高度重叠；2) 内容重复：05-数据结构.md与06-面向对象.md在struct/interface上有重复；3) 内容重复：02-并发与异步.md与06-Context专题.md中context内容重叠；4) defer在函数.md和错误处理.md中都有讲解；5) 函数式选项模式在函数.md和装饰器.md中重复；6) 部分文件过于简短（如01-文件操作.md仅约100行）。建议合并重复内容，优化结构。",
+      "updated": "2026-04-20T15:09:31.260108",
+      "result": "修复05-Go新特性.md中6处代码错误(maps.Copy返回值/slices.SortedFunc API/go:embed位置/context.AfterFunc类型/weak.Pointer/errors.Join注释/汇总表new位置)；精简04-开发环境.md消除与01-基础重复内容"
     }
   }
 }
