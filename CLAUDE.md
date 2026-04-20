@@ -26,7 +26,7 @@ python scripts/task_runner.py --report  # 查看执行报告
 2. **前置审查**（delete-reviewer agents）并行执行，**阻塞**常规任务
 3. 前置全部 completed → **常规任务**（agent-orchestrator agents）
 4. 完成后 `git commit`
-5. auto reset → 回到步骤1继续
+5. 再次 `python scripts/task_runner.py --once` → 检测全部完成 → 自动重置 → 回到步骤1继续
 6. 直到你说"停止"
 
 ### Agent 使用规范

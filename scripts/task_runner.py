@@ -92,16 +92,30 @@ class TaskRunner:
         return tasks_list
 
     def get_pending_tasks(self) -> list:
-        """获取待处理任务"""
-        return [t for t in self.get_all_tasks() if t.get("status") == "pending"]
+        """获取待处理任务（已解除阻塞）"""
+        blocked = set()
+        for t in self.get_all_tasks():
+            if t.get("status") == "pending":
+                blocked_by = t.get("blockedBy", [])
+                if blocked_by and not all(
+                    self.get_task_by_id(dep).get("status") == "completed"
+                    for dep in blocked_by
+                ):
+                    blocked.add(t.get("_key"))
+        return [t for t in self.get_all_tasks() if t.get("status") == "pending" and t.get("_key") not in blocked]
 
-    def get_prereq_tasks(self) -> list:
-        """获取前置审查任务"""
-        return [t for t in self.get_all_tasks() if t.get("type") == "prereq_delete"]
-
-    def get_regular_tasks(self) -> list:
-        """获取常规任务"""
-        return [t for t in self.get_all_tasks() if t.get("type") != "prereq_delete"]
+    def get_blocked_tasks(self) -> list:
+        """获取被阻塞的任务"""
+        blocked = []
+        for t in self.get_all_tasks():
+            if t.get("status") == "pending":
+                blocked_by = t.get("blockedBy", [])
+                if blocked_by and not all(
+                    self.get_task_by_id(dep).get("status") == "completed"
+                    for dep in blocked_by
+                ):
+                    blocked.append(t)
+        return blocked
 
     def get_task_by_id(self, task_id: str):
         """根据 ID 获取任务"""
@@ -165,81 +179,66 @@ class TaskRunner:
             print()
             return ""
 
-        # 优先检查前置任务
-        prereq_pending = [t for t in self.get_prereq_tasks() if t.get("status") == "pending"]
+        # 分离可执行任务和阻塞任务
+        blocked = self.get_blocked_tasks()
+        pending = self.get_pending_tasks()
 
-        if prereq_pending:
-            # 只输出前置任务，阻塞常规任务
-            lines = ["# 前置审查任务（阻塞中）\n"]
-            lines.append(f"共 {len(prereq_pending)} 个模块待审查\n")
-            lines.append(f"Generated at: {datetime.now().isoformat()}\n")
-            lines.append("详见 .claude/agents/delete-reviewer.md\n")
+        lines = ["# 待执行任务\n"]
+        lines.append(f"Generated at: {datetime.now().isoformat()}\n")
+
+        # 可执行任务
+        if pending:
+            lines.append(f"## 可执行任务（{len(pending)} 个）\n")
+            lines.append("详见 .claude/agents/agent-orchestrator.md\n")
             lines.append("")
-
-            for task in prereq_pending:
+            for task in pending:
                 target = task.get("target", "")
                 path = task.get('path', '')
                 version = versions.get(path, "")
-                lines.append(f"## {target}")
+                lines.append(f"### {target}")
                 lines.append(f"- 路径: `{path}`")
                 if version:
                     parts = [v.strip() for v in version.split('/')]
                     lines.append(f"- 基础版本: `{parts[0]}`")
                     if len(parts) > 1:
                         lines.append(f"- 新版: `{' / '.join(parts[1:])}`")
-                # 关联 prompt 模板
                 prompt_file = get_prompt_file(path)
                 if prompt_file:
                     lines.append(f"- 参考文档: `scripts/prompts/{prompt_file}`")
                 if path.startswith("0-计算机基础"):
-                    lines.append("- 说明：内容为主，版本为辅。版本敏感度排序：Shell > 系统软件 > 其他。Shell脚本关注版本差异；系统软件注意平台差异；计算机体系/编程运行环境/软件工程/网络则核心概念不变。")
+                    lines.append("- 说明：内容为主，版本为辅。版本敏感度排序：Shell > 系统软件 > 其他。")
                 lines.append("")
+        else:
+            lines.append("## 可执行任务（0 个）\n\n")
 
-            lines.append("---")
+        # 阻塞任务
+        if blocked:
+            lines.append(f"## 阻塞任务（{len(blocked)} 个，等待依赖完成）\n")
+            lines.append("详见 .claude/agents/delete-reviewer.md\n")
             lines.append("")
-            lines.append("**并行执行：每个前置任务分配一个 delete-reviewer agent**")
-            lines.append("")
-            lines.append("每个任务区块的内容会作为 prompt 注入给对应的子 agent。")
-
-            return "\n".join(lines)
-
-        # 前置任务全部完成，输出常规任务
-        pending = self.get_pending_tasks()
-
-        if not pending:
-            return """# 无待执行任务
-
-运行 `python scripts/task_runner.py --once` 查看任务列表。
-"""
-
-        lines = ["# 待执行任务\n"]
-        lines.append(f"Generated at: {datetime.now().isoformat()}\n")
-        lines.append("详见 .claude/agents/agent-orchestrator.md\n")
-        lines.append("")
-
-        for task in pending:
-            target = task.get("target", "")
-            path = task.get('path', '')
-            version = versions.get(path, "")
-            lines.append(f"## {target}")
-            lines.append(f"- 路径: `{path}`")
-            if version:
-                # 格式: "基础版本 / 新版 / 最新版"
-                parts = [v.strip() for v in version.split('/')]
-                lines.append(f"- 基础版本: `{parts[0]}`")
-                if len(parts) > 1:
-                    lines.append(f"- 新版: `{' / '.join(parts[1:])}`")
-            # 关联 prompt 模板
-            prompt_file = get_prompt_file(path)
-            if prompt_file:
-                lines.append(f"- 参考文档: `scripts/prompts/{prompt_file}`")
-            if path.startswith("0-计算机基础"):
-                lines.append("- 说明：内容为主，版本为辅。版本敏感度排序：Shell > 系统软件 > 其他。Shell脚本关注版本差异；系统软件注意平台差异；计算机体系/编程运行环境/软件工程/网络则核心概念不变。")
-            lines.append("")
+            for task in blocked:
+                target = task.get("target", "")
+                path = task.get('path', '')
+                version = versions.get(path, "")
+                blocked_by = task.get("blockedBy", [])
+                deps = [self.get_task_by_id(d).get("target", d) for d in blocked_by]
+                lines.append(f"### {target}")
+                lines.append(f"- 路径: `{path}`")
+                lines.append(f"- 等待: {', '.join(deps)}")
+                if version:
+                    parts = [v.strip() for v in version.split('/')]
+                    lines.append(f"- 基础版本: `{parts[0]}`")
+                    if len(parts) > 1:
+                        lines.append(f"- 新版: `{' / '.join(parts[1:])}`")
+                lines.append("")
+        else:
+            lines.append("## 阻塞任务（0 个）\n\n")
 
         lines.append("---")
         lines.append("")
-        lines.append("**并行执行：每个任务分配一个 agent-orchestrator agent**")
+        lines.append("**并行执行：每个任务分配一个 agent**")
+        lines.append("- 可执行任务 → agent-orchestrator")
+        lines.append("- 阻塞任务 → delete-reviewer")
         lines.append("")
         lines.append("每个任务区块的内容会作为 prompt 注入给对应的子 agent。")
 
@@ -250,15 +249,10 @@ class TaskRunner:
         issues = []
         for task_key, task_info in self.tasks_data.get("tasks", {}).items():
             status = task_info.get("status")
-            run_count = task_info.get("run_count", 0)
             result = task_info.get("result")
 
-            if status == "completed" and run_count == 0:
-                issues.append(f"{task_key}: completed 但 run_count=0（可能未通过 --update 更新）")
             if status == "completed" and not result:
                 issues.append(f"{task_key}: completed 但无 result")
-            if status == "pending" and run_count >= 3:
-                issues.append(f"{task_key}: pending 但 run_count={run_count}（执行多次未完成）")
         return issues
 
     def generate_report(self) -> str:
