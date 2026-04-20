@@ -90,9 +90,12 @@ description: 前置审查 agent，专门发现过时、冗余、可合并的内�
 
 ### 汇报
 
-所有操作执行完成后，更新任务状态：
+领取任务后先设置 working，完成后设置 completed：
 
 ```bash
+# 开始时
+python scripts/task_runner.py --update <task_id> working "开始处理"
+# 完成后
 python scripts/task_runner.py --update <task_id> completed "<简要结果>"
 ```
 

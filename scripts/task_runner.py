@@ -115,6 +115,10 @@ class TaskRunner:
 
     def update_task(self, task_id: str, new_status: str, result: str = "", findings: list | None = None):
         """更新任务状态和结果"""
+        if new_status not in ("pending", "working", "completed"):
+            logger.error(f"无效状态: {new_status}，必须是 pending/working/completed 之一")
+            return False
+
         if not self.tasks_data:
             logger.error("任务数据未加载")
             return False
@@ -205,7 +209,8 @@ class TaskRunner:
         lines.append("**执行方式：使用子 agent 直接 spawn 并行执行任务**")
         lines.append("- 每个任务分配一个子 agent（run_in_background=True）")
         lines.append("- 无需 TeamCreate，agents 之间无需通信")
-        lines.append("- 完成后调用 `python scripts/task_runner.py --update <task_id> completed <result>`")
+        lines.append("- Agent 领取后调用 `--update <task_id> working \"开始处理\"`")
+        lines.append("- 完成后调用 `--update <task_id> completed \"<结果>\"`")
 
         return "\n".join(lines)
 
