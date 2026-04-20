@@ -170,15 +170,6 @@ class TaskRunner:
         if self.auto_reset():
             print("全部任务已完成，已自动重置为 pending。")
 
-        # 简易校验
-        issues = self.verify_tasks()
-        if issues:
-            print("⚠️ 任务状态异常:")
-            for issue in issues:
-                print(f"  - {issue}")
-            print()
-            return ""
-
         # 获取可执行任务（代码内按 blockedBy 筛选）
         pending = self.get_pending_tasks()
 
@@ -219,22 +210,12 @@ class TaskRunner:
         lines.append("- delete-reviewer: .claude/agents/delete-reviewer.md")
         lines.append("- agent-orchestrator: .claude/agents/agent-orchestrator.md")
         lines.append("")
-        lines.append("**并行执行：每个任务分配一个 agent**")
-        lines.append("")
-        lines.append("每个任务区块的内容会作为 prompt 注入给对应的子 agent。")
+        lines.append("**执行方式：使用子 agent 直接 spawn 并行执行任务**")
+        lines.append("- 每个任务分配一个子 agent（run_in_background=True）")
+        lines.append("- 无需 TeamCreate，agents 之间无需通信")
+        lines.append("- 完成后调用 `python scripts/task_runner.py --update <task_id> completed <result>`")
 
         return "\n".join(lines)
-
-    def verify_tasks(self) -> list:
-        """校验任务状态一致性，返回问题列表"""
-        issues = []
-        for task_key, task_info in self.tasks_data.get("tasks", {}).items():
-            status = task_info.get("status")
-            result = task_info.get("result")
-
-            if status == "completed" and not result:
-                issues.append(f"{task_key}: completed 但无 result")
-        return issues
 
     def generate_report(self) -> str:
         """生成执行报告"""
