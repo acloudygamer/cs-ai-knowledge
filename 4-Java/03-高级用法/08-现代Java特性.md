@@ -570,10 +570,25 @@ class Order {
 | Sealed Classes | 17 | 限制继承层次 |
 | Record Patterns | 21 | Record 解构 |
 | Virtual Threads | 21 | 轻量级线程 |
+| Primitive Types in Patterns | 25 | 模式匹配支持基本类型（第三预览）|
 | Instance Main Methods | 25 | 简化的程序入口 |
 | Module Import | 25 | import module 语法 |
 | Flexible Constructor Body | 25 | 构造函数初始化顺序增强 |
 | Key Derivation Function API | 25 | 密码学密钥派生标准 API |
+
+## 已撤回/未发布特性
+
+### String Templates（已撤回）
+
+String Templates 在 Java 21/22 预览后被撤回：
+
+- **Java 21**：首次预览（JEP 430）
+- **Java 22**：第二预览（JEP 459）
+- **Java 23**：原计划再次预览，但被撤回
+
+> 经过广泛讨论和反馈，Java 团队认为当前形式的 String Templates 不够合适，目前没有就更好的设计方案达成共识。因此该特性被暂时撤回，JDK 23 不会包含它。
+
+未来可能会以不同的设计重新引入。
 
 ## 版本选择建议
 

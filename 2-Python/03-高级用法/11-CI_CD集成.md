@@ -19,7 +19,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ["3.10", "3.11", "3.12"]
+        python-version: ["3.10", "3.11", "3.12", "3.14"]
 
     steps:
       - uses: actions/checkout@v4
@@ -71,7 +71,7 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
+          python-version: "3.14"
 
       - name: Install lint tools
         run: pip install ruff mypy
@@ -87,7 +87,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ["3.10", "3.11", "3.12"]
+        python-version: ["3.10", "3.11", "3.12", "3.14"]
         poetry-version: "1.7"
 
     steps:
@@ -272,7 +272,7 @@ tox -e lint
 
 ```dockerfile
 # 构建阶段
-FROM python:3.12-slim as builder
+FROM python:3.14-slim as builder
 
 WORKDIR /app
 COPY pyproject.toml poetry.lock* ./
@@ -281,7 +281,7 @@ RUN pip install poetry && \
     poetry install --no-root --without dev
 
 # 运行阶段
-FROM python:3.12-slim
+FROM python:3.14-slim
 
 WORKDIR /app
 COPY --from=builder /app /app
@@ -300,7 +300,7 @@ CMD ["python", "-m", "src.main"]
 ### Multi-stage 构建
 
 ```dockerfile
-FROM python:3.12-slim as base
+FROM python:3.14-slim as base
 WORKDIR /app
 COPY pyproject.toml poetry.lock* ./
 
