@@ -100,9 +100,8 @@ template <typename T>
 requires std::integral<T>
 T add(T a, T b) { return a + b; }
 ```
-```
 
-### 工作约束
+## 工作约束
 
 - 只在任务指定的目录中工作
 - 遵循项目编码规范
