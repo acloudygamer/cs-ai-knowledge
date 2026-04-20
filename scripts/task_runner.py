@@ -64,9 +64,11 @@ class TaskRunner:
             return self.tasks_data
         except FileNotFoundError:
             logger.error(f"任务文件不存在: {self.tasks_file}")
+            self.tasks_data = {}
             return {}
         except json.JSONDecodeError as e:
             logger.error(f"任务文件 JSON 解析错误: {e}")
+            self.tasks_data = {}
             return {}
 
     def save_tasks(self):
@@ -98,24 +100,11 @@ class TaskRunner:
             if t.get("status") == "pending":
                 blocked_by = t.get("blockedBy", [])
                 if blocked_by and not all(
-                    self.get_task_by_id(dep).get("status") == "completed"
+                    (self.get_task_by_id(dep) or {}).get("status") == "completed"
                     for dep in blocked_by
                 ):
                     blocked.add(t.get("_key"))
         return [t for t in self.get_all_tasks() if t.get("status") == "pending" and t.get("_key") not in blocked]
-
-    def get_blocked_tasks(self) -> list:
-        """获取被阻塞的任务"""
-        blocked = []
-        for t in self.get_all_tasks():
-            if t.get("status") == "pending":
-                blocked_by = t.get("blockedBy", [])
-                if blocked_by and not all(
-                    self.get_task_by_id(dep).get("status") == "completed"
-                    for dep in blocked_by
-                ):
-                    blocked.append(t)
-        return blocked
 
     def get_task_by_id(self, task_id: str):
         """根据 ID 获取任务"""
@@ -150,12 +139,15 @@ class TaskRunner:
 
     def auto_reset(self):
         """全部完成后自动重置所有任务为 pending"""
+        if not self.load_tasks():
+            return False
         all_tasks = self.get_all_tasks()
         if not all_tasks:
             return False
         completed = [t for t in all_tasks if t.get("status") == "completed"]
         if len(completed) == len(all_tasks):
-            for task_info in self.tasks_data.get("tasks", {}).values():
+            tasks = self.tasks_data.get("tasks", {})  # type: ignore
+            for task_info in tasks.values():
                 task_info["status"] = "pending"
             self.save_tasks()
             return True

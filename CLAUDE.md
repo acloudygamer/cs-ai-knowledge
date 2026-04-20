@@ -3,8 +3,9 @@
 ## 核心命令
 
 ```bash
-python scripts/task_runner.py --once    # 生成待执行任务（完成后自动重置）
+python scripts/task_runner.py --once    # 生成待执行任务（全部完成后自动重置）
 python scripts/task_runner.py --report  # 查看执行报告
+python scripts/task_runner.py --update <task_id> <status> <result>  # 更新任务状态
 ```
 
 ### 开始工作循环
