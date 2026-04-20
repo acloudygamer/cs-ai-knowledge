@@ -19,7 +19,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ["3.10", "3.11", "3.12", "3.14"]
+        python-version: ["3.12", "3.13", "3.14"]
 
     steps:
       - uses: actions/checkout@v4
@@ -87,7 +87,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ["3.10", "3.11", "3.12", "3.14"]
+        python-version: ["3.12", "3.13", "3.14"]
         poetry-version: "1.7"
 
     steps:
@@ -224,7 +224,7 @@ pip install tox
 ```ini
 # tox.ini
 [tox]
-envlist = py310,py311,py312,lint,type
+envlist = py312,py313,py314,lint,type
 isolated_build = True
 
 [testenv]
@@ -368,7 +368,7 @@ name = "mypackage"
 version = "0.1.0"
 description = "A short description"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.12"
 license = {text = "MIT"}
 authors = [
     {name = "Your Name", email = "you@example.com"}
