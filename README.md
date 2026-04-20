@@ -5,8 +5,8 @@
 ## 系统架构
 
 ```
-task_runner.py --once → delete-reviewer agents (前置审查，阻塞)
-                  → agent-orchestrator agents (常规任务)
+task_runner.py --once → delete-reviewer agents (并行，前置审查)
+                  → agent-orchestrator agents (并行，常规任务)
 ```
 
 | Agent | 职责 | 触发条件 |
