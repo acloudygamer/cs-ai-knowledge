@@ -1,11 +1,11 @@
 {
-  "version": "3.0",
-  "updated": "2026-04-20T15:46:59.233449",
+  "version": "4.0",
+  "updated": "2026-04-20T16:05:00.000000",
   "tasks": {
     "task_001_prereq": {
       "target": "计算机基础-删除审查",
       "path": "0-计算机基础/",
-      "type": "prereq_delete",
+      "agent": "delete-reviewer",
       "status": "pending",
       "run_count": 3,
       "last_result": "审查完成：无删除建议",
@@ -15,17 +15,18 @@
     "task_001": {
       "target": "计算机基础",
       "path": "0-计算机基础/",
+      "agent": "agent-orchestrator",
       "blockedBy": ["task_001_prereq"],
       "status": "pending",
       "run_count": 3,
       "last_result": "删除重复内容：02-Shell家族.md 删220行脚本重复内容，04-并行与并发.md 删360行进程线程重复内容，模块结构更清晰",
-      "updated": "2026-04-20T15:12:11.337540",
+      "updated": "2026-04-20T15:12:11.337542",
       "result": "已完成内容审查与去重"
     },
     "task_002_prereq": {
       "target": "数据结构与算法-删除审查",
       "path": "1-数据结构与算法/",
-      "type": "prereq_delete",
+      "agent": "delete-reviewer",
       "status": "pending",
       "run_count": 4,
       "last_result": "审查完成：无删除建议",
@@ -35,6 +36,7 @@
     "task_002": {
       "target": "数据结构与算法",
       "path": "1-数据结构与算法/",
+      "agent": "agent-orchestrator",
       "blockedBy": ["task_002_prereq"],
       "status": "pending",
       "run_count": 3,
@@ -45,7 +47,7 @@
     "task_003_prereq": {
       "target": "Python-删除审查",
       "path": "2-Python/",
-      "type": "prereq_delete",
+      "agent": "delete-reviewer",
       "status": "pending",
       "run_count": 4,
       "last_result": "删除Python3.11过时内容",
@@ -55,6 +57,7 @@
     "task_003": {
       "target": "Python",
       "path": "2-Python/",
+      "agent": "agent-orchestrator",
       "blockedBy": ["task_003_prereq"],
       "status": "pending",
       "run_count": 3,
@@ -65,7 +68,7 @@
     "task_004_prereq": {
       "target": "C++-删除审查",
       "path": "3-C++/",
-      "type": "prereq_delete",
+      "agent": "delete-reviewer",
       "status": "pending",
       "run_count": 4,
       "last_result": "删除协程Generator过时实现",
@@ -75,6 +78,7 @@
     "task_004": {
       "target": "C++",
       "path": "3-C++/",
+      "agent": "agent-orchestrator",
       "blockedBy": ["task_004_prereq"],
       "status": "pending",
       "run_count": 3,
@@ -85,7 +89,7 @@
     "task_005_prereq": {
       "target": "Java-删除审查",
       "path": "4-Java/",
-      "type": "prereq_delete",
+      "agent": "delete-reviewer",
       "status": "pending",
       "run_count": 4,
       "last_result": "审查完成：无删除建议",
@@ -95,6 +99,7 @@
     "task_005": {
       "target": "Java",
       "path": "4-Java/",
+      "agent": "agent-orchestrator",
       "blockedBy": ["task_005_prereq"],
       "status": "pending",
       "run_count": 3,
@@ -105,7 +110,7 @@
     "task_006_prereq": {
       "target": "JavaScript-删除审查",
       "path": "5-JavaScript/",
-      "type": "prereq_delete",
+      "agent": "delete-reviewer",
       "status": "pending",
       "run_count": 3,
       "last_result": "删除导入断言和惰性求值",
@@ -115,6 +120,7 @@
     "task_006": {
       "target": "JavaScript",
       "path": "5-JavaScript/",
+      "agent": "agent-orchestrator",
       "blockedBy": ["task_006_prereq"],
       "status": "pending",
       "run_count": 3,
@@ -125,7 +131,7 @@
     "task_007_prereq": {
       "target": "Go-删除审查",
       "path": "6-Go/",
-      "type": "prereq_delete",
+      "agent": "delete-reviewer",
       "status": "pending",
       "run_count": 3,
       "last_result": "修复Ordered+补充版本历史",
@@ -135,6 +141,7 @@
     "task_007": {
       "target": "Go",
       "path": "6-Go/",
+      "agent": "agent-orchestrator",
       "blockedBy": ["task_007_prereq"],
       "status": "pending",
       "run_count": 3,

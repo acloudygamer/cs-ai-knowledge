@@ -179,66 +179,47 @@ class TaskRunner:
             print()
             return ""
 
-        # 分离可执行任务和阻塞任务
-        blocked = self.get_blocked_tasks()
+        # 获取可执行任务（代码内按 blockedBy 筛选）
         pending = self.get_pending_tasks()
+
+        if not pending:
+            return """# 无待执行任务
+
+运行 `python scripts/task_runner.py --once` 查看任务列表。
+"""
 
         lines = ["# 待执行任务\n"]
         lines.append(f"Generated at: {datetime.now().isoformat()}\n")
 
-        # 可执行任务
-        if pending:
-            lines.append(f"## 可执行任务（{len(pending)} 个）\n")
-            lines.append("详见 .claude/agents/agent-orchestrator.md\n")
-            lines.append("")
-            for task in pending:
-                target = task.get("target", "")
-                path = task.get('path', '')
-                version = versions.get(path, "")
-                lines.append(f"### {target}")
-                lines.append(f"- 路径: `{path}`")
-                if version:
-                    parts = [v.strip() for v in version.split('/')]
-                    lines.append(f"- 基础版本: `{parts[0]}`")
-                    if len(parts) > 1:
-                        lines.append(f"- 新版: `{' / '.join(parts[1:])}`")
-                prompt_file = get_prompt_file(path)
-                if prompt_file:
-                    lines.append(f"- 参考文档: `scripts/prompts/{prompt_file}`")
-                if path.startswith("0-计算机基础"):
-                    lines.append("- 说明：内容为主，版本为辅。版本敏感度排序：Shell > 系统软件 > 其他。")
-                lines.append("")
-        else:
-            lines.append("## 可执行任务（0 个）\n\n")
+        for task in pending:
+            target = task.get("target", "")
+            path = task.get('path', '')
+            version = versions.get(path, "")
+            agent = task.get("agent", "general-purpose")
 
-        # 阻塞任务
-        if blocked:
-            lines.append(f"## 阻塞任务（{len(blocked)} 个，等待依赖完成）\n")
-            lines.append("详见 .claude/agents/delete-reviewer.md\n")
+            lines.append(f"### {target}")
+            lines.append(f"- 路径: `{path}`")
+            if version:
+                parts = [v.strip() for v in version.split('/')]
+                lines.append(f"- 基础版本: `{parts[0]}`")
+                if len(parts) > 1:
+                    lines.append(f"- 新版: `{' / '.join(parts[1:])}`")
+            lines.append(f"- 使用 agent: {agent}")
+            prompt_file = get_prompt_file(path)
+            if prompt_file:
+                lines.append(f"- 参考文档: `scripts/prompts/{prompt_file}`")
+            if path.startswith("0-计算机基础"):
+                lines.append("- 说明：内容为主，版本为辅。版本敏感度排序：Shell > 系统软件 > 其他。")
             lines.append("")
-            for task in blocked:
-                target = task.get("target", "")
-                path = task.get('path', '')
-                version = versions.get(path, "")
-                blocked_by = task.get("blockedBy", [])
-                deps = [self.get_task_by_id(d).get("target", d) for d in blocked_by]
-                lines.append(f"### {target}")
-                lines.append(f"- 路径: `{path}`")
-                lines.append(f"- 等待: {', '.join(deps)}")
-                if version:
-                    parts = [v.strip() for v in version.split('/')]
-                    lines.append(f"- 基础版本: `{parts[0]}`")
-                    if len(parts) > 1:
-                        lines.append(f"- 新版: `{' / '.join(parts[1:])}`")
-                lines.append("")
-        else:
-            lines.append("## 阻塞任务（0 个）\n\n")
 
+        # 参考文档
         lines.append("---")
         lines.append("")
+        lines.append("**参考文档**")
+        lines.append("- delete-reviewer: .claude/agents/delete-reviewer.md")
+        lines.append("- agent-orchestrator: .claude/agents/agent-orchestrator.md")
+        lines.append("")
         lines.append("**并行执行：每个任务分配一个 agent**")
-        lines.append("- 可执行任务 → agent-orchestrator")
-        lines.append("- 阻塞任务 → delete-reviewer")
         lines.append("")
         lines.append("每个任务区块的内容会作为 prompt 注入给对应的子 agent。")
 
