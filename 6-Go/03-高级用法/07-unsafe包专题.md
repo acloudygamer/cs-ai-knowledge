@@ -423,10 +423,11 @@ offset := unsafe.Offsetof(T{}.b)
 // Go 版本升级可能导致结构体布局变化
 // unsafe 操作可能在升级后失效
 
-// 检查 Go 版本
+// 检查 Go 版本（使用字符串前缀检查）
 import "runtime"
-if runtime.Version() >= "go1.22" {
-    // 使用新布局
+import "strings"
+if strings.HasPrefix(runtime.Version(), "go1.2") {
+    // go1.20 及以上版本
 }
 ```
 
