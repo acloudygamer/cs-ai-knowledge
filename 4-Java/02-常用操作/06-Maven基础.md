@@ -207,7 +207,7 @@ Spring Boot 项目继承 `spring-boot-starter-parent`，获得：
 <parent>
     <groupId>org.springframework.boot</groupId>
     <artifactId>spring-boot-starter-parent</artifactId>
-    <version>3.2.0</version>
+    <version>3.4.0</version>
 </parent>
 
 <dependencies>

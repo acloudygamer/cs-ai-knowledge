@@ -55,7 +55,7 @@ gu update native-image
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>3.2.0</version>
+        <version>3.4.0</version>
     </parent>
 
     <groupId>com.example</groupId>
@@ -63,7 +63,7 @@ gu update native-image
     <version>1.0.0</version>
 
     <properties>
-        <java.version>17</java.version>
+        <java.version>21</java.version>
         <native.maven.plugin.version>0.9.24</native.maven.plugin.version>
     </properties>
 
@@ -501,7 +501,7 @@ spec:
 <plugin>
     <groupId>org.springframework.boot</groupId>
     <artifactId>spring-boot-aot-maven-plugin</artifactId>
-    <version>3.2.0</version>
+    <version>3.4.0</version>
     <executions>
         <execution>
             <id>prepare-aot</id>

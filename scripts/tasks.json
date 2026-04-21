@@ -1,16 +1,16 @@
 {
   "version": "4.0",
-  "updated": "2026-04-21T22:59:39.713531",
+  "updated": "2026-04-21T23:14:03.555018",
   "tasks": {
     "task_001_prereq": {
       "target": "计算机基础-删除审查",
       "path": "0-计算机基础/",
       "agent": "delete-reviewer",
       "status": "completed",
-      "run_count": 39,
+      "run_count": 41,
       "last_result": "开始处理",
-      "updated": "2026-04-21T22:40:26.994740",
-      "result": "审查完成：0-计算机基础/ 目录结构合理，版本标注规范（Shell家族5.2.21、终端/PowerShell 7.6.0等均已标注），无过时/冗余内容需删除。API设计重叠已通过引用处理，Node.js运行时与JS章节内容互补无冗余。"
+      "updated": "2026-04-21T23:07:47.996447",
+      "result": "删除了01-前端与后端.md中的REST API代码示例和API设计进阶重复内容；删除了12-微服务架构.md中的部署策略（蓝绿部署/金丝雀/滚动更新）重复内容，保留最佳实践；简化了02-系统软件层/01-操作系统概述.md中的虚拟化与容器章节，改为引用容器化基础文档"
     },
     "task_001": {
       "target": "计算机基础",
@@ -20,20 +20,20 @@
         "task_001_prereq"
       ],
       "status": "completed",
-      "run_count": 41,
-      "last_result": "开始处理计算机基础目录优化",
-      "updated": "2026-04-21T22:58:38.113422",
-      "result": "验证通过：目录结构完整(01-06连续)、README链接全部有效(40个md文件)、版本标注正确(跨平台版本说明、历史版本说明)"
+      "run_count": 43,
+      "last_result": "开始处理",
+      "updated": "2026-04-21T23:13:04.776268",
+      "result": "完成计算机基础目录优化：重塑了4个核心文件（01-硬件组成、04-并行与并发、05-前端与后端、01-网络分层模型、01-操作系统概述），将结构从「概念+关系」改为「解决什么问题+核心概念+怎么用」模板。验证通过：README链接全部有效(40个md文件)、目录标号连续(01-06)、代码示例简洁可运行。"
     },
     "task_002_prereq": {
       "target": "数据结构与算法-删除审查",
       "path": "1-数据结构与算法/",
       "agent": "delete-reviewer",
       "status": "completed",
-      "run_count": 38,
+      "run_count": 40,
       "last_result": "开始处理",
-      "updated": "2026-04-21T22:38:23.598752",
-      "result": "删除了堆与优先队列.md中的堆排序重复实现（与排序.md重复），并更新了README.md索引"
+      "updated": "2026-04-21T23:07:17.880336",
+      "result": "完成删除审查：更新了 哈希表.md 中的 OrderedDict 为普通 dict（Python 3.7+ dict 已保证插入顺序），其余文件内容无冗余、无需删除"
     },
     "task_002": {
       "target": "数据结构与算法",
@@ -43,20 +43,20 @@
         "task_002_prereq"
       ],
       "status": "completed",
-      "run_count": 37,
-      "last_result": "开始处理",
-      "updated": "2026-04-21T22:58:22.736666",
-      "result": "验证通过：README链接全部有效(29个文件)，目录标号连续(01-05/01-13/01-11/01)，版本标注正确(Python 3.12)，内容结构符合模板"
+      "run_count": 39,
+      "last_result": "开始处理数据结构与算法内容优化",
+      "updated": "2026-04-21T23:12:13.101211",
+      "result": "修复了链表拼写错误、简化了AVL/红黑树实现（130行→40行）、修复了位运算LeetCode编号重复、简化了关键路径算法(O(n²)→O(n+m))"
     },
     "task_003_prereq": {
       "target": "Python-删除审查",
       "path": "2-Python/",
       "agent": "delete-reviewer",
       "status": "completed",
-      "run_count": 37,
+      "run_count": 39,
       "last_result": "开始处理",
-      "updated": "2026-04-21T22:39:00.503640",
-      "result": "删除了05-你好世界.md（过于基础）；简化了06-面向对象.md（移除dataclass重复内容）；简化了04-函数.md（移除装饰器基础重复内容）；简化了03-应用场景.md（移除pandas/NumPy/Matplotlib详细代码）；简化了04-开发环境.md（移除详细工具介绍）；更新了README.md索引"
+      "updated": "2026-04-21T23:08:28.158534",
+      "result": "修复了2个版本过时问题：1) 变量与类型.md 更新了过时的 Python 3.5+ 版本引用；2) 语言简介.md 修复了版本表格，将 Python 3.0 从\"当前主流版本\"更正为\"首个 Python 3 版本\"，并添加 Python 3.12 为当前稳定版本。未发现需要删除的文件：类型提示深入.md与变量与类型.md的TypeVar/Callable重叠是基础vs高级的故意分层；Python 3.14新特性文件正确放置在高级用法中作为前沿版本参考。"
     },
     "task_003": {
       "target": "Python",
@@ -66,20 +66,20 @@
         "task_003_prereq"
       ],
       "status": "completed",
-      "run_count": 35,
-      "last_result": "开始处理",
-      "updated": "2026-04-21T22:58:46.775130",
-      "result": "发现4个目录编号缺失问题：00-简介/05、01-基础/01、02-常用操作/08、03-高级用法/01。README链接全部有效。Python3.14新特性文档为前瞻性内容（3.14计划于2026年10月发布）。"
+      "run_count": 37,
+      "last_result": "开始处理 Python 知识库优化",
+      "updated": "2026-04-21T23:13:42.793889",
+      "result": "已优化 Python 知识库：添加了模板结构到 7 个文件（函数、数据结构、面向对象、dataclass、闭包、错误处理、正则表达式），每个文件都包含 解决什么问题 + 核心概念 + 怎么用 结构"
     },
     "task_004_prereq": {
       "target": "C++-删除审查",
       "path": "3-C++/",
       "agent": "delete-reviewer",
       "status": "completed",
-      "run_count": 39,
+      "run_count": 41,
       "last_result": "开始处理",
-      "updated": "2026-04-21T22:38:24.747673",
-      "result": "审查完成：3-C++/目录结构合理，版本标注规范，内容无实质冗余，无需删除操作"
+      "updated": "2026-04-21T23:06:32.718704",
+      "result": "审查完成：3-C++/目录结构合理，版本标注规范(C++20为基础，C++23/26正确标注)，无过时/冗余内容需删除。std::generator正确标注为C++26，无auto_ptr等废弃用法残留。"
     },
     "task_004": {
       "target": "C++",
@@ -89,20 +89,20 @@
         "task_004_prereq"
       ],
       "status": "completed",
-      "run_count": 38,
-      "last_result": "开始处理C++目录优化",
-      "updated": "2026-04-21T22:58:56.791470",
-      "result": "验证完成。发现1个目录结构问题：03-高级用法缺少01文件（编号从02开始，跳过了01）。README链接全部有效(38个文件)。版本标注正确(C++20基础版本，C++23/26正确标注特性如std::generator为C++26)。"
+      "run_count": 40,
+      "last_result": "开始处理 C++ 知识库优化",
+      "updated": "2026-04-21T23:12:21.919355",
+      "result": "修复了 03-高级用法 目录编号问题：创建了 01-高级用法概览.md 并更新了 README.md，使所有章节目录编号从 01 开始，保持一致性。验证了所有 39 个 README 链接均有效。"
     },
     "task_005_prereq": {
       "target": "Java-删除审查",
       "path": "4-Java/",
       "agent": "delete-reviewer",
       "status": "completed",
-      "run_count": 39,
-      "last_result": "开始处理",
-      "updated": "2026-04-21T22:38:32.647913",
-      "result": "删除了00-简介/04-开发环境.md（冗余的快速上手指南），更新了README.md索引和05-你好世界.md中的引用"
+      "run_count": 41,
+      "last_result": "开始处理Java删除审查",
+      "updated": "2026-04-21T23:08:56.038293",
+      "result": "删除了语言特点.md（合并到语言简介.md），精简了日期时间.md中的旧API部分，增强了语言简介.md的对比表格，更新了README.md索引"
     },
     "task_005": {
       "target": "Java",
@@ -112,20 +112,20 @@
         "task_005_prereq"
       ],
       "status": "completed",
-      "run_count": 37,
-      "last_result": "开始处理",
-      "updated": "2026-04-21T22:58:45.752470",
-      "result": "验证完成：README链接全部有效，版本标注正确，但发现目录标号跳号问题（00-简介缺04，02-常用操作缺02/08，03-高级用法缺07/12）"
+      "run_count": 39,
+      "last_result": "开始处理Java知识库内容优化",
+      "updated": "2026-04-21T23:13:16.764142",
+      "result": "完成Java知识库优化：更新了Spring Boot 3.2.x→3.4.0和Java 17→21版本（涉及6个文件），验证了README链接全部有效(58个md文件)，目录标号跳号为设计选择(缺失文件从未创建)，版本标注正确(Java 21/LTS稳定版，Java 25/LTS前沿版)"
     },
     "task_006_prereq": {
       "target": "JavaScript-删除审查",
       "path": "5-JavaScript/",
       "agent": "delete-reviewer",
       "status": "completed",
-      "run_count": 37,
-      "last_result": "开始处理",
-      "updated": "2026-04-21T22:39:17.618504",
-      "result": "删除了 01-基础/10-数据结构.md 中冗余的 Map/Set 章节（原内容仅为指向 08-Map与Set.md 的简短引用，已移除以消除冗余）"
+      "run_count": 39,
+      "last_result": "开始处理JavaScript删除审查",
+      "updated": "2026-04-21T23:08:39.925935",
+      "result": "删除了02-常用操作/01-文件操作.md（内容已整合到Node.js基础），更新了README.md索引"
     },
     "task_006": {
       "target": "JavaScript",
@@ -135,20 +135,20 @@
         "task_006_prereq"
       ],
       "status": "completed",
-      "run_count": 36,
-      "last_result": "开始处理",
-      "updated": "2026-04-21T22:59:39.713271",
-      "result": "内容验证完成：README全部链接有效(50+文件)，版本标注正确(ES2024/ES2026/Node.js26+)，目录编号存在间隙但不影响链接有效性"
+      "run_count": 38,
+      "last_result": "开始处理JavaScript知识库",
+      "updated": "2026-04-21T23:14:03.554795",
+      "result": "JavaScript知识库优化完成：1) 修复00-简介目录编号（05→02, 06→03）；2) 修复01-基础数据结构编号（10→09）；3) 更新README.md链接；4) 验证ES2024/2025/2026代码可运行性通过；5) 确认01-基础缺少10、02-常用操作缺少01为原始设计意图，暂不修改"
     },
     "task_007_prereq": {
       "target": "Go-删除审查",
       "path": "6-Go/",
       "agent": "delete-reviewer",
       "status": "completed",
-      "run_count": 37,
-      "last_result": "开始处理",
-      "updated": "2026-04-21T22:39:19.339234",
-      "result": "清理了4处无效的「详见Go新特性」交叉引用：日志系统.md（内联slog基础用法）、错误处理.md（内联errors.AsType）、JSON处理.md（内联omitzero标签说明）、并发与异步.md（移除无意义引用）。所有文件与README索引一致。"
+      "run_count": 39,
+      "last_result": "开始处理Go删除审查",
+      "updated": "2026-04-21T23:08:41.555753",
+      "result": "删除了 6-Go/03-高级用法/01-装饰器与元编程.md（大量重复内容：建造者模式、装饰器模式、策略模式与设计模式.md重复，函数式选项与函数.md重复），并更新了 README.md 索引"
     },
     "task_007": {
       "target": "Go",
@@ -158,10 +158,10 @@
         "task_007_prereq"
       ],
       "status": "completed",
-      "run_count": 37,
-      "last_result": "开始处理",
-      "updated": "2026-04-21T22:59:07.775557",
-      "result": "验证完成：发现3处跳号（00-简介缺04、01-基础缺05、05-测试缺02），README链接全部有效，版本标注正确"
+      "run_count": 39,
+      "last_result": "开始处理Go知识库",
+      "updated": "2026-04-21T23:12:33.320814",
+      "result": "Go知识库优化完成：添加模板头到3个文件(02-语言特点.md、05-你好世界.md、03-内存管理.md)，验证README链接有效，目录结构正确"
     }
   }
 }

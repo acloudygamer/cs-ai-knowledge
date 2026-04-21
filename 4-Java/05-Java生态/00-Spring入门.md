@@ -21,14 +21,14 @@ Spring 是 Java 企业级开发的核心框架，提供依赖注入（DI）和�
 curl https://start.spring.io/starter.zip \
     -d type=gradle \
     -d language=java \
-    -d bootVersion=3.2.0 \
+    -d bootVersion=3.4.0 \
     -d baseDir=demo \
     -d groupId=com.example \
     -d artifactId=demo \
     -d name=demo \
     -d description="Demo project" \
     -d packageName=com.example.demo \
-    -d javaVersion=17 \
+    -d javaVersion=21 \
     -d dependencies=web \
     -o demo.zip
 ```
@@ -43,7 +43,7 @@ curl https://start.spring.io/starter.zip \
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>3.2.0</version>
+        <version>3.4.0</version>
     </parent>
 
     <groupId>com.example</groupId>
@@ -52,7 +52,7 @@ curl https://start.spring.io/starter.zip \
     <name>demo</name>
 
     <properties>
-        <java.version>17</java.version>
+        <java.version>21</java.version>
     </properties>
 
     <dependencies>

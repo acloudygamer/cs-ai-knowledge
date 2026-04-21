@@ -1,6 +1,17 @@
 # dataclass 专题
 
-`dataclass` 是 Python 3.7+ 引入的装饰器，专门用于简化数据类（Data Class）的创建。它自动生成 `__init__`、`__repr__`、`__eq__` 等方法，大幅减少样板代码。
+## 解决什么问题
+
+需要创建主要用于存储数据的类时，手写 `__init__`、`__repr__`、`__eq__` 等方法繁琐易错。dataclass 自动生成这些样板代码。
+
+## 核心概念
+
+- `@dataclass` 装饰器自动生成 `__init__`、`__repr__`、`__eq__`
+- `field(default_factory=...)` 处理可变默认值
+- `frozen=True` 创建不可变对象
+- `slots=True`（Python 3.10+）减少内存占用
+
+## 怎么用
 
 ## 基础用法
 
