@@ -188,9 +188,9 @@ class TaskRunner:
             lines.append(f"- 路径: `{path}`")
             if version:
                 parts = [v.strip() for v in version.split('/')]
-                lines.append(f"- 基础版本: `{parts[0]}`")
+                lines.append(f"- 稳定版: `{parts[0]}`")
                 if len(parts) > 1:
-                    lines.append(f"- 新版: `{' / '.join(parts[1:])}`")
+                    lines.append(f"- 前沿版: `{' / '.join(parts[1:])}`")
             lines.append(f"- 使用 agent: {agent}")
             prompt_file = get_prompt_file(path)
             if prompt_file:
