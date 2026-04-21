@@ -5,7 +5,7 @@
 ### Dockerfile 基本结构
 
 ```dockerfile
-FROM openjdk:17-slim
+FROM openjdk:25-slim
 
 WORKDIR /app
 
@@ -22,7 +22,7 @@ ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar /app/myapp.jar"]
 
 ```dockerfile
 # 阶段 1: 构建
-FROM maven:3.9-eclipse-temurin-17 AS builder
+FROM maven:3.9-eclipse-temurin-25 AS builder
 WORKDIR /build
 COPY pom.xml .
 RUN mvn dependency:go-offline
@@ -30,7 +30,7 @@ COPY src ./src
 RUN mvn package -DskipTests
 
 # 阶段 2: 运行
-FROM eclipse-temurin:17-jre-alpine
+FROM eclipse-temurin:25-jre-alpine
 WORKDIR /app
 COPY --from=builder /build/target/myapp.jar /app/myapp.jar
 
@@ -47,7 +47,7 @@ ENTRYPOINT ["java", "-jar", "/app/myapp.jar"]
     <version>3.3.2</version>
     <configuration>
         <from>
-            <image>eclipse-temurin:17-jre-alpine</image>
+            <image>eclipse-temurin:25-jre-alpine</image>
         </from>
         <to>
             <image>docker.io/myuser/myapp</image>
@@ -77,7 +77,7 @@ plugins {
 
 jib {
     from {
-        image = 'eclipse-temurin:17-jre-alpine'
+        image = 'eclipse-temurin:25-jre-alpine'
     }
     to {
         image = 'docker.io/myuser/myapp'
@@ -462,7 +462,7 @@ public class PodService {
 
 ```dockerfile
 # 使用轻量级基础镜像
-FROM eclipse-temurin:17-jre-alpine
+FROM eclipse-temurin:25-jre-alpine
 
 # 最小化层数
 COPY target/myapp.jar /app/myapp.jar

@@ -47,7 +47,7 @@ Java 8（Lambda/Stream）→ Java 11（HttpClient）→ Java 17（密封类）�
 - [HTTP客户端对比](./02-常用操作/14-HTTP客户端对比.md)
 - [JSON处理](./02-常用操作/03-JSON处理.md)
 - [错误处理](./02-常用操作/04-错误处理.md)
-- [Stream API](./02-常用操作/05-Stream%20API.md)
+- [Stream API](./02-常用操作/05-Stream-API.md)
 - [Maven基础](./02-常用操作/06-Maven基础.md)
 - [日志框架](./02-常用操作/07-日志框架.md)
 - [单元测试](./02-常用操作/08-单元测试.md)
