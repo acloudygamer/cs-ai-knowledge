@@ -95,8 +95,9 @@ type Person struct {
 | `json:"-"` | 忽略 | 忽略 |
 | `json:"name,string"` | 转字符串 | 从字符串解析 |
 | `json:"name,omitempty,string"` | 空值忽略 | 从字符串解析 |
+| `json:"name,omitempty,omitzero"` | 零值忽略，空切片/映射保留 | 空值忽略 |
 
-详见 [Go新特性](../03-高级用法/05-Go新特性.md#go-124-新特性) 中 `omitzero` 标签。
+`omitzero`（Go 1.24+）只省略零值，保留空切片和空映射。
 
 ## 自定义序列化
 
