@@ -555,6 +555,171 @@ class Order {
 }
 ```
 
+## Scoped Values（Java 25）
+
+线程作用域变量，比 ThreadLocal 更适合虚拟线程。
+
+### 基本用法
+
+```java
+// ThreadLocal 在虚拟线程中的问题
+// 100 万虚拟线程 = 100 万个 String 对象副本！
+ThreadLocal<String> context = new ThreadLocal<>();
+context.set("user-123");
+
+// Scoped Value 解决方案：共享数据，虚拟线程不复制
+static final ScopedValue<String> USER_ID = ScopedValue.newInstance();
+
+// 在作用域内访问
+ScopedValue.where(USER_ID, "user-123")
+    .run(() -> {
+        // 这个作用域内的所有代码都能访问 USER_ID
+        String id = USER_ID.get();
+        processWithUser(id);
+    });
+```
+
+### 虚拟线程优势
+
+```java
+// ThreadLocal：每个虚拟线程都有独立副本
+// 100 万 VT = 100 万副本 = 内存爆炸
+
+// Scoped Value：数据在载体线程中，虚拟线程共享
+// 100 万 VT = 1 份数据（按需共享）
+static final ScopedValue<String> REQUEST_ID = ScopedValue.newInstance();
+
+void handleRequest(HttpRequest request) {
+    ScopedValue.where(REQUEST_ID, request.getId())
+        .run(() -> {
+            // 所有子虚拟线程都能访问同一个 REQUEST_ID
+            // 但不会为每个虚拟线程创建副本
+        });
+}
+```
+
+### 与 ThreadLocal 对比
+
+| 特性 | ThreadLocal | ScopedValue |
+|------|-------------|-------------|
+| 虚拟线程开销 | 每个 VT 独立副本 | 共享数据，无副本 |
+| 继承性 | InheritableThreadLocal 可继承 | 通过 ScopedValue.where 传递 |
+| 适用场景 | 少量线程 | 大量虚拟线程 |
+
+## Primitive Types in Patterns（Java 25，第三预览）
+
+模式匹配支持基本类型。
+
+### 基本用法
+
+```java
+// Java 21: 只能匹配包装类型
+Object obj = 42;
+if (obj instanceof Integer i) {  // i 是 Integer，不是 int
+    System.out.println(i.intValue());
+}
+
+// Java 25: 直接匹配基本类型
+Object obj = 42;
+if (obj instanceof int i) {  // i 是 int
+    System.out.println(i * 2);
+}
+```
+
+### 在 switch 中使用
+
+```java
+// Java 25: switch 支持基本类型模式
+String describe(Object obj) {
+    return switch (obj) {
+        case null -> "null";
+        case int i when i > 0 -> "正整数: " + i;
+        case int i -> "整数: " + i;
+        case double d when d > 0 -> "正浮点: " + d;
+        case String s -> "字符串: " + s;
+        default -> "其他";
+    };
+}
+```
+
+### Record 中的基本类型
+
+```java
+record Point(int x, int y) {}  // 使用 int 而非 Integer
+
+void printSum(Object obj) {
+    // Java 25: 直接解构基本类型
+    if (obj instanceof Point(int px, int py)) {
+        System.out.println(px + py);  // 无需自动装箱
+    }
+}
+```
+
+## Key Derivation Function API（Java 25）
+
+标准化的密码学密钥派生 API。
+
+### 基本用法
+
+```java
+import java.security.interfaces.EdECPrivateKey;
+import java.security.kdf.*;
+import java.util.HexFormat;
+
+// HKDF 密钥派生
+var params = HKDFParameter.builder()
+    .algorithm("HKDF-SHA-256")
+    .input("secret".getBytes())
+    .salt("salt".getBytes())
+    .info("context".getBytes())
+    .build();
+
+byte[] derivedKey = HKDFKeyFactory.doKeyDerivation(params);
+
+// 输出为十六进制
+String hexKey = HexFormat.of().formatHex(derivedKey);
+System.out.println("Derived key: " + hexKey);
+```
+
+### 支持的算法
+
+```java
+// HKDF（HMAC-based Key Derivation Function）
+var hkdf = HKDFParameter.builder()
+    .algorithm("HKDF-SHA-256")
+    .input(secretKeyMaterial)
+    .salt(salt)
+    .info(appInfo)
+    .build();
+
+// 派生 32 字节密钥
+byte[] key = HKDFKeyFactory.doKeyDerivation(hkdf, 32);
+```
+
+### 应用场景
+
+```java
+// 1. 从主密钥派生会话密钥
+byte[] sessionKey = HKDFKeyFactory.doKeyDerivation(
+    HKDFParameter.builder()
+        .algorithm("HKDF-SHA-256")
+        .input(masterKey)
+        .info("session".getBytes())
+        .salt(sessionId.getBytes())
+        .build(),
+    32  // 派生密钥长度
+);
+
+// 2. 密钥材料扩展
+byte[] expandedKey = HKDFKeyFactory.doKeyDerivation(
+    HKDFParameter.builder()
+        .algorithm("HKDF-SHA-256")
+        .input(inputKeyMaterial)
+        .build(),
+    64  // 扩展到指定长度
+);
+```
+
 ## 快速特性一览
 
 | 特性 | 版本 | 说明 |
@@ -570,12 +735,12 @@ class Order {
 | Sealed Classes | 17 | 限制继承层次 |
 | Record Patterns | 21 | Record 解构 |
 | Virtual Threads | 21 | 轻量级线程 |
-| Primitive Types in Patterns | 25 | 模式匹配支持基本类型（第三预览）|
+| Scoped Values | 25 | 线程作用域变量 |
+| Primitive Types in Patterns | 25 | 模式匹配支持基本类型 |
 | Instance Main Methods | 25 | 简化的程序入口 |
 | Module Import | 25 (预览) | import module 语法 |
 | Flexible Constructor Body | 25 | 构造函数初始化顺序增强 |
-| Key Derivation Function API | 25 | 密码学密钥派生标准 API |
-| Scoped Values | 25 | 轻量级线程作用域变量 |
+| Key Derivation Function API | 25 | 密码学密钥派生 |
 
 ## 已撤回/未发布特性
 

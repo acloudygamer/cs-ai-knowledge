@@ -2,51 +2,20 @@
 
 > **版本说明**: tty/pts 是 Unix/Linux 概念。Windows Terminal (Windows 11) 提供类似功能但使用不同机制。
 
-## 概念
+## 解决什么问题
 
-**终端**是输入输出设备的抽象概念，**tty** (teletypewriter) 是Unix/Linux对终端设备的抽象。
+用户需要一种方式与操作系统交互。终端将键盘输入和屏幕输出抽象为字符流，让Shell接收命令并返回结果，是远程访问和文本交互的基础。
 
-```
-用户 → 终端 → Shell → 内核 → 硬件
-```
+## 核心概念
 
-## 关系
+- 终端是输入输出设备的抽象，tty是Linux对终端的字符设备抽象
+- 标准输入/输出/错误（stdin/stdout/stderr）是进程与终端交互的通道
+- 终端行规程处理回显、行缓冲、信号转换（Ctrl+C发送SIGINT）
+- 虚拟终端（tty1-tty6）提供本地多会话，伪终端（pty）支持远程会话
 
-**关键连接**：
-- 终端 → **Shell**：终端接收用户输入，传递给Shell
-- Shell → **终端**：Shell输出结果到终端显示
-- 内核 → **tty驱动**：内核通过tty驱动管理终端设备
-- 终端 ← **伪终端**：远程访问时使用伪终端解决socket与终端的兼容问题
+## 怎么用
 
-## 终端历史
-
-早期计算机价格昂贵，一台主机连接多个终端：
-
-| 终端 | 特点 |
-|------|------|
-| 电传打字机(tty) | 机械打字机，逐字符输入输出 |
-| 视频终端(VT100) | 1978年DEC公司，支持光标控制 |
-| IBM 3270 | 大型机专用终端 |
-
-### 终端模拟器
-
-现代用软件模拟终端：
-
-```bash
-# Linux 终端模拟器
-xterm        # X11基础终端
-gnome-terminal  # GNOME桌面默认
-konsole      # KDE桌面默认
-alacritty   # GPU加速，性能高
-
-# Windows
-Windows Terminal   # 微软官方，推荐使用
-ConEMU              # 老牌终端增强
-```
-
-## tty 设备
-
-Linux将终端抽象为字符设备：
+### 查看和使用终端设备
 
 ```bash
 # 查看当前终端设备
@@ -58,89 +27,26 @@ ls -l /dev/tty*
 # ttyS0, ttyS1...  串口终端
 # tty1-tty6        虚拟终端 (Ctrl+Alt+F1-F6切换)
 # pts/0, pts/1...  伪终端
-```
 
-### 虚拟终端
-
-Linux支持6个虚拟终端 (tty1-tty6)：
-
-```bash
 # 切换虚拟终端
 Ctrl + Alt + F1   # 切换到tty1
-Ctrl + Alt + F2   # 切换到tty2
-...
 Ctrl + Alt + F7   # 返回图形界面
-
-# 当前用户可以看到
-who
-# 输出: user  tty1  2024-01-01 10:00
 ```
 
-## 终端行规程 (Line Discipline)
-
-终端内核模块处理字符的转换和缓冲：
-
-```python
-# 终端行规程的功能
-line_discipline = {
-    "回显(Echo)": "用户输入字符时在屏幕上显示",
-    "行缓冲": "用户按回车后才将行内容发给程序",
-    "信号处理": "Ctrl+C发送SIGINT, Ctrl+Z发送SIGTSTP",
-    "CRLF转换": "Windows换行\\r\\n转为\\n"
-}
-```
-
-## 标准输入/输出/错误
-
-每个进程默认关联三个文件描述符：
-
-```c
-// C语言 标准文件描述符
-#include <unistd.h>
-
-// 0: 标准输入 (stdin) - 通常是终端
-// 1: 标准输出 (stdout) - 通常是终端
-// 2: 标准错误 (stderr) - 通常是终端
-
-write(STDOUT_FILENO, "Hello\n", 6);
-fprintf(stderr, "Error: file not found\n");
-```
+### 标准输入输出与重定向
 
 ```bash
 # 重定向
 command > output.txt    # 标准输出重定向到文件
-command 2> error.txt    # 标准错误重定向到文件
-command > all.txt 2>&1  # 两者都重定向
-command &> all.txt      # 简写形式
+command 2> error.txt     # 标准错误重定向到文件
+command > all.txt 2>&1   # 两者都重定向
+command &> all.txt       # 简写形式
 
 # 管道
-command1 | command2     # command1的输出作为command2的输入
+command1 | command2      # command1的输出作为command2的输入
 ```
 
-## 伪终端 (Pseudo-TTY)
-
-SSH等远程会话时使用伪终端：
-
-```bash
-# SSH工作原理
-ssh user@server
-  ↓
-本地终端打开伪终端主设备 (pty master)
-  ↓
-SSH服务器打开伪终端从设备 (pty slave)
-  ↓
-服务器上的shell连接pty slave
-  ↓
-数据通过SSH加密隧道传输
-```
-
-**为什么需要伪终端？**
-- 网络socket无法提供终端的完整行为
-- 伪终端让远程程序感觉像在本地终端运行
-
-## stty 命令
-
-stty 用于查看和设置终端参数：
+### stty 终端设置
 
 ```bash
 # 查看当前终端设置
@@ -151,19 +57,10 @@ stty -a
 stty erase ^H        # 设置退格键
 stty -echo           # 关闭回显（密码输入时）
 stty echo            # 开启回显
-stty -icanon          # 关闭规范模式（行缓冲）
-stty intr ^C          # 设置中断信号键
-stty susp ^Z          # 设置挂起信号键
-
-# 从命令行读取单个字符
-stty -icanon -echo
-char=$(dd bs=1 count=1 2>/dev/null)
-stty sane
+stty intr ^C         # 设置中断信号键
 ```
 
-## 终端控制字符
-
-终端行规程处理的特殊控制字符：
+### 终端控制字符
 
 ```bash
 # 常用控制字符（Ctrl组合键）
@@ -179,19 +76,30 @@ Ctrl+L   # 清屏
 stty -a | grep control
 ```
 
-## 终端属性
+## 终端行规程
 
-终端有丰富的属性控制行为：
+终端内核模块处理字符的转换和缓冲：
+
+| 功能 | 说明 |
+|------|------|
+| 回显(Echo) | 用户输入字符时在屏幕上显示 |
+| 行缓冲 | 用户按回车后才将行内容发给程序 |
+| 信号处理 | Ctrl+C发送SIGINT, Ctrl+Z发送SIGTSTP |
+| CRLF转换 | Windows换行\r\n转为\n |
+
+## 伪终端
+
+> 详细内容见 [03-伪终端](./03-伪终端.md)。
+
+SSH等远程会话时使用伪终端。数据通过SSH加密隧道传输，但远程程序感觉像在本地终端运行。
 
 ```bash
-# canonical模式（行缓冲）- 用户按回车才发送
-# 非canonical模式 - 立即发送（如vim、less）
-
-# echo模式
-# ispeed/ospeed - 输入/输出速度
-# rows/columns - 终端大小
-
-# 查看完整属性
-stty -a
+# SSH工作原理
+ssh user@server
+  ↓
+本地终端打开伪终端主设备 (pty master)
+  ↓
+SSH服务器打开伪终端从设备 (pty slave)
+  ↓
+服务器上的shell连接pty slave
 ```
-

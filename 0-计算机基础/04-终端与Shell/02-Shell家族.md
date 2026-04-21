@@ -1,6 +1,6 @@
 # Shell家族
 
-> **版本说明**: bash 4+ 特性已标注版本。环境: GNU Bash 5.2 (WSL/MINGW64), PowerShell 7.6.0, Ubuntu 24.04, Windows 11。
+> **版本说明**: 环境: GNU Bash 5.2 (WSL/MINGW64), PowerShell 7.6.0, Ubuntu 24.04, Windows 11。
 
 ## 解决什么问题
 

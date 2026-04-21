@@ -21,73 +21,113 @@
 
 ### PEP 750 - 模板字符串字面量
 
-Python 3.14 引入了模板字符串（t-strings），这是继 f-strings 之后字符串处理能力的又一次重要升级：
+Python 3.14 引入了模板字符串（t-strings），这是继 f-strings 之后字符串处理能力的又一次重要升级。t-strings 使用 `t` 前缀，返回 `Template` 对象而非普通字符串：
 
 ```python
-# t-string 返回 Template 对象，而非普通字符串
+from string.templatelib import Template
+
+# t-string 返回 Template 对象
 name = "World"
 template = t"Hello {name}!"
 
-print(type(template))  # <class 'str'>
-print(template)  # Hello World
-
-# 通过 .strings 和 .interpolations 访问模板结构
-print(template.strings)  # ('Hello ', '!')
-print(template.interpolations[0].value)  # 'World'
+print(type(template))  # <class 'string.templatelib.Template'>
 ```
 
-### t-string vs f-string
+### 核心 API
+
+`Template` 对象提供以下属性访问模板结构：
 
 ```python
+name = "World"
+template = t"Hello {name}!"
+
+# strings: 字符串部分元组（比插值数量多1）
+print(template.strings)  # ('Hello ', '!')
+
+# interpolations: 插值对象元组
+print(template.interpolations)  # (Interpolation(...),)
+print(template.interpolations[0].value)  # 'World'
+print(template.interpolations[0].expression)  # 'name'
+
+# values: 所有插值的值（快捷属性）
+print(template.values)  # ('World',)
+```
+
+### 处理模板字符串
+
+t-strings 没有内置 `substitute()` 方法，需要自行处理。示例实现 f-string 功能：
+
+```python
+from string.templatelib import Template, Interpolation
+from typing import Literal
+
+def convert(value: object, conversion: Literal["a", "r", "s"] | None) -> object:
+    if conversion == "a":
+        return ascii(value)
+    elif conversion == "r":
+        return repr(value)
+    elif conversion == "s":
+        return str(value)
+    return value
+
+def f(template: Template) -> str:
+    """将 Template 处理为普通字符串（类似 f-string）"""
+    parts = []
+    for item in template:
+        match item:
+            case str() as s:
+                parts.append(s)
+            case Interpolation(value, _, conversion, format_spec):
+                value = convert(value, conversion)
+                value = format(value, format_spec)
+                parts.append(value)
+    return "".join(parts)
+
+# 使用
 name = "Alice"
 age = 30
-
-# f-string：即时求值
-f_result = f"Hello {name}, you are {age} years old."
-print(type(f_result))  # <class 'str'>
-print(f_result)  # Hello Alice, you are 30 years old.
-
-# t-string：延迟求值，可复用
-template = t"Hello {name}, you are {age} years old."
-
-context1 = {"name": "Bob", "age": 25}
-context2 = {"name": "Charlie", "age": 35}
-
-print(template.substitute(context1))  # Hello Bob, you are 25 years old.
-print(template.substitute(context2))  # Hello Charlie, you are 35 years old.
+template = t"Hello {name!r}, value: {age:.2f}"
+print(f(template))  # Hello 'Alice', value: 30.00
 ```
 
 ### 安全性提升
 
-t-string 返回 Template 对象，支持后续安全处理：
+t-string 的延迟处理特性使其适合安全渲染场景：
 
 ```python
-# t-string 返回模板对象，延迟求值
-user_input = "<script>alert('xss')</script>"
-template = t"<div>{user_input}</div>"
-
-# 获取插值信息
-print(template.strings)        # ('<div>', '</div>')
-print(template.interpolations) # (Interpolation(value=..., ...),)
-
-# 安全处理示例
+from string.templatelib import Template, Interpolation
 import html
 
-def safe_render(template, **kwargs):
-    """安全渲染模板"""
-    escaped = {k: html.escape(str(v)) for k, v in kwargs.items()}
+def safe_render(template: Template) -> str:
+    """安全渲染模板，自动转义插值"""
     parts = []
-    strings = template.strings
-    interpolations = template.interpolations
+    for item in template:
+        match item:
+            case str() as s:
+                parts.append(s)
+            case Interpolation(value, _, _, _):
+                parts.append(html.escape(str(value)))
+    return "".join(parts)
 
-    for i, interp in enumerate(interpolations):
-        parts.append(strings[i])
-        parts.append(escaped.get(interp.name, ''))
-    parts.append(strings[-1])
-    return ''.join(parts)
-
-result = safe_render(template, user_input=user_input)
+user_input = "<script>alert('xss')</script>"
+template = t"<div>{user_input}</div>"
+result = safe_render(template)
 # <div>&lt;script&gt;alert(&#x27;xss&#x27;)&lt;/script&gt;</div>
+```
+
+### 迭代模板内容
+
+```python
+name = "Python"
+version = "3.14"
+template = t"Hello {name} {version}"
+
+for item in template:
+    match item:
+        case str() as s:
+            print(f"String: {s!r}")
+        case Interpolation() as i:
+            print(f"Interpolation: value={i.value}, expression={i.expression}")
 ```
 
 ### 支持的插值语法
@@ -96,10 +136,10 @@ result = safe_render(template, user_input=user_input)
 # 变量插值
 name = "Python"
 version = "3.14"
-t"Hello {name} {version}"  # {name} 和 {version} 被插值
+t"Hello {name} {version}"
 
 # 表达式
-t"Result: {2 + 2}"  # {2 + 2} 求值
+t"Result: {2 + 2}"
 
 # 转换标志
 t"{name!r}"   # repr
@@ -109,6 +149,10 @@ t"{name!a}"   # ascii
 # 格式说明符
 pi = 3.14159
 t"Pi: {pi:.2f}"  # Pi: 3.14
+
+# 调试说明符 =
+x = 5
+t"{x=}"  # strings[0]='x=', values=(5,)
 ```
 
 ---
@@ -117,7 +161,7 @@ t"Pi: {pi:.2f}"  # Pi: 3.14
 
 ### PEP 649 - 注释延迟评估
 
-Python 3.14 对类型提示机制做了根本性改进，类型注释不再立即计算：
+Python 3.14 对类型提示机制做了改进，类型注释在需要时才求值：
 
 ```python
 # Python 3.13 及之前：类型提示立即求值
@@ -125,50 +169,39 @@ Python 3.14 对类型提示机制做了根本性改进，类型注释不再立�
 
 # Python 3.14：类型提示延迟求值
 # 只有在真正需要时才进行求值
-
-from annotationlib import get_annotations, Format
-
-def new_way(arg: UndefinedType):  # 不再需要引号
-    pass
-
-# 获取类型提示（字符串形式）
-annotations = get_annotations(new_way, format=Format.STRING)
-print(annotations)  # {'arg': 'UndefinedType'}
-
-# 获取前向引用对象
-annotations = get_annotations(new_way, format=Format.FORWARDREF)
-print(annotations)  # {'arg': ForwardRef('UndefinedType')}
 ```
 
-### 对大型项目的意义
+### 实际应用
+
+类型提示延迟求值减少了模块导入时的开销：
 
 ```python
-# 大型项目不再需要前向引用加引号
-# 之前
+# 在 Python 3.14 中，不需要前向引用加引号
 class MyClass:
-    def method(self, other: "OtherClass") -> "MyClass":
+    def method(self, other: OtherClass) -> MyClass:  # 不需要 "OtherClass"
         pass
 
-# 现在
+# 之前（Python 3.13 及之前）
 class MyClass:
-    def method(self, other: OtherClass) -> MyClass:
+    def method(self, other: "OtherClass") -> "MyClass":  # 需要引号
         pass
 ```
 
-### annotationlib 模块
+### 获取类型提示
 
 ```python
-from annotationlib import get_annotations, Format, stringify
+# 使用 typing.get_type_hints() 获取（已支持延迟求值）
+from typing import get_type_hints
 
-# 获取字符串形式的注解
-stringify(MyClass.method)  # "{'other': 'OtherClass', 'return': 'MyClass'}"
+class MyClass:
+    x: int
+    y: str
 
-# 使用 ForwardRef 进行延迟求值
-from annotationlib import get_annotations, Format
-
-annotations = get_annotations(func, format=Format.FORWARDREF)
-# 可以后续再解析这些引用
+hints = get_type_hints(MyClass)
+print(hints)  # {'x': <class 'int'>, 'y': <class 'str'>}
 ```
+
+> 注：PEP 649 的完整实现（`annotationlib` 模块）在 Python 3.14 中仍在完善，部分功能可能在后续版本中实现。
 
 ---
 
@@ -188,34 +221,15 @@ interp = interpreters.create()
 interp.exec("""
 import sys
 print(f"Running in interpreter: {id(sys)}")
-result = 42 * 2
 """)
 
 # 在子解释器中运行函数
 def run_in_interpreter():
-    import threading
-    import time
-
-    def isolated_task(interp_id):
-        def heavy_computation():
-            total = 0
-            for i in range(1000000):
-                total += i ** 2
-            return total
-
-        # 每个解释器有独立的 GIL
-        import interpreters
-        interp = interpreters.create()
-        result = interp.exec(heavy_computation.__code__)
-        return result
-
-    # 并行运行多个解释器
-    with threading.Thread(target=isolated_task, args=(1,)) as t1:
-        with threading.Thread(target=isolated_task, args=(2,)) as t2:
-            t1.start()
-            t2.start()
-            t1.join()
-            t2.join()
+    import interpreters
+    interp = interpreters.create()
+    interp.exec("""
+result = 42 * 2
+""")
 ```
 
 ### 与线程的区别
@@ -232,12 +246,9 @@ def thread_task():
 # 子解释器：每个解释器有独立的 GIL
 def interpreter_task():
     interp = interpreters.create()
-    code = """
+    interp.exec("""
 total = sum(i * i for i in range(1000000))
-"""
-    return interp.exec(code)
-
-# 子解释器可以实现真正的并行
+""")
 ```
 
 ---
@@ -276,7 +287,7 @@ print(f"Traditional: {time.time() - start:.3f}s")
 
 # 自由线程模式：真正并行
 # 在 python -X gil=0 下运行
-# 4 个线程能真正并行执行，理论上快 4 倍
+# 4 个线程能真正并行执行
 ```
 
 ---
@@ -306,11 +317,6 @@ with zstd.ZstdCompressor() as compressor:
         for chunk in iter(lambda: f.read(8192), b""):
             f.write(compressor.compress(chunk))
         f.write(compressor.flush())
-
-# 流式解压缩
-with zstd.ZstdDecompressor() as decompressor:
-    with open("output.zst", "rb") as f:
-        f.write(decompressor.decompress(f.read()))
 ```
 
 ### 压缩级别
@@ -334,7 +340,7 @@ print(f"Best: {len(compressed_best)} bytes")
 
 ### PEP 758 - except* 表达式省略括号
 
-Python 3.14 允许在 `except*` 表达式中省略括号，并支持不带 `as` 子句：
+Python 3.14 允许在 `except*` 表达式中省略括号：
 
 ```python
 # 之前（Python 3.11+）
@@ -353,9 +359,6 @@ except* ErrorA, ErrorB:
 ### except* 多异常捕获
 
 ```python
-# Python 3.14 改进了多异常捕获语法
-# 括号变为可选，使用逗号分隔多个异常类型
-
 async def demo():
     try:
         async with asyncio.TaskGroup() as tg:
@@ -378,17 +381,11 @@ Python 3.14 引入了新的调试器接口，允许更高效的外部调试：
 # Python 3.14 的调试器接口改进
 # 通过 -X debug 选项启用
 
+# 新的调试钩子
 import sys
 
-# 新的调试钩子
 sys.add_debug_hook("step", lambda: print("Step"))
 sys.add_debug_hook("breakpoint", lambda: print("Breakpoint"))
-
-def my_function():
-    result = 0
-    for i in range(10):
-        result += i
-    return result
 ```
 
 ### 调试优化
@@ -396,9 +393,7 @@ def my_function():
 ```python
 # PEP 768 提供了更高效的调试机制
 # 减少了调试时的性能开销
-
-# 与 IDE 集成更紧密
-# 支持更细粒度的断点控制
+# 与 IDE 集成更紧密，支持更细粒度的断点控制
 ```
 
 ---
@@ -553,7 +548,6 @@ Python 3.14 引入了实验性的尾调用解释器（需要自定义编译）�
 ```python
 # 尾调用优化的典型场景
 def factorial(n, acc=1):
-    # 当函数在尾部返回另一个函数调用时，可进行尾调用优化
     return factorial(n-1, n*acc) if n > 1 else acc
 
 def tail_sum(n, total=0):
