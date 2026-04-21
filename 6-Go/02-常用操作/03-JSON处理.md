@@ -96,47 +96,7 @@ type Person struct {
 | `json:"name,string"` | 转字符串 | 从字符串解析 |
 | `json:"name,omitempty,string"` | 空值忽略 | 从字符串解析 |
 
-### omitzero 标签（Go 1.24+）
-
-`omitzero` 只忽略零值，但保留空切片、空映射、空数组。
-
-```go
-type Event struct {
-    Time    time.Time `json:"time,omitempty,omitzero"`
-    Created time.Time `json:"created,omitempty"`
-    Tags    []string  `json:"tags,omitempty,omitzero"`
-    Meta    map[string]any `json:"meta,omitempty,omitzero"`
-}
-
-func main() {
-    e := Event{
-        Time:    time.Time{}, // 零值时间，会被 omitzero 忽略
-        Created: time.Date(2024, 1, 15, 10, 30, 0, 0, time.UTC),
-        Tags:    []string{},  // 空切片，会被保留
-        Meta:    map[string]any{}, // 空映射，会被保留
-    }
-
-    data, _ := json.MarshalIndent(e, "", "  ")
-    fmt.Println(string(data))
-    // {
-    //   "created": "2024-01-15T10:30:00Z",
-    //   "tags": [],
-    //   "meta": {}
-    // }
-}
-```
-
-对比 `omitempty` 和 `omitzero`：
-
-| 值类型 | `omitempty` | `omitzero` |
-|--------|-------------|-------------|
-| `int: 0` | 忽略 | 忽略 |
-| `string: ""` | 忽略 | 忽略 |
-| `bool: false` | 忽略 | 忽略 |
-| `slice: nil` | 忽略 | 忽略 |
-| `slice: []` | 忽略 | 保留 |
-| `map: nil` | 忽略 | 忽略 |
-| `map: {}` | 忽略 | 保留 |
+详见 [Go新特性](../03-高级用法/05-Go新特性.md#go-124-新特性) 中 `omitzero` 标签。
 
 ## 自定义序列化
 
