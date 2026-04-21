@@ -1,16 +1,16 @@
 {
   "version": "4.0",
-  "updated": "2026-04-21T15:48:59.438790",
+  "updated": "2026-04-21T15:55:14.028209",
   "tasks": {
     "task_001_prereq": {
       "target": "计算机基础-删除审查",
       "path": "0-计算机基础/",
       "agent": "delete-reviewer",
       "status": "completed",
-      "run_count": 18,
-      "last_result": "开始处理",
-      "updated": "2026-04-21T15:38:33.242654",
-      "result": "删除审查完成：从 04-虚拟机.md 删除 Docker 容器冗余章节（约50行），该内容与 05-软件工程概念/09-容器化基础.md 重复。已添加指向容器化基础.md 的引用链接。文件现聚焦于系统虚拟机（Hypervisor/VMware/KVM/Hyper-V）和语言虚拟机（JVM/CLR/BEAM/WASM）。其他内容经审查无过时/冗余/可合并问题：伪终端分层合理（入门概述+应用示例 vs 完整指南）；GC/系统调用内容在各自专门文件中定位准确；Shell文件版本标注正确（bash 5.2/PowerShell 7.6.0/tmux 3.3+）；系统软件版本标注正确（Ubuntu 24.04/WSL 2.6/Windows 11）。"
+      "run_count": 19,
+      "last_result": "删除审查完成：从 04-虚拟机.md 删除 Docker 容器冗余章节（约50行），该内容与 05-软件工程概念/09-容器化基础.md 重复。已添加指向容器化基础.md 的引用链接。文件现聚焦于系统虚拟机（Hypervisor/VMware/KVM/Hyper-V）和语言虚拟机（JVM/CLR/BEAM/WASM）。其他内容经审查无过时/冗余/可合并问题：伪终端分层合理（入门概述+应用示例 vs 完整指南）；GC/系统调用内容在各自专门文件中定位准确；Shell文件版本标注正确（bash 5.2/PowerShell 7.6.0/tmux 3.3+）；系统软件版本标注正确（Ubuntu 24.04/WSL 2.6/Windows 11）。",
+      "updated": "2026-04-21T15:54:09.032646",
+      "result": "删除审查完成：移除3个过于宽泛的版本标注 - 02-Shell家族.md（列出环境但未说明具体版本差异内容）、01-操作系统概述.md（笼统说明概念跨版本通用）、02-内核与系统调用.md（笼统说明概念跨版本通用）。剩余版本标注审查通过：01-终端与tty.md（平台差异）、03-伪终端.md（WSL 2.6行为）、05-终端高级操作.md（tmux 3.3+/screen 4.9+具体版本）。无过时/冗余/可合并内容，目录结构完整。"
     },
     "task_001": {
       "target": "计算机基础",
@@ -19,7 +19,7 @@
       "blockedBy": [
         "task_001_prereq"
       ],
-      "status": "completed",
+      "status": "pending",
       "run_count": 18,
       "last_result": "开始处理",
       "updated": "2026-04-21T15:42:49.328370",
@@ -30,10 +30,10 @@
       "path": "1-数据结构与算法/",
       "agent": "delete-reviewer",
       "status": "completed",
-      "run_count": 19,
-      "last_result": "开始处理",
-      "updated": "2026-04-21T15:41:09.518803",
-      "result": "数据结构与算法删除审查完成：快慢指针、优先队列、单调队列等上轮清理内容已确认完全移除，无剩余重复内容，版本标注正确（Python 3.12仅在README.md），目录结构清晰（32个md文件），无需删除内容。"
+      "run_count": 20,
+      "last_result": "数据结构与算法删除审查完成：快慢指针、优先队列、单调队列等上轮清理内容已确认完全移除，无剩余重复内容，版本标注正确（Python 3.12仅在README.md），目录结构清晰（32个md文件），无需删除内容。",
+      "updated": "2026-04-21T15:54:59.960773",
+      "result": "删除审查完成：1) 从08-单调栈.md删除接雨水章节（约90行），该问题的双指针解法属于双指针范畴而非单调栈范畴，习题列表同步移除；2) 从07-递归与分治.md删除全排列和子集生成章节（约70行），这两个是典型的回溯问题而非分治问题，LeetCode题目列表同步移除回溯相关题目；3) README.md同步移除接雨水和全排列的引用标注。"
     },
     "task_002": {
       "target": "数据结构与算法",
@@ -42,7 +42,7 @@
       "blockedBy": [
         "task_002_prereq"
       ],
-      "status": "completed",
+      "status": "pending",
       "run_count": 18,
       "last_result": "开始处理",
       "updated": "2026-04-21T15:46:44.175145",
@@ -53,10 +53,10 @@
       "path": "2-Python/",
       "agent": "delete-reviewer",
       "status": "completed",
-      "run_count": 18,
-      "last_result": "删除了1个冗余文件（03-高级用法/01-装饰器与元编程.md），该内容与05-设计模式/06-装饰器模式.md重复。已更新README.md索引，移除对应链接。Python 3.12和3.14新特性文件内容独立，无重叠，予以保留。",
-      "updated": "2026-04-21T15:38:05.275935",
-      "result": "Python删除审查完成：删除了 03-高级用法/06-Python3.12新特性.md（Python 3.12 → 3.14 版本迁移后该文件已过时），更新了 README.md 索引，移除对应链接。"
+      "run_count": 19,
+      "last_result": "Python删除审查完成：删除了 03-高级用法/06-Python3.12新特性.md（Python 3.12 → 3.14 版本迁移后该文件已过时），更新了 README.md 索引，移除对应链接。",
+      "updated": "2026-04-21T15:52:38.646641",
+      "result": "删除2个冗余文件：1) 05-设计模式/08-迭代器模式.md（与01-基础/07-迭代器与生成器.md重复）；2) 03-高级用法/10-异步编程深入.md（与03-高级用法/02-并发与异步.md重复）。已更新README.md移除对应链接。"
     },
     "task_003": {
       "target": "Python",
@@ -65,7 +65,7 @@
       "blockedBy": [
         "task_003_prereq"
       ],
-      "status": "completed",
+      "status": "pending",
       "run_count": 17,
       "last_result": "开始处理",
       "updated": "2026-04-21T15:44:01.847061",
@@ -76,10 +76,10 @@
       "path": "3-C++/",
       "agent": "delete-reviewer",
       "status": "completed",
-      "run_count": 19,
+      "run_count": 21,
       "last_result": "开始处理",
-      "updated": "2026-04-21T15:37:21.220202",
-      "result": "C++删除审查完成：未发现需删除内容。目录结构完整（16个文件），版本标注正确（C++20基础版本），无过时/冗余/可合并内容。协程、并发、移动语义等主题分层合理（基础概述+深入讲解），上次审查已处理std::generator冗余问题。"
+      "updated": "2026-04-21T15:55:14.027968",
+      "result": "删除审查完成：从 02-常用操作/04-错误处理.md 删除 C++23/26 版本特定内容（std::expected 部分，约11行），该内容已在 09-C++23新特性.md 中全面覆盖。移除内容包括：std::expected 用法示例及 C++26 monadic 操作注释。保留文件结构完整（528行，原539行），代码块格式正确。其他内容经审查无过时/冗余/可合并问题：C++20/23/26 新特性文件分层合理（基础概述+深入讲解）；协程、并发、移动语义等主题定位准确；标准库工具深入.md 与版本文件内容无重叠。"
     },
     "task_004": {
       "target": "C++",
@@ -88,7 +88,7 @@
       "blockedBy": [
         "task_004_prereq"
       ],
-      "status": "completed",
+      "status": "pending",
       "run_count": 18,
       "last_result": "开始处理",
       "updated": "2026-04-21T15:43:11.485070",
@@ -98,7 +98,7 @@
       "target": "Java-删除审查",
       "path": "4-Java/",
       "agent": "delete-reviewer",
-      "status": "completed",
+      "status": "pending",
       "run_count": 19,
       "last_result": "开始处理",
       "updated": "2026-04-21T15:41:32.662182",
@@ -111,7 +111,7 @@
       "blockedBy": [
         "task_005_prereq"
       ],
-      "status": "completed",
+      "status": "pending",
       "run_count": 17,
       "last_result": "开始处理",
       "updated": "2026-04-21T15:48:39.231415",
@@ -121,7 +121,7 @@
       "target": "JavaScript-删除审查",
       "path": "5-JavaScript/",
       "agent": "delete-reviewer",
-      "status": "completed",
+      "status": "pending",
       "run_count": 17,
       "last_result": "开始处理",
       "updated": "2026-04-21T15:41:09.678938",
@@ -134,7 +134,7 @@
       "blockedBy": [
         "task_006_prereq"
       ],
-      "status": "completed",
+      "status": "pending",
       "run_count": 17,
       "last_result": "开始处理",
       "updated": "2026-04-21T15:48:59.438572",
@@ -145,10 +145,10 @@
       "path": "6-Go/",
       "agent": "delete-reviewer",
       "status": "completed",
-      "run_count": 17,
-      "last_result": "删除了1处过时内容，验证完毕",
-      "updated": "2026-04-21T15:37:27.284285",
-      "result": "删除2处冗余内容：1) 装饰器与元编程.md 中的泛型章节（~100行），泛型内容已整合到 01-基础/07-泛型专题.md；2) 性能优化.md 中的 Race Detector 章节（~90行），已整合到 03-高级用法/14-RaceCondition模式.md。同步更新 README.md 移除过时描述。"
+      "run_count": 19,
+      "last_result": "开始处理",
+      "updated": "2026-04-21T15:52:50.030193",
+      "result": "Go删除审查完成：无过时/冗余/可合并内容。验证通过：(1)slog内容分层正确(新特性vs专项)；(2)iter/weak等仅在Go新特性文件出现；(3)内存管理与性能优化内容无重叠；(4)Green Tea GC版本标注正确(1.25实验性→1.26默认启用)；(5)上轮清理的Race Detector残留已确认为简短引用，非完整章节。"
     },
     "task_007": {
       "target": "Go",
@@ -157,7 +157,7 @@
       "blockedBy": [
         "task_007_prereq"
       ],
-      "status": "completed",
+      "status": "pending",
       "run_count": 18,
       "last_result": "开始处理",
       "updated": "2026-04-21T15:48:53.051489",
