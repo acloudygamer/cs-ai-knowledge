@@ -435,7 +435,7 @@ void main() {
 // void main(String[] args) 也允许
 ```
 
-## Module Import Declaration (Java 25, 预览)
+## Module Import Declaration (Java 25)
 
 `import module` 一次性导入模块所有公共类。
 
@@ -720,6 +720,101 @@ byte[] expandedKey = HKDFKeyFactory.doKeyDerivation(
 );
 ```
 
+## Unnamed Variables & Patterns (Java 22)
+
+下划线 `_` 表示无需使用的变量，使代码更简洁。
+
+### 基本用法
+
+```java
+// 传统方式：必须为每个变量命名
+try (var conn = getConnection()) {
+    // conn 后续不使用，但必须命名
+}
+
+// Java 22：使用下划线忽略不需要的变量
+try (var _ = getConnection()) {
+    // 连接会被关闭，但不需要引用它
+}
+```
+
+### 在 Lambda 表达式中
+
+```java
+// 传统方式
+map.forEach((key, value) -> System.out.println(value));
+
+// Java 22：只使用 value，key 用下划线忽略
+map.forEach((_, value) -> System.out.println(value));
+```
+
+### 在模式匹配中
+
+```java
+record Point(int x, int y) {}
+
+// 只需要 y 坐标，x 用下划线忽略
+if (obj instanceof Point(_, int y)) {
+    System.out.println("y = " + y);
+}
+
+// switch 中也可以使用
+String format(Object obj) {
+    return switch (obj) {
+        case Point(_, int y) -> "Point at y=" + y;
+        case String s -> "String: " + s;
+        default -> "Other";
+    };
+}
+```
+
+## Markdown Documentation (Java 23)
+
+JavaDoc 支持 Markdown 格式的文档注释。
+
+### 基本用法
+
+```java
+/**
+ * # 计算器
+ *
+ * 提供基本的数学运算功能。
+ *
+ * ## 主要功能
+ * - 加法运算
+ * - 减法运算
+ * - 乘法运算
+ *
+ * @author Developer
+ * @since 1.0
+ */
+public class Calculator {
+    /**
+     * 计算两个整数的和。
+     *
+     * **示例：**
+     * ```java
+     * int result = add(1, 2);  // 返回 3
+     * ```
+     *
+     * @param a 第一个整数
+     * @param b 第二个整数
+     * @return 两个整数的和
+     */
+    public int add(int a, int b) {
+        return a + b;
+    }
+}
+```
+
+### 支持的 Markdown 元素
+
+- 标题（`#`, `##`, `###`）
+- 列表（`-`, `*`, `1.`）
+- 代码块（```）
+- 粗体（`**`）和斜体（`*`）
+- 链接和图片
+
 ## 快速特性一览
 
 | 特性 | 版本 | 说明 |
@@ -741,7 +836,7 @@ byte[] expandedKey = HKDFKeyFactory.doKeyDerivation(
 | Scoped Values | 25 | 线程作用域变量 |
 | Primitive Types in Patterns | 25 | 模式匹配支持基本类型 |
 | Instance Main Methods | 25 | 简化的程序入口 |
-| Module Import | 25 (预览) | import module 语法 |
+| Module Import | 25 | import module 语法 |
 | Flexible Constructor Body | 25 | 构造函数初始化顺序增强 |
 | Key Derivation Function API | 25 | 密码学密钥派生 |
 

@@ -254,9 +254,26 @@ class TaskRunner:
                     lines.append(f"- {t.get('target', '')}")
 
         if pending > 0:
-            lines.append("\n## 待处理任务")
+            blocked = set()
             for t in all_tasks:
                 if t.get("status") == "pending":
+                    blocked_by = t.get("blockedBy", [])
+                    if blocked_by and not all(
+                        (self.get_task_by_id(dep) or {}).get("status") == "completed"
+                        for dep in blocked_by
+                    ):
+                        blocked.add(t.get("_key"))
+
+            blocked_pending = [t for t in all_tasks if t.get("status") == "pending" and t.get("_key") in blocked]
+            ready_pending = [t for t in all_tasks if t.get("status") == "pending" and t.get("_key") not in blocked]
+
+            if blocked_pending:
+                lines.append("\n## 待处理任务（被阻塞）")
+                for t in blocked_pending:
+                    lines.append(f"- {t.get('target', '')}")
+            if ready_pending:
+                lines.append("\n## 待处理任务（可执行）")
+                for t in ready_pending:
                     lines.append(f"- {t.get('target', '')}")
 
         return "\n".join(lines)

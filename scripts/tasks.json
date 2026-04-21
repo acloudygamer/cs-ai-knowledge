@@ -1,6 +1,6 @@
 {
   "version": "4.0",
-  "updated": "2026-04-21T18:48:26.148457",
+  "updated": "2026-04-21T19:14:02.494813",
   "tasks": {
     "task_001_prereq": {
       "target": "计算机基础-删除审查",
@@ -111,11 +111,11 @@
       "blockedBy": [
         "task_005_prereq"
       ],
-      "status": "pending",
-      "run_count": 21,
+      "status": "completed",
+      "run_count": 24,
       "last_result": "开始处理Java模块优化",
-      "updated": "2026-04-21T16:43:44.255754",
-      "result": "Java模块优化完成：修复README.md中Stream API链接错误（05-Stream%20API.md → 05-Stream-API.md），验证版本标注正确（Java 25新特性正确标注，Java 21历史引用正确），目录结构完整（63个md文件），README所有链接有效，无过时/冗余/重复内容。"
+      "updated": "2026-04-21T19:14:02.494501",
+      "result": "Java模块优化完成：1) 现代Java特性.md - 修正Module Import状态(Java 25已正式发布，非预览)；2) 添加Unnamed Variables & Patterns详细章节(Java 22，下划线忽略变量)；3) 添加Markdown Documentation详细章节(Java 23，JavaDoc支持Markdown)；4) 版本表更新完毕，所有Java 22-25特性正确标注；5) 验证通过：63个md文件，版本关系正确(Java 21基础→Java 25新特性)，README链接有效，目录结构完整。"
     },
     "task_006_prereq": {
       "target": "JavaScript-删除审查",
