@@ -1,6 +1,6 @@
 {
   "version": "4.0",
-  "updated": "2026-04-21T15:25:36.209307",
+  "updated": "2026-04-21T15:33:18.170649",
   "tasks": {
     "task_001_prereq": {
       "target": "计算机基础-删除审查",
@@ -111,11 +111,11 @@
       "blockedBy": [
         "task_005_prereq"
       ],
-      "status": "pending",
-      "run_count": 13,
-      "last_result": "开始处理 Java 21 到 Java 25 版本优化",
-      "updated": "2026-04-20T19:36:57.556515",
-      "result": "Java 21 到 Java 25 版本优化完成：1. 修正学习路线.md中Java 25版本标注错误（从'非LTS'改为'LTS'），并标注Module Import为预览特性；2. 现代Java特性.md中Module Import Declaration章节标题和表格均标注为'预览'状态；3. 在快速特性一览表格中新增Scoped Values（JEP 506）作为Java 25正式特性；4. 所有其他版本标注（Java 21/22/25特性）经审查均正确无误。"
+      "status": "completed",
+      "run_count": 15,
+      "last_result": "开始处理",
+      "updated": "2026-04-21T15:33:18.170416",
+      "result": "Java 21→25 版本优化完成：更新现代Java特性.md的快速特性一览表格，新增Java 22最终特性（JEP 454 Foreign Function & Memory API、JEP 456 Unnamed Variables & Patterns）和Java 23最终特性（JEP 467 Markdown Documentation）。版本标注审查通过：Java 25特性（Instance Main Methods为正式版、Module Import为预览）标注正确。"
     },
     "task_006_prereq": {
       "target": "JavaScript-删除审查",

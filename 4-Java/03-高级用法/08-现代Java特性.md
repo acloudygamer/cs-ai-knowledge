@@ -733,6 +733,9 @@ byte[] expandedKey = HKDFKeyFactory.doKeyDerivation(
 | Pattern Matching instanceof | 16 | instanceof 自动转换 |
 | Text Blocks | 15 | 多行字符串 |
 | Sealed Classes | 17 | 限制继承层次 |
+| Foreign Function & Memory API | 22 | 本地互操作（无 JNI）|
+| Unnamed Variables & Patterns | 22 | 下划线命名忽略变量 |
+| Markdown Documentation | 23 | JavaDoc 支持 Markdown |
 | Record Patterns | 21 | Record 解构 |
 | Virtual Threads | 21 | 轻量级线程 |
 | Scoped Values | 25 | 线程作用域变量 |
