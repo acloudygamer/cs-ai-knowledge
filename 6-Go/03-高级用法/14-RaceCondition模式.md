@@ -1,5 +1,16 @@
 # Race Condition 模式与修复
 
+### 解决什么问题
+多个 goroutine 并发访问共享资源时，执行顺序不确定导致结果不确定，甚至导致程序崩溃。
+
+### 核心概念
+- Race condition：并发访问共享资源，结果依赖执行顺序
+- go test -race：内置 race detector，检测并发访问问题
+- Happens-before：Go 内存模型保证的顺序关系
+- 修复模式：互斥锁、原子操作、channel、sync.Once
+
+### 怎么用
+
 ## 概述
 
 Race condition（竞态条件）是指多个并发执行的线程或 goroutine 在访问共享资源时，由于执行顺序的不确定性导致的结果不确定性。Go 提供了强大的 race detector 来检测这类问题。
