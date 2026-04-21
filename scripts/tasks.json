@@ -1,6 +1,6 @@
 {
   "version": "4.0",
-  "updated": "2026-04-21T16:02:22.488199",
+  "updated": "2026-04-21T16:26:39.279423",
   "tasks": {
     "task_001_prereq": {
       "target": "计算机基础-删除审查",
@@ -111,11 +111,11 @@
       "blockedBy": [
         "task_005_prereq"
       ],
-      "status": "pending",
-      "run_count": 17,
-      "last_result": "开始处理",
-      "updated": "2026-04-21T15:48:39.231415",
-      "result": "Java 21→25 版本优化完成：1) 现代Java特性.md 已覆盖 Java 25 所有特性（Instance Main Methods、Module Import、Flexible Constructor Body、Scoped Values、Primitive Types in Patterns、Key Derivation Function API）；2) 版本标注正确（Java 25 为 LTS，特性正确标注版本）；3) 目录结构完整（62个文件，编号连续无断裂）；4) README.md 链接全部有效；5) 无过时内容、无冗余、无重复，内容质量审查通过。"
+      "status": "completed",
+      "run_count": 19,
+      "last_result": "开始处理Java模块优化",
+      "updated": "2026-04-21T16:21:27.271846",
+      "result": "Java模块优化完成：修复04-开发环境.md版本标注（Java 21→Java 25），更新安装示例输出为Java 25版本。验证完成：1)版本标注正确（Java 25特性正确标注，Java 21历史引用正确）；2)目录结构完整（62个md文件）；3)README链接全部有效；4)内容质量审查通过（虚拟线程等重复内容为合理分层）。"
     },
     "task_006_prereq": {
       "target": "JavaScript-删除审查",
@@ -134,11 +134,11 @@
       "blockedBy": [
         "task_006_prereq"
       ],
-      "status": "pending",
-      "run_count": 17,
-      "last_result": "开始处理",
-      "updated": "2026-04-21T15:48:59.438572",
-      "result": "JavaScript Node26+ES2026 优化完成：1) ES2026新特性.md 添加5个新特性（using/await using、Temporal API、Error.isError、Array.fromAsync、Uint8Array新方法）；2) 更新特性速查表；3) 添加 ES2026 兼容性检测代码；4) 验证目录结构完整（60个md文件），README链接有效。"
+      "status": "completed",
+      "run_count": 19,
+      "last_result": "开始处理JavaScript知识库优化",
+      "updated": "2026-04-21T16:26:39.279204",
+      "result": "JavaScript Node26+ES2026 优化审查完成：1) 版本标注正确（engines.node>=26.0.0，ES2026特性完整）；2) ES2026新特性已覆盖（using/Temporal API/Error.isError/Array.fromAsync/Uint8Array方法）；3) README链接全部有效；4) 目录结构完整（60个md文件）；5) 内容质量审查通过，无过时/冗余内容。"
     },
     "task_007_prereq": {
       "target": "Go-删除审查",
