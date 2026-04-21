@@ -1,6 +1,6 @@
 {
   "version": "4.0",
-  "updated": "2026-04-21T17:14:33.178731",
+  "updated": "2026-04-21T18:48:26.148457",
   "tasks": {
     "task_001_prereq": {
       "target": "计算机基础-删除审查",
@@ -19,11 +19,11 @@
       "blockedBy": [
         "task_001_prereq"
       ],
-      "status": "pending",
-      "run_count": 25,
-      "last_result": "开始处理",
-      "updated": "2026-04-21T16:41:00.955579",
-      "result": "优化了数据结构与算法模块：1) 栈与队列.md - 补充Python标准库deque用法，修复list.pop(0)的O(n)性能问题说明，扩展应用场景表格；2) 堆与优先队列.md - 补充heapq模块用法（heapify/nlargest/nsmallest/最大堆），添加合并有序文件示例，添加复杂度对比表"
+      "status": "completed",
+      "run_count": 27,
+      "last_result": "开始处理计算机基础目录优化",
+      "updated": "2026-04-21T18:47:59.583114",
+      "result": "计算机基础目录优化完成：1) 02-Shell家族.md - 更新Shell版本表（bash 5.2/GNU、zsh 5.9+、fish 3.6+、PowerShell 7.6.0），添加bash版本说明（5.2.21 WSL/5.2.37 MINGW64）和PowerShell 7.6.0版本说明；2) 07-系统引导.md - 修复3处过时内核版本（5.14.0→3.6.6-1cdd4371.x86_64动态获取或更新到6.8.0），使用Ubuntu Linux作为示例发行版。版本敏感内容已按Shell>系统软件优先级更新完毕。"
     },
     "task_002_prereq": {
       "target": "数据结构与算法-删除审查",
@@ -42,11 +42,11 @@
       "blockedBy": [
         "task_002_prereq"
       ],
-      "status": "pending",
-      "run_count": 21,
+      "status": "completed",
+      "run_count": 23,
       "last_result": "开始处理数据结构与算法模块优化",
-      "updated": "2026-04-21T16:54:52.251146",
-      "result": "修复14个文件的重复章节问题：移除并查集、跳表、KD-Tree、Treap、HLD、Link-Cut-Tree、前缀树、线段树与树状数组、动态规划、贪心、回溯、RMQ问题、数组与字符串、字符串模式匹配等文件中的冗余核心概念/核心思想/核心要点章节，使内容直接进入代码示例部分，遵循标准模板结构（解决什么问题+核心概念+怎么用→代码示例）"
+      "updated": "2026-04-21T18:46:41.258711",
+      "result": "数据结构与算法模块优化完成：审查了20+个文件，确认内容质量良好。验证通过：(1)所有文件遵循标准模板结构（解决什么问题→核心概念→怎么用）；(2)Python 3.12代码示例语法正确，无需升级到3.14+（无3.14特定特性需求）；(3)版本标注正确（Python 3.12为基础）；(4)README所有链接有效，目录结构完整（32个md文件，编号01-16无断裂）；(5)无过时/冗余/重复内容，上一轮已清理重复章节。"
     },
     "task_003_prereq": {
       "target": "Python-删除审查",
@@ -88,21 +88,21 @@
       "blockedBy": [
         "task_004_prereq"
       ],
-      "status": "pending",
-      "run_count": 22,
+      "status": "completed",
+      "run_count": 24,
       "last_result": "开始处理C++模块优化",
-      "updated": "2026-04-21T16:49:09.757658",
-      "result": "C++模块优化完成：审查28个文件确认内容质量良好，版本标注正确（C++20为基础，C++23/C++26正确标注），README所有38个链接有效，目录结构完整（编号02-16无断裂），无过时/冗余/重复内容，无需修复。"
+      "updated": "2026-04-21T18:48:26.148246",
+      "result": "C++模块优化完成：1) 添加缺失的C++26 Contracts合约编程章节（[[expects]]/[[ensures]]/[[assert]]，含模板结构：解决什么问题+核心概念+怎么用）；2) 更新编译器支持表添加Contracts（GCC 14+/Clang 19+/MSVC实现中）；3) 更新版本对比表添加Contracts行；4) 更新迁移指南添加合约编程为首选考虑。验证通过：C++23/C++26特性说明准确，目录结构完整（39个md文件），README链接有效，版本关系正确（C++20基础→C++23→C++26）。"
     },
     "task_005_prereq": {
       "target": "Java-删除审查",
       "path": "4-Java/",
       "agent": "delete-reviewer",
-      "status": "pending",
-      "run_count": 23,
+      "status": "completed",
+      "run_count": 25,
       "last_result": "开始处理",
-      "updated": "2026-04-21T16:31:25.459741",
-      "result": "Java删除审查完成：无过时/冗余/可合并内容。审查结果：1) 08-现代Java特性.md 的快速特性表仅为概览，详细内容在专门文件（Stream API、Lambda 等），非冗余；2) 11-虚拟线程深度.md 与 08-现代Java特性.md 对 Scoped Values 的讨论定位互补（虚拟线程上下文 vs Java 25 新特性概览），非重复；3) Sealed Classes 在基础章节有概念、在高级章节有深入，非冗余；4) Java 21 作为基础版本，其特性（虚拟线程、Record 模式等）仍然有效，Java 25 新增特性未取代；5) String Templates 已撤回说明作为历史记录有价值。目录结构完整（49个文件，编号连续）。"
+      "updated": "2026-04-21T18:47:51.262507",
+      "result": "Java删除审查完成：无过时/冗余/可合并内容。验证通过：(1)所有63个文件内容质量良好；(2)版本标注正确（Java 21为基础，Java 25新特性正确标注）；(3)内容分层合理（基础概念与高级用法各有定位）；(4)目录结构完整，README链接有效；(5)无过时API引用（Object.finalize()等已正确标注废弃）。"
     },
     "task_005": {
       "target": "Java",
@@ -134,11 +134,11 @@
       "blockedBy": [
         "task_006_prereq"
       ],
-      "status": "pending",
-      "run_count": 21,
-      "last_result": "开始处理",
-      "updated": "2026-04-21T16:36:45.529154",
-      "result": "JavaScript Node26+ES2026 优化审查完成：1) 版本标注正确（engines.node>=26.0.0，ES2026特性完整）；2) ES2026新特性已覆盖（using/Temporal API/Error.isError/Array.fromAsync/Uint8Array方法）；3) README链接全部有效；4) 目录结构完整（60个md文件）；5) 内容质量审查通过，无过时/冗余内容，无Node24错误标注。"
+      "status": "completed",
+      "run_count": 23,
+      "last_result": "开始处理JavaScript模块优化",
+      "updated": "2026-04-21T18:46:45.816540",
+      "result": "JavaScript Node26+ES2026优化验证完成：1)版本标注正确(engines.node>=26.0.0, tsconfig target ES2026)；2)ES2026新特性完整覆盖(using/Temporal API/Error.isError/Array.fromAsync/Uint8Array方法)；3)无Node24过时引用；4)目录结构完整(58个md文件)，README链接有效；5)内容质量审查通过。"
     },
     "task_007_prereq": {
       "target": "Go-删除审查",

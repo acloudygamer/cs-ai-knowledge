@@ -26,15 +26,17 @@
 
 ## 主要Shell类型
 
-| Shell | 开发年份 | 特点 | 默认系统 |
-|-------|----------|------|----------|
-| sh (Bourne) | 1977 | 最早标准，语法基础 | Solaris |
-| bash | 1989 | Linux默认，兼容sh | Linux |
-| zsh | 1990 | 兼容bash，插件丰富 | macOS |
-| fish | 2005 | 开箱即用，语法高亮 | - |
-| PowerShell | 2006 | 对象管道，跨平台 | Windows |
+| Shell | 版本 | 特点 | 默认系统 |
+|-------|------|------|----------|
+| sh (Bourne) | POSIX标准 | 最早标准，语法基础 | Solaris |
+| bash | 5.2 (GNU) | Linux默认，兼容sh | Linux |
+| zsh | 5.9+ | 兼容bash，插件丰富 | macOS (Catalina+) |
+| fish | 3.6+ | 开箱即用，语法高亮 | - |
+| PowerShell | 7.6.0 | 对象管道，跨平台 | Windows |
 
 ### bash
+
+> **版本说明**: GNU Bash 5.2.21 (WSL / Ubuntu 24.04), 5.2.37 (MINGW64 / Git Bash)
 
 ```bash
 # bash配置
@@ -51,12 +53,17 @@
 
 ### PowerShell
 
+> **版本说明**: PowerShell 7.6.0 (跨平台，Windows/Mac/Linux)
+
 ```powershell
 # 变量（$开头）
 $name = "Alice"
 
 # 命令
 Get-Process | Where-Object CPU -gt 100
+
+# 查看版本
+$PSVersionTable.PSVersion
 ```
 
 ## 配置文件
