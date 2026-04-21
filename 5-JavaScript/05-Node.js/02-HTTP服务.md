@@ -470,27 +470,6 @@ server.listen(443, () => {
 });
 ```
 
-### HTTP/2 特性
-
-```javascript
-// Server Push
-res.createPushPromise({
-  ':path': '/styles.css'
-}).push Promise.then((pushStream) => {
-  pushStream.respondWithFile('./public/styles.css');
-});
-
-// 流控制
-req.on('stream', (stream, headers) => {
-  stream.respond({
-    ':status': 200,
-    'content-type': 'text/plain'
-  });
-  stream.write('Hello ');
-  stream.end('HTTP/2');
-});
-```
-
 ---
 
 ## 性能优化

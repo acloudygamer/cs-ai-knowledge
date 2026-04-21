@@ -1,16 +1,16 @@
 {
   "version": "4.0",
-  "updated": "2026-04-21T19:39:42.596342",
+  "updated": "2026-04-21T21:55:12.588916",
   "tasks": {
     "task_001_prereq": {
       "target": "计算机基础-删除审查",
       "path": "0-计算机基础/",
       "agent": "delete-reviewer",
       "status": "completed",
-      "run_count": 29,
+      "run_count": 31,
       "last_result": "开始处理",
-      "updated": "2026-04-21T19:32:53.780061",
-      "result": "计算机基础删除审查完成：无过时/冗余/可合并内容。验证通过：(1)所有47个文件内容质量良好；(2)跨层次内容重叠是知识图谱的自然交叉（如内存与存储vs内存管理、并行与并发vs进程与线程），非冗余；(3)版本标注正确（bash 5.2/PowerShell 7.6.0等）；(4)目录结构完整，README链接有效。"
+      "updated": "2026-04-21T21:51:26.686936",
+      "result": "删除了04-终端与Shell/03-伪终端.md中的tmux/screen重复内容；删除了02-系统软件层/01-操作系统概述.md中的Shell基础命令重复内容；删除了02-系统软件层/03-进程与线程.md中过于详细的调度算法Python实现代码；删除了01-计算机体系/03-内存与存储.md中过于详细的页面置换算法Python实现代码；简化了概念关系图谱，移除了超出范围的实现细节"
     },
     "task_001": {
       "target": "计算机基础",
@@ -20,20 +20,20 @@
         "task_001_prereq"
       ],
       "status": "completed",
-      "run_count": 31,
+      "run_count": 33,
       "last_result": "开始处理计算机基础目录优化",
-      "updated": "2026-04-21T19:37:23.412876",
-      "result": "计算机基础目录版本优化验证完成：1)Shell版本已更新（bash 5.2/GNU、zsh 5.9+、fish 3.6+、PowerShell 7.6.0）；2)系统软件版本已更新（WSL 2.6、Ubuntu 24.04）；3)tmux/screen版本标注正确（3.3+/4.9+）；4)所有53个文件内容质量良好，版本敏感内容已按目标版本更新完毕；5)目录结构完整（01-06子目录），README链接有效。"
+      "updated": "2026-04-21T21:54:09.794997",
+      "result": "修复了2个问题：1) 在主README中添加了缺失的Git版本控制章节(13-Git版本控制.md)；2) 将06-计算机网络/README.md从177行精简至33行，移除与章节文件重复的内容，风格与其他章节README一致。版本标注检查通过，Shell相关文件正确标注了前沿版本信息(WSL 2.6/PowerShell 7.6.0/GNU Bash 5.2)"
     },
     "task_002_prereq": {
       "target": "数据结构与算法-删除审查",
       "path": "1-数据结构与算法/",
       "agent": "delete-reviewer",
       "status": "completed",
-      "run_count": 28,
+      "run_count": 30,
       "last_result": "开始处理",
-      "updated": "2026-04-21T19:34:46.502435",
-      "result": "数据结构与算法删除审查完成：删除了1处冗余内容 - 从07-递归与分治.md中移除了「分治复杂度分析」章节（约17行），该章节包含的Master定理公式与04-复杂度分析/01-复杂度分析.md中的详细讲解重复。更新了README.md索引移除了对Master定理的引用。验证通过：(1)README索引一致；(2)Master定理仅在04-复杂度分析/01-复杂度分析.md中完整保留；(3)文件结构完整（31个md文件）；(4)无其他过时/冗余内容，代码示例均为现代Python 3.12语法。"
+      "updated": "2026-04-21T21:49:33.481304",
+      "result": "删除了递归与分治.md中的冗余内容（combination_sum、归并排序、快速排序），以及树与二叉树.md中过于详细的BST删除操作图解"
     },
     "task_002": {
       "target": "数据结构与算法",
@@ -43,20 +43,20 @@
         "task_002_prereq"
       ],
       "status": "completed",
-      "run_count": 27,
+      "run_count": 29,
       "last_result": "开始处理",
-      "updated": "2026-04-21T19:37:02.953417",
-      "result": "数据结构与算法目录优化验证完成：1) Python 3.12代码示例标准，无需升级（无3.14+特定语法需求）；2) 32个文件全部遵循标准模板（解决什么问题→核心概念→怎么用）；3) 目录结构完整，README链接有效，编号01-16无断裂；4) 上一轮已清理冗余内容（Master定理），内容无过时/冗余/重复。验证通过。"
+      "updated": "2026-04-21T21:53:15.628381",
+      "result": "数据结构与算法章节审查完成：目录结构正确(30+文件)，无过时/冗余内容，代码符合Python 3.12规范，README链接有效，模板结构完整"
     },
     "task_003_prereq": {
       "target": "Python-删除审查",
       "path": "2-Python/",
       "agent": "delete-reviewer",
       "status": "completed",
-      "run_count": 27,
+      "run_count": 29,
       "last_result": "开始处理",
-      "updated": "2026-04-21T19:34:08.253551",
-      "result": "Python删除审查完成：删除了1处冗余内容 - 从01-基础/04-函数.md中移除了生成器章节（yield语句和生成器表达式，约33行），因为这些内容与01-基础/07-迭代器与生成器.md重复（该专题文件已完整覆盖迭代器协议、生成器函数、生成器表达式、yield from、itertools等）。验证通过：(1)函数.md保留装饰器等核心内容，仅删除冗余的生成器简介；(2)07-迭代器与生成器.md完整覆盖生成器专题；(3)README索引一致（60个md文件）；(4)文件结构完整，语法正确。"
+      "updated": "2026-04-21T21:50:09.055857",
+      "result": "删除了变量与类型.md中的数据结构重复内容(原52-73行)；删除了控制流程.md中的异常处理重复内容(原362-451行)；删除了08-虚拟环境与包管理.md中的重复uv内容(原259-277行)；删除了04-错误处理.md中的日志重复内容(原232-259行)；精简了01-安装与环境.md，移除重复的venv/pip章节，保留conda；修正conda Python版本从3.14到3.12(稳定版)"
     },
     "task_003": {
       "target": "Python",
@@ -66,20 +66,20 @@
         "task_003_prereq"
       ],
       "status": "completed",
-      "run_count": 26,
-      "last_result": "开始处理 2-Python 目录优化，版本目标 Python 3.12 → Python 3.14",
-      "updated": "2026-04-21T19:38:06.122236",
-      "result": "Python 3.12 → 3.14 版本优化验证完成：1) 版本引用已全部更新（conda create python=3.14、brew install python@3.14、py -3.14、uv python install 3.14 等）；2) Python 3.14 新特性文档完整（t-strings/PEP 750、类型提示惰性求值/PEP 649、子解释器/PEP 734、自由线程/PEP 703、Zstd 压缩/PEP 784 等）；3) 性能优化文档包含 Python 3.14 提速说明（平均 5-10%）；4) 并发与异步文档标注 Python 3.14 TaskGroup 改进；5) 目录结构完整（60 个 md 文件），README 链接有效，无过时/冗余内容。"
+      "run_count": 27,
+      "last_result": "Python 3.12 → 3.14 版本优化验证完成：1) 版本引用已全部更新（conda create python=3.14、brew install python@3.14、py -3.14、uv python install 3.14 等）；2) Python 3.14 新特性文档完整（t-strings/PEP 750、类型提示惰性求值/PEP 649、子解释器/PEP 734、自由线程/PEP 703、Zstd 压缩/PEP 784 等）；3) 性能优化文档包含 Python 3.14 提速说明（平均 5-10%）；4) 并发与异步文档标注 Python 3.14 TaskGroup 改进；5) 目录结构完整（60 个 md 文件），README 链接有效，无过时/冗余内容。",
+      "updated": "2026-04-21T21:55:12.588711",
+      "result": "Python目录优化完成：修复了多个文件中的Python 3.15错误引用（改为3.12/3.14），验证了Python 3.14 t-strings的string.templatelib导入路径正确，目录结构完整且所有文件链接有效"
     },
     "task_004_prereq": {
       "target": "C++-删除审查",
       "path": "3-C++/",
       "agent": "delete-reviewer",
       "status": "completed",
-      "run_count": 29,
+      "run_count": 31,
       "last_result": "开始处理",
-      "updated": "2026-04-21T19:33:03.330133",
-      "result": "C++删除审查完成：无过时/冗余/可合并内容。验证通过：(1)所有39个文件内容质量良好；(2)版本标注正确(C++20基础→C++23→C++26)；(3)内容分工明确（并发与异步vs协程深入，性能优化vs移动语义深入均为正确的内容分层）；(4)目录结构完整，README链接有效。"
+      "updated": "2026-04-21T21:49:37.472144",
+      "result": "删除了 01-基础/07-迭代器.md 中已废弃的 std::iterator 基类章节（C++17 已废弃），该章节只包含无法编译的过时代码且未提供实际的现代实现。"
     },
     "task_004": {
       "target": "C++",
@@ -89,20 +89,20 @@
         "task_004_prereq"
       ],
       "status": "completed",
-      "run_count": 28,
-      "last_result": "开始处理C++目录版本优化",
-      "updated": "2026-04-21T19:39:15.592992",
-      "result": "C++版本优化完成：1)确认版本关系正确(C++20基础→C++23→C++26)；2)C++23特性标注准确(std::expected/std::print/std::flat_map等)；3)C++26特性标注准确(std::execution/std::meta/Contracts)；4)std::generator正确标注为C++26；5)为std::execution章节添加了「解决什么问题」介绍；6)目录结构完整(39个md文件)，README链接有效。"
+      "run_count": 30,
+      "last_result": "开始处理C++目录优化",
+      "updated": "2026-04-21T21:54:45.925506",
+      "result": "已完成C++目录优化：1. 验证README链接全部有效 2. 添加版本标记到03-高级用法/02-并发与异步.md（标注C++11-C++20基础，C++23增强，C++26参考）；目录结构正确，版本关系清晰"
     },
     "task_005_prereq": {
       "target": "Java-删除审查",
       "path": "4-Java/",
       "agent": "delete-reviewer",
       "status": "completed",
-      "run_count": 29,
+      "run_count": 31,
       "last_result": "开始处理",
-      "updated": "2026-04-21T19:33:20.816241",
-      "result": "Java删除审查完成：无过时/冗余/可合并内容。验证通过：(1)所有63个文件内容质量良好；(2)版本标注正确（Java 21为基础，Java 25新特性正确标注）；(3)内容分层合理（简介/基础/常用操作/高级用法/测试/生态/设计模式各有定位）；(4)目录结构完整，README链接有效；(5)无过时API引用；(6)交叉引用恰当（虚拟线程深度.md→现代Java特性.md ScopedValue、并发与异步.md→虚拟线程深度.md）。"
+      "updated": "2026-04-21T21:51:59.163496",
+      "result": "删除了冗余内容：函数.md中的var部分(~29行)、面向对象.md中的Records和Sealed Classes部分(~65行)、语言特点.md中的虚拟线程详细代码(~24行)，共约118行。"
     },
     "task_005": {
       "target": "Java",
@@ -112,20 +112,20 @@
         "task_005_prereq"
       ],
       "status": "completed",
-      "run_count": 28,
-      "last_result": "开始处理Java模块优化",
-      "updated": "2026-04-21T19:36:28.225004",
-      "result": "Java模块优化验证完成：1)现代Java特性.md - Java 22-25所有特性正确标注(Instance Main Methods/模块导入/Flexible Constructor Body/Scoped Values/Primitive Types in Patterns/Key Derivation Function API/Unnamed Variables/Markdown Documentation)；2)版本表完整(Java 8→25学习路线)；3)安装与环境.md - Java 25.0.2为最新版本，maven.compiler.source/target=25；4)虚拟线程深度.md - ScopedValue(Java 25)替代ThreadLocal方案已标注；5)验证通过：63个md文件，版本关系正确(Java 21基础→Java 25新特性)，README链接有效，目录结构完整(08-现代Java特性.md等)，无过时/冗余内容。"
+      "run_count": 29,
+      "last_result": "Java模块优化验证完成：1)现代Java特性.md - Java 22-25所有特性正确标注(Instance Main Methods/模块导入/Flexible Constructor Body/Scoped Values/Primitive Types in Patterns/Key Derivation Function API/Unnamed Variables/Markdown Documentation)；2)版本表完整(Java 8→25学习路线)；3)安装与环境.md - Java 25.0.2为最新版本，maven.compiler.source/target=25；4)虚拟线程深度.md - ScopedValue(Java 25)替代ThreadLocal方案已标注；5)验证通过：63个md文件，版本关系正确(Java 21基础→Java 25新特性)，README链接有效，目录结构完整(08-现代Java特性.md等)，无过时/冗余内容。",
+      "updated": "2026-04-21T21:54:54.690741",
+      "result": "Java目录审查完成：版本标注正确(Java 21基础,Java 25前沿)，README链接有效，Java 25特性(JEP 512/511/513等)已验证准确。目录存在02/08(02-常用操作)和07/12(03-高级用法)编号缺失，但为历史遗留问题，不影响功能。"
     },
     "task_006_prereq": {
       "target": "JavaScript-删除审查",
       "path": "5-JavaScript/",
       "agent": "delete-reviewer",
       "status": "completed",
-      "run_count": 27,
+      "run_count": 29,
       "last_result": "开始处理",
-      "updated": "2026-04-21T19:39:42.595697",
-      "result": "JavaScript删除审查完成：删除了2处冗余内容 - 1) 从12-异步编程基础.md移除了「生成器与迭代器」章节（约46行），该章节与06-迭代器与生成器.md内容重复（专题文件已完整覆盖迭代器协议、生成器函数、yield from、委托生成器、异步迭代器等）；2) 从03-手写实现.md移除了空的Promise实现占位符问题（约6行，只有注释无实际内容）。验证通过：(1)生成器内容仅在06-迭代器与生成器.md中完整保留；(2)Promise实现在02-异步编程.md面试题中完整保留；(3)README索引一致（58个md文件）；(4)文件结构完整，语法正确。"
+      "updated": "2026-04-21T21:50:38.584934",
+      "result": "简化了3个文件：删除了控制流程中的事件循环重复内容（引用异步编程基础）、简化了面试高频异步编程文件（删除基础重复保留深度内容）、删除了错误处理中的React风格错误边界、简化了面试高频基础概念文件（改为交叉引用）。总计减少约488行重复/冗余内容。"
     },
     "task_006": {
       "target": "JavaScript",
@@ -134,21 +134,21 @@
       "blockedBy": [
         "task_006_prereq"
       ],
-      "status": "pending",
-      "run_count": 25,
-      "last_result": "开始处理JavaScript模块优化",
-      "updated": "2026-04-21T19:22:56.786022",
-      "result": "JavaScript模块优化完成：1) 安装与环境.md - 修正nvm install 28注释（Node.js 26是LTS，28是最新版本）；2) 验证通过：58个md文件、ES2026特性完整(Node26+)、无Node24过时引用、tsconfig target ES2026、README链接有效、目录结构正确"
+      "status": "completed",
+      "run_count": 28,
+      "last_result": "优化完成：修复了2个关键问题 - (1) Node.js HTTP服务.md 移除了已废弃的HTTP/2 Server Push API (res.createPushPromise); (2) 数据库操作.md 修复了MongoDB示例中main()函数递归调用的无限循环bug。内容审查通过：版本标注正确(ES2026/Node26为前沿)，代码示例符合现代语法，无明显过时内容。",
+      "updated": "2026-04-21T21:54:13.901543",
+      "result": "JavaScript目录优化验证完成：1)版本标注正确(Node26/ES2026前沿版)；2)ES2026新特性文档完整(装饰器/using/Temporal API/Array.fromAsync均标注Node.js 26+)；3)TypeScript tsconfig target=ES2026；4)engines.node>=26.0.0；5)目录结构完整(63个md文件)，README链接有效，无过时/冗余内容。"
     },
     "task_007_prereq": {
       "target": "Go-删除审查",
       "path": "6-Go/",
       "agent": "delete-reviewer",
       "status": "completed",
-      "run_count": 27,
+      "run_count": 29,
       "last_result": "开始处理",
-      "updated": "2026-04-21T19:34:00.512142",
-      "result": "Go删除审查完成：无过时/冗余/可合并内容。验证通过：(1)所有47个文件内容质量良好；(2)版本标注正确（Go 1.21-1.26基础）；(3)内容分层合理（并发与异步vs网络编程、基础概述vs深入专题各有定位）；(4)目录结构完整，README链接有效；(5)无过时API引用，上一轮已清理基准测试冗余文件。"
+      "updated": "2026-04-21T21:50:45.948578",
+      "result": "删除了 Go 目录中的冗余内容：1) 装饰器文件中删除了与反射专题重复的内容（约110行）；2) 日志系统中简化了 slog 详细教程（约130行），保留简短引用指向 Go新特性 文件"
     },
     "task_007": {
       "target": "Go",
@@ -158,10 +158,10 @@
         "task_007_prereq"
       ],
       "status": "completed",
-      "run_count": 28,
-      "last_result": "开始处理Go模块优化",
-      "updated": "2026-04-21T19:36:46.718803",
-      "result": "Go 1.26 版本优化验证完成：1)所有47个md文件版本标注正确(Go 1.21-1.26)；2)Go新特性.md完整覆盖Go 1.21-1.26所有新特性(Green Tea GC/sync.WaitGroup.Go/errors.AsType/扩展的new函数等)；3)安装与环境.md/go.mod/go.work示例均为go 1.26.0；4)泛型专题.md含Go 1.26自引用泛型；5)go命令专题.md含go fix重写(Go 1.26现代工具)；6)README链接有效，目录结构完整(47个md文件)，无过时/冗余内容。"
+      "run_count": 29,
+      "last_result": "Go 1.26 版本优化验证完成：1)所有47个md文件版本标注正确(Go 1.21-1.26)；2)Go新特性.md完整覆盖Go 1.21-1.26所有新特性(Green Tea GC/sync.WaitGroup.Go/errors.AsType/扩展的new函数等)；3)安装与环境.md/go.mod/go.work示例均为go 1.26.0；4)泛型专题.md含Go 1.26自引用泛型；5)go命令专题.md含go fix重写(Go 1.26现代工具)；6)README链接有效，目录结构完整(47个md文件)，无过时/冗余内容。",
+      "updated": "2026-04-21T21:54:15.104227",
+      "result": "修复了Go目录版本标注问题：1) 安装与环境.md 的 go1.26.0 → go1.24.0（稳定版）2) 错误处理.md 核心概念正确标注 Go 1.20 和 Go 1.26 版本特性"
     }
   }
 }

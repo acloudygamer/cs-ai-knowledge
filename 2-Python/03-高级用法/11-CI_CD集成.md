@@ -19,7 +19,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ["3.14", "3.15"]
+        python-version: ["3.12", "3.14"]
 
     steps:
       - uses: actions/checkout@v4
@@ -87,7 +87,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ["3.14", "3.15"]
+        python-version: ["3.12", "3.14"]
         poetry-version: "1.7"
 
     steps:
