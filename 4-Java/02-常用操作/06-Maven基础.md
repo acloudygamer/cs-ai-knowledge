@@ -65,8 +65,8 @@ my-project/
                 <artifactId>maven-compiler-plugin</artifactId>
                 <version>3.11.0</version>
                 <configuration>
-                    <source>17</source>
-                    <target>17</target>
+                    <source>25</source>
+                    <target>25</target>
                 </configuration>
             </plugin>
         </plugins>
@@ -270,8 +270,8 @@ mvn archetype:generate \
     <artifactId>maven-compiler-plugin</artifactId>
     <version>3.11.0</version>
     <configuration>
-        <source>17</source>
-        <target>17</target>
+        <source>25</source>
+        <target>25</target>
         <encoding>UTF-8</encoding>
     </configuration>
 </plugin>
