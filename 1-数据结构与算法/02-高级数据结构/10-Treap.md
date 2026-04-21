@@ -11,18 +11,6 @@ Treap = Tree + Heap，结合 BST 有序性和堆平衡性，实现比红黑树/A
 
 ### 怎么用
 
-## 核心概念
-
-Treap = Tree + Heap，随机化二叉搜索树，结合了 BST 的有序性和堆的平衡性。
-
-## 基本原理
-
-- 每个节点有 key（维持 BST）和 priority（维持堆）
-- BST 性质：左子树 < 根 < 右子树
-- 堆性质：节点的 priority 大于子节点（max-heap）
-- 随机 priority 保证期望平衡
-- 比红黑树/AVL 实现简单，性能相当
-
 ## 实现
 
 ```python
