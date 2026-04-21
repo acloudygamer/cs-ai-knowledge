@@ -324,7 +324,7 @@ type CreateUserParams = Parameters<typeof createUser>;
 // tsconfig.json
 {
   "compilerOptions": {
-    "target": "ES2022",
+    "target": "ES2026",
     "module": "ESNext",
     "moduleResolution": "bundler",
     "strict": true,
