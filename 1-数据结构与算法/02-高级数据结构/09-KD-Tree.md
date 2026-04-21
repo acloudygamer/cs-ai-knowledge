@@ -1,4 +1,4 @@
-# KD-Tree
+## KD-Tree
 
 ### 解决什么问题
 K 维空间索引结构，用于最近邻搜索、范围查询、聚类分析等高维数据处理。是 kNN 算法、特征点匹配等场景的底层数据结构。
@@ -10,6 +10,27 @@ K 维空间索引结构，用于最近邻搜索、范围查询、聚类分析等
 - 最近邻搜索期望 O(log n)，高维退化至 O(n)
 
 ### 怎么用
+
+```python
+class KDNode:
+    def __init__(self, point, dim):
+        self.point = point  # k维点
+        self.dim = dim      # 划分的维度
+        self.left = None
+        self.right = None
+
+def build_kd_tree(points, depth=0):
+    if not points:
+        return None
+    k = len(points[0])
+    dim = depth % k
+    points.sort(key=lambda x: x[dim])
+    mid = len(points) // 2
+    node = KDNode(points[mid], dim)
+    node.left = build_kd_tree(points[:mid], depth + 1)
+    node.right = build_kd_tree(points[mid + 1:], depth + 1)
+    return node
+```
 
 ## 实现
 

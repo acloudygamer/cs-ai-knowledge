@@ -1,4 +1,4 @@
-# Link-Cut Tree (LCT)
+## Link-Cut Tree (LCT)
 
 ### 解决什么问题
 动态树数据结构，支持动态加边、删边、路径查询等操作。适用于动态连通性、动态最小生成树、树上路径操作等需要动态修改树结构的场景。
@@ -11,6 +11,18 @@
 - 核心原理：使用 Splay 维护辅助树
 
 ### 怎么用
+
+```python
+class LCTNode:
+    def __init__(self, val):
+        self.val = val
+        self.ch = [None, None]  # 左右子节点
+        self.p = None           # 父节点
+        self.rev = False        # 反转标记
+
+    def is_root(self, node):
+        return node.p is None or (node.p.ch[0] != node and node.p.ch[1] != node)
+```
 
 ## 实现
 

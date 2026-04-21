@@ -1,4 +1,4 @@
-# 树链剖分（Heavy-Light Decomposition, HLD）
+## 树链剖分（Heavy-Light Decomposition, HLD）
 
 ### 解决什么问题
 将树拆分成若干条链，使得任意两点间路径被分成 O(log n) 条链，从而在树上路径上支持线段树操作（查询、更新）。适用于树上路径查询、树上DP等场景。
@@ -10,6 +10,38 @@
 - 通过深度优先将树展开为线性结构
 
 ### 怎么用
+
+```python
+class HLD:
+    def __init__(self, n, edges, root=0):
+        self.n = n
+        self.adj = [[] for _ in range(n)]
+        for u, v in edges:
+            self.adj[u].append(v)
+            self.adj[v].append(u)
+        self.parent = [0] * n
+        self.depth = [0] * n
+        self.size = [0] * n
+        self heavy = [0] * n
+        self.head = [0] * n
+        self.pos = [0] * n
+        self.cur_pos = 0
+        self.dfs(root, root)
+        self.decompose(root, root)
+
+    def dfs(self, u, p):
+        self.size[u] = 1
+        max_size = 0
+        for v in self.adj[u]:
+            if v != p:
+                self.parent[v] = u
+                self.depth[v] = self.depth[u] + 1
+                self.dfs(v, u)
+                self.size[u] += self.size[v]
+                if self.size[v] > max_size:
+                    max_size = self.size[v]
+                    self.heavy[u] = v
+```
 
 ## 实现
 

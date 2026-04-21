@@ -1,4 +1,4 @@
-# Treap（随机化 BST）
+## Treap（随机化 BST）
 
 ### 解决什么问题
 Treap = Tree + Heap，结合 BST 有序性和堆平衡性，实现比红黑树/AVL 更简单但性能相当的平衡 BST。适用于需要顺序统计、排名、区间查询的场景。
@@ -10,6 +10,42 @@ Treap = Tree + Heap，结合 BST 有序性和堆平衡性，实现比红黑树/A
 - 隐式 Treap：用下标代替指针，实现序列操作
 
 ### 怎么用
+
+```python
+import random
+
+class TreapNode:
+    def __init__(self, key):
+        self.key = key
+        self.priority = random.random()
+        self.left = None
+        self.right = None
+
+def rotate_right(y):
+    x = y.left
+    y.left = x.right
+    x.right = y
+    return x
+
+def rotate_left(x):
+    y = x.right
+    x.right = y.left
+    y.left = x
+    return y
+
+def treap_insert(root, key):
+    if not root:
+        return TreapNode(key)
+    if key < root.key:
+        root.left = treap_insert(root.left, key)
+        if root.left.priority < root.priority:
+            root = rotate_right(root)
+    else:
+        root.right = treap_insert(root.right, key)
+        if root.right.priority < root.priority:
+            root = rotate_left(root)
+    return root
+```
 
 ## 实现
 

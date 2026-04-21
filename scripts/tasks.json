@@ -1,16 +1,16 @@
 {
   "version": "4.0",
-  "updated": "2026-04-21T23:27:23.433334",
+  "updated": "2026-04-21T23:41:25.852034",
   "tasks": {
     "task_001_prereq": {
       "target": "计算机基础-删除审查",
       "path": "0-计算机基础/",
       "agent": "delete-reviewer",
       "status": "completed",
-      "run_count": 43,
+      "run_count": 45,
       "last_result": "开始处理",
-      "updated": "2026-04-21T23:22:57.115884",
-      "result": "删除了冗余内容：1) 07-认证授权.md 中的 Docker 容器安全 section（52行），与 09-容器化基础.md 重复；2) 01-网络分层模型.md 中的 HTTP 方法和状态码 tables（20行），与 03-HTTP协议深入.md 重复"
+      "updated": "2026-04-21T23:34:08.111879",
+      "result": "删除了冗余文件 01-计算机体系/03-内存与存储.md（内容与 02-系统软件层/06-内存管理.md 大量重复），已更新两个 README.md 索引"
     },
     "task_001": {
       "target": "计算机基础",
@@ -20,20 +20,20 @@
         "task_001_prereq"
       ],
       "status": "completed",
-      "run_count": 45,
+      "run_count": 47,
       "last_result": "开始处理",
-      "updated": "2026-04-21T23:24:36.398773",
-      "result": "审查完成：README链接有效、目录标号连续、代码可运行、版本标注合理、内容质量良好，无修复需求"
+      "updated": "2026-04-21T23:37:43.898613",
+      "result": "修复了5个文件的模板结构：02-指令执行.md、05-GPU与异构计算.md（转为解决什么问题/核心概念/怎么用）、01-编译器.md、02-解释器.md、06-垃圾回收.md。验证了README.md所有链接有效（43个文件全部存在），目录标号连续（01-计算机体系跳号是前置任务已删除的重复文件）。"
     },
     "task_002_prereq": {
       "target": "数据结构与算法-删除审查",
       "path": "1-数据结构与算法/",
       "agent": "delete-reviewer",
       "status": "completed",
-      "run_count": 42,
+      "run_count": 44,
       "last_result": "开始处理",
-      "updated": "2026-04-21T23:21:24.156323",
-      "result": "审查完成，未发现需要删除的文件。内容组织清晰，无显著冗余：数组与字符串、链表、栈与队列、哈希表、字符串模式匹配各自边界清晰；高级数据结构与算法思想分类合理；习题列表中的跨文件引用不构成实质冗余。"
+      "updated": "2026-04-21T23:32:48.488245",
+      "result": "删除审查完成：该目录无过时/冗余内容，结构合理，所有32个文件均保留"
     },
     "task_002": {
       "target": "数据结构与算法",
@@ -43,20 +43,20 @@
         "task_002_prereq"
       ],
       "status": "completed",
-      "run_count": 41,
+      "run_count": 43,
       "last_result": "开始处理数据结构与算法内容优化",
-      "updated": "2026-04-21T23:25:14.328385",
-      "result": "修复了3处内容问题：1) 链表.md在### 怎么用下添加了代码示例 2) 位运算.md删除了未被调用的basic_bit_operations死代码 3) 数组与字符串.md在### 怎么用下添加了代码示例。验证了代码可运行性、README链接有效、目录标号连续。"
+      "updated": "2026-04-21T23:41:25.851828",
+      "result": "完成数据结构与算法内容优化：修复了30个文件的H1标题为H2，添加了怎么用部分的直接代码示例，验证了所有README链接有效、目录标号连续、代码可运行"
     },
     "task_003_prereq": {
       "target": "Python-删除审查",
       "path": "2-Python/",
       "agent": "delete-reviewer",
       "status": "completed",
-      "run_count": 41,
+      "run_count": 43,
       "last_result": "开始处理",
-      "updated": "2026-04-21T23:21:13.819475",
-      "result": "删除了03-应用场景.md（内容与01-语言简介.md重复），更新了01-语言简介.md中的版本表（添加Python 3.14前沿版本），并同步更新了README.md索引"
+      "updated": "2026-04-21T23:33:07.651608",
+      "result": "删除了冗余的06-学习路线.md，更新了版本表添加Python 3.13，扩展了README.md中的学习路线内容"
     },
     "task_003": {
       "target": "Python",
@@ -66,20 +66,20 @@
         "task_003_prereq"
       ],
       "status": "completed",
-      "run_count": 39,
+      "run_count": 41,
       "last_result": "开始处理 Python 知识库优化",
-      "updated": "2026-04-21T23:26:21.807630",
-      "result": "完成了 Python 知识库内容优化：1) 修复了 03-高级用法/02-并发与异步.md 中未闭合的代码块；2) 为 05-设计模式/06-装饰器模式.md 添加了模板头部（解决什么问题、核心概念、怎么用）；3) 验证了 README.md 所有链接有效；4) 验证了代码示例可运行；5) 确认版本标注一致性（Python 3.12 稳定版、3.14 前沿版）"
+      "updated": "2026-04-21T23:37:31.337462",
+      "result": "修复了 06-装饰器模式.md 的标题层级问题（### 改为 ##），验证了全部 57 个 README.md 链接有效，目录编号连续（缺失文件为故意跳过），Python 3.12/3.13/3.14 版本引用一致"
     },
     "task_004_prereq": {
       "target": "C++-删除审查",
       "path": "3-C++/",
       "agent": "delete-reviewer",
       "status": "completed",
-      "run_count": 43,
+      "run_count": 45,
       "last_result": "开始处理",
-      "updated": "2026-04-21T23:21:21.820929",
-      "result": "完成3-C++/删除审查：检查了40个md文件，未发现需要删除的过时/冗余内容。版本标注正确（C++20为基础版本，C++23/C++26正确归类）。内容结构符合渐进式学习设计，各文件间有正确的交叉引用，无实质性重复。"
+      "updated": "2026-04-21T23:33:42.898955",
+      "result": "删除了高级用法概览.md（纯目录文件），修正了C++23新特性.md中的重复代码，简化了C++20新特性.md中的协程章节（保留链接到协程深入.md），更新了README.md索引"
     },
     "task_004": {
       "target": "C++",
@@ -89,20 +89,20 @@
         "task_004_prereq"
       ],
       "status": "completed",
-      "run_count": 42,
+      "run_count": 44,
       "last_result": "开始处理 C++ 知识库优化",
-      "updated": "2026-04-21T23:26:47.815206",
-      "result": "优化了 6 个文件的模板结构：C++20新特性、C++23新特性、协程深入、变量与类型、CMake构建、内存管理、设计模式。验证了 README.md 40 个链接全部有效，目录编号连续，版本标注一致。"
+      "updated": "2026-04-21T23:38:02.869703",
+      "result": "优化完成：验证了README.md所有链接有效、目录标号连续(00-04)、C++20/23/26版本一致性；修复了09-C++23新特性.md中std::expected章节的孤立标题问题(移除多余的'### 怎么用'，保留'### 基础用法')；代码示例经抽查可运行"
     },
     "task_005_prereq": {
       "target": "Java-删除审查",
       "path": "4-Java/",
       "agent": "delete-reviewer",
       "status": "completed",
-      "run_count": 42,
-      "last_result": "删除了语言特点.md（合并到语言简介.md），精简了日期时间.md中的旧API部分，增强了语言简介.md的对比表格，更新了README.md索引",
-      "updated": "2026-04-21T23:22:34.021661",
-      "result": "删除了03-内存管理.md中的重复GC算法内容并添加引用；删除了11-虚拟线程深度.md中的重复Scoped Values内容并添加引用；将06-Maven基础.md和13-Gradle.md中的Java版本从17更新到25"
+      "run_count": 44,
+      "last_result": "开始处理",
+      "updated": "2026-04-21T23:33:04.647900",
+      "result": "删除了并发与异步.md中的Virtual Threads章节（lines 248-260的并发模式演进+引用）和Scoped Values提及（ThreadLocal部分），消除与虚拟线程深度.md和现代Java特性.md的三向重复。保留的传统并发内容（Thread、ExecutorService、CompletableFuture、Concurrent Collections、Synchronizers、原子类）仍然完整。"
     },
     "task_005": {
       "target": "Java",
@@ -112,20 +112,20 @@
         "task_005_prereq"
       ],
       "status": "completed",
-      "run_count": 41,
+      "run_count": 43,
       "last_result": "开始处理Java知识库内容优化",
-      "updated": "2026-04-21T23:25:40.980263",
-      "result": "Java知识库内容优化完成：验证通过README链接(52个)、目录标号连续、版本一致性正确(Java 8/11/17/21/25)、代码示例可运行、GC和Scoped Values引用正确去重"
+      "updated": "2026-04-21T23:37:32.613873",
+      "result": "Java知识库内容优化完成：验证通过README链接(52个)、目录标号连续(缺失编号为未使用占位符)、版本一致性正确(Java 8/11/17/21/25)、代码示例结构正确、Scoped Values引用正确去重(主内容在08-现代Java特性.md，11-虚拟线程深度.md正确引用)，无修复需求"
     },
     "task_006_prereq": {
       "target": "JavaScript-删除审查",
       "path": "5-JavaScript/",
       "agent": "delete-reviewer",
       "status": "completed",
-      "run_count": 41,
+      "run_count": 43,
       "last_result": "开始处理",
-      "updated": "2026-04-21T23:20:46.504039",
-      "result": "删除了 01-基础/05-类与模块.md 中的 ES Modules 冗余内容（原约150行），保留 Class 相关内容，并添加指向 06-前端工程化/01-模块化.md 的引用。模块化内容已完整保留在工程化目录中。"
+      "updated": "2026-04-21T23:33:28.512050",
+      "result": "删除了6个冗余文件：数据结构.md、Symbol详解.md、学习路线.md、二进制数据与Atomics.md、异步编程.md（面试）、手写实现.md（面试）。更新了README.md索引并清理了相关内部引用。"
     },
     "task_006": {
       "target": "JavaScript",
@@ -135,20 +135,20 @@
         "task_006_prereq"
       ],
       "status": "completed",
-      "run_count": 40,
+      "run_count": 42,
       "last_result": "开始处理JavaScript知识库",
-      "updated": "2026-04-21T23:27:23.433070",
-      "result": "JavaScript知识库审查完成：README链接全部有效(54个)，代码示例均可运行，ES2024/2025/2026版本标注正确，ES Modules冗余内容已清理(05-类与模块.md)，目录编号存在个别跳号现象但不影响内容完整性"
+      "updated": "2026-04-21T23:36:45.276419",
+      "result": "完成JavaScript知识库审查 - README链接全部有效，目录结构正确(存在合理缺口)，代码可运行，ES2026特性标注准确，跨引用路径正确，无重大问题"
     },
     "task_007_prereq": {
       "target": "Go-删除审查",
       "path": "6-Go/",
       "agent": "delete-reviewer",
       "status": "completed",
-      "run_count": 41,
+      "run_count": 43,
       "last_result": "开始处理",
-      "updated": "2026-04-21T23:22:22.472616",
-      "result": "删除了 05-Go新特性.md 中重复的 iter.Seq 和 slog 详细示例，保留新特性表格中的简洁标注"
+      "updated": "2026-04-21T23:33:53.885517",
+      "result": "删除了Go新特性.md中的重复cmp.Or示例，修复了go命令专题.md中过时的godoc命令为go doc -http并标注版本"
     },
     "task_007": {
       "target": "Go",
@@ -158,10 +158,10 @@
         "task_007_prereq"
       ],
       "status": "completed",
-      "run_count": 41,
+      "run_count": 43,
       "last_result": "开始处理Go知识库",
-      "updated": "2026-04-21T23:26:28.186775",
-      "result": "优化Go知识库：修复05-测试/03-集成测试.md模板结构（添加解决什么问题/核心概念/怎么用头部），验证所有README链接有效、版本标注一致（Go 1.24/1.26）、目录结构正确、代码可运行性"
+      "updated": "2026-04-21T23:37:27.384046",
+      "result": "修复了 01-go命令专题.md 中 go vet -strict（非标准命令）问题；验证了 README.md 所有链接有效；确认 Go 1.21-1.26 版本一致性良好；确认代码示例正确"
     }
   }
 }
