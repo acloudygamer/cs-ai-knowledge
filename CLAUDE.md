@@ -8,6 +8,24 @@ python scripts/task_runner.py --report  # 查看执行报告
 python scripts/task_runner.py --update <task_id> <status> <result>  # 更新任务状态
 ```
 
+### 仲裁命令
+
+```bash
+python scripts/task_runner.py --arbitrate_submit <task_id> <path> <reason> <content>  # 提交仲裁请求
+python scripts/task_runner.py --leader_arbitration  # 查看需人工处理的仲裁
+python scripts/task_runner.py --leader_resolve <arb_id> delete/keep/people  # 解决仲裁
+```
+
+### 仲裁处理（Leader）
+
+当 Agent 遇到无法判断版本归属的代码时，会提交仲裁请求。Leader 处理流程：
+
+1. **查看待处理仲裁**：`python scripts/task_runner.py --leader_arbitration`
+2. **解决仲裁**：
+   - `delete` - 确认低于 `<stable>`，删除
+   - `keep` - 确认属于 `<stable>` 或更高，保留
+   - `people` - 需要人工查看处理
+
 ### 开始工作循环
 
 当你说"开始工作循环"或"开始"时：

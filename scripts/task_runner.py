@@ -6,6 +6,9 @@
 - --once: 生成待执行任务指令（全部完成后自动重置）
 - --update <key> <status> <result>: 更新任务状态和结果
 - --report: 生成执行报告
+- --arbitrate_submit: 提交仲裁请求
+- --leader_arbitration: 查看需人工处理的仲裁
+- --leader_resolve: 解决仲裁
 """
 
 import json
@@ -29,6 +32,7 @@ logger = logging.getLogger(__name__)
 SCRIPT_DIR = Path(__file__).parent
 TASKS_FILE = SCRIPT_DIR / "tasks.json"
 VERSIONS_FILE = SCRIPT_DIR / "versions.json"
+ARBITRATIONS_FILE = SCRIPT_DIR / "arbitrations.json"
 PROMPTS_DIR = SCRIPT_DIR / "prompts"
 
 
@@ -185,18 +189,19 @@ class TaskRunner:
             agent = task.get("agent", "general-purpose")
 
             lines.append(f"### {target}")
-            lines.append(f"- **工作目录**: `{path}`")
+            lines.append(f"- **工作目录** `{path}`")
             if version:
                 parts = [v.strip() for v in version.split('/')]
-                lines.append(f"- **稳定版**: `{parts[0]}`")
+                lines.append(f"- **稳定版** `{parts[0]}`")
                 if len(parts) > 1:
-                    lines.append(f"- **前沿版**: `{' / '.join(parts[1:])}`")
-            lines.append(f"- 使用 agent: {agent}")
+                    lines.append(f"- **前沿版** `{' / '.join(parts[1:])}`")
+            lines.append(f"- **任务编号** `{task.get('_key')}`")
+            lines.append(f"- **执行 Agent** `{agent}`")
             prompt_file = get_prompt_file(path)
             if prompt_file:
-                lines.append(f"- 参考文档: `scripts/prompts/{prompt_file}`")
+                lines.append(f"- **参考文档** `scripts/prompts/{prompt_file}`")
             if path.startswith("0-计算机基础"):
-                lines.append("- 说明：内容为主，版本为辅。版本敏感度排序：Shell > 系统软件 > 其他。")
+                lines.append("- **说明**：内容为主，版本为辅。版本敏感度排序：Shell > 系统软件 > 其他。")
             lines.append("")
 
         # 参考文档
@@ -211,6 +216,8 @@ class TaskRunner:
         lines.append("- 无需 TeamCreate，agents 之间无需通信")
         lines.append("- Agent 领取后调用 `--update <task_id> working \"开始处理\"`")
         lines.append("- 完成后调用 `--update <task_id> completed \"<结果>\"`")
+        lines.append("")
+        lines.append("**仲裁请求**：当遇到无法判断版本归属的代码时，调用 `--arbitrate_submit` 提交仲裁")
 
         return "\n".join(lines)
 
@@ -225,7 +232,7 @@ class TaskRunner:
         total = len(all_tasks)
         completed = len([t for t in all_tasks if t.get("status") == "completed"])
         pending = len([t for t in all_tasks if t.get("status") == "pending"])
-        working = len([t for t in all_tasks if t.get("status") == "working"])
+        working = len([t for t in all_tasks if t.get("status") == "working")]
 
         lines = [
             "=" * 50,
@@ -279,6 +286,117 @@ class TaskRunner:
         return "\n".join(lines)
 
 
+class ArbitrationManager:
+    """仲裁管理器"""
+
+    def __init__(self):
+        self.arbitrations_file = ARBITRATIONS_FILE
+        self.data = None
+
+    def load(self) -> dict:
+        """加载仲裁数据"""
+        try:
+            with open(self.arbitrations_file, 'r', encoding='utf-8') as f:
+                self.data = json.load(f)
+            return self.data
+        except FileNotFoundError:
+            self.data = {"updated": None, "arbitrations": []}
+            return self.data
+        except json.JSONDecodeError as e:
+            logger.error(f"仲裁文件 JSON 解析错误: {e}")
+            self.data = {"updated": None, "arbitrations": []}
+            return self.data
+
+    def save(self):
+        """保存仲裁数据"""
+        if self.data is None:
+            return
+        try:
+            self.data['updated'] = datetime.now().isoformat()
+            with open(self.arbitrations_file, 'w', encoding='utf-8') as f:
+                json.dump(self.data, f, ensure_ascii=False, indent=2)
+        except Exception as e:
+            logger.error(f"保存仲裁数据失败: {e}")
+
+    def submit(self, task_id: str, path: str, reason: str, content: str) -> str:
+        """提交仲裁请求"""
+        self.load()
+        arb_id = f"arb_{len(self.data['arbitrations']) + 1:03d}"
+        arb = {
+            "id": arb_id,
+            "task_id": task_id,
+            "path": path,
+            "reason": reason,
+            "content": content,
+            "status": "pending",
+            "created_at": datetime.now().isoformat()
+        }
+        self.data["arbitrations"].append(arb)
+        self.save()
+        logger.info(f"仲裁请求已提交: {arb_id}")
+        return arb_id
+
+    def resolve(self, arb_id: str, action: str):
+        """解决仲裁"""
+        self.load()
+        for arb in self.data["arbitrations"]:
+            if arb["id"] == arb_id:
+                if action == "delete":
+                    arb["status"] = "resolved_delete"
+                    arb["resolved_at"] = datetime.now().isoformat()
+                elif action == "keep":
+                    arb["status"] = "resolved_keep"
+                    arb["resolved_at"] = datetime.now().isoformat()
+                elif action == "people":
+                    arb["status"] = "people"
+                    arb["resolved_at"] = datetime.now().isoformat()
+                else:
+                    logger.error(f"无效操作: {action}，必须是 delete/keep/people 之一")
+                    return False
+                self.save()
+                logger.info(f"仲裁已解决: {arb_id} -> {action}")
+                return True
+        logger.warning(f"仲裁 {arb_id} 未找到")
+        return False
+
+    def list_people(self) -> list:
+        """列出所有需要人工处理的仲裁"""
+        self.load()
+        return [arb for arb in self.data.get("arbitrations", []) if arb.get("status") == "people"]
+
+    def list_all(self) -> list:
+        """列出所有仲裁"""
+        self.load()
+        return self.data.get("arbitrations", [])
+
+    def show_people(self) -> str:
+        """显示需人工处理的仲裁"""
+        people = self.list_people()
+        if not people:
+            return "无需要人工处理的仲裁。"
+
+        lines = ["# 需要人工处理的仲裁\n"]
+        lines.append(f"生成时间: {datetime.now().isoformat()}\n")
+        lines.append(f"总数: {len(people)}\n")
+        lines.append("")
+        lines.append("=" * 60)
+
+        for arb in people:
+            lines.append(f"\n## {arb['id']}")
+            lines.append(f"- **任务编号**: `{arb['task_id']}`")
+            lines.append(f"- **文件路径**: `{arb['path']}`")
+            lines.append(f"- **原因**: {arb['reason']}")
+            lines.append(f"- **内容**:")
+            lines.append("```")
+            lines.append(arb['content'][:500] + ("..." if len(arb['content']) > 500 else ""))
+            lines.append("```")
+            lines.append("")
+            lines.append(f"解决命令: `python scripts/task_runner.py --leader_resolve {arb['id']} delete/keep/people`")
+            lines.append("-" * 60)
+
+        return "\n".join(lines)
+
+
 def main():
     import argparse
 
@@ -288,8 +406,14 @@ def main():
     parser.add_argument('--findings', '-f', metavar='FINDINGS_JSON', help='附加发现')
     parser.add_argument('--report', '-r', action='store_true', help='生成执行报告')
 
+    # 仲裁相关命令
+    parser.add_argument('--arbitrate_submit', nargs=4, metavar=('TASK_ID', 'PATH', 'REASON', 'CONTENT'), help='提交仲裁请求')
+    parser.add_argument('--leader_arbitration', action='store_true', help='查看需人工处理的仲裁')
+    parser.add_argument('--leader_resolve', nargs=2, metavar=('ARB_ID', 'ACTION'), help='解决仲裁 (delete/keep/people)')
+
     args = parser.parse_args()
     runner = TaskRunner()
+    arb_mgr = ArbitrationManager()
 
     if args.report:
         print(runner.generate_report())
@@ -307,6 +431,26 @@ def main():
         runner.load_tasks()
         success = runner.update_task(task_id, status, result, findings)
         print(f"{'Updated' if success else 'Failed to update'}: {task_id} -> {status}")
+        return
+
+    if args.arbitrate_submit:
+        task_id, path, reason, content = args.arbitrate_submit
+        arb_id = arb_mgr.submit(task_id, path, reason, content)
+        print(f"仲裁请求已提交: {arb_id}")
+        print(f"解决命令: python scripts/task_runner.py --leader_resolve {arb_id} delete/keep/people")
+        return
+
+    if args.leader_arbitration:
+        print(arb_mgr.show_people())
+        return
+
+    if args.leader_resolve:
+        arb_id, action = args.leader_resolve
+        if action not in ("delete", "keep", "people"):
+            print(f"ERROR: 无效操作 {action}，必须是 delete/keep/people 之一")
+            sys.exit(1)
+        success = arb_mgr.resolve(arb_id, action)
+        print(f"{'已解决' if success else '失败'}: {arb_id} -> {action}")
         return
 
     if args.once:
