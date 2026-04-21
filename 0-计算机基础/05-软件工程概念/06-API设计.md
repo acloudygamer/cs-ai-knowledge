@@ -240,65 +240,7 @@ Accept: application/vnd.api+json; version=2
 
 ## 认证方式
 
-### API Key
-
-```bash
-# 简单密钥认证
-X-API-Key: your-api-key-here
-
-# 适合: 服务端到服务端,简单的身份验证
-```
-
-### JWT (JSON Web Token)
-
-```javascript
-// 签发 JWT
-const token = jwt.sign(
-    { userId: 123, role: 'admin' },
-    process.env.JWT_SECRET,
-    { expiresIn: '7d' }
-);
-
-// 验证 JWT
-const decoded = jwt.verify(token, process.env.JWT_SECRET);
-
-// JWT 结构
-// eyJhbGciOiJIUzI1NiJ9.eyJ1c2VySWQiOjEyM30.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c
-//    Header          .        Payload           .    Signature
-```
-
-### OAuth 2.0
-
-```bash
-# 授权码流程
-# 1. 用户点击授权
-GET /oauth/authorize?
-    client_id=your-client-id&
-    redirect_uri=https://your-app.com/callback&
-    response_type=code&
-    scope=read,write
-
-# 2. 授权服务器回调
-https://your-app.com/callback?code=authorization-code
-
-# 3. 交换令牌
-POST /oauth/token
-{
-    "grant_type": "authorization_code",
-    "code": "authorization-code",
-    "client_id": "your-client-id",
-    "client_secret": "your-client-secret",
-    "redirect_uri": "https://your-app.com/callback"
-}
-
-# 响应
-{
-    "access_token": "access-token-here",
-    "refresh_token": "refresh-token-here",
-    "expires_in": 3600,
-    "token_type": "Bearer"
-}
-```
+> 详细说明见 [07-认证授权](./07-认证授权.md)。
 
 ## 错误处理
 

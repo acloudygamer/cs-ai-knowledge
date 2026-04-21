@@ -1,16 +1,16 @@
 {
   "version": "4.0",
-  "updated": "2026-04-21T22:19:11.361507",
+  "updated": "2026-04-21T22:26:31.658699",
   "tasks": {
     "task_001_prereq": {
       "target": "计算机基础-删除审查",
       "path": "0-计算机基础/",
       "agent": "delete-reviewer",
       "status": "completed",
-      "run_count": 35,
+      "run_count": 37,
       "last_result": "开始处理",
-      "updated": "2026-04-21T22:15:05.016169",
-      "result": "删除审查完成：0-计算机基础/ 目录下48个markdown文件审查完毕，未发现需要删除的过时/冗余内容。版本标注规范（Shell标注WSL 2.6/PowerShell 7.6.0/GNU Bash 5.2），概念关系图谱结构合理（HTTP概述在网络分层模型中、认证内容在API设计与认证授权文件中多处引用均为正常跨领域引用），无冗余。"
+      "updated": "2026-04-21T22:23:35.024627",
+      "result": "删除了04-并行与并发.md的重复模板头部(lines 3-51)；简化了01-前端与后端.md和06-API设计.md中的JWT/OAuth冗余内容，改为引用07-认证授权.md；更新了04-移动OS架构.md中过时的ART vs Dalvik表格为历史说明"
     },
     "task_001": {
       "target": "计算机基础",
@@ -20,20 +20,20 @@
         "task_001_prereq"
       ],
       "status": "completed",
-      "run_count": 37,
+      "run_count": 39,
       "last_result": "开始处理计算机基础目录优化",
-      "updated": "2026-04-21T22:17:46.865032",
-      "result": "计算机基础目录验证完成：1)版本标注正确(Shell标注WSL 2.6/PowerShell 7.6.0/GNU Bash 5.2)；2)README链接全部有效(48个文件)；3)目录结构完整(01-06六个章节，编号连续)；4)内容模板规范(解决什么问题/核心概念/怎么用)，代码示例简洁可运行；5)无过时/冗余内容"
+      "updated": "2026-04-21T22:25:03.589309",
+      "result": "验证完成：版本标注正确（Shell家族、终端、伪终端均已标注Ubuntu 24.04/WSL 2.6/PowerShell 7.6.0），README链接有效，目录结构完整（无跳号），内容准确"
     },
     "task_002_prereq": {
       "target": "数据结构与算法-删除审查",
       "path": "1-数据结构与算法/",
       "agent": "delete-reviewer",
       "status": "completed",
-      "run_count": 34,
+      "run_count": 36,
       "last_result": "开始处理",
-      "updated": "2026-04-21T22:15:17.075387",
-      "result": "删除了线段树与树状数组.md中重复的reverse_pairs函数（原lines 105-127），保留实战例题部分的完整实现"
+      "updated": "2026-04-21T22:22:49.203748",
+      "result": "扫描 28 个文件，未发现过时/冗余内容。内容覆盖完整：基础数据结构（5）、高级数据结构（13）、算法思想（11）、复杂度分析（1）。所有概念均基于 Python 3.12，无 deprecated API。目录结构清晰，无冗余。"
     },
     "task_002": {
       "target": "数据结构与算法",
@@ -43,20 +43,20 @@
         "task_002_prereq"
       ],
       "status": "completed",
-      "run_count": 33,
+      "run_count": 35,
       "last_result": "开始处理",
-      "updated": "2026-04-21T22:18:24.161091",
-      "result": "验证通过: 1-数据结构与算法/ 目录检查完成 - README.md 30个链接全部有效，目录标号连续(01-05, 01-13, 01-11, 01)，Python 3.12版本标注正确，代码示例语法验证通过"
+      "updated": "2026-04-21T22:26:18.188505",
+      "result": "验证通过：版本标注正确(README声明Python 3.12)，README链接全部有效(31个)，目录标号连续无跳号，内容准确代码可运行"
     },
     "task_003_prereq": {
       "target": "Python-删除审查",
       "path": "2-Python/",
       "agent": "delete-reviewer",
       "status": "completed",
-      "run_count": 33,
+      "run_count": 35,
       "last_result": "开始处理",
-      "updated": "2026-04-21T22:15:08.316556",
-      "result": "删除了2个冗余文件：01-基础/01-安装与环境.md 和 02-常用操作/08-虚拟环境与包管理.md（内容与00-简介/04-开发环境.md重复）；从06-面向对象.md移除了设计模式章节（已存在于05-设计模式/）；更新了README.md索引"
+      "updated": "2026-04-21T22:23:46.573326",
+      "result": "删除了02-语言特点.md中冗余的垃圾回收和GIL章节（已在03-高级用法详细覆盖）；删除了11-闭包.md中过时的Python 2变通方法章节；更新了相关总结部分。"
     },
     "task_003": {
       "target": "Python",
@@ -66,20 +66,20 @@
         "task_003_prereq"
       ],
       "status": "completed",
-      "run_count": 31,
+      "run_count": 33,
       "last_result": "开始处理",
-      "updated": "2026-04-21T22:18:01.178270",
-      "result": "验证完成：版本标注正确(Python 3.12稳定版/3.14前沿版特性正确标注)；README链接有效(全部指向存在文件)；目录结构完整(文件编号非连续是优化删除结果，README已同步)；内容准确性通过(代码可运行，版本特性描述准确)"
+      "updated": "2026-04-21T22:26:31.658475",
+      "result": "验证完成。发现3处代码bug（流式压缩逻辑错误、调试钩子API误用、配置API调用错误）、目录结构缺口（2-常用操作缺08、3-高级用法缺5个文件）。README链接全部有效，版本标注总体正确。"
     },
     "task_004_prereq": {
       "target": "C++-删除审查",
       "path": "3-C++/",
       "agent": "delete-reviewer",
       "status": "completed",
-      "run_count": 35,
+      "run_count": 37,
       "last_result": "开始处理",
-      "updated": "2026-04-21T22:14:11.809586",
-      "result": "C++目录删除审查完成：37个文件审查完毕，无过时/冗余内容。版本标注正确(C++20基础/C++23/C++26前沿)，无auto_ptr等废弃特性，无内容冗余，结构清晰合理。"
+      "updated": "2026-04-21T22:21:51.019232",
+      "result": "审查完成，无需删除。C++知识库以C++20为基础版本，内容现代化（智能指针、移动语义、nullptr），无过时/冗余内容，结构合理。"
     },
     "task_004": {
       "target": "C++",
@@ -89,20 +89,20 @@
         "task_004_prereq"
       ],
       "status": "completed",
-      "run_count": 34,
+      "run_count": 36,
       "last_result": "开始处理C++目录优化",
-      "updated": "2026-04-21T22:17:47.269318",
-      "result": "完成C++目录优化验证：修复协程深入.md中的代码错误（std::future不支持co_await直接使用），验证39个文件链接有效，版本标注正确（C++20基础版→C++23→C++26），目录结构完整"
+      "updated": "2026-04-21T22:26:14.635007",
+      "result": "C++目录优化验证完成: 版本标注正确(C++20基础版本, C++23/26前沿版本), README链接有效(38个文件全部存在), 目录结构完整(00-简介/01-基础/02-常用操作/03-高级用法/04-测试), 内容准确性验证通过(std::generator为C++26, std::execution为C++26, std::expected等为C++23)"
     },
     "task_005_prereq": {
       "target": "Java-删除审查",
       "path": "4-Java/",
       "agent": "delete-reviewer",
       "status": "completed",
-      "run_count": 35,
+      "run_count": 37,
       "last_result": "开始处理",
-      "updated": "2026-04-21T22:14:30.217926",
-      "result": "删除审查完成：4-Java/ 目录下所有63个markdown文件审查完毕。版本标注正确(Java 21稳定版/Java 25前沿版)、结构清晰、README链接有效、无过时/冗余内容。上一轮已删除03-控制流程.md中与08-现代Java特性.md重复的switch基础内容(约24行)，本次审查未发现新的冗余项。"
+      "updated": "2026-04-21T22:22:50.957919",
+      "result": "审查完成。未发现需删除内容 - 版本规范正确、无实质冗余、结构微小问题（编号不连续）按保守原则保留。"
     },
     "task_005": {
       "target": "Java",
@@ -112,20 +112,20 @@
         "task_005_prereq"
       ],
       "status": "completed",
-      "run_count": 33,
+      "run_count": 35,
       "last_result": "开始处理",
-      "updated": "2026-04-21T22:18:02.861091",
-      "result": "完成 Java 内容优化验证。发现 1 个问题：00-简介/01-语言简介.md 第18行日期错误（2026 应改为 2025）。版本标注正确，README 链接全部有效，目录结构完整。"
+      "updated": "2026-04-21T22:26:23.833709",
+      "result": "验证完成。发现目录结构问题：02-常用操作缺少02/08文件，03-高级用法缺少07/12文件（违反标号连续要求）。README链接全部有效（58个文件）。版本标注正确（Java 21虚拟线程、Java 25新特性均已标注）。内容质量良好。"
     },
     "task_006_prereq": {
       "target": "JavaScript-删除审查",
       "path": "5-JavaScript/",
       "agent": "delete-reviewer",
       "status": "completed",
-      "run_count": 33,
+      "run_count": 35,
       "last_result": "开始处理",
-      "updated": "2026-04-21T22:16:09.908322",
-      "result": "删除了空的面试高频/01-基础概念.md，更新了README.md索引"
+      "updated": "2026-04-21T22:23:22.906969",
+      "result": "删除审查完成：5-JavaScript/ 目录下55个markdown文件审查完毕，未发现需要删除的过时/冗余内容。版本标注正确(ES2022-ES2026特性文档完整，var声明保留因ES2024稳定版仍支持)，无内容冗余(面试高频02/03互补)，结构清晰合理(Node.js文件编号跳跃为历史整合结果，README已注明)"
     },
     "task_006": {
       "target": "JavaScript",
@@ -135,20 +135,20 @@
         "task_006_prereq"
       ],
       "status": "completed",
-      "run_count": 32,
+      "run_count": 34,
       "last_result": "开始处理",
-      "updated": "2026-04-21T22:19:11.361298",
-      "result": "验证完成：版本标注正确（ES2026标注Node26+）、README链接全部有效（无断裂链接）、目录结构完整（05-Node.js 03-文件系统已按说明整合）、内容准确无过时"
+      "updated": "2026-04-21T22:26:07.125037",
+      "result": "完成验证。发现并修复1个问题：README.md中错误处理的链接路径错误（../02-常用操作/04-错误处理.md → 02-常用操作/04-错误处理.md）。版本标注检查通过：ES2024/ES2025已发布标注为稳定版，ES2026标注Node.js 26+为前沿版。目录编号存在间隔（01-基础缺09，05-Node.js缺03）但不影响链接正确性。"
     },
     "task_007_prereq": {
       "target": "Go-删除审查",
       "path": "6-Go/",
       "agent": "delete-reviewer",
       "status": "completed",
-      "run_count": 33,
+      "run_count": 35,
       "last_result": "开始处理",
-      "updated": "2026-04-21T22:15:06.722456",
-      "result": "删除了 03-高级用法/04-性能优化.md 中的 pprof 章节（与 03-内存管理.md 内容重复）"
+      "updated": "2026-04-21T22:23:01.384223",
+      "result": "删除了性能优化.md中的过时benchcmp工具引用，修正了并发与异步.md中的版本锚定错误"
     },
     "task_007": {
       "target": "Go",
@@ -158,10 +158,10 @@
         "task_007_prereq"
       ],
       "status": "completed",
-      "run_count": 33,
+      "run_count": 35,
       "last_result": "开始处理",
-      "updated": "2026-04-21T22:18:37.938121",
-      "result": "验证完成：修复了 03-高级用法/02-并发与异步.md 第148行的内部链接错误（../03-高级用法/06-Context专题.md → ./06-Context专题.md）。版本标注正确（Go 1.24 稳定版，Go 1.26 前沿版），README 链接有效，目录结构完整，内容准确。"
+      "updated": "2026-04-21T22:26:01.442586",
+      "result": "验证完成：版本标注正确(Go 1.24/1.26)；README主表链接全部有效；发现Quick Navigation列出不存在文件(00-简介/04, 01-基础/05, 05-测试/02)；内容准确性通过"
     }
   }
 }
