@@ -1,8 +1,12 @@
 # pytest 基础
 
-pytest 是 Python 最流行的单元测试框架。
+pytest 是 Python 最流行的单元测试框架，通过 `assert` 语句进行断言，支持丰富的插件生态。
 
 ## 安装与运行
+
+`pip install pytest` 安装，`pytest` 命令运行测试。常用选项：`-v` 详细输出、`-k` 按名称过滤、`-s` 显示 print 输出。
+
+### 参考样例
 
 ```bash
 # 安装
@@ -16,7 +20,9 @@ pytest -v                  # 详细输出
 pytest -k "test_name"      # 按名称过滤
 ```
 
-## 基本用法
+pytest 自动发现 `test_*.py` 和 `*_test.py` 文件中的测试函数。`pytest.raises` 捕获异常，`pytest.approx` 比较浮点数。
+
+### 参考样例
 
 ```python
 # test_example.py
@@ -42,7 +48,9 @@ def test_exception_message():
         int("abc")
 ```
 
-## 测试函数组织
+测试类以 `Test` 开头，方法以 `test_` 开头。pytest 自动收集并执行。
+
+### 参考样例
 
 ```python
 # test_bank.py
@@ -99,7 +107,9 @@ class TestBankAccount:
             account.withdraw(100)
 ```
 
-## setup 和 teardown
+`setup_method`/`teardown_method` 每个测试方法前后运行，`setup_module`/`teardown_module` 整个模块前后运行。
+
+### 参考样例
 
 ```python
 class TestDatabaseConnection:
@@ -132,7 +142,9 @@ def teardown_module(module):
     print("\nTearing down module")
 ```
 
-## 测试标记（Markers）
+`@pytest.mark.*` 定义测试标记，通过 `pytest -m slow` 等命令过滤运行。
+
+### 参考样例
 
 ```python
 import pytest
@@ -164,7 +176,9 @@ def test_known_bug():
 # pytest -m "unit and not slow"
 ```
 
-## 参数化测试
+`@pytest.mark.parametrize` 装饰器用不同参数多次运行同一测试。
+
+### 参考样例
 
 ```python
 @pytest.mark.parametrize("input,expected", [
@@ -194,7 +208,9 @@ def test_combinations(a, b):
     assert a + b > 0
 ```
 
-## 配置文件
+`pytest.ini` 或 `pyproject.toml` 的 `[tool.pytest.ini_options]` 配置测试路径、命名规则、默认选项。
+
+### 参考样例
 
 ```ini
 # pytest.ini 或 pyproject.toml

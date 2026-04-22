@@ -1,8 +1,14 @@
 # CI/CD 集成
 
+GitHub Actions 是 GitHub 原生的 CI/CD 平台，通过 `.github/workflows/` 中的 YAML 文件定义工作流。`actions/checkout`、`actions/setup-python` 是常用 action。
+
 ## GitHub Actions
 
 ### 基础工作流
+
+GitHub Actions 工作流由 trigger（触发条件）、jobs（作业）、steps（步骤）组成。矩阵策略（matrix）支持多 Python 版本并行测试。
+
+### 参考样例
 
 ```yaml
 # .github/workflows/test.yml
@@ -51,7 +57,9 @@ jobs:
           file: ./coverage.xml
 ```
 
-### 完整工作流示例
+完整 CI 工作流通常包含 lint、test、build、publish 阶段，各阶段可串行（`needs`）或并行执行。
+
+### 参考样例
 
 ```yaml
 # .github/workflows/ci.yml
@@ -156,9 +164,11 @@ jobs:
           password: ${{ secrets.PYPI_TOKEN }}
 ```
 
-## pre-commit
+`pre-commit` 在提交前自动运行代码检查（ruff、mypy、flake8 等），确保代码质量。`.pre-commit-config.yaml` 定义钩子配置。
 
 ### 安装与配置
+
+### 参考样例
 
 ```bash
 pip install pre-commit
@@ -192,7 +202,9 @@ repos:
         additional_dependencies: [types-all]
 ```
 
-### 自定义钩子
+自定义钩子通过 `repo: local` 定义本地脚本钩子，可用于安全扫描、测试等自定义任务。
+
+### 参考样例
 
 ```yaml
 # .pre-commit-config.yaml
@@ -213,9 +225,11 @@ repos:
       pass_filenames: false
 ```
 
-## Tox（多环境测试）
+`tox` 通过 `tox.ini` 定义多环境测试矩阵（不同 Python 版本、lint、type-check），自动创建虚拟环境并运行测试。
 
 ### 安装与配置
+
+### 参考样例
 
 ```bash
 pip install tox
@@ -297,7 +311,9 @@ USER appuser
 CMD ["python", "-m", "src.main"]
 ```
 
-### Multi-stage 构建
+Multi-stage 构建分离 builder 和 runtime 阶段，减小最终镜像体积。使用非 root 用户运行容器是安全最佳实践。
+
+### 参考样例
 
 ```dockerfile
 FROM python:3.14-slim as base
@@ -326,9 +342,11 @@ COPY --from=builder /app/src/ /app/src/
 CMD ["python", "-m", "src.main"]
 ```
 
-## 依赖管理
+依赖管理确保构建可重现。`pip-compile` 从 requirements.in 生成锁定的 requirements.txt。`poetry lock` 管理 Poetry 项目的依赖锁文件。
 
 ### pip-compile（锁定依赖）
+
+### 参考样例
 
 ```bash
 pip install pip-tools
@@ -353,9 +371,11 @@ poetry lock --update-all   # 升级所有依赖
 poetry check               # 检查依赖有效性
 ```
 
-## 发布到 PyPI
+发布流程：本地构建（`python -m build`）→ `twine check` 验证 → `twine upload` 上传。TestPyPI 用于测试，正式发布到 PyPI。
 
 ### 配置
+
+### 参考样例
 
 ```toml
 # pyproject.toml

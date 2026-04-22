@@ -1,17 +1,14 @@
 # Django 基础
 
-Django 是一个高级 Python Web 框架，鼓励快速开发和简洁实用的设计哲学。它遵循 " batteries included" 原则，提供几乎所有 Web 开发需要的组件。
+Django 是高级 Python Web 框架，遵循 "batteries included" 原则。MTV 架构：Model（模型）、Template（模板）、View（视图）。
 
 ## 核心特性
 
-- **MTV 架构** - Model-Template-View 模式
-- **ORM** - 强大的对象关系映射
-- **Admin 后台** - 自动生成管理界面
-- **表单处理** - 完整的表单验证和处理
-- **用户认证** - 内置认证系统
-- **安全性** - 防止 SQL 注入、XSS、CSRF 等
-
 ## 环境准备
+
+`pip install django` 安装，`django-admin startproject` 创建项目，`python manage.py startapp` 创建应用。
+
+### 参考样例
 
 ```bash
 pip install django
@@ -41,7 +38,9 @@ myproject/
     └── tests.py
 ```
 
-## 模型 (Models)
+Django ORM 通过 `models.Model` 子类定义模型，字段类型对应数据库列。
+
+### 参考样例
 
 ```python
 from django.db import models
@@ -185,7 +184,9 @@ class OrderItem(models.Model):
         return self.quantity * self.unit_price
 ```
 
-## 视图 (Views)
+Django 视图处理请求并返回响应。Class-based views（CBV）如 `ListView`、`DetailView` 提供通用功能。
+
+### 参考样例
 
 ```python
 from django.shortcuts import render, get_object_or_404, redirect
@@ -289,7 +290,9 @@ class DashboardView(TemplateView):
         return context
 ```
 
-## URL 配置
+URL 配置通过 `urls.py` 中的 `path()` 和 `include()` 组织路由。
+
+### 参考样例
 
 ```python
 # myproject/urls.py
@@ -337,7 +340,9 @@ urlpatterns = [
 ]
 ```
 
-## 表单 (Forms)
+Django 表单通过 `forms.ModelForm` 或 `forms.Form` 定义，提供验证和渲染。
+
+### 参考样例
 
 ```python
 from django import forms
@@ -387,7 +392,9 @@ class ProductSearchForm(forms.Form):
     in_stock = forms.BooleanField(required=False)
 ```
 
-## Admin 配置
+Django Admin 通过 `@admin.register()` 装饰器配置模型管理界面。
+
+### 参考样例
 
 ```python
 from django.contrib import admin
@@ -451,7 +458,9 @@ class OrderAdmin(admin.ModelAdmin):
     )
 ```
 
-## 中间件
+Django 中间件通过 `MiddlewareMixin` 子类实现，`process_request/process_response` 处理请求/响应。
+
+### 参考样例
 
 ```python
 # myproject/settings.py
@@ -497,7 +506,9 @@ class CartMiddleware(MiddlewareMixin):
         return None
 ```
 
-## 信号 (Signals)
+Django 信号通过 `@receiver` 装饰器监听模型事件，如保存后、删除前。
+
+### 参考样例
 
 ```python
 from django.db.models.signals import post_save, pre_delete
@@ -521,7 +532,9 @@ def order_item_deleted(sender, instance, **kwargs):
     instance.product.save()
 ```
 
-## 测试
+Django 测试通过 `django.test.TestCase` 子类编写，使用 `Client` 模拟请求。
+
+### 参考样例
 
 ```python
 from django.test import TestCase, Client

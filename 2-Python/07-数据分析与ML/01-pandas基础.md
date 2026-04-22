@@ -1,23 +1,22 @@
 # pandas 基础
 
-pandas 是 Python 数据分析的核心库，提供了高性能、易用的数据结构和数据分析工具。
+pandas 是 Python 数据分析核心库，提供 `DataFrame`（二维表格）和 `Series`（一维数组），支持缺失值处理、分组聚合、时间序列。
 
 ## 核心特性
 
-- **DataFrame** - 二维表格数据结构
-- **Series** - 一维标签数组
-- **缺失数据处理** - NaN 值处理
-- **数据对齐** - 自动对齐标签
-- **分组聚合** - 强大的 groupby
-- **时间序列** - 原生支持日期时间
-
 ## 环境准备
+
+`pip install pandas numpy openpyxl` 安装。
+
+### 参考样例
 
 ```bash
 pip install pandas numpy openpyxl
 ```
 
-## 数据结构
+`Series` 是一维标签数组，`DataFrame` 是二维表格，通过 `pd.Series()` 和 `pd.DataFrame()` 创建。
+
+### 参考样例
 
 ```python
 import pandas as pd
@@ -55,7 +54,9 @@ df = pd.DataFrame(data)
 print(df)
 ```
 
-## 数据读取和保存
+`pd.read_csv/excel/json/sql` 读取数据，`df.to_csv/excel/json` 保存数据。
+
+### 参考样例
 
 ```python
 import pandas as pd
@@ -88,7 +89,9 @@ for chunk in df:
     process(chunk)
 ```
 
-## 数据选择
+`df[col]` 选择列，`df.loc` 按标签索引，`df.iloc` 按位置索引，`df[condition]` 条件过滤。
+
+### 参考样例
 
 ```python
 import pandas as pd
@@ -129,7 +132,9 @@ print(df.at["a", "name"])
 print(df.iat[0, 0])
 ```
 
-## 数据操作
+`df.drop`、`df.rename`、`df.assign` 操作列，`pd.concat`、`pd.merge` 合并数据。
+
+### 参考样例
 
 ```python
 import pandas as pd
@@ -180,7 +185,9 @@ df["Salary_sqrt"] = np.sqrt(df["Salary"])
 df["rank"] = df["Salary"].rank(ascending=False)
 ```
 
-## 缺失数据处理
+`df.isnull()` 检测缺失值，`df.dropna()` 删除缺失，`df.fillna()` 填充缺失。
+
+### 参考样例
 
 ```python
 import pandas as pd
@@ -216,7 +223,9 @@ df_interpolated = df.interpolate(method="linear")
 df_interpolated = df.interpolate(method="quadratic")
 ```
 
-## 数据统计和聚合
+`df.groupby()` 分组，`df.agg()` 聚合，`df.pivot_table()` 透视表。
+
+### 参考样例
 
 ```python
 import pandas as pd
@@ -276,7 +285,9 @@ crosstab = pd.crosstab(df["city"], df["product"])
 print(crosstab)
 ```
 
-## 数据合并和连接
+`pd.concat` 拼接，`pd.merge` SQL 风格连接，`df.join` 索引连接。
+
+### 参考样例
 
 ```python
 import pandas as pd
@@ -313,7 +324,9 @@ df4 = df2.set_index("id")
 result = df3.join(df4, how="inner")
 ```
 
-## 时间序列处理
+`pd.date_range` 创建时间序列，`df.resample` 重采样，`df.rolling` 滚动窗口。
+
+### 参考样例
 
 ```python
 import pandas as pd
@@ -354,7 +367,9 @@ df["dayofweek"] = df.index.dayofweek
 df["quarter"] = df.index.quarter
 ```
 
-## 数据可视化
+`df.plot()` 直接绑定 matplotlib，生成折线图、柱状图、散点图、饼图。
+
+### 参考样例
 
 ```python
 import pandas as pd
@@ -390,7 +405,9 @@ plt.show()
 plt.savefig("chart.png", dpi=300, bbox_inches="tight")
 ```
 
-## 性能优化技巧
+pandas 性能优化：使用 `category` 类型、`df.query`、`pd.eval`、`df.eval`。
+
+### 参考样例
 
 ```python
 import pandas as pd

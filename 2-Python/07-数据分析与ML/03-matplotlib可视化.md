@@ -1,22 +1,22 @@
 # matplotlib 可视化
 
-matplotlib 是 Python 最流行的可视化库，提供了灵活的 2D 绘图能力。
+matplotlib 是 Python 最流行的可视化库，核心概念：`Figure`（画布）、`Axes`（绘图区）、`Axis`（坐标轴）。
 
 ## 核心概念
 
-- **Figure** - 整个画布
-- **Axes** - 实际绘图区域
-- **Axis** - 坐标轴
-- **Artist** - 所有可见元素
-- **Backend** - 输出格式
-
 ## 环境准备
+
+`pip install matplotlib` 安装。
+
+### 参考样例
 
 ```bash
 pip install matplotlib
 ```
 
-## 基础用法
+两种风格：面向对象（`fig, ax = plt.subplots()`）和 pyplot（`plt.plot()`）。推荐面向对象风格。
+
+### 参考样例
 
 ```python
 import matplotlib.pyplot as plt
@@ -44,6 +44,10 @@ plt.show()
 ## 常用图表
 
 ### 折线图
+
+`ax.plot(x, y)` 绑定折线图，可设置样式、标签、网格。
+
+### 参考样例
 
 ```python
 import matplotlib.pyplot as plt
@@ -88,6 +92,10 @@ plt.show()
 
 ### 散点图
 
+`ax.scatter(x, y)` 绑定散点图，支持颜色、大小映射。
+
+### 参考样例
+
 ```python
 import matplotlib.pyplot as plt
 import numpy as np
@@ -128,6 +136,10 @@ plt.show()
 ```
 
 ### 柱状图
+
+`ax.bar` 绑定柱状图，支持分组、堆叠、水平柱状图。
+
+### 参考样例
 
 ```python
 import matplotlib.pyplot as plt
@@ -202,6 +214,10 @@ plt.show()
 
 ### 饼图
 
+`ax.pie` 绑定饼图，支持突出显示、环形图。
+
+### 参考样例
+
 ```python
 import matplotlib.pyplot as plt
 import numpy as np
@@ -253,6 +269,10 @@ plt.show()
 ```
 
 ### 直方图和密度图
+
+`ax.hist` 绑定直方图，`scipy.stats.gaussian_kde` 进行核密度估计。
+
+### 参考样例
 
 ```python
 import matplotlib.pyplot as plt
@@ -309,6 +329,10 @@ plt.show()
 
 ### 箱线图
 
+`ax.boxplot` 绑定箱线图，展示数据分布和异常值。`ax.violinplot` 绑定小提琴图。
+
+### 参考样例
+
 ```python
 import matplotlib.pyplot as plt
 import numpy as np
@@ -362,6 +386,10 @@ plt.show()
 ```
 
 ### 热力图
+
+`ax.imshow` 绑定热力图，展示二维数据矩阵。
+
+### 参考样例
 
 ```python
 import matplotlib.pyplot as plt
@@ -423,6 +451,10 @@ plt.show()
 ```
 
 ### 子图布局
+
+`GridSpec` 或 `subplot_mosaic` 创建复杂子图布局。
+
+### 参考样例
 
 ```python
 import matplotlib.pyplot as plt
@@ -486,6 +518,10 @@ plt.show()
 
 ### 样式和主题
 
+`plt.style.use` 应用内置主题，`plt.rcParams` 自定义样式。
+
+### 参考样例
+
 ```python
 import matplotlib.pyplot as plt
 import numpy as np
@@ -531,6 +567,10 @@ plt.show()
 
 ### 保存图片
 
+`fig.savefig` 保存图片，支持 PNG、PDF、SVG、JPEG 格式。
+
+### 参考样例
+
 ```python
 import matplotlib.pyplot as plt
 import numpy as np
@@ -549,6 +589,10 @@ plt.close(fig)
 ```
 
 ### 交互式图表
+
+`ax.annotate` 添加标注，`ax.text` 添加文本框。
+
+### 参考样例
 
 ```python
 import matplotlib.pyplot as plt

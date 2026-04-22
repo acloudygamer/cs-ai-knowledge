@@ -1,16 +1,14 @@
 # FastAPI 快速入门
 
-FastAPI 是一个现代、快速的 Python Web 框架，基于标准 Python 类型提示，支持异步操作，内置 OpenAPI 和 JSON Schema 验证。
+FastAPI 是现代 Python Web 框架，基于类型提示，支持异步操作，内置 OpenAPI 文档。核心特性：高性能、Pydantic 数据验证、自动文档、依赖注入。
 
 ## 核心特性
 
-- **高性能** - 与 Node.js 和 Go 相当的性能
-- **类型安全** - 基于 Pydantic 的数据验证
-- **自动文档** - Swagger UI 和 ReDoc 自动生成
-- **异步支持** - 原生异步支持，充分利用 Python 3.7+
-- **依赖注入** - 强大的依赖注入系统
-
 ## 环境准备
+
+`pip install fastapi uvicorn[standard]` 安装。`fastapi` 是核心框架，`uvicorn` 是 ASGI 服务器。
+
+### 参考样例
 
 ```bash
 pip install fastapi uvicorn[standard]
@@ -20,6 +18,10 @@ pip install fastapi uvicorn[standard]
 - `uvicorn` - ASGI 服务器
 
 ## 第一个 FastAPI 应用
+
+`FastAPI()` 创建应用实例，`@app.get/post/put/delete` 定义路由。Pydantic `BaseModel` 定义请求/响应模型。
+
+### 参考样例
 
 ```python
 from fastapi import FastAPI, HTTPException
@@ -90,6 +92,10 @@ uvicorn main:app --reload
 
 ## 路径参数和查询参数
 
+`Annotated` 配合 `Path`/`Query` 添加参数验证。
+
+### 参考样例
+
 ```python
 from fastapi import FastAPI, Path, Query, HTTPException
 from typing import Annotated
@@ -120,7 +126,9 @@ async def search(
     }
 ```
 
-## 请求体和 Pydantic 模型
+Pydantic `BaseModel` 配合 `Field` 定义数据模型和验证规则。`response_model` 明确返回类型。
+
+### 参考样例
 
 ```python
 from fastapi import FastAPI, HTTPException
@@ -179,7 +187,9 @@ async def create_user(user: UserCreate):
     return db_user
 ```
 
-## 依赖注入
+依赖注入通过 `Depends()` 函数实现，用于认证、数据库会话等共享资源。
+
+### 参考样例
 
 ```python
 from fastapi import FastAPI, Depends, HTTPException, Header
@@ -229,7 +239,9 @@ async def admin_action(user: Annotated[dict, Depends(require_admin)]):
     return {"message": "Admin action completed", "user": user}
 ```
 
-## 数据库集成 (SQLAlchemy)
+`SQLAlchemy` ORM 通过 `Depends(get_db)` 注入数据库会话，实现 CRUD 操作。
+
+### 参考样例
 
 ```python
 from fastapi import FastAPI, Depends, HTTPException
@@ -308,7 +320,9 @@ def list_items(skip: int = 0, limit: int = 10, db: Session = Depends(get_db)):
     return items
 ```
 
-## 异常处理
+`@app.exception_handler` 注册全局异常处理器，`HTTPException` 用于常见 HTTP 错误。
+
+### 参考样例
 
 ```python
 from fastapi import FastAPI, HTTPException, Request
@@ -343,7 +357,9 @@ async def trigger_error():
     raise CustomException("ValidationError", "Invalid input data")
 ```
 
-## 中间件
+`BaseHTTPMiddleware` 子类实现中间件，通过 `app.add_middleware()` 注册。
+
+### 参考样例
 
 ```python
 from fastapi import FastAPI, Request
@@ -380,7 +396,9 @@ async def root():
     return {"message": "Check headers for timing info"}
 ```
 
-## 背景任务
+`BackgroundTasks` 添加后台任务，如注册后发送邮件。
+
+### 参考样例
 
 ```python
 from fastapi import FastAPI, BackgroundTasks, Depends

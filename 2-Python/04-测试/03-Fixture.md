@@ -1,8 +1,10 @@
 # Fixture
 
-pytest fixture 用于提供测试所需的预处理和后处理逻辑。
+pytest fixture 通过 `@pytest.fixture` 装饰器提供测试所需的预处理和后处理逻辑，通过 `yield` 实现清理。
 
 ## 基本 fixture
+
+### 参考样例
 
 ```python
 import pytest
@@ -23,7 +25,9 @@ def test_sample_data(sample_data):
     assert sample_data["name"] == "Alice"
 ```
 
-## fixture 返回值
+Fixture 可以依赖其他 fixture，通过函数参数声明依赖关系。
+
+### 参考样例
 
 ```python
 @pytest.fixture
@@ -38,7 +42,9 @@ def test_insert(database):
     assert database.count() == 1
 ```
 
-## fixture 依赖
+`scope` 参数控制 fixture 生命周期：`function`（默认，每个测试）、`class`（每个类）、`module`（每个模块）、`session`（整个会话）。
+
+### 参考样例
 
 ```python
 @pytest.fixture
@@ -82,7 +88,9 @@ def session_fixture():
     return "session"
 ```
 
-## autouse
+`autouse=True` 自动应用于所有测试，无需显式声明使用。
+
+### 参考样例
 
 ```python
 # autouse 自动应用于所有测试
@@ -99,7 +107,9 @@ class TestDatabase:
         self.db.close()
 ```
 
-## 参数化 fixture
+Fixture 可以参数化，通过 `request.param` 访问不同参数值。
+
+### 参考样例
 
 ```python
 @pytest.fixture(params=[1, 2, 3])
@@ -118,7 +128,9 @@ def user_data(request):
     return {"email": request.param[0], "name": request.param[1]}
 ```
 
-## fixture 命名
+建议使用描述性名称，避免技术术语。
+
+### 参考样例
 
 ```python
 # 建议使用描述性名称
@@ -129,7 +141,9 @@ def verified_user_token():
 # 避免使用 mock 或 stub 等技术术语
 ```
 
-## conftest.py
+`conftest.py` 在测试目录中定义共享 fixture，pytest 自动发现并加载。
+
+### 参考样例
 
 ```python
 # conftest.py - 共享 fixture
@@ -156,7 +170,9 @@ def db(app):
         db.drop_all()
 ```
 
-## tmp_path（临时文件）
+`tmp_path` 是 pytest 内置 fixture，提供临时目录用于测试文件操作。
+
+### 参考样例
 
 ```python
 def test_write_to_file(tmp_path):
@@ -174,7 +190,9 @@ def test_csv_processing(tmp_path):
     assert len(result) == 2
 ```
 
-## fixture 工厂
+Fixture 工厂返回创建对象的函数，支持在测试中创建多个对象实例。
+
+### 参考样例
 
 ```python
 # 工厂 fixture 返回创建对象的函数
@@ -201,7 +219,9 @@ def test_multiple_users(make_user):
     assert user2.name == "Bob"
 ```
 
-## 常用内置 fixture
+pytest 提供常用内置 fixture：`capfd` 捕获输出、`monkeypatch` 动态替换、`tmp_path` 临时目录、`caplog` 捕获日志。
+
+### 参考样例
 
 ```python
 def test_capfd(capfd):
@@ -228,7 +248,9 @@ def test_env(monkeypatch):
     assert os.environ["API_KEY"] == "test-key"
 ```
 
-## fixture 错误处理
+Fixture 失败时，依赖它的测试会被跳过。使用 `pytest.skip` 跳过测试。
+
+### 参考样例
 
 ```python
 @pytest.fixture

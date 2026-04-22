@@ -1,22 +1,22 @@
 # Flask 基础
 
-Flask 是一个轻量级的 Python Web 框架，灵活、简洁、易扩展。它不像 Django 那样 "batteries included"，但正因如此，Flask 让你可以选择需要的组件。
+Flask 是轻量级 Python Web 框架，核心简单但扩展丰富。不同于 Django 的 "batteries included"，Flask 允许自由选择组件。
 
 ## 核心特性
 
-- **轻量级** - 核心简单，扩展丰富
-- **灵活** - 自由选择数据库、模板引擎等
-- **RESTful** - 轻松构建 REST API
-- **内置开发服务器** - 方便调试
-- **Jinja2 模板** - 强大的模板引擎
-
 ## 环境准备
+
+`pip install flask` 安装。
+
+### 参考样例
 
 ```bash
 pip install flask
 ```
 
-## 第一个 Flask 应用
+`Flask(__name__)` 创建应用，`@app.route()` 定义路由。
+
+### 参考样例
 
 ```python
 from flask import Flask, render_template, request, jsonify, redirect, url_for, flash, session
@@ -50,7 +50,9 @@ if __name__ == "__main__":
     app.run(debug=True, port=5000)
 ```
 
-## 路由和请求处理
+Flask 请求钩子（`before_request`、`after_request`）和路由处理函数处理请求。`request` 对象提供请求数据访问。
+
+### 参考样例
 
 ```python
 from flask import Flask, request, jsonify, abort
@@ -185,7 +187,9 @@ def headers():
     })
 ```
 
-## 模板引擎 (Jinja2)
+Jinja2 模板引擎通过 `render_template()` 渲染 HTML，支持模板继承、循环、条件。
+
+### 参考样例
 
 ```html
 <!-- templates/base.html -->
@@ -292,7 +296,9 @@ def truncate_words_filter(value, num=50):
     return value
 ```
 
-## 数据库集成
+Flask-SQLAlchemy 通过 `db.Model` 定义模型，提供 CRUD 操作。
+
+### 参考样例
 
 ```python
 from flask import Flask, request, jsonify
@@ -438,7 +444,9 @@ def get_posts():
     })
 ```
 
-## 认证和会话
+Flask 认证基于 `session`，使用 `werkzeug.security` 哈希密码。
+
+### 参考样例
 
 ```python
 from flask import Flask, request, jsonify, session, g
@@ -508,7 +516,9 @@ def protected():
     return jsonify({"message": f"Hello, {auth.current_user()}!"})
 ```
 
-## 错误处理
+`@app.errorhandler` 装饰器注册错误处理器，返回 JSON 或模板。
+
+### 参考样例
 
 ```python
 from flask import Flask, jsonify, render_template, request
@@ -547,7 +557,9 @@ def force_500():
     raise InternalServerError("Something went wrong")
 ```
 
-## REST API 设计最佳实践
+Flask-RESTful 提供 `Resource` 和 `marshal_with` 简化 REST API 开发。
+
+### 参考样例
 
 ```python
 from flask import Flask, request, jsonify, Blueprint
@@ -614,7 +626,9 @@ api.add_resource(ItemResource, "/items/<int:item_id>")
 app.register_blueprint(api_bp)
 ```
 
-## 蓝图 (Blueprints) 组织大型应用
+蓝图（Blueprint）将应用拆分为模块化组件，便于大型应用组织。
+
+### 参考样例
 
 ```python
 # app/__init__.py

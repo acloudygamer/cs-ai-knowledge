@@ -1,4 +1,6 @@
-# Python 3.14 新特性
+# Python 3.14 新特性 <latest>
+
+Python 3.14 是前沿版本，包含多项重大改进：模板字符串 t-strings、类型提示惰性求值、子解释器支持、Zstd 压缩等。
 
 ## 目录
 
@@ -17,11 +19,13 @@
 
 ---
 
-## 模板字符串 t-strings
+## 模板字符串 t-strings <latest>
+
+Python 3.14 引入模板字符串（t-strings），使用 `t` 前缀返回 `Template` 对象，提供延迟处理特性，适合安全渲染场景。
 
 ### PEP 750 - 模板字符串字面量
 
-Python 3.14 引入了模板字符串（t-strings），这是继 f-strings 之后字符串处理能力的又一次重要升级。t-strings 使用 `t` 前缀，返回 `Template` 对象而非普通字符串：
+### 参考样例
 
 ```python
 from string.templatelib import Template
@@ -35,7 +39,9 @@ print(type(template))  # <class 'string.templatelib.Template'>
 
 ### 核心 API
 
-`Template` 对象提供以下属性访问模板结构：
+`Template` 对象提供 `strings`、`interpolations`、`values` 属性访问模板结构。
+
+### 参考样例
 
 ```python
 name = "World"
@@ -55,7 +61,9 @@ print(template.values)  # ('World',)
 
 ### 处理模板字符串
 
-t-strings 没有内置 `substitute()` 方法，需要自行处理。示例实现 f-string 功能：
+t-strings 没有内置 `substitute()` 方法，需要遍历模板自行处理。
+
+### 参考样例
 
 ```python
 from string.templatelib import Template, Interpolation
@@ -92,7 +100,9 @@ print(f(template))  # Hello 'Alice', value: 30.00
 
 ### 安全性提升
 
-t-string 的延迟处理特性使其适合安全渲染场景：
+t-string 的延迟处理特性适合安全渲染，通过 `html.escape` 转义用户输入防止 XSS。
+
+### 参考样例
 
 ```python
 from string.templatelib import Template, Interpolation
@@ -117,6 +127,10 @@ result = safe_render(template)
 
 ### 迭代模板内容
 
+`Template` 对象可迭代，每个元素是字符串或 `Interpolation` 对象。
+
+### 参考样例
+
 ```python
 name = "Python"
 version = "3.14"
@@ -131,6 +145,10 @@ for item in template:
 ```
 
 ### 支持的插值语法
+
+t-strings 支持变量插值、表达式、转换标志（`!r` `!s` `!a`）、格式说明符和调试说明符 `=`。
+
+### 参考样例
 
 ```python
 # 变量插值
@@ -157,11 +175,13 @@ t"{x=}"  # strings[0]='x=', values=(5,)
 
 ---
 
-## 类型提示惰性求值
+## 类型提示惰性求值 <latest>
+
+PEP 649 改进类型提示机制，类型注释在需要时才求值，减少模块导入开销，不再需要前向引用引号。
 
 ### PEP 649 - 注释延迟评估
 
-Python 3.14 对类型提示机制做了改进，类型注释在需要时才求值：
+### 参考样例
 
 ```python
 # Python 3.13 及之前：类型提示立即求值
@@ -173,7 +193,9 @@ Python 3.14 对类型提示机制做了改进，类型注释在需要时才求�
 
 ### 实际应用
 
-类型提示延迟求值减少了模块导入时的开销：
+类型提示延迟求值减少模块导入时的开销，不需要前向引用加引号。
+
+### 参考样例
 
 ```python
 # 在 Python 3.14 中，不需要前向引用加引号
@@ -188,6 +210,10 @@ class MyClass:
 ```
 
 ### 获取类型提示
+
+`typing.get_type_hints()` 已支持延迟求值。
+
+### 参考样例
 
 ```python
 # 使用 typing.get_type_hints() 获取（已支持延迟求值）
@@ -205,11 +231,13 @@ print(hints)  # {'x': <class 'int'>, 'y': <class 'str'>}
 
 ---
 
-## 子解释器支持
+## 子解释器支持 <latest>
+
+PEP 734/749 在标准库添加 `interpreters` 模块，每个子解释器有独立的 GIL，可实现真正并行。
 
 ### PEP 734 / PEP 749 - 标准库中的子解释器
 
-Python 3.14 在标准库中添加了 `interpreters` 模块，支持创建真正的独立解释器：
+### 参考样例
 
 ```python
 import interpreters
@@ -234,6 +262,10 @@ result = 42 * 2
 
 ### 与线程的区别
 
+线程共享同一 GIL，子解释器每个有独立 GIL，适合 CPU 密集型并行任务。
+
+### 参考样例
+
 ```python
 import interpreters
 import threading
@@ -253,13 +285,13 @@ total = sum(i * i for i in range(1000000))
 
 ---
 
-## 自由线程模式持续改进
+## 自由线程模式持续改进 <latest>
+
+PEP 703 引入自由线程模式（Python 3.13），3.14 继续完善。`python -X gil=0` 或 `python3.14t` 启用。
 
 ### PEP 703 - 自由线程模式持续改进
 
-Python 3.14 继续改进自由线程模式（free-threaded build），允许多线程真正并行执行：
-
-> 注：自由线程模式最初在 Python 3.13 (PEP 703) 中引入，3.14 继续完善此功能。
+### 参考样例
 
 ```bash
 # 启用自由线程模式
@@ -270,6 +302,10 @@ python3.14t
 ```
 
 ### 性能对比
+
+自由线程模式下 4 个线程能真正并行执行 CPU 密集型任务。
+
+### 参考样例
 
 ```python
 import threading
@@ -292,11 +328,13 @@ print(f"Traditional: {time.time() - start:.3f}s")
 
 ---
 
-## Zstd 压缩支持
+## Zstd 压缩支持 <latest>
+
+PEP 784 新增 `compression.zstd` 模块，支持 Zstandard 高效压缩算法，提供流式压缩接口。
 
 ### PEP 784 - compression.zstd 模块
 
-Python 3.14 新增了 `compression.zstd` 模块，支持 Zstandard 压缩算法：
+### 参考样例
 
 ```python
 import compression.zstd as zstd
@@ -321,6 +359,10 @@ with zstd.ZstdCompressor() as compressor:
 
 ### 压缩级别
 
+Zstd 压缩级别范围 1-22，默认为 3，级别越高压缩率越大但越慢。
+
+### 参考样例
+
 ```python
 import compression.zstd as zstd
 
@@ -336,11 +378,13 @@ print(f"Best: {len(compressed_best)} bytes")
 
 ---
 
-## 异常语法改进
+## 异常语法改进 <latest>
+
+PEP 758 允许 `except*` 表达式省略括号，语法更简洁。
 
 ### PEP 758 - except* 表达式省略括号
 
-Python 3.14 允许在 `except*` 表达式中省略括号：
+### 参考样例
 
 ```python
 # 之前（Python 3.11+）
@@ -358,6 +402,10 @@ except* ErrorA, ErrorB:
 
 ### except* 多异常捕获
 
+`except*` 捕获 `TaskGroup` 中不同类型的异常。
+
+### 参考样例
+
 ```python
 async def demo():
     try:
@@ -371,11 +419,13 @@ async def demo():
 
 ---
 
-## 外部调试器接口
+## 外部调试器接口 <latest>
+
+PEP 768 提供零开销外部调试器接口，减少调试时的性能开销，与 IDE 集成更紧密。
 
 ### PEP 768 - 零开销外部调试器接口
 
-Python 3.14 引入了新的调试器接口，允许更高效的外部调试：
+### 参考样例
 
 ```python
 # Python 3.14 的调试器接口改进
@@ -390,6 +440,10 @@ sys.add_debug_hook("breakpoint", lambda: print("Breakpoint"))
 
 ### 调试优化
 
+PEP 768 提供了更高效的调试机制，减少了调试时的性能开销。
+
+### 参考样例
+
 ```python
 # PEP 768 提供了更高效的调试机制
 # 减少了调试时的性能开销
@@ -398,11 +452,13 @@ sys.add_debug_hook("breakpoint", lambda: print("Breakpoint"))
 
 ---
 
-## UUID 新版本支持
+## UUID 新版本支持 <latest>
+
+Python 3.14 的 `uuid` 模块支持 v6/v7/v8，v7 是 Unix Epoch 时间戳（可排序），v8 是自定义格式。
 
 ### UUID 版本 6-8
 
-Python 3.14 的 `uuid` 模块现在支持 UUID 版本 6、7、8：
+### 参考样例
 
 ```python
 import uuid
@@ -430,6 +486,10 @@ print(f"v8: {uuid_v8}")
 
 ### 命名空间改进
 
+v3/v5 命名空间 UUID 生成性能提升 40%。
+
+### 参考样例
+
 ```python
 import uuid
 
@@ -446,11 +506,13 @@ print(f"v5: {uuid_v5}")
 
 ---
 
-## REPL 语法高亮
+## REPL 语法高亮 <latest>
+
+Python 3.14 的 REPL 支持语法高亮、更好的多行编辑和持久化历史记录。
 
 ### 交互式解释器改进
 
-Python 3.14 的 REPL 现在支持语法高亮：
+### 参考样例
 
 ```bash
 $ python3.14
@@ -466,6 +528,10 @@ Hello, World!
 
 ### 多行编辑改进
 
+REPL 提供更好的多行编辑支持和自动缩进。
+
+### 参考样例
+
 ```python
 >>> # 更好的多行编辑支持
 >>> # 自动缩进
@@ -477,6 +543,10 @@ nested
 ```
 
 ### 持久化历史记录
+
+REPL 历史记录跨会话持久化，可使用方向键上下查看。
+
+### 参考样例
 
 ```python
 >>> # 历史记录现在跨会话持久化
@@ -495,9 +565,13 @@ nested
 
 ---
 
-## asyncio 改进
+## asyncio 改进 <latest>
+
+Python 3.14 改进了 `TaskGroup` 和异步迭代器性能。
 
 ### TaskGroup 增强
+
+### 参考样例
 
 ```python
 import asyncio
@@ -512,6 +586,10 @@ async def demo():
 ```
 
 ### 异步迭代器改进
+
+异步生成器在 Python 3.14 中更高效。
+
+### 参考样例
 
 ```python
 import asyncio
@@ -533,11 +611,13 @@ asyncio.run(main())
 
 ---
 
-## 其他改进
+## 其他改进 <latest>
 
 ### 尾调用解释器 (Tail-Call Interpreter)
 
-Python 3.14 引入了实验性的尾调用解释器（需要自定义编译）：
+Python 3.14 引入了实验性的尾调用解释器（需要自定义编译），复用栈帧避免栈空间消耗。
+
+### 参考样例
 
 ```bash
 # 实验性功能，需要自定义编译
@@ -561,6 +641,10 @@ def tail_sum(n, total=0):
 
 ### 性能提升
 
+Python 3.14 相比 3.13 平均提升约 5-10%，部分 Python 密集型任务可提升 30-40%。
+
+### 参考样例
+
 ```python
 # Python 3.14 相比 3.13 平均提升约 5-10%
 # 在 PyPerformance 基准测试中平均提速 9-15%
@@ -580,6 +664,10 @@ print(f"Execution time: {t:.3f}s")
 
 ### 配置 API 改进
 
+PEP 741 提供了更灵活的解释器初始化配置方式。
+
+### 参考样例
+
 ```python
 # PEP 741 - Python 配置 API
 # 更灵活的解释器初始化配置
@@ -595,6 +683,10 @@ sys.set_init_config({
 
 ### 工件验证
 
+PEP 761 过渡到 Sigstore 进行工件验证，Python 3.14 开始不再支持 PGP 签名。
+
+### 参考样例
+
 ```python
 # PEP 761 - 过渡到 Sigstore 进行工件验证
 # Python 3.14 开始不再支持 PGP 签名
@@ -605,6 +697,10 @@ sys.set_init_config({
 ```
 
 ### 标准库清理
+
+Python 3.14 移除了一些废弃模块和方法，改进弃用警告。
+
+### 参考样例
 
 ```python
 # 移除了一些废弃模块和方法
@@ -620,6 +716,10 @@ warnings.warn(
 ```
 
 ### 错误信息改进
+
+Python 3.14 改进了 `NameError`、`ImportError` 的错误提示，提供更清晰的修复建议。
+
+### 参考样例
 
 ```python
 # Python 3.14 继续改进错误提示

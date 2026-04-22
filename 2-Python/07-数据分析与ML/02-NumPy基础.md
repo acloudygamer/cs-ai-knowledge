@@ -1,23 +1,22 @@
 # NumPy 基础
 
-NumPy 是 Python 科学计算的基础库，提供了高性能的多维数组对象和用于处理这些数组的工具。
+NumPy 是 Python 科学计算基础库，提供高性能 `ndarray` 多维数组，支持向量化操作和广播机制。
 
 ## 核心特性
 
-- **ndarray** - 高性能多维数组
-- **向量化操作** - 无需循环的数组运算
-- **广播机制** - 不同形状数组间的运算
-- **数学函数** - 丰富的数学函数库
-- **线性代数** - 矩阵运算、特征值等
-- **随机数生成** - 各种分布的随机数
-
 ## 环境准备
+
+`pip install numpy` 安装。
+
+### 参考样例
 
 ```bash
 pip install numpy
 ```
 
-## 数组创建
+`np.array` 从列表创建，`np.zeros/ones/full` 创建特殊数组，`np.arange/linspace` 创建范围数组。
+
+### 参考样例
 
 ```python
 import numpy as np
@@ -61,7 +60,9 @@ dt = np.dtype([("name", "U10"), ("age", "i4"), ("weight", "f4")])
 people = np.array([("Alice", 25, 55.5), ("Bob", 30, 70.0)], dtype=dt)
 ```
 
-## 数组属性
+`arr.shape` 查看形状，`arr.dtype` 查看类型，`arr.reshape` 改变形状。
+
+### 参考样例
 
 ```python
 import numpy as np
@@ -87,7 +88,9 @@ arr_flat = arr.flatten()      # 复制并展平
 arr_ravel = arr.ravel()       # 返回展平视图（可能不复制）
 ```
 
-## 数组索引和切片
+`arr[i]` 基本索引，`arr[start:stop:step]` 切片，`arr[condition]` 布尔索引，`arr[[i,j]]` 花式索引。
+
+### 参考样例
 
 ```python
 import numpy as np
@@ -129,7 +132,9 @@ result = np.where(arr > 5, arr, 0)  # 条件替换
 indices = np.where(arr > 5)         # 返回满足条件的索引
 ```
 
-## 数组运算
+NumPy 支持逐元素算术运算、比较运算、聚合函数（`np.sum`、`np.mean` 等）。
+
+### 参考样例
 
 ```python
 import numpy as np
@@ -184,7 +189,9 @@ print(np.cumsum(arr))    # [1, 3, 6, 10, 15]
 print(np.cumprod(arr))   # [1, 2, 6, 24, 120]
 ```
 
-## 广播机制
+广播允许不同形状数组进行运算，小数组广播到大数组。
+
+### 参考样例
 
 ```python
 import numpy as np
@@ -210,7 +217,9 @@ print(np.outer(p, q))
 #  [12 15 18]]
 ```
 
-## 数学函数
+NumPy 提供三角函数、指数对数、幂函数、取整函数等丰富数学函数。
+
+### 参考样例
 
 ```python
 import numpy as np
@@ -252,7 +261,9 @@ print(np.modf(arr.astype(float)))  # 返回小数和整数部分
 print(np.clip(arr, 1, 3))    # 限制在 [1, 3] 范围内
 ```
 
-## 线性代数
+`np.linalg` 提供矩阵乘法、逆矩阵、特征值、线性方程组求解等线性代数功能。
+
+### 参考样例
 
 ```python
 import numpy as np
@@ -308,7 +319,9 @@ print(np.linalg.norm(A, ord=np.inf))  # 无穷范数
 print(np.linalg.matrix_rank(A))
 ```
 
-## 随机数生成
+`np.random` 提供多种分布的随机数生成，正态、均匀、泊松、二项分布等。
+
+### 参考样例
 
 ```python
 import numpy as np
@@ -342,7 +355,9 @@ np.random.shuffle(arr_2d)  # 只洗牌行
 np.random.shuffle(arr_2d, axis=1)  # 只洗牌列
 ```
 
-## 文件操作
+`np.save/load` 保存 numpy 文件，`np.savetxt/loadtxt` 保存文本文件。
+
+### 参考样例
 
 ```python
 import numpy as np
@@ -374,7 +389,9 @@ np.save("arr.npy", arr)
 np.savez_compressed("arr_compressed.npz", arr=arr)
 ```
 
-## 结构化数组
+结构化数组通过 `dtype` 定义多字段结构，模拟数据库表。
+
+### 参考样例
 
 ```python
 import numpy as np
@@ -419,7 +436,9 @@ employees = np.array([
 sorted_employees = np.sort(employees, order=["department", "name"])
 ```
 
-## 高级用法
+高级用法包括向量化函数、多项式拟合、近似相等判断、内存布局优化。
+
+### 参考样例
 
 ```python
 import numpy as np

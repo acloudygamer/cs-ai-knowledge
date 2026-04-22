@@ -1,8 +1,12 @@
 # Mock 与 Fake
 
-测试时隔离外部依赖，使用 Mock 模拟对象行为。
+测试时隔离外部依赖，使用 Mock 模拟对象行为，Fake 提供简化实现替代复杂真实对象。
 
 ## unittest.mock 基本用法
+
+`Mock` 创建可配置的空对象，设置 `return_value` 和 `side_effect`，通过 `assert_*` 方法验证调用。
+
+### 参考样例
 
 ```python
 from unittest.mock import Mock, MagicMock, patch
@@ -35,6 +39,10 @@ mock_obj.method.call_args_list  # 所有调用的参数列表
 
 ## MagicMock（自动魔法方法）
 
+`MagicMock` 自动实现 `__getitem__`、`__len__`、`__iter__` 等魔术方法，适用于模拟字典、列表等容器。
+
+### 参考样例
+
 ```python
 # MagicMock 自动实现魔术方法
 mock_list = MagicMock()
@@ -55,6 +63,10 @@ print(mock_dict.get("missing", "default"))  # default
 ```
 
 ## patch 装饰器
+
+`@patch` 装饰器或上下文管理器临时替换模块级对象（函数、类、属性）。
+
+### 参考样例
 
 ```python
 from unittest.mock import patch
@@ -97,6 +109,10 @@ def test_file_operations(mock_open, mock_exists):
 
 ## side_effect（副作用）
 
+`side_effect` 设置返回值序列或异常，或指向实际函数处理参数。
+
+### 参考样例
+
 ```python
 # 模拟多次调用返回不同值
 mock_func = Mock()
@@ -128,6 +144,10 @@ print(mock_calc(3, 4))  # 7
 ```
 
 ## 创建 Fake 类
+
+Fake 是简化实现，替代外部服务（数据库、邮件服务等），提供可预测的测试行为。
+
+### 参考样例
 
 ```python
 # Fake 用于替代真实的复杂对象
@@ -183,6 +203,10 @@ def test_user_creation():
 
 ## patch 对象方法
 
+`patch.object` 替换对象的方法，`create_autospec` 自动推断签名防止错误调用。
+
+### 参考样例
+
 ```python
 # 部分模拟
 class MyClass:
@@ -209,6 +233,10 @@ mock_func(1, 2, c=3)  # 签名检查
 ```
 
 ## Mock 最佳实践
+
+保持 Mock 局部化，使用 `spec` 防止错误调用，验证调用顺序。
+
+### 参考样例
 
 ```python
 # 1. 保持 Mock 局部化
