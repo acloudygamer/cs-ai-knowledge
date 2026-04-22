@@ -24,8 +24,8 @@ Java 8（Lambda/Stream）→ Java 11（HttpClient）→ Java 17（密封类）�
 ## 简介
 
 - [语言简介](./00-简介/01-语言简介.md)
-- [应用场景](./00-简介/03-应用场景.md)
-- [你好世界](./00-简介/05-你好世界.md)
+- [应用场景](./00-简介/02-应用场景.md)
+- [你好世界](./00-简介/03-你好世界.md)
 
 ## 基础
 
@@ -40,17 +40,17 @@ Java 8（Lambda/Stream）→ Java 11（HttpClient）→ Java 17（密封类）�
 ## 常用操作
 
 - [文件操作](./02-常用操作/01-文件操作.md)
-- [JSON处理](./02-常用操作/03-JSON处理.md)
-- [错误处理](./02-常用操作/04-错误处理.md)
-- [Stream API](./02-常用操作/05-Stream-API.md)
-- [Maven基础](./02-常用操作/06-Maven基础.md)
-- [日志框架](./02-常用操作/07-日志框架.md)
-- [JDBC数据库操作](./02-常用操作/09-JDBC数据库操作.md)
-- [正则表达式](./02-常用操作/10-正则表达式.md)
-- [日期时间](./02-常用操作/11-日期时间.md)
-- [网络编程](./02-常用操作/12-网络编程.md)
-- [Gradle](./02-常用操作/13-Gradle.md)
-- [HTTP客户端对比](./02-常用操作/14-HTTP客户端对比.md)
+- [JSON处理](./02-常用操作/02-JSON处理.md)
+- [错误处理](./02-常用操作/03-错误处理.md)
+- [Stream API](./02-常用操作/04-Stream-API.md)
+- [Maven基础](./02-常用操作/05-Maven基础.md)
+- [日志框架](./02-常用操作/06-日志框架.md)
+- [JDBC数据库操作](./02-常用操作/07-JDBC数据库操作.md)
+- [正则表达式](./02-常用操作/08-正则表达式.md)
+- [日期时间](./02-常用操作/09-日期时间.md)
+- [网络编程](./02-常用操作/10-网络编程.md)
+- [Gradle](./02-常用操作/11-Gradle.md)
+- [HTTP客户端对比](./02-常用操作/12-HTTP客户端对比.md)
 
 ## 高级用法
 
@@ -60,12 +60,12 @@ Java 8（Lambda/Stream）→ Java 11（HttpClient）→ Java 17（密封类）�
 - [性能优化](./03-高级用法/04-性能优化.md)
 - [模块系统](./03-高级用法/05-模块系统.md)
 - [JVM原理](./03-高级用法/06-JVM原理.md)
-- [现代Java特性](./03-高级用法/08-现代Java特性.md)
-- [响应式编程](./03-高级用法/09-响应式编程.md)
-- [安全编码](./03-高级用法/10-安全编码.md)
-- [虚拟线程深度](./03-高级用法/11-虚拟线程深度.md)
-- [Lombok](./03-高级用法/13-Lombok.md)
-- [GraalVM与NativeImage](./03-高级用法/14-GraalVM与NativeImage.md)
+- [现代Java特性](./03-高级用法/07-现代Java特性.md)
+- [响应式编程](./03-高级用法/08-响应式编程.md)
+- [安全编码](./03-高级用法/09-安全编码.md)
+- [虚拟线程深度](./03-高级用法/10-虚拟线程深度.md)
+- [Lombok](./03-高级用法/11-Lombok.md)
+- [GraalVM与NativeImage](./03-高级用法/12-GraalVM与NativeImage.md)
 
 ## 测试
 
@@ -77,17 +77,17 @@ Java 8（Lambda/Stream）→ Java 11（HttpClient）→ Java 17（密封类）�
 
 ## Java生态
 
-- [Spring入门](./05-Java生态/00-Spring入门.md)
-- [SpringBoot深度](./05-Java生态/01-SpringBoot深度.md)
-- [JPA与Hibernate](./05-Java生态/02-JPA与Hibernate.md)
-- [Redis](./05-Java生态/03-Redis.md)
-- [Kafka](./05-Java生态/04-Kafka.md)
-- [Docker与K8s](./05-Java生态/05-Docker与K8s.md)
-- [MyBatis](./05-Java生态/06-MyBatis.md)
-- [SpringCloud微服务](./05-Java生态/07-SpringCloud微服务.md)
-- [SpringSecurity](./05-Java生态/08-SpringSecurity.md)
-- [Elasticsearch与MongoDB](./05-Java生态/09-Elasticsearch与MongoDB.md)
-- [监控与链路追踪](./05-Java生态/10-监控与链路追踪.md)
+- [Spring入门](./05-Java生态/01-Spring入门.md)
+- [SpringBoot深度](./05-Java生态/02-SpringBoot深度.md)
+- [JPA与Hibernate](./05-Java生态/03-JPA与Hibernate.md)
+- [Redis](./05-Java生态/04-Redis.md)
+- [Kafka](./05-Java生态/05-Kafka.md)
+- [Docker与K8s](./05-Java生态/06-Docker与K8s.md)
+- [MyBatis](./05-Java生态/07-MyBatis.md)
+- [SpringCloud微服务](./05-Java生态/08-SpringCloud微服务.md)
+- [SpringSecurity](./05-Java生态/09-SpringSecurity.md)
+- [Elasticsearch与MongoDB](./05-Java生态/10-Elasticsearch与MongoDB.md)
+- [监控与链路追踪](./05-Java生态/11-监控与链路追踪.md)
 
 ## 设计模式
 
