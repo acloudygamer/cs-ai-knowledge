@@ -1,21 +1,26 @@
 # 终端与tty
 
-tty/pts 是 Unix/Linux 概念。Windows Terminal (Windows 11) 提供类似功能但使用不同机制。 (<latest> Ubuntu 24.04 的 Wayland 协议下 pts 设备仍通过 DRM/KMS 交互)
+终端将键盘输入和屏幕输出抽象为字符流，是用户与操作系统交互的基础接口。Shell接收命令并返回结果，远程访问和文本交互均依赖于此。
 
-## 解决什么问题
-
-用户需要一种方式与操作系统交互。终端将键盘输入和屏幕输出抽象为字符流，让Shell接收命令并返回结果，是远程访问和文本交互的基础。
+> **机制演进说明**
+> - **tty/pts 机制**：Unix/Linux 的终端抽象，通过字符设备实现
+> - **Windows Terminal 变革**：Windows 11 提供现代终端体验，使用不同底层机制 (<latest>)
+> - **Ubuntu 24.04 Wayland**：pts 设备仍通过 DRM/KMS 交互 (<latest>)
 
 ## 核心概念
 
-- 终端是输入输出设备的抽象，tty是Linux对终端的字符设备抽象
-- 标准输入/输出/错误（stdin/stdout/stderr）是进程与终端交互的通道
-- 终端行规程处理回显、行缓冲、信号转换（Ctrl+C发送SIGINT）
-- 虚拟终端（tty1-tty6）提供本地多会话，伪终端（pty）支持远程会话
+**tty**（TeleTYpewriter）是Linux对终端设备的字符设备抽象。终端设备分为三类：物理终端（tty1-tty6，本地多会话）、串口终端（ttyS0等）、伪终端（pts/X，SSH/终端仿真器）。**stdin/stdout/stderr**是进程与终端交互的三个标准通道。
 
-## 怎么用
+**终端行规程（Line Discipline）**在内核中处理字符转换：回显（输入字符实时显示）、行缓冲（按回车后才交付）、信号转换（Ctrl+C映射为SIGINT）、CRLF转换（Windows换行符规范化）。
 
-### 查看和使用终端设备
+### 终端设备层级
+
+```
+用户输入 → 键盘 → 内核终端行规程 → Shell进程
+Shell输出 → 内核终端行规程 → 屏幕显示
+```
+
+### 参考样例
 
 ```bash
 # 查看当前终端设备
@@ -33,37 +38,8 @@ Ctrl + Alt + F1   # 切换到tty1
 Ctrl + Alt + F7   # 返回图形界面
 ```
 
-### 标准输入输出与重定向
-
 ```bash
-# 重定向
-command > output.txt    # 标准输出重定向到文件
-command 2> error.txt     # 标准错误重定向到文件
-command > all.txt 2>&1   # 两者都重定向
-command &> all.txt       # 简写形式
-
-# 管道
-command1 | command2      # command1的输出作为command2的输入
-```
-
-### stty 终端设置
-
-```bash
-# 查看当前终端设置
-stty -a
-# 输出: speed 38400 baud; rows 50; columns 120; lc ...
-
-# 常用设置
-stty erase ^H        # 设置退格键
-stty -echo           # 关闭回显（密码输入时）
-stty echo            # 开启回显
-stty intr ^C         # 设置中断信号键
-```
-
-### 终端控制字符
-
-```bash
-# 常用控制字符（Ctrl组合键）
+# 常用控制字符
 Ctrl+C   # SIGINT - 中断进程
 Ctrl+Z   # SIGTSTP - 挂起进程（bg/fg恢复）
 Ctrl+D   # EOF - 关闭输入
@@ -72,29 +48,36 @@ Ctrl+Q   # XON - 恢复输出
 Ctrl+H   # 退格（Backspace）
 Ctrl+L   # 清屏
 
-# 查看所有控制字符
-stty -a | grep control
+# stty 查看/设置终端参数
+stty -a                    # 查看所有设置
+stty erase ^H             # 设置退格键
+stty -echo                 # 关闭回显（密码输入时）
 ```
 
-## 终端行规程
+## 标准I/O重定向与管道
 
-终端内核模块处理字符的转换和缓冲：
+Shell提供强大的I/O重定向能力，将命令的输入输出连接到文件或其他命令：
 
-| 功能 | 说明 |
-|------|------|
-| 回显(Echo) | 用户输入字符时在屏幕上显示 |
-| 行缓冲 | 用户按回车后才将行内容发给程序 |
-| 信号处理 | Ctrl+C发送SIGINT, Ctrl+Z发送SIGTSTP |
-| CRLF转换 | Windows换行\r\n转为\n |
+```bash
+# 重定向
+command > output.txt    # 标准输出重定向到文件（覆盖）
+command >> output.txt   # 追加模式
+command 2> error.txt    # 标准错误重定向到文件
+command > all.txt 2>&1  # 标准输出和错误都重定向
+command &> all.txt      # 简写形式
+
+# 管道：前一个命令的stdout连接到后一个的stdin
+command1 | command2
+```
 
 ## 伪终端
 
+SSH等远程会话时使用伪终端（pty）。远程程序感觉像在本地终端运行，数据通过SSH加密隧道传输。
+
 > 详细内容见 [03-伪终端](./03-伪终端.md)。
 
-SSH等远程会话时使用伪终端。数据通过SSH加密隧道传输，但远程程序感觉像在本地终端运行。
-
 ```bash
-# SSH工作原理
+# SSH 伪终端工作原理
 ssh user@server
   ↓
 本地终端打开伪终端主设备 (pty master)
