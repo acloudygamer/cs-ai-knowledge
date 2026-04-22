@@ -8,7 +8,11 @@ Java 21 引入了许多现代语言特性，让代码更简洁、更安全。本
 
 Records 是不可变数据类，用于替代笨重的类。
 
-### 基本用法
+Records 的核心价值在于**编译器自动生成equals、hashCode、toString 及访问器方法**，将原本需要数十行样板代码才能实现的类压缩为一行声明。Record 自动生成的组件遵循约定优于配置原则，getter 方法名即为字段名而非传统 getXxx() 形式。
+
+Record 本质是**名义类型**（Nominal Type），类声明即类型定义，不可继承其他类但可实现接口。
+
+### 参考样例
 
 ```java
 // 传统方式：需要大量样板代码
@@ -46,9 +50,8 @@ int age = user.age();
 System.out.println(user);  // User[name=Alice, age=30]
 ```
 
-### Record 约束
-
 ```java
+// Record 约束
 // Record 不能继承其他类
 // public record Student extends User() { }  // 编译错误
 
@@ -61,14 +64,9 @@ public record User(String name, int age) implements Identifiable {
 }
 ```
 
-### Record 的组件自动生成
-
 ```java
+// Record 内部可定义静态字段和静态方法
 public record Point(int x, int y) {
-
-    // 自动生成的组件（构造函数、equals、hashCode、toString）
-
-    // 可以自定义静态字段和静态方法
     public static Point origin() {
         return new Point(0, 0);
     }
@@ -79,10 +77,8 @@ public record Point(int x, int y) {
 }
 ```
 
-### Record 与模式匹配
-
 ```java
-// Record 在 switch 中使用
+// Record 与 switch 模式匹配结合
 String format(Object obj) {
     return switch (obj) {
         case null -> "null";
@@ -96,9 +92,11 @@ String format(Object obj) {
 
 ## Sealed Classes
 
-密封类限制哪些类可以继承它。
+密封类限制哪些类可以继承它，通过穷尽性检查让编译器确保所有可能子类都被处理。
 
-### 基本用法
+密封类的核心机制是**有限继承层次**——编译器在编译期就能验证 switch 表达式是否穷尽所有可能，无需 default 兜底。子类修饰符控制继承灵活性：final 禁止继承，non-sealed 解除密封允许任意子类（用于框架扩展）。
+
+### 参考样例
 
 ```java
 // 密封 Shape，只允许 Circle 和 Rectangle 继承
@@ -119,8 +117,6 @@ public non-sealed class Rectangle extends Shape {
 }
 ```
 
-### 修饰符含义
-
 | 修饰符 | 含义 |
 |--------|------|
 | `sealed` | 允许指定子类 |
@@ -128,20 +124,16 @@ public non-sealed class Rectangle extends Shape {
 | `final` | 不能被继承 |
 | `static` | 不能有内部子类 |
 
-### 隐式 sealed
-
 ```java
-// 如果同一源文件中定义，子类在同一包内自动可访问
+// 隐式 sealed：同一源文件中定义，子类在同一包内自动可访问
 public sealed class Animal { }
 class Dog extends Animal { }      // 同一包内，允许
 class Cat extends Animal { }     // 同一包内，允许
 // class Bird extends Animal { } // 编译错误，超出包范围
 ```
 
-### Sealed 与 Pattern Matching
-
 ```java
-// 密封类让编译器知道所有可能的情况
+// Sealed 与 Pattern Matching：编译器知道所有可能情况
 double calculateArea(Shape shape) {
     return switch (shape) {
         case Circle c -> Math.PI * c.radius() * c.radius();
@@ -154,6 +146,10 @@ double calculateArea(Shape shape) {
 ## Pattern Matching
 
 ### instanceof 模式匹配
+
+instanceof 模式匹配消除了强制类型转换的样板代码——模式变量直接由编译器注入作用域，类型检查与变量绑定在同一个表达式中完成。
+
+### 参考样例
 
 ```java
 // 传统方式
@@ -169,6 +165,8 @@ if (obj instanceof String s) {
 ```
 
 ### Guarded Patterns
+
+带条件的模式匹配通过 when 子句实现额外的运行时检查，将条件从外部 if 迁移到模式内部。
 
 ```java
 // 带条件的模式匹配
@@ -188,6 +186,8 @@ return switch (obj) {
 
 ### Record Patterns
 
+嵌套 Record 解构允许在模式匹配中直接提取嵌套字段，实现类似解构赋值的能力。
+
 ```java
 // 嵌套 Record 解构
 record Point(int x, int y) {}
@@ -202,7 +202,9 @@ void printCenter(Object obj) {
 
 ## Switch 表达式
 
-### 箭头表达式
+switch 从语句进化为表达式，意味着 switch 可以返回值。箭头表达式（->）是 switch 表达式的标准语法，配合 yield 可从块中返回值。
+
+### 参考样例
 
 ```java
 // 传统 switch
@@ -215,8 +217,7 @@ switch (day) {
         break;
     case TUESDAY:
         result = 7;
-        break;
-    // ...
+        // ...
 }
 
 // Switch 表达式
@@ -229,10 +230,8 @@ int result = switch (day) {
 };
 ```
 
-###  yield 关键字
-
 ```java
-// 复杂逻辑使用 yield 返回值
+// yield 关键字：从块中返回值
 int result = switch (day) {
     case MONDAY -> {
         int hours = 8;
@@ -248,9 +247,8 @@ int result = switch (day) {
 };
 ```
 
-### 枚举与 Switch
-
 ```java
+// 枚举与 Switch
 enum Status { PENDING, APPROVED, REJECTED }
 
 String getMessage(Status status) {
@@ -264,9 +262,9 @@ String getMessage(Status status) {
 
 ## Text Blocks
 
-多行字符串字面量。
+文本块是多行字符串字面量，消除了转义和拼接的麻烦。缩进由编译器自动处理，行首空白按最左对齐去除。
 
-### 基本用法
+### 参考样例
 
 ```java
 // 传统方式：转义和拼接
@@ -284,10 +282,8 @@ String json = """
 """;
 ```
 
-### 格式化控制
-
 ```java
-// 文本块的缩进会自动去除
+// 格式化控制
 String sql = """
     SELECT id, name, email
     FROM users
@@ -309,13 +305,11 @@ String html = """
     """;
 ```
 
-### 字符串格式化
-
 ```java
+// 字符串格式化
 String name = "Alice";
 int age = 30;
 
-// 使用 String.format 或 formatted()
 String info = String.format("Name: %s, Age: %d", name, age);
 
 String template = """
@@ -326,7 +320,9 @@ String template = """
 
 ## Sealed Interfaces
 
-接口也可以密封。
+接口也可以密封，工作原理与密封类相同——permits 子句列出所有实现类。
+
+### 参考样例
 
 ```java
 // 密封接口
@@ -347,11 +343,11 @@ public final class DeleteCommand implements Command {
 }
 ```
 
-## Instance Main Methods (Java 25 版本新增)
+## Instance Main Methods (<latest> 版本新增)
 
-实例主方法简化 Java 程序入口，无需类声明。
+实例主方法简化 Java 程序入口，无需类声明即可定义程序入口点。这解决了"只需要运行几行代码就要写一个完整类"的痛点。
 
-### 基本用法
+### 参考样例
 
 ```java
 // 传统方式：需要类声明
@@ -367,20 +363,19 @@ void main() {
 }
 ```
 
-### 约束
-
 ```java
+// 约束
 // 必须是 void main()
 // 不能是 static
 // 不能有参数或其他返回类型
 // void main(String[] args) 也允许
 ```
 
-## Module Import Declaration (Java 25 版本新增)
+## Module Import Declaration (<latest> 版本新增)
 
-`import module` 一次性导入模块所有公共类。
+`import module` 一次性导入模块所有公共类，减少大量重复的 import 语句。这是语法级优化，不影响运行时性能。
 
-### 基本用法
+### 参考样例
 
 ```java
 // 传统方式：逐个导入
@@ -397,10 +392,8 @@ List<String> list = new ArrayList<>();
 Map<String, Integer> map = new HashMap<>();
 ```
 
-### 应用场景
-
 ```java
-// 大量使用某模块的类时，代码更简洁
+// 应用场景
 import module java.io;
 
 void main() {
@@ -415,11 +408,11 @@ import java.io.FileReader;
 import java.io.PrintWriter;
 ```
 
-## Flexible Constructor Body (Java 25 版本新增)
+## Flexible Constructor Body (<latest> 版本新增)
 
-允许在构造函数中 super()/this() 调用前执行初始化逻辑。
+允许在构造函数中 super()/this() 调用前执行初始化逻辑。传统 Java 要求 this() 或 super() 必须是第一条语句，这导致验证逻辑无法复用。Java 25 解除了这一限制，允许在调用父类/本类构造函数之前执行参数预处理。
 
-### 传统限制
+### 参考样例
 
 ```java
 // 传统 Java：this() 或 super() 必须是第一条语句
@@ -445,9 +438,8 @@ class User {
 }
 ```
 
-### Java 25 新方式
-
 ```java
+// Java 25 新方式
 class User {
     private String id;
     private String name;
@@ -470,9 +462,8 @@ class User {
 }
 ```
 
-### 实际应用
-
 ```java
+// 实际应用：防御性复制与计算
 class Order {
     private final String id;
     private final List<Item> items;
@@ -496,11 +487,13 @@ class Order {
 }
 ```
 
-## Scoped Values (Java 22 版本新增)
+## Scoped Values (<latest> 版本新增)
 
 线程作用域变量，比 ThreadLocal 更适合虚拟线程。
 
-### 基本用法
+ScopedValue 的核心机制是**数据在载体线程中按需共享**，而非为每个虚拟线程创建独立副本。这解决了 ThreadLocal 在虚拟线程场景下的内存爆炸问题——100 万虚拟线程使用 ThreadLocal 需要 100 万份数据副本，而 ScopedValue 只需 1 份。
+
+### 参考样例
 
 ```java
 // ThreadLocal 在虚拟线程中的问题
@@ -520,9 +513,8 @@ ScopedValue.where(USER_ID, "user-123")
     });
 ```
 
-### 虚拟线程优势
-
 ```java
+// 虚拟线程优势
 // ThreadLocal：每个虚拟线程都有独立副本
 // 100 万 VT = 100 万副本 = 内存爆炸
 
@@ -539,19 +531,19 @@ void handleRequest(HttpRequest request) {
 }
 ```
 
-### 与 ThreadLocal 对比
-
 | 特性 | ThreadLocal | ScopedValue |
 |------|-------------|-------------|
 | 虚拟线程开销 | 每个 VT 独立副本 | 共享数据，无副本 |
 | 继承性 | InheritableThreadLocal 可继承 | 通过 ScopedValue.where 传递 |
 | 适用场景 | 少量线程 | 大量虚拟线程 |
 
-## Primitive Types in Patterns（Java 25 版本新增，第三预览）
+## Primitive Types in Patterns (<latest> 版本新增，第三预览)
 
-模式匹配支持基本类型。
+模式匹配支持基本类型，消除自动装箱带来的性能开销。
 
-### 基本用法
+Java 25 之前 instanceof 和 switch 只能匹配包装类型，自动装箱/拆箱带来额外开销。Java 25 直接支持 int、double 等基本类型，避免了这个问题。
+
+### 参考样例
 
 ```java
 // Java 21: 只能匹配包装类型
@@ -567,8 +559,6 @@ if (obj instanceof int i) {  // i 是 int
 }
 ```
 
-### 在 switch 中使用
-
 ```java
 // Java 25: switch 支持基本类型模式
 String describe(Object obj) {
@@ -583,9 +573,8 @@ String describe(Object obj) {
 }
 ```
 
-### Record 中的基本类型
-
 ```java
+// Record 中的基本类型
 record Point(int x, int y) {}  // 使用 int 而非 Integer
 
 void printSum(Object obj) {
@@ -596,11 +585,11 @@ void printSum(Object obj) {
 }
 ```
 
-## Key Derivation Function API（Java 25 版本新增）
+## Key Derivation Function API (<latest> 版本新增)
 
-标准化的密码学密钥派生 API。
+标准化的密码学密钥派生 API，统一了 HKDF 等密钥派生函数的接口。
 
-### 基本用法
+### 参考样例
 
 ```java
 import java.security.interfaces.EdECPrivateKey;
@@ -622,8 +611,6 @@ String hexKey = HexFormat.of().formatHex(derivedKey);
 System.out.println("Derived key: " + hexKey);
 ```
 
-### 支持的算法
-
 ```java
 // HKDF（HMAC-based Key Derivation Function）
 var hkdf = HKDFParameter.builder()
@@ -637,9 +624,8 @@ var hkdf = HKDFParameter.builder()
 byte[] key = HKDFKeyFactory.doKeyDerivation(hkdf, 32);
 ```
 
-### 应用场景
-
 ```java
+// 应用场景
 // 1. 从主密钥派生会话密钥
 byte[] sessionKey = HKDFKeyFactory.doKeyDerivation(
     HKDFParameter.builder()
@@ -661,11 +647,11 @@ byte[] expandedKey = HKDFKeyFactory.doKeyDerivation(
 );
 ```
 
-## Unnamed Variables & Patterns (Java 22 版本新增)
+## Unnamed Variables & Patterns (<latest> 版本新增)
 
-下划线 `_` 表示无需使用的变量，使代码更简洁。
+下划线 `_` 表示无需使用的变量，使代码更简洁，避免为无意义变量命名。
 
-### 基本用法
+### 参考样例
 
 ```java
 // 传统方式：必须为每个变量命名
@@ -679,19 +665,16 @@ try (var _ = getConnection()) {
 }
 ```
 
-### 在 Lambda 表达式中
-
 ```java
-// 传统方式
+// Lambda 表达式
 map.forEach((key, value) -> System.out.println(value));
 
 // Java 22：只使用 value，key 用下划线忽略
 map.forEach((_, value) -> System.out.println(value));
 ```
 
-### 在模式匹配中
-
 ```java
+// 模式匹配中
 record Point(int x, int y) {}
 
 // 只需要 y 坐标，x 用下划线忽略
@@ -709,11 +692,11 @@ String format(Object obj) {
 }
 ```
 
-## Markdown Documentation (Java 23 版本新增)
+## Markdown Documentation (<latest> 版本新增)
 
-JavaDoc 支持 Markdown 格式的文档注释。
+JavaDoc 支持 Markdown 格式的文档注释，提升文档可读性。
 
-### 基本用法
+### 参考样例
 
 ```java
 /**
@@ -748,8 +731,7 @@ public class Calculator {
 }
 ```
 
-### 支持的 Markdown 元素
-
+支持的 Markdown 元素：
 - 标题（`#`, `##`, `###`）
 - 列表（`-`, `*`, `1.`）
 - 代码块（```）
