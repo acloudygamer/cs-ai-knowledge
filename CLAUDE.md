@@ -42,6 +42,6 @@ python scripts/task_runner.py --leader_resolve <arb_id> delete/keep/people  # �
    - `python scripts/task_runner.py --leader_people` 查看需人工
    - `python scripts/task_runner.py --leader_resolve <arb_id> delete/keep/people` 解决
 6. 仲裁解决完毕 → `git commit` → `git push`
-7. **不自动循环**，需人工确认继续
+7. **无仲裁时自动循环继续**；有仲裁时需人工确认
 
 详见 [README.md](README.md)
