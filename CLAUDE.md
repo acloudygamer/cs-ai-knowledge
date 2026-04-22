@@ -35,10 +35,13 @@ python scripts/task_runner.py --leader_resolve <arb_id> delete/keep/people  # �
 当你说"开始工作循环"或"开始"时：
 1. `python scripts/task_runner.py --once` 生成指令
 2. 按指令 spawn agents 并行执行
-3. 等待 agent 完成通知
-4. 收到通知 → 再次 `--once`
-5. 无新任务且全部完成 → `--report` 查看 → `git commit` → `git push`
-6. 回到步骤1继续
-7. 直到你说"停止"
+3. 等待 agent 完成 → 再次 `--once` → spawn agents（循环直到无新任务）
+4. 用 `--report` 确认全部完成
+5. 仲裁处理：
+   - `python scripts/task_runner.py --leader_pending` 查看待处理
+   - `python scripts/task_runner.py --leader_people` 查看需人工
+   - `python scripts/task_runner.py --leader_resolve <arb_id> delete/keep/people` 解决
+6. 仲裁解决完毕 → `git commit` → `git push`
+7. **不自动循环**，需人工确认继续
 
 详见 [README.md](README.md)
