@@ -1,8 +1,6 @@
 # dataclass 专题
 
-## 解决什么问题
-
-需要创建主要用于存储数据的类时，手写 `__init__`、`__repr__`、`__eq__` 等方法繁琐易错。dataclass 自动生成这些样板代码。
+dataclass 自动生成 `__init__`、`__repr__`、`__eq__` 等样板代码，适合创建主要用于存储数据的类。
 
 ## 核心概念
 
@@ -11,11 +9,11 @@
 - `frozen=True` 创建不可变对象
 - `slots=True`（Python 3.10+）减少内存占用
 
-## 怎么用
-
 ## 基础用法
 
-### 简单 dataclass
+dataclass 自动生成等价于手写的 `__init__`、`__repr__`、`__eq__` 方法。
+
+### 参考样例
 
 ```python
 from dataclasses import dataclass
@@ -61,7 +59,9 @@ class Point:
 
 ## 字段配置
 
-### field 详解
+`field` 函数提供细粒度的字段配置选项：默认值、初始化行为、比较行为、哈希行为。
+
+### 参考样例
 
 ```python
 from dataclasses import dataclass, field
@@ -131,7 +131,9 @@ print(config)
 
 ## 比较功能
 
-### 自动生成比较方法
+`order=True` 生成 `<`, `<=`, `>`, `>=` 方法。`eq=False` 禁用 `__eq__` 和 `__hash__`。
+
+### 参考样例
 
 ```python
 from dataclasses import dataclass, field
@@ -178,7 +180,9 @@ print(p1 == p2)  # True（递归比较）
 
 ## 不可变性
 
-### frozen=True
+`frozen=True` 创建浅不可变对象，防止顶层赋值。深层不可变需要自定义 `__post_init__`。
+
+### 参考样例
 
 ```python
 from dataclasses import dataclass
@@ -236,7 +240,9 @@ class TrulyImmutable:
 
 ## post_init 处理
 
-### 初始化后处理
+`__post_init__` 在 `__init__` 后调用，用于计算派生字段或验证参数。
+
+### 参考样例
 
 ```python
 from dataclasses import dataclass, field
@@ -286,7 +292,9 @@ print(profile.is_adult)       # True
 
 ## 继承
 
-### dataclass 继承行为
+dataclass 继承时，字段会自动包含在 `__init__` 中。有默认值的字段必须在无默认值字段之后。
+
+### 参考样例
 
 ```python
 from dataclasses import dataclass, field
@@ -318,9 +326,11 @@ class Cat(Animal):
     color: str = "white"
 ```
 
-## 工厂函数替代
+## dataclass vs namedtuple vs dict
 
-### dataclass vs namedtuple vs dict
+dataclass 相比 namedtuple 默认可变且功能更丰富，相比 dict 有类型提示和自描述性。
+
+### 参考样例
 
 ```python
 from dataclasses import dataclass, asdict, astuple, fields
@@ -366,6 +376,28 @@ for f in fields(p):
     print(f"{f.name}: {f.type}")
 # x: <class 'float'>
 # y: <class 'float'>
+```
+
+## slots 模式
+
+`slots=True`（Python 3.10+）限制实例属性，减少内存占用。
+
+### 参考样例
+
+```python
+from dataclasses import dataclass, field
+
+
+# Python 3.10+ 可以使用 slots
+@dataclass(slots=True)
+class OptimizedPoint:
+    x: float
+    y: float
+
+
+p = OptimizedPoint(1.0, 2.0)
+# p.z = 3.0  # AttributeError: 'OptimizedPoint' object has no attribute 'z'
+# 更小的内存占用，更快的属性访问
 ```
 
 ## 实用模式
@@ -508,26 +540,6 @@ class User:
 
 user = User("Alice", password_hash="***", internal_id=12345)
 print(user)  # User(name='Alice')，不含敏感信息
-```
-
-## slots 模式
-
-### dataclass + slots（Python 3.10+）
-
-```python
-from dataclasses import dataclass, field
-
-
-# Python 3.10+ 可以使用 slots
-@dataclass(slots=True)
-class OptimizedPoint:
-    x: float
-    y: float
-
-
-p = OptimizedPoint(1.0, 2.0)
-# p.z = 3.0  # AttributeError: 'OptimizedPoint' object has no attribute 'z'
-# 更小的内存占用，更快的属性访问
 ```
 
 ## 完整示例

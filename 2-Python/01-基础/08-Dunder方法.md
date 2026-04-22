@@ -1,10 +1,21 @@
 # 魔术方法（Dunder Methods）
 
-魔术方法（Magic Methods）或 Dunder Methods（双下划线方法）是 Python 中以双下划线开头和结尾的特殊方法。它们由 Python 解释器自动调用，用于实现各种语言特性。
+Dunder Methods（双下划线方法）是 Python 中以双下划线开头和结尾的特殊方法，由解释器自动调用，用于实现各种语言特性。
+
+## 核心概念
+
+- `__new__` 和 `__init__` 控制对象创建和初始化
+- `__repr__` 和 `__str__` 定义对象的字符串表示
+- `__eq__`、`__hash__`、`__lt__` 等实现比较操作
+- `__iter__` 和 `__next__` 实现迭代器协议
+- `__enter__` 和 `__exit__` 实现上下文管理器
+- 描述符协议 `__get__`、`__set__`、`__delete__` 控制属性访问
 
 ## 对象创建与销毁
 
-### `__new__` 和 `__init__`
+`__new__` 创建并返回实例，`__init__` 初始化实例。`__new__` 通常用于不可变类型或单例模式。
+
+### 参考样例
 
 ```python
 class Singleton:
@@ -57,7 +68,9 @@ class FileHandler:
 
 ## 表示与字符串
 
-### `__repr__` 和 `__str__`
+`__repr__` 用于调试（格式应为有效 Python 代码），`__str__` 用于用户友好的显示。`__format__` 支持自定义格式说明符。
+
+### 参考样例
 
 ```python
 class Person:
@@ -110,7 +123,9 @@ print(f"{duration:m}")  # 61.1 minutes
 
 ## 比较操作
 
-### `__eq__`, `__hash__`, `__lt__` 等
+`__eq__` 定义相等性，`__hash__` 定义哈希值（必须与 `__eq__` 一致），`__lt__` 等定义顺序。`functools.total_ordering` 可简化比较方法。
+
+### 参考样例
 
 ```python
 class Version:
@@ -164,7 +179,7 @@ version_map = {Version(1, 0, 0): "stable"}
 print(version_map[v1])  # stable
 ```
 
-### 使用 functools.total_ordering
+### functools.total_ordering
 
 ```python
 from functools import total_ordering
@@ -197,7 +212,9 @@ class Version:
 
 ## 布尔值
 
-### `__bool__`
+`__bool__` 控制布尔值判定。如果未定义 `__bool__`，则检查 `__len__ > 0`。两者都未定义时对象总是被认为是 True。
+
+### 参考样例
 
 ```python
 class EmptyContainer:
@@ -231,7 +248,9 @@ print(bool(non_empty))  # True
 
 ## 可调用对象
 
-### `__call__`
+`__call__` 使实例可以像函数一样被调用，用于创建可调用对象、装饰器、记忆化等场景。
+
+### 参考样例
 
 ```python
 class Counter:
@@ -290,7 +309,9 @@ print(fibonacci.cache)  # 缓存的结果
 
 ## 属性访问
 
-### `__getattr__`, `__setattr__`, `__delattr__`
+`__getattr__` 访问不存在属性时调用，`__setattr__` 设置任何属性时调用，`__delattr__` 删除属性时调用。`__getattribute__` 拦截所有属性访问。
+
+### 参考样例
 
 ```python
 class DynamicAttributes:
@@ -383,7 +404,9 @@ print(obj.get_log())
 
 ## 容器类型
 
-### `__len__`, `__getitem__`, `__setitem__`, `__delitem__`
+实现 `__len__`、`__getitem__`、`__setitem__`、`__delitem__`、`__contains__`、`__iter__` 使类具有容器行为。
+
+### 参考样例
 
 ```python
 class SortedList:
@@ -449,7 +472,9 @@ print(dd)  # {'fruits': ['apple', 'banana']}
 
 ## 迭代器
 
-### `__iter__`, `__next__`
+`__iter__` 返回迭代器自身，`__next__` 返回下一个元素并维护迭代状态。生成器函数是更简洁的迭代器实现方式。
+
+### 参考样例
 
 ```python
 class Fibonacci:
@@ -501,7 +526,9 @@ for num in CountDown(5):
 
 ## 上下文管理器
 
-### `__enter__`, `__exit__`
+`__enter__` 进入上下文并返回资源对象，`__exit__` 处理清理工作。`@contextmanager` 装饰器允许用生成器创建上下文管理器。
+
+### 参考样例
 
 ```python
 class Transaction:
@@ -557,7 +584,9 @@ with Transaction(MockConnection()) as tx:
 
 ## 数学运算
 
-### `__add__`, `__sub__`, `__mul__` 等
+`__add__`、`__sub__`、`__mul__` 等实现算术运算。`__rmul__` 支持反向运算（`scalar * object`）。`__abs__` 支持绝对值。
+
+### 参考样例
 
 ```python
 class Vector:
@@ -611,35 +640,11 @@ print(-v1)         # Vector(-1, -2)
 print(abs(v1))     # 2.236... (sqrt(5))
 ```
 
-### 反向运算
-
-```python
-class Number:
-    def __init__(self, value):
-        self.value = value
-
-    def __repr__(self):
-        return f"Number({self.value})"
-
-    def __add__(self, other):
-        if isinstance(other, Number):
-            return Number(self.value + other.value)
-        return Number(self.value + other)
-
-    def __radd__(self, other):
-        """other + self，当 other 没有 __add__ 时调用"""
-        return Number(other + self.value)
-
-
-n = Number(5)
-print(n + 3)       # Number(8)
-print(3 + n)       # Number(8)，调用 __radd__
-print(n + Number(2))  # Number(7)
-```
-
 ## 描述符协议
 
-### `__get__`, `__set__`, `__delete__`
+描述符是实现了 `__get__`、`__set__`、`__delete__` 的对象，作为类属性使用时控制属性访问。
+
+### 参考样例
 
 ```python
 class Range:

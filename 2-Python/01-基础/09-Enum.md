@@ -2,6 +2,15 @@
 
 枚举是 Python 3.4+ 引入的类型，用于定义具名的常量集合。相比于简单的整数常量，枚举提供更好的类型安全和代码可读性。
 
+## 核心概念
+
+- 枚举成员唯一性：相同值的枚举成员是同一个对象的别名
+- `auto()` 自动赋值简化枚举定义
+- `IntEnum` 可与整数直接比较和运算
+- `StrEnum`（Python 3.11+）可直接用于字符串操作
+- `Flag` 支持位标志运算，`IntFlag` 支持与整数位运算
+- `@unique` 装饰器确保所有枚举值唯一
+
 ## 基础用法
 
 ### 定义枚举
@@ -598,7 +607,7 @@ print(isinstance(c, Color))     # True
 # IntEnum 是 int 的子类
 ic = IntColor.RED
 print(isinstance(ic, int))      # True
-print(isinstance(ic, IntEnum))  # True
+print(isinstance(ic, IntColor))  # True
 ```
 
 ## 枚举迭代
