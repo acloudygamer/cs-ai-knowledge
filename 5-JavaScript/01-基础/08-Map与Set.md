@@ -286,7 +286,7 @@ class EventEmitter {
 
 ---
 
-## WeakRef（ES2021）
+## WeakRef
 
 ### 基本用法
 
