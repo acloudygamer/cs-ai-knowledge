@@ -1,6 +1,6 @@
 # 终端与tty
 
-> **版本说明**: tty/pts 是 Unix/Linux 概念。Windows Terminal (Windows 11) 提供类似功能但使用不同机制。
+> **版本说明**: tty/pts 是 Unix/Linux 概念。Windows Terminal (Windows 11) 提供类似功能但使用不同机制。(<latest> 版本新增: Ubuntu 24.04 的 Wayland 协议下 pts 设备仍通过 DRM/KMS 交互)
 
 ## 解决什么问题
 

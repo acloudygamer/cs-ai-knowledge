@@ -415,17 +415,6 @@ void main() {
 }
 ```
 
-### 自动导入
-
-```java
-// java.lang 中的类自动导入
-void main() {
-    // System、String、Integer 等无需 import
-    var list = new ArrayList<String>();  // ArrayList 需要 import
-    IO.println("Hello");  // java.lang.IO 自动导入 (Java 25)
-}
-```
-
 ### 约束
 
 ```java

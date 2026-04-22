@@ -36,7 +36,7 @@
 
 ### bash
 
-> **版本说明**: GNU Bash 5.2.21 (WSL / Ubuntu 24.04), 5.2.37 (MINGW64 / Git Bash)
+> **版本说明**: GNU Bash 5.2 (<latest> Ubuntu 24.04 默认 5.2.21; WSL/MSYS2 环境可达 5.2.37; Windows 11 的 Git Bash 5.2.37)
 
 ```bash
 # bash配置
@@ -53,7 +53,7 @@
 
 ### PowerShell
 
-> **版本说明**: PowerShell 7.6.0 (跨平台，Windows/Mac/Linux)
+> **版本说明**: PowerShell 7+ (<latest> 7.6.0 为 Ubuntu 24.04 默认版本，跨平台支持 Windows/Mac/Linux)
 
 ```powershell
 # 变量（$开头）
