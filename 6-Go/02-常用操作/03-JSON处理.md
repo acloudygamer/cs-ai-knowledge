@@ -1,21 +1,23 @@
 # JSON处理
 
+Go 的 `encoding/json` 将 JSON 数据与 Go 结构体相互转换。结构体标签（tag）控制字段命名、空值处理和忽略行为。
+
 ## encoding/json
 
-```go
-import (
-    "encoding/json"
-    "fmt"
-)
+### 结构体标签
 
-// 结构体标签控制 JSON 字段
+```go
 type User struct {
     Name     string   `json:"name"`
     Age      int      `json:"age"`
     Email    string   `json:"email,omitempty"`  // 空值忽略
     Password string   `json:"-"`                 // 忽略此字段
 }
+```
 
+### Marshal/Unmarshal
+
+```go
 // 序列化
 user := User{Name: "Tom", Age: 30}
 data, err := json.Marshal(user)
@@ -35,7 +37,11 @@ if err != nil {
     panic(err)
 }
 fmt.Println(u.Name, u.Age)
+```
 
+### 参考样例
+
+```go
 // 处理 map
 var m map[string]interface{}
 json.Unmarshal([]byte(jsonStr), &m)
@@ -51,6 +57,10 @@ for decoder.More() {
 
 ## json-iterator（高性能）
 
+标准库 encoding/json 的替代品，性能提升显著。
+
+### 参考样例
+
 ```go
 import "github.com/json-iterator/go"
 
@@ -63,6 +73,19 @@ json.Unmarshal(data, &user)
 ```
 
 ## JSON 标签详解
+
+| 标签 | 序列化 | 反序列化 |
+|------|--------|----------|
+| `json:"name"` | 正常输出 | 正常解析 |
+| `json:"name,omitempty"` | 空值忽略 | 空值忽略 |
+| `json:"-"` | 忽略 | 忽略 |
+| `json:"name,string"` | 转字符串 | 从字符串解析 |
+| `json:"name,omitempty,string"` | 空值忽略 | 从字符串解析 |
+| `json:"name,omitempty,omitzero"` | 零值忽略，空切片/映射保留 | 空值忽略 |
+
+`omitzero`（Go 1.24+）只省略零值，保留空切片和空映射。
+
+### 参考样例
 
 ```go
 type Person struct {
@@ -86,20 +109,11 @@ type Person struct {
 // {"id": "123"} 而不是 {"id": 123}
 ```
 
-### 常见标签组合
-
-| 标签 | 序列化 | 反序列化 |
-|------|--------|----------|
-| `json:"name"` | 正常输出 | 正常解析 |
-| `json:"name,omitempty"` | 空值忽略 | 空值忽略 |
-| `json:"-"` | 忽略 | 忽略 |
-| `json:"name,string"` | 转字符串 | 从字符串解析 |
-| `json:"name,omitempty,string"` | 空值忽略 | 从字符串解析 |
-| `json:"name,omitempty,omitzero"` | 零值忽略，空切片/映射保留 | 空值忽略 |
-
-`omitzero`（Go 1.24+）只省略零值，保留空切片和空映射。
-
 ## 自定义序列化
+
+实现 `json.Marshaler` 和 `json.Unmarshaler` 接口自定义序列化逻辑。
+
+### 参考样例
 
 ```go
 import (
@@ -154,27 +168,15 @@ func (t *CustomTime) UnmarshalJSON(data []byte) error {
 type User struct {
     Name    UpperCaseString `json:"name"`
     Email   string          `json:"email"`
-    Created CustomTime       `json:"created"`
-}
-
-func main() {
-    u := User{
-        Name:    "john doe",
-        Email:   "test@example.com",
-        Created: CustomTime{time.Now()},
-    }
-
-    data, _ := json.MarshalIndent(u, "", "  ")
-    fmt.Println(string(data))
-    // {
-    //   "name": "JOHN DOE",
-    //   "email": "test@example.com",
-    //   "created": "2024-01-15 10:30:00"
-    // }
+    Created CustomTime      `json:"created"`
 }
 ```
 
 ## 匿名结构体与动态 JSON
+
+临时数据结构使用匿名结构体，动态键使用 map。
+
+### 参考样例
 
 ```go
 // 1. 匿名结构体（临时数据）
@@ -208,6 +210,10 @@ jsonBytes, _ := json.Marshal(dynamic)
 
 ## 流式解析与生成
 
+大文件使用流式 API 避免一次性加载到内存。
+
+### 参考样例
+
 ```go
 import (
     "bufio"
@@ -215,7 +221,7 @@ import (
     "os"
 )
 
-// 1. 流式解析大文件
+// 流式解析大文件
 func parseLargeJSON(file string) error {
     f, err := os.Open(file)
     if err != nil {
@@ -224,7 +230,6 @@ func parseLargeJSON(file string) error {
     defer f.Close()
 
     scanner := bufio.NewScanner(f)
-    // 默认 scanner 缓冲区太小，需要调大
     buf := make([]byte, 0, 64*1024)
     scanner.Buffer(buf, 1024*1024)
 
@@ -237,13 +242,12 @@ func parseLargeJSON(file string) error {
         if err := json.Unmarshal(line, &item); err != nil {
             continue
         }
-        // 处理 item
         _ = item
     }
     return scanner.Err()
 }
 
-// 2. JSON 合并补丁（RFC 6902）
+// JSON 合并补丁（RFC 6902）
 func mergePatch(original, patch []byte) ([]byte, error) {
     var origMap, patchMap map[string]interface{}
     json.Unmarshal(original, &origMap)
@@ -262,6 +266,8 @@ func mergePatch(original, patch []byte) ([]byte, error) {
 
 ## 常见问题
 
+### 参考样例
+
 ```go
 // 1. JSON 中的数字精度丢失
 // 解决：使用 json.Number 或 string 标签
@@ -269,9 +275,8 @@ type IDWithPrecision struct {
     ID int64 `json:"id,string"`
 }
 
-// 2. HTML 字符转义（> 变成 \u003e）
+// 2. HTML 字符转义（> 变成 >）
 // 解决：使用 htmlEscaped = false
-// json.Marshal 给 htmlEscaped 传 false
 
 // 3. 反序列化到 nil 映射/切片
 var m map[string]int

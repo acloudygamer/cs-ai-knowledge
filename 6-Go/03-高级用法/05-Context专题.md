@@ -1,17 +1,6 @@
 # Context 专题
 
-## 概述
-
 `context` 包是 Go 中处理请求作用域内取消信号和截止时间的标准方式。用于在 goroutine 之间传递请求范围的数据和取消信号。
-
-### 核心场景
-
-- 跨 API 边界的请求取消
-- 超时控制
-- 传递请求级别的元数据
-- 优雅关闭长时间运行的操作
-
----
 
 ## Context 接口
 
@@ -39,11 +28,11 @@ ctx, cancel := context.WithDeadline(parentCtx, time.Now().Add(5*time.Second))
 ctx := context.WithValue(parentCtx, key, value)
 ```
 
----
-
 ## WithCancel
 
-### 基本用法
+`WithCancel` 创建一个可手动取消的 Context。当调用 `cancel()` 时，Context 的 `Done()` channel 关闭。
+
+### 参考样例
 
 ```go
 func main() {
@@ -107,11 +96,11 @@ func crawlUrls(ctx context.Context, urls []string) ([]string, error) {
 }
 ```
 
----
-
 ## WithTimeout
 
-### 基本用法
+`WithTimeout` 创建带超时时间的 Context，超时自动取消。
+
+### 参考样例
 
 ```go
 func fetchData(ctx context.Context, url string) ([]byte, error) {
@@ -145,18 +134,6 @@ func handleRequest(w http.ResponseWriter, r *http.Request) {
         http.Error(w, "Timeout", http.StatusRequestTimeout)
     }
 }
-
-func server() {
-    handler := http.HandlerFunc(handleRequest)
-    srv := &http.Server{
-        Handler: handler,
-        Addr:    ":8080",
-        // ReadTimeout:  10 * time.Second,
-        // WriteTimeout: 10 * time.Second,
-        // IdleTimeout:  120 * time.Second,
-    }
-    srv.ListenAndServe()
-}
 ```
 
 ### 数据库查询超时
@@ -178,11 +155,11 @@ func queryWithTimeout(ctx context.Context, db *sql.DB) ([]int, error) {
 }
 ```
 
----
-
 ## WithDeadline
 
-### 基本用法
+`WithDeadline` 创建带绝对截止时间的 Context。
+
+### 参考样例
 
 ```go
 func longRunningTask(ctx context.Context) error {
@@ -203,7 +180,6 @@ func longRunningTask(ctx context.Context) error {
 
 ```go
 func processRequest(ctx context.Context) {
-    // 假设上游传入 ctx，截止时间是 30 秒后
     deadline, ok := ctx.Deadline()
     if ok {
         fmt.Printf("Request deadline: %v\n", deadline)
@@ -216,16 +192,14 @@ func processRequest(ctx context.Context) {
         ctx, cancel = context.WithDeadline(ctx, time.Now().Add(remaining))
         defer cancel()
     }
-
-    // 子任务执行...
 }
 ```
 
----
-
 ## WithValue
 
-### 基本用法
+`WithValue` 在 Context 中存储键值对，常用于传递请求级别的元数据。
+
+### 参考样例
 
 ```go
 type key int
@@ -290,8 +264,6 @@ type contextKey string
 const myKey contextKey = "myKey"
 ```
 
----
-
 ## 错误处理
 
 ### Context 错误
@@ -320,24 +292,6 @@ func runTask(ctx context.Context) error {
     return nil
 }
 ```
-
-### HTTP 错误响应
-
-```go
-func handle(w http.ResponseWriter, r *http.Request) {
-    err := process(r.Context())
-    if err != nil {
-        select {
-        case <-r.Context().Done():
-            http.Error(w, "Request cancelled", http.StatusBadRequest)
-        default:
-            http.Error(w, err.Error(), http.StatusInternalServerError)
-        }
-    }
-}
-```
-
----
 
 ## 最佳实践
 
@@ -388,8 +342,6 @@ func parent() {
 func child(ctx context.Context) {
     ctx, cancel := context.WithTimeout(ctx, time.Second)
     defer cancel()  // 子 Context 的 cancel
-
-    // ...
 }
 ```
 
@@ -402,8 +354,6 @@ ctx := context.Background()
 // 或者 TODO（暂时不确定）
 ctx := context.TODO()
 ```
-
----
 
 ## 常见模式
 
@@ -441,7 +391,7 @@ func parallelFetch(ctx context.Context, urls []string) ([]byte, error) {
             return nil, ctx.Err()
         case r := <-results:
             if r.err != nil {
-                cancel()  // 取消其他
+                cancel()
                 return nil, r.err
             }
             datas = append(datas, r.data...)
@@ -465,21 +415,6 @@ func retryWithTimeout(ctx context.Context, fn func() error) error {
             return ctx.Err()
         case <-time.After(time.Second):
             // 继续重试
-        }
-    }
-}
-```
-
-### 进度报告
-
-```go
-func reportProgress(ctx context.Context, reportFn func(int)) {
-    for i := 0; i < 100; i++ {
-        select {
-        case <-ctx.Done():
-            return
-        case <-time.After(100 * time.Millisecond):
-            reportFn(i)
         }
     }
 }
