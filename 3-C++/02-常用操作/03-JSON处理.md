@@ -1,6 +1,14 @@
-# JSON处理
+# JSON 处理
 
 ## nlohmann/json 库
+
+nlohmann/json 是 C++ 最流行的 JSON 库，提供直观的 API 进行 JSON 序列化与反序列化。
+
+### 基本使用
+
+JSON 对象可通过初始化列表创建，支持键值对、数组嵌套。`dump()` 序列化为字符串，`parse()` 反序列化。
+
+### 参考样例
 
 ```cpp
 #include <nlohmann/json.hpp>
@@ -36,7 +44,9 @@ std::ofstream out("data.json");
 out << obj.dump(2);
 ```
 
-## 序列化到文件
+### 序列化到文件
+
+### 参考样例
 
 ```cpp
 json data = {{"version", "1.0"}, {"enabled", true}};
@@ -46,6 +56,10 @@ std::ofstream("config.json") << data << std::endl;
 ## JSON 序列化进阶
 
 ### 基本类型序列化
+
+nlohmann/json 自动处理基本类型到 JSON 的转换，容器类型自动映射为 JSON 数组或对象。
+
+### 参考样例
 
 ```cpp
 // 基本类型直接序列化
@@ -59,6 +73,10 @@ json j7 = std::map<std::string, int>{{"a", 1}};  // map → object
 ```
 
 ### 自定义类型序列化（ADL / make_json）
+
+通过定义 `to_json` 和 `from_json` 函数，可让自定义类型支持 JSON 序列化。
+
+### 参考样例
 
 ```cpp
 struct Person {
@@ -85,6 +103,8 @@ Person p2 = j.get<Person>();         // 或 j.get_to(p2);
 
 ### unordered_map / set 序列化
 
+### 参考样例
+
 ```cpp
 std::unordered_map<std::string, int> umap = {{"a", 1}, {"b", 2}};
 json j = umap;  // {"a": 1, "b": 2}
@@ -93,6 +113,10 @@ json j = umap;  // {"a": 1, "b": 2}
 ## JSON 反序列化进阶
 
 ### 安全解析（防止异常）
+
+使用 `json::parse()` 可能抛出异常，应使用 `try-catch` 或 `std::error_code` 处理。
+
+### 参考样例
 
 ```cpp
 // 方式1：try-catch
@@ -114,6 +138,8 @@ if (ec) {
 
 ### 检查键存在性
 
+### 参考样例
+
 ```cpp
 json j = {{"name", "Alice"}, {"age", 30}};
 
@@ -132,7 +158,9 @@ for (auto& [key, value] : j.items()) {
 
 ## JSON Schema 验证
 
-nlohmann/json 支持 JSON Schema 验证（需要 `NLOHMANN_JSON_SCHEMA_VALIDATION` 宏）：
+nlohmann/json 支持 JSON Schema 验证，通过 `json_validator` 类实现。
+
+### 参考样例
 
 ```cpp
 #include <nlohmann/json-schema.hpp>
@@ -163,6 +191,8 @@ try {
 
 ### 常用 Schema 规则
 
+### 参考样例
+
 ```cpp
 json person_schema = {
     {"type", "object"},
@@ -192,7 +222,9 @@ json person_schema = {
 
 ## JSONPath 查询
 
-使用 `json_path` 库进行 XPath 类似的查询：
+使用 `json_path` 库进行 XPath 类似的查询，支持路径表达式。
+
+### 参考样例
 
 ```cpp
 #include <nlohmann/json.hpp>
@@ -239,7 +271,11 @@ auto all_prices = json_path::query(data, "$..price");
 | `$.store.book[?(@.author =~ /.*Rees/)]` | 作者名匹配正则 |
 | `$` | 根对象 |
 
-## JSON 合并与_patch
+## JSON 合并与 patch
+
+`merge_patch()` 实现 RFC 7386 定义的 JSON Merge Patch，patch 中的值会覆盖 base 中的值。
+
+### 参考样例
 
 ```cpp
 json base = {{"name", "Alice"}, {"age", 30}, {"city", "Beijing"}};
@@ -253,12 +289,16 @@ base.merge_patch(patch);
 json target = {{"a", 1}, {"b", {{"c", 2}}}};
 json source = {{"b", {{"c", 3}, {"d", 4}}}};
 target.merge_patch(source);
-// result: {"a": 1, "b": {"c": 3, "d": 4}}
+// result: {"a": 1, "b", {"c": 3, "d": 4}}
 ```
 
 ## JSON 与二进制
 
 ### msgpack 序列化（更紧凑）
+
+msgpack 是高效的二进制序列化格式，比 JSON 更紧凑。
+
+### 参考样例
 
 ```cpp
 #include <nlohmann/json.hpp>
@@ -275,7 +315,9 @@ json j2 = nlohmann::msgpack::unpack(packed);
 
 ### 二进制 JSON（BSON 风格）
 
-nlohmann/json 支持 BSON、CBOR、UBJSON 等二进制格式：
+nlohmann/json 支持 BSON、CBOR、UBJSON 等二进制格式。
+
+### 参考样例
 
 ```cpp
 #include <nlohmann/json.hpp>

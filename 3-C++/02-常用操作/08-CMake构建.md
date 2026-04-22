@@ -12,6 +12,8 @@ C++ 项目需要跨平台构建，直接调用编译器处理大量源文件和�
 
 CMakeLists.txt 基本结构：设置最低版本、定义项目、设置 C++ 标准、查找源文件、生成可执行文件。
 
+### 参考样例
+
 ```cmake
 cmake_minimum_required(VERSION 3.16)
 project(MyProject VERSION 1.0 LANGUAGES CXX)
@@ -43,6 +45,8 @@ project/
 
 ### 源文件目标
 
+### 参考样例
+
 ```cmake
 # 可执行文件
 add_executable(myapp main.cpp)
@@ -57,6 +61,8 @@ add_library(myshd SHARED utils.cpp)
 ### 目标属性
 
 `target_include_directories` 设置包含目录，`target_link_libraries` 链接库，`target_compile_options` 设置编译选项，`target_compile_features` 设置 C++ 标准特性。
+
+### 参考样例
 
 ```cmake
 add_executable(myapp main.cpp)
@@ -86,6 +92,8 @@ target_compile_features(myapp PUBLIC cxx_std_20)
 - **PUBLIC**：当前目标和依赖此目标的其他目标都使用
 - **INTERFACE**：仅依赖此目标的其他目标使用
 
+### 参考样例
+
 ```cmake
 # mylib 的 include 目录传递给 app
 target_include_directories(mylib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
@@ -98,6 +106,8 @@ target_include_directories(mylib INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/include)
 ## 查找包
 
 `find_package` 查找系统库或第三方库，生成导入目标或提供变量。
+
+### 参考样例
 
 ```cmake
 # 查找包
@@ -112,6 +122,8 @@ target_link_libraries(myapp PRIVATE Boost::filesystem)
 ## 子目录与模块化
 
 使用 `add_subdirectory` 添加子目录，子目录应有自己的 CMakeLists.txt。
+
+### 参考样例
 
 ```cmake
 # 主 CMakeLists.txt
@@ -144,6 +156,8 @@ target_include_directories(mylib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../include)
 
 生成器表达式在构建时动态计算，适用于配置依赖路径、条件编译选项等。
 
+### 参考样例
+
 ```cmake
 # 条件链接库
 target_link_libraries(myapp PRIVATE
@@ -159,6 +173,8 @@ target_include_directories(myapp PRIVATE
 
 ## 构建步骤
 
+### 参考样例
+
 ```bash
 # 配置项目（生成构建文件）
 mkdir build && cd build
@@ -172,6 +188,8 @@ make
 ```
 
 ## 完整示例
+
+### 参考样例
 
 ```cmake
 # CMakeLists.txt
