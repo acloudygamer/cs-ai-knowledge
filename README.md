@@ -5,13 +5,13 @@
 ## 系统架构
 
 ```
-task_runner.py --once → delete-reviewer agents (并行，前置审查)
+task_runner.py --once → topology-architect agents (并行，前置审查)
                   → agent-orchestrator agents (并行，常规任务)
 ```
 
 | Agent | 职责 | 触发条件 |
 |-------|------|----------|
-| delete-reviewer | 发现过时/冗余内容，删除/合并/迁移 | 前置审查任务 |
+| topology-architect | 发现过时/冗余内容，删除/合并/迁移 | 前置审查任务 |
 | agent-orchestrator | 内容优化与新增 | 前置全部完成后 |
 
 ## 核心文件
@@ -20,7 +20,7 @@ task_runner.py --once → delete-reviewer agents (并行，前置审查)
 |------|------|
 | scripts/tasks.json | 任务列表 |
 | scripts/task_runner.py | 任务循环脚本 |
-| .claude/agents/delete-reviewer.md | 前置审查 Agent |
+| .claude/agents/topology-architect.md | 前置审查 Agent |
 | .claude/agents/agent-orchestrator.md | 常规任务 Agent |
 
 ## 内容概览

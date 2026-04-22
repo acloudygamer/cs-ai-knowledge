@@ -5,7 +5,7 @@
     "task_001_prereq": {
       "target": "计算机基础-删除审查",
       "path": "0-计算机基础/",
-      "agent": "delete-reviewer",
+      "agent": "topology-architect",
       "status": "completed",
       "run_count": 59,
       "last_result": "开始执行前置审查：执行目录去重与低于 Windows 11 稳定版的物理清理。",
@@ -28,7 +28,7 @@
     "task_002_prereq": {
       "target": "数据结构与算法-删除审查",
       "path": "1-数据结构与算法/",
-      "agent": "delete-reviewer",
+      "agent": "topology-architect",
       "status": "completed",
       "run_count": 59,
       "last_result": "开始执行前置审查：执行目录去重与低于 Python 3.12 版本的物理清理。",
@@ -51,7 +51,7 @@
     "task_003_prereq": {
       "target": "Python-删除审查",
       "path": "2-Python/",
-      "agent": "delete-reviewer",
+      "agent": "topology-architect",
       "status": "completed",
       "run_count": 57,
       "last_result": "开始执行前置审查：执行目录去重与低于 Python 3.12 版本的物理清理。",
@@ -74,7 +74,7 @@
     "task_004_prereq": {
       "target": "C++-删除审查",
       "path": "3-C++/",
-      "agent": "delete-reviewer",
+      "agent": "topology-architect",
       "status": "completed",
       "run_count": 59,
       "last_result": "继续C++目录删除审查任务...",
@@ -97,7 +97,7 @@
     "task_005_prereq": {
       "target": "Java-删除审查",
       "path": "4-Java/",
-      "agent": "delete-reviewer",
+      "agent": "topology-architect",
       "status": "completed",
       "run_count": 58,
       "last_result": "开始执行前置审查：执行目录去重与低于 Java 21 稳定版本的物理清理。",
@@ -120,7 +120,7 @@
     "task_006_prereq": {
       "target": "JavaScript-删除审查",
       "path": "5-JavaScript/",
-      "agent": "delete-reviewer",
+      "agent": "topology-architect",
       "status": "completed",
       "run_count": 57,
       "last_result": "开始执行前置审查：执行目录去重与低于 stable 版本的物理清理。",
@@ -143,7 +143,7 @@
     "task_007_prereq": {
       "target": "Go-删除审查",
       "path": "6-Go/",
-      "agent": "delete-reviewer",
+      "agent": "topology-architect",
       "status": "completed",
       "run_count": 57,
       "last_result": "开始执行前置审查：执行目录去重与低于 Go 1.24 版本的物理清理。",

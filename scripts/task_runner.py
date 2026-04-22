@@ -208,7 +208,7 @@ class TaskRunner:
         lines.append("---")
         lines.append("")
         lines.append("**参考文档**")
-        lines.append("- delete-reviewer: .claude/agents/delete-reviewer.md")
+        lines.append("- topology-architect: .claude/agents/topology-architect.md")
         lines.append("- agent-orchestrator: .claude/agents/agent-orchestrator.md")
         lines.append("")
         lines.append("**执行方式：每个任务分配一个子 agent（run_in_background=True）并行执行**")
