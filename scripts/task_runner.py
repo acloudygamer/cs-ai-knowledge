@@ -359,15 +359,42 @@ class ArbitrationManager:
         logger.warning(f"仲裁 {arb_id} 未找到")
         return False
 
+    def list_pending(self) -> list:
+        """列出所有待 Leader 处理的仲裁"""
+        self.load()
+        return [arb for arb in self.data.get("arbitrations", []) if arb.get("status") == "pending"]
+
     def list_people(self) -> list:
         """列出所有需要人工处理的仲裁"""
         self.load()
         return [arb for arb in self.data.get("arbitrations", []) if arb.get("status") == "people"]
 
-    def list_all(self) -> list:
-        """列出所有仲裁"""
-        self.load()
-        return self.data.get("arbitrations", [])
+    def show_pending(self) -> str:
+        """显示待 Leader 处理的仲裁"""
+        pending = self.list_pending()
+        if not pending:
+            return "无待处理的仲裁。"
+
+        lines = ["# 待处理的仲裁\n"]
+        lines.append(f"生成时间: {datetime.now().isoformat()}\n")
+        lines.append(f"总数: {len(pending)}\n")
+        lines.append("")
+        lines.append("=" * 60)
+
+        for arb in pending:
+            lines.append(f"\n## {arb['id']}")
+            lines.append(f"- **任务编号**: `{arb['task_id']}`")
+            lines.append(f"- **文件路径**: `{arb['path']}`")
+            lines.append(f"- **原因**: {arb['reason']}")
+            lines.append(f"- **内容**:")
+            lines.append("```")
+            lines.append(arb['content'][:500] + ("..." if len(arb['content']) > 500 else ""))
+            lines.append("```")
+            lines.append("")
+            lines.append(f"解决命令: `python scripts/task_runner.py --leader_resolve {arb['id']} delete/keep/people`")
+            lines.append("-" * 60)
+
+        return "\n".join(lines)
 
     def show_people(self) -> str:
         """显示需人工处理的仲裁"""
@@ -408,7 +435,8 @@ def main():
 
     # 仲裁相关命令
     parser.add_argument('--arbitrate_submit', nargs=4, metavar=('TASK_ID', 'PATH', 'REASON', 'CONTENT'), help='提交仲裁请求')
-    parser.add_argument('--leader_arbitration', action='store_true', help='查看需人工处理的仲裁')
+    parser.add_argument('--leader_pending', action='store_true', help='查看待处理的仲裁')
+    parser.add_argument('--leader_people', action='store_true', help='查看需人工处理的仲裁')
     parser.add_argument('--leader_resolve', nargs=2, metavar=('ARB_ID', 'ACTION'), help='解决仲裁 (delete/keep/people)')
 
     args = parser.parse_args()
@@ -440,7 +468,11 @@ def main():
         print(f"解决命令: python scripts/task_runner.py --leader_resolve {arb_id} delete/keep/people")
         return
 
-    if args.leader_arbitration:
+    if args.leader_pending:
+        print(arb_mgr.show_pending())
+        return
+
+    if args.leader_people:
         print(arb_mgr.show_people())
         return
 

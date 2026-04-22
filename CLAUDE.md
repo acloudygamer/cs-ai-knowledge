@@ -12,19 +12,23 @@ python scripts/task_runner.py --update <task_id> <status> <result>  # 更新任�
 
 ```bash
 python scripts/task_runner.py --arbitrate_submit <task_id> <path> <reason> <content>  # 提交仲裁请求
-python scripts/task_runner.py --leader_arbitration  # 查看需人工处理的仲裁
+python scripts/task_runner.py --leader_pending  # 查看待处理的仲裁（Leader 处理）
+python scripts/task_runner.py --leader_people  # 查看需人工处理的仲裁
 python scripts/task_runner.py --leader_resolve <arb_id> delete/keep/people  # 解决仲裁
 ```
 
 ### 仲裁处理（Leader）
 
-当 Agent 遇到无法判断版本归属的代码时，会提交仲裁请求。Leader 处理流程：
+当 Agent 遇到无法判断版本归属的代码时，会提交仲裁请求（状态为 `pending`）。
 
-1. **查看待处理仲裁**：`python scripts/task_runner.py --leader_arbitration`
-2. **解决仲裁**：
-   - `delete` - 确认低于 `<stable>`，删除
-   - `keep` - 确认属于 `<stable>` 或更高，保留
-   - `people` - 需要人工查看处理
+1. **Agent**：遇到不确定代码 → `--arbitrate_submit` 提交仲裁 → 继续工作（不等待）
+2. **Leader**：有空时查看并处理仲裁
+   - `python scripts/task_runner.py --leader_pending` 查看待处理的仲裁
+   - `python scripts/task_runner.py --leader_people` 查看需人工处理的仲裁
+   - `python scripts/task_runner.py --leader_resolve <arb_id> delete/keep/people`
+     - `delete` - 确认低于 `<stable>`，删除
+     - `keep` - 确认属于 `<stable>` 或更高，保留
+     - `people` - 标记为需要人工查看处理
 
 ### 开始工作循环
 
