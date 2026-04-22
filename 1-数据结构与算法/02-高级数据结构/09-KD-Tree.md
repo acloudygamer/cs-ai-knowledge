@@ -9,36 +9,17 @@ K 维空间索引结构，用于最近邻搜索、范围查询、聚类分析等
 - 类似 BST，但维度交替划分
 - 最近邻搜索期望 O(log n)，高维退化至 O(n)
 
-### 怎么用
-
-```python
-class KDNode:
-    def __init__(self, point, dim):
-        self.point = point  # k维点
-        self.dim = dim      # 划分的维度
-        self.left = None
-        self.right = None
-
-def build_kd_tree(points, depth=0):
-    if not points:
-        return None
-    k = len(points[0])
-    dim = depth % k
-    points.sort(key=lambda x: x[dim])
-    mid = len(points) // 2
-    node = KDNode(points[mid], dim)
-    node.left = build_kd_tree(points[:mid], depth + 1)
-    node.right = build_kd_tree(points[mid + 1:], depth + 1)
-    return node
-```
+---
 
 ## 实现
 
+### 参考样例
+
 ```python
 class KDNode:
     def __init__(self, point, dim):
-        self.point = point  # k维点
-        self.dim = dim      # 划分的维度
+        self.point = point
+        self.dim = dim
         self.left = None
         self.right = None
 
@@ -49,12 +30,10 @@ class KDTree:
         self.root = None
 
     def build(self, points):
-        """构建 KD-Tree"""
         def build_node(points, depth):
             if not points:
                 return None
 
-            # 交替选择维度
             dim = depth % self.k
             points.sort(key=lambda x: x[dim])
             mid = len(points) // 2
@@ -68,7 +47,6 @@ class KDTree:
         return self.root
 
     def insert(self, point):
-        """插入点"""
         def insert_node(node, point, depth):
             if node is None:
                 return KDNode(point, depth % self.k)
@@ -83,7 +61,6 @@ class KDTree:
         self.root = insert_node(self.root, point, 0)
 
     def search(self, target):
-        """搜索最近邻"""
         def search_nearest(node, target, depth, best):
             if node is None:
                 return best
@@ -94,7 +71,6 @@ class KDTree:
             if dist < self._distance(best, target):
                 best = node.point
 
-            # 先搜索可能包含最近点的子树
             if target[dim] < node.point[dim]:
                 next_branch = node.left
                 other_branch = node.right
@@ -104,7 +80,6 @@ class KDTree:
 
             best = search_nearest(next_branch, target, depth + 1, best)
 
-            # 检查另一个分支是否可能包含更近的点
             if abs(target[dim] - node.point[dim]) < self._distance(best, target):
                 best = search_nearest(other_branch, target, depth + 1, best)
 
@@ -115,7 +90,6 @@ class KDTree:
         return search_nearest(self.root, target, 0, self.root.point)
 
     def range_query(self, lo, hi):
-        """范围查询：返回在 [lo, hi] 范围内的所有点"""
         result = []
 
         def query_node(node, bounds, depth):
@@ -125,12 +99,10 @@ class KDTree:
             dim = depth % self.k
             point = node.point
 
-            # 检查当前点是否在范围内
             in_bounds = all(lo[i] <= point[i] <= hi[i] for i in range(self.k))
             if in_bounds:
                 result.append(point)
 
-            # 递归搜索子树
             if point[dim] >= lo[dim]:
                 query_node(node.left, bounds, depth + 1)
             if point[dim] <= hi[dim]:
@@ -141,15 +113,17 @@ class KDTree:
 
     @staticmethod
     def _distance(p1, p2):
-        """欧氏距离"""
         return sum((a - b) ** 2 for a, b in zip(p1, p2)) ** 0.5
 ```
 
+---
+
 ## 最近邻搜索
+
+### 参考样例
 
 ```python
 def k_nearest_neighbors(tree, target, k=1):
-    """找 k 个最近邻"""
     candidates = []
 
     def search(node, depth):
@@ -160,7 +134,6 @@ def k_nearest_neighbors(tree, target, k=1):
         point = node.point
         dist = tree._distance(point, target)
 
-        # 维护大小为 k 的最大堆
         if len(candidates) < k:
             candidates.append((dist, point))
             candidates.sort(reverse=True)
@@ -168,7 +141,6 @@ def k_nearest_neighbors(tree, target, k=1):
             candidates[0] = (dist, point)
             candidates.sort(reverse=True)
 
-        # 确定搜索顺序
         if target[dim] < point[dim]:
             near, far = node.left, node.right
         else:
@@ -176,13 +148,14 @@ def k_nearest_neighbors(tree, target, k=1):
 
         search(near, depth + 1)
 
-        # 检查是否需要搜索另一子树
         if len(candidates) < k or abs(target[dim] - point[dim]) < candidates[0][0]:
             search(far, depth + 1)
 
     search(tree.root, 0)
     return [p for _, p in sorted(candidates)]
 ```
+
+---
 
 ## 应用场景
 
@@ -194,6 +167,8 @@ def k_nearest_neighbors(tree, target, k=1):
 | 异常检测 | 寻找距离异常远的点 |
 | 碰撞检测 | 游戏开发中的空间划分 |
 
+---
+
 ## KD-Tree vs 其他结构
 
 | 结构 | 适用维度 | 最近邻查询 | 范围查询 |
@@ -202,6 +177,8 @@ def k_nearest_neighbors(tree, target, k=1):
 | Ball Tree | 高维 | O(n^(1-1/d)) | 高效 |
 | R-Tree | 2-3 维 | 高效 | 高效 |
 | 暴力搜索 | 任意 | O(n) | O(n) |
+
+---
 
 ## 维度灾难
 
@@ -218,13 +195,19 @@ KD-Tree 的性能随维度增加而退化：
 | 局部敏感哈希 (LSH) | 适合高维近似最近邻 |
 | 分层可导航小世界图 (HNSW) | 更适合高维向量检索 |
 
+---
+
 ## 平衡 KD-Tree
 
 上述 `KDTree.build` 已使用中位数分割保证平衡，每层按维度排序取中间点，使树高为 O(log n)。
 
+---
+
 ## 实战例题
 
-### 1. 二维平面最近点对
+### 二维平面最近点对
+
+### 参考样例
 
 ```python
 def closest_pair(points):
@@ -238,7 +221,6 @@ def closest_pair(points):
     def distance(p1, p2):
         return math.sqrt((p1[0] - p2[0])**2 + (p1[1] - p2[1])**2)
 
-    # 使用 KD-Tree 加速最近邻查询
     kdtree = KDTree()
     kdtree.build(points)
 
@@ -246,7 +228,6 @@ def closest_pair(points):
     closest = None
 
     for p in points:
-        # 找最近的点
         neighbor = kdtree.search(p)
         if neighbor:
             d = distance(p, neighbor)
@@ -257,7 +238,9 @@ def closest_pair(points):
     return closest, min_dist
 ```
 
-### 2. K 近邻分类
+### K 近邻分类
+
+### 参考样例
 
 ```python
 def knn_classify(train_data, test_point, k=5):
@@ -271,17 +254,18 @@ def knn_classify(train_data, test_point, k=5):
 
     neighbors = kdtree.k_nearest_neighbors(test_point, k)
 
-    # 投票
     label_count = {}
     for i, p in enumerate(neighbors):
-        idx = kdtree.root.search_index(p)  # 找到对应索引
+        idx = kdtree.root.search_index(p)
         label = train_data[idx][1]
         label_count[label] = label_count.get(label, 0) + 1
 
     return max(label_count, key=label_count.get)
 ```
 
-### 3. 范围搜索 for 图像处理
+### 范围搜索 for 图像处理
+
+### 参考样例
 
 ```python
 def range_search_image(points, query_box):
@@ -296,6 +280,8 @@ def range_search_image(points, query_box):
     lo, hi = query_box
     return kdtree.range_query(lo, hi)
 ```
+
+---
 
 ## 局限性
 

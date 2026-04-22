@@ -9,45 +9,11 @@ Treap = Tree + Heap，结合 BST 有序性和堆平衡性，实现比红黑树/A
 - 随机 priority 保证期望平衡
 - 隐式 Treap：用下标代替指针，实现序列操作
 
-### 怎么用
-
-```python
-import random
-
-class TreapNode:
-    def __init__(self, key):
-        self.key = key
-        self.priority = random.random()
-        self.left = None
-        self.right = None
-
-def rotate_right(y):
-    x = y.left
-    y.left = x.right
-    x.right = y
-    return x
-
-def rotate_left(x):
-    y = x.right
-    x.right = y.left
-    y.left = x
-    return y
-
-def treap_insert(root, key):
-    if not root:
-        return TreapNode(key)
-    if key < root.key:
-        root.left = treap_insert(root.left, key)
-        if root.left.priority < root.priority:
-            root = rotate_right(root)
-    else:
-        root.right = treap_insert(root.right, key)
-        if root.right.priority < root.priority:
-            root = rotate_left(root)
-    return root
-```
+---
 
 ## 实现
+
+### 参考样例
 
 ```python
 import random
@@ -66,15 +32,12 @@ class Treap:
         self.root = None
 
     def insert(self, key):
-        """插入节点"""
         if self.root is None:
             self.root = TreapNode(key)
             return
 
-        # BST 插入
         if key < self.root.key:
             self.root.left = self._insert(self.root.left, key)
-            # 左子节点优先级更高则右旋
             if self.root.left.priority > self.root.priority:
                 self.root = self._rotate_right(self.root)
         else:
@@ -97,7 +60,6 @@ class Treap:
         return node
 
     def delete(self, key):
-        """删除节点"""
         self.root = self._delete(self.root, key)
 
     def _delete(self, node, key):
@@ -109,13 +71,11 @@ class Treap:
         elif key > node.key:
             node.right = self._delete(node.right, key)
         else:
-            # 找到要删除的节点
             if node.left is None:
                 return node.right
             elif node.right is None:
                 return node.left
             else:
-                # 两个子节点都存在，向下旋转直到成为叶节点
                 if node.left.priority > node.right.priority:
                     node = self._rotate_right(node)
                     node.right = self._delete(node.right, key)
@@ -125,7 +85,6 @@ class Treap:
         return node
 
     def search(self, key):
-        """搜索节点"""
         node = self.root
         while node:
             if key == node.key:
@@ -137,21 +96,18 @@ class Treap:
         return None
 
     def _rotate_right(self, node):
-        """右旋"""
         left = node.left
         node.left = left.right
         left.right = node
         return left
 
     def _rotate_left(self, node):
-        """左旋"""
         right = node.right
         node.right = right.left
         right.left = node
         return right
 
     def inorder(self):
-        """中序遍历（有序序列）"""
         result = []
 
         def traverse(node):
@@ -164,11 +120,15 @@ class Treap:
         return result
 ```
 
+---
+
 ## Treap 变种
 
 ### 隐式 Treap（序列维护）
 
 用节点位置作为 key，支持区间操作。
+
+### 参考样例
 
 ```python
 class ImplicitTreap:
@@ -178,16 +138,10 @@ class ImplicitTreap:
         self.root = None
 
     def push(self, node):
-        """下推延迟标记"""
         if node and node.pending:
-            # 应用 pending 操作
             node.pending = 0
 
     def split(self, node, key):
-        """
-        按位置 split
-        返回 (left, right)，left 有 key 个元素
-        """
         if node is None:
             return (None, None)
 
@@ -206,7 +160,6 @@ class ImplicitTreap:
             return (node, right)
 
     def merge(self, left, right):
-        """合并两棵 Treap"""
         if left is None:
             return right
         if right is None:
@@ -224,19 +177,16 @@ class ImplicitTreap:
             return right
 
     def insert(self, pos, val):
-        """在位置 pos 插入 val"""
         node = TreapNode(val)
         left, right = self.split(self.root, pos)
         self.root = self.merge(self.merge(left, node), right)
 
     def erase(self, pos):
-        """删除位置 pos 的元素"""
         left, mid_right = self.split(self.root, pos)
         _, right = self.split(mid_right, 1)
         self.root = self.merge(left, right)
 
     def query(self, l, r):
-        """查询区间 [l, r)"""
         left, rest = self.split(self.root, l)
         mid, right = self.split(rest, r - l)
         result = self._collect(mid)
@@ -251,7 +201,6 @@ class ImplicitTreap:
             node.size = 1 + self._size(node.left) + self._size(node.right)
 
     def _collect(self, node):
-        """收集所有 key"""
         result = []
 
         def traverse(n):
@@ -265,6 +214,8 @@ class ImplicitTreap:
         return result
 ```
 
+---
+
 ## 应用场景
 
 | 场景 | 说明 |
@@ -275,6 +226,8 @@ class ImplicitTreap:
 | 排序 | 期望 O(n log n) |
 | 字典 | 比红黑树实现简单 |
 
+---
+
 ## Treap vs 其他 BST
 
 | 特性 | Treap | 红黑树 | AVL |
@@ -284,6 +237,8 @@ class ImplicitTreap:
 | 最坏高度 | O(n) | O(log n) | O(log n) |
 | 插入/删除 | 快 | 快 | 快 |
 | 平衡条件 | 随机 priority | 颜色+旋转 | 高度差 |
+
+---
 
 ## Treap 的数学保证
 
