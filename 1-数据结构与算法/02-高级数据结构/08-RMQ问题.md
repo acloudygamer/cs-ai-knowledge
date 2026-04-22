@@ -8,33 +8,6 @@ Range Minimum/Maximum Query（区间最值查询），在数组上快速回答�
 - 线段树：O(n) 预处理，O(log n) 查询，适用于动态数据
 - ST 表：利用 dp[l][i] 表示 [l, l+2^i-1] 区间的最值
 
-### 怎么用
-
-```python
-import math
-
-# 稀疏表（Sparse Table）- O(1) RMQ 查询
-class SparseTable:
-    def __init__(self, arr):
-        self.n = len(arr)
-        self.log = [0] * (self.n + 1)
-        for i in range(2, self.n + 1):
-            self.log[i] = self.log[i // 2] + 1
-        k = self.log[self.n] + 1
-        self.st = [[0] * k for _ in range(self.n)]
-        for i in range(self.n):
-            self.st[i][0] = arr[i]
-        j = 1
-        while (1 << j) <= self.n:
-            for i in range(self.n - (1 << j) + 1):
-                self.st[i][j] = min(self.st[i][j-1], self.st[i + (1 << (j-1))][j-1])
-            j += 1
-
-    def query(self, l, r):
-        j = self.log[r - l + 1]
-        return min(self.st[l][j], self.st[r - (1 << j) + 1][j])
-```
-
 ## 稀疏表（Sparse Table）
 
 基于 DP 的 RMQ 解决方案，适用于静态数据。

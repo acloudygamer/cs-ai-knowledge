@@ -250,8 +250,11 @@ class LCTWithSum:
 
 ## 模板总结
 
+核心操作序列：make_root(x) → access(y) → splay(y)，执行后 y 的左子树即 x 到 y 的路径。
+
+### 参考样例
+
 ```python
-# LCT 核心操作模板
 def link_cut_template():
     # 1. make_root(x) - 将 x 变为根
     # 2. access(y) - 建立到 y 的实路径
