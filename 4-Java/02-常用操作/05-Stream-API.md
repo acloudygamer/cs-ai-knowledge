@@ -357,7 +357,7 @@ List<Integer> flat = nested.stream()
     .toList();  // [1, 2, 3, 4, 5, 6]
 ```
 
-### 内置 Gatherers (Java 22 版本新增)
+### 内置 Gatherers
 
 ```java
 // 使用内置的 fold（左折叠）
