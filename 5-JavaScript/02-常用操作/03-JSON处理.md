@@ -1,17 +1,23 @@
 # JSON处理
 
+JSON 是 JavaScript Object Notation 的缩写，是一种轻量级数据交换格式。JavaScript 提供 JSON.parse() 解析和 JSON.stringify() 序列化。ES2024 的 structuredClone 提供更强大的深拷贝能力。
+
 ## JSON.parse / JSON.stringify
 
 ### 基本用法
 
+JSON.parse() 将 JSON 字符串转为 JavaScript 对象。JSON.stringify() 将对象转为 JSON 字符串，可选地接收 replacer 函数或数组，以及缩进空格数。
+
+### 参考样例
+
 ```javascript
 // 解析 JSON 字符串
-const obj = JSON.parse('{"name": "Alice", "age": 25}');
+const obj = JSON.parse('{"Name": "Alice", "age": 25}');
 const arr = JSON.parse('[1, 2, 3]');
 
 // 序列化
 const str = JSON.stringify({ name: 'Alice', age: 25 });
-// '{"name":"Alice","age":25}'
+// '{"Name":"Alice","age":25}'
 
 // 格式化（美化输出，缩进 2 空格）
 const pretty = JSON.stringify(obj, null, 2);
@@ -22,7 +28,9 @@ const pretty4 = JSON.stringify(obj, null, 4);
 
 ### replacer 函数
 
-`replacer` 可以是函数或数组，用于过滤或转换属性：
+replacer 可以是函数（自定义转换逻辑）或数组（只包含指定属性）。函数接收 key 和 value， 返回 undefined 排除属性。
+
+### 参考样例
 
 ```javascript
 const obj = { name: 'Alice', age: 25, password: 'secret123' };
@@ -49,6 +57,10 @@ const transformed = JSON.stringify(obj, (key, value) => {
 
 ### BigInt 序列化
 
+JSON.stringify() 不支持 BigInt，需自定义 replacer 转为字符串。
+
+### 参考样例
+
 ```javascript
 // JSON.stringify(1n) 抛出 TypeError
 // 解决：自定义序列化
@@ -66,12 +78,16 @@ const parsed = JSON.parse(str, (_, v) =>
 
 ### 日期处理
 
+Date 对象序列化后变成 ISO 字符串，反序列化时需用 reviver 转换回 Date。
+
+### 参考样例
+
 ```javascript
 const obj = { name: 'Alice', date: new Date() };
 
 // 序列化：Date 变成字符串
 const str = JSON.stringify(obj);
-// {"name":"Alice","date":"2024-01-15T08:30:00.000Z"}
+// {"Name":"Alice","date":"2024-01-15T08:30:00.000Z"}
 
 // 反序列化：使用 reviver 转换回 Date
 const parsed = JSON.parse(str, (k, v) => {
@@ -85,6 +101,10 @@ const parsed = JSON.parse(str, (k, v) => {
 ## JSON 验证
 
 ### try-catch 处理解析错误
+
+解析前用 try-catch 包裹，防止无效 JSON 导致程序中断。
+
+### 参考样例
 
 ```javascript
 function safeParse(jsonString) {
@@ -103,6 +123,10 @@ if (result.success) {
 ```
 
 ### JSON Schema 验证
+
+使用 ajv 等库进行 Schema 验证，确保数据符合预期格式。
+
+### 参考样例
 
 ```javascript
 // 使用 ajv 库进行 Schema 验证
@@ -132,6 +156,10 @@ if (!valid) {
 
 ### 使用 JSON 方法
 
+JSON.parse(JSON.stringify()) 实现深拷贝，但有限制：不拷贝 function、undefined、Symbol、Date（变字符串）、RegExp（变空对象）、循环引用对象。
+
+### 参考样例
+
 ```javascript
 // 浅拷贝（只拷贝第一层）
 const original = { name: 'Alice', address: { city: 'Beijing' } };
@@ -149,6 +177,10 @@ const deepCopy = JSON.parse(JSON.stringify(original));
 ```
 
 ### structuredClone
+
+structuredClone 是浏览器内置的深拷贝 API，支持更多类型和循环引用。
+
+### 参考样例
 
 ```javascript
 const original = {
@@ -173,6 +205,8 @@ const clone = structuredClone(original);
 ## 文件操作（Node.js）
 
 ### 读取 JSON 文件
+
+### 参考样例
 
 ```javascript
 const fs = require('fs');
@@ -207,6 +241,8 @@ async function safeLoadJson(filePath) {
 
 ### 写入 JSON 文件
 
+### 参考样例
+
 ```javascript
 const fs = require('fs').promises;
 
@@ -232,6 +268,10 @@ async function appendData(newData) {
 ## JSON 合并与补丁
 
 ### 合并对象
+
+浅合并用展开运算符，深合并需递归处理嵌套对象。
+
+### 参考样例
 
 ```javascript
 // 浅合并
@@ -259,6 +299,10 @@ function deepMerge(target, source) {
 ```
 
 ### JSON Merge Patch (RFC 7396)
+
+patch 为 null 删除整个文档，属性为 null 删除该属性，嵌套对象递归合并。
+
+### 参考样例
 
 ```javascript
 // 应用 JSON Merge Patch
@@ -291,7 +335,9 @@ const result = applyMergePatch(doc, patch);
 
 ### JSON Patch (RFC 6902)
 
-用于描述对 JSON 文档的操作序列：
+JSON Patch 用操作序列描述对 JSON 文档的修改，支持 replace、add、remove、move、copy 等操作。
+
+### 参考样例
 
 ```javascript
 // JSON Patch 操作
@@ -320,6 +366,10 @@ const [result] = applyPatch(doc, patch);
 
 ### 大文件流式处理
 
+使用 JSONStream 处理无法一次性加载的大 JSON 文件。
+
+### 参考样例
+
 ```javascript
 // 使用 JSONStream 处理大 JSON 文件
 const JSONStream = require('JSONStream');
@@ -337,6 +387,8 @@ stream.pipe(parser);
 
 ### 高效拼接
 
+### 参考样例
+
 ```javascript
 // 错误：频繁字符串拼接
 let result = '';
@@ -352,6 +404,8 @@ const result = `[${parts.join(',')}]`;
 ## 常用场景示例
 
 ### 配置管理
+
+### 参考样例
 
 ```javascript
 // config.json
@@ -382,6 +436,8 @@ const cacheSize = config.features?.maxCacheSize ?? 500;
 ```
 
 ### 数据持久化
+
+### 参考样例
 
 ```javascript
 // 简单的数据存储
@@ -430,6 +486,8 @@ console.log(store.get('user'));
 ```
 
 ### API 响应处理
+
+### 参考样例
 
 ```javascript
 // 标准化 API 响应格式

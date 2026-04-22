@@ -1,8 +1,14 @@
 # Map 与 Set
 
+ES6 引入的 Map 和 Set 提供了比 Object 和 Array 更适合做字典和集合操作的数据结构。Map 的键可以是任意类型，Set 自动去重且提供更高效的集合操作。
+
 ## Map
 
 ### 基本操作
+
+Map 是键值对集合，键可以是任意类型（包括对象、函数）。相比 Object，Map 提供更一致的 API、更好的性能和插入顺序保证。
+
+### 参考样例
 
 ```javascript
 // 创建 Map
@@ -22,6 +28,10 @@ map.clear();               // 清空所有
 ```
 
 ### 遍历
+
+Map 原生可迭代，提供 keys()、values()、entries() 方法和 forEach。
+
+### 参考样例
 
 ```javascript
 const map = new Map([
@@ -63,6 +73,8 @@ map.forEach((value, key) => {
 | 原型 | 无原型链 | 有原型链（需用 hasOwn） |
 | JSON | 需手动序列化 | 直接 JSON.stringify |
 
+### 参考样例
+
 ```javascript
 // Map 可以用任意类型做键
 const objKey = { id: 1 };
@@ -76,6 +88,8 @@ map.set(funcKey, 'function value');
 ```
 
 ### 应用场景
+
+### 参考样例
 
 ```javascript
 // 1. 缓存/字典
@@ -110,6 +124,10 @@ const rolePermissions = new Map([
 
 ### 基本操作
 
+Set 是唯一值集合，自动去重。适合需要确保元素唯一性的场景。
+
+### 参考样例
+
 ```javascript
 // 创建 Set（自动去重）
 const set = new Set([1, 2, 3, 2, 1]);
@@ -125,6 +143,10 @@ set.clear();           // 清空
 
 ### 遍历
 
+Set 可使用 for...of、forEach 遍历，支持 keys()、values()、entries()。
+
+### 参考样例
+
 ```javascript
 const set = new Set([1, 2, 3]);
 
@@ -137,6 +159,8 @@ set.forEach(item => console.log(item));
 ```
 
 ### 应用场景
+
+### 参考样例
 
 ```javascript
 // 1. 数组去重
@@ -168,9 +192,9 @@ new Set([...setA, ...setB]);  // {1, 2, 3, 4}
 
 ### 特点
 
-- 键必须是对象（不能是原始值）
-- 键是弱引用的，不阻止垃圾回收
-- 不可遍历，没有 size，没有 clear()
+WeakMap 的键必须是对象，键是弱引用（不影响 GC）。当唯一引用被清除时，WeakMap 条目自动被垃圾回收。不可遍历，没有 size，没有 clear()。
+
+### 参考样例
 
 ```javascript
 const wm = new WeakMap();
@@ -188,6 +212,8 @@ obj = null;  // obj 可以被垃圾回收
 ```
 
 ### 应用场景
+
+### 参考样例
 
 ```javascript
 // 1. 私有数据
@@ -223,9 +249,9 @@ buttonEl.addEventListener('click', () => {
 
 ### 特点
 
-- 只能添加对象
-- 对象没有其他引用时会被 GC
-- 不可遍历，没有 size，没有 clear()
+WeakSet 只能添加对象，成员弱引用。成员对象没有其他引用时自动被 GC。不可遍历，没有 size，没有 clear()。
+
+### 参考样例
 
 ```javascript
 const ws = new WeakSet();
@@ -244,6 +270,8 @@ obj1 = null;
 ```
 
 ### 应用场景
+
+### 参考样例
 
 ```javascript
 // 1. 追踪访问过的对象
@@ -290,6 +318,10 @@ class EventEmitter {
 
 ### 基本用法
 
+WeakRef 创建对对象的弱引用，不阻止 GC。deref() 返回对象或 undefined（已 GC）。
+
+### 参考样例
+
 ```javascript
 // WeakRef 创建对对象的弱引用
 const ref = new WeakRef({ name: 'Alice' });
@@ -313,6 +345,10 @@ function cachedFn(fn) {
 ```
 
 ### FinalizationRegistry
+
+FinalizationRegistry 在对象被 GC 时执行回调，用于资源清理。
+
+### 参考样例
 
 ```javascript
 // 对象被 GC 后执行回调

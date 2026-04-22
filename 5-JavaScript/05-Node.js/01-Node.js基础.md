@@ -1,8 +1,10 @@
 # Node.js 基础
 
+Node.js 是基于 Chrome V8 引擎的 JavaScript 运行时，使用事件驱动、非阻塞 I/O 模型。核心模块（events、fs、path、os、buffer、crypto）提供系统级能力。模块系统支持 CommonJS（require/module.exports）和 ES Modules（import/export）。
+
 ## 简介
 
-Node.js 是基于 Chrome V8 引擎的 JavaScript 运行时环境，使用事件驱动、非阻塞 I/O 模型。
+Node.js 的事件驱动模型基于 EventEmitter 模式。非阻塞 I/O 使高并发成为可能，单线程避免线程切换开销，但 CPU 密集型任务需借助 Worker Threads 或 child_process。
 
 ### 核心概念
 
@@ -20,6 +22,10 @@ emitter.emit('greet', 'Alice');
 
 ### 模块系统
 
+Node.js 14+ 支持 ES Modules，通过 package.json 的 type 字段或 .mjs 扩展名启用。
+
+### 参考样例
+
 ```javascript
 // CommonJS 模块
 const fs = require('fs');
@@ -35,6 +41,8 @@ import myModule from './myModule.mjs';
 ---
 
 ## 全局对象
+
+Node.js 提供 `__dirname`、`__filename`、`require`、`exports`、`module` 等全局变量。`process` 对象提供进程控制能力。`globalThis` 是跨环境的全局对象。
 
 ### 特殊全局变量
 
@@ -80,6 +88,10 @@ queueMicrotask(() => console.log('microtask'));
 
 ## process 对象
 
+process 对象是全局对象，提供当前进程的信息和控制能力。包括版本、平台、架构、进程ID、工作目录、环境变量、命令行参数、标准流、退出等。
+
+### 参考样例
+
 ```javascript
 // 进程信息
 console.log(process.version);       // Node.js 版本
@@ -113,7 +125,11 @@ process.exit(1);  // 异常退出
 
 ## 文件系统（fs）
 
+fs 模块提供文件系统操作。Node.js 10+ 的 fs.promises API 支持 async/await。流操作适合大文件处理。
+
 ### 同步 vs 异步
+
+### 参考样例
 
 ```javascript
 const fs = require('fs');
@@ -136,6 +152,8 @@ import { readFile } from 'fs/promises';
 ```
 
 ### 常用操作
+
+### 参考样例
 
 ```javascript
 const fs = require('fs/promises');
@@ -172,6 +190,10 @@ await copyFile('./src.txt', './dest.txt');
 ```
 
 ### 流操作
+
+流操作通过管道连接，适合大文件处理。Transform 流可在传输过程中修改数据。
+
+### 参考样例
 
 ```javascript
 const fs = require('fs');
@@ -222,6 +244,10 @@ pipeline(
 
 ## path 模块
 
+path 模块处理路径字符串，提供跨平台路径操作。Windows 使用反斜杠，Unix 使用正斜杠。
+
+### 参考样例
+
 ```javascript
 const path = require('path');
 
@@ -252,6 +278,10 @@ path.isAbsolute('./foo/bar');  // false
 
 ## os 模块
 
+os 模块提供操作系统信息，包括 CPU、内存、网络、用户等。
+
+### 参考样例
+
 ```javascript
 const os = require('os');
 
@@ -278,6 +308,10 @@ os.userInfo();
 ---
 
 ## events 模块
+
+EventEmitter 是 Node.js 事件驱动模型的核心。`on()` 注册监听器，`emit()` 触发事件，`once()` 只触发一次，`off()` 移除监听器。
+
+### 参考样例
 
 ```javascript
 const EventEmitter = require('events');
@@ -325,6 +359,10 @@ console.log(emitter.listeners('greet'));
 
 ## buffer 模块
 
+Buffer 用于处理二进制数据。Node.js 6+ 的 Buffer.from() / Buffer.alloc() 是创建 Buffer 的标准方式。
+
+### 参考样例
+
 ```javascript
 // 创建 Buffer
 const buf1 = Buffer.alloc(10);          // 10 字节，初始化为 0
@@ -359,6 +397,10 @@ bufSrc.copy(bufDest, 0, 0, bufSrc.length);
 ---
 
 ## crypto 模块
+
+crypto 模块提供加密功能，包括哈希、HMAC、AES、随机数、UUID、PBKDF2 等。
+
+### 参考样例
 
 ```javascript
 const crypto = require('crypto');
@@ -402,6 +444,10 @@ crypto.pbkdf2('password', 'salt', 100000, 64, 'sha512', (err, key) => {
 ---
 
 ## 错误处理
+
+Node.js 错误包含 code（如 ENOENT）、message、path 等属性。同步代码用 try/catch，异步回调需在回调中处理错误，Promise 错误用 .catch() 或 try/catch。
+
+### 参考样例
 
 ```javascript
 // 同步错误
@@ -457,6 +503,17 @@ throw new AppError('Something went wrong', 'ERR_SOMETHING');
 
 ### 模块解析算法
 
+1. 内置模块（crypto, fs, path...）
+2. 文件模块（./module 或 /module）
+3. node_modules 目录
+4. 目录：package.json main → index.js → package.json exports
+
+### ES Modules 与 CommonJS 互操作
+
+ES Modules 导入 CommonJS 总是获取默认导出。CommonJS 导入 ES Modules 需使用动态 import()。
+
+### 参考样例
+
 ```javascript
 // 导入 'module'
 // 1. 内置模块（crypto, fs, path...）
@@ -471,12 +528,8 @@ throw new AppError('Something went wrong', 'ERR_SOMETHING');
 // ES Modules 导入
 import crypto from 'crypto';           // 默认导入
 import { createHash } from 'crypto';   // 命名导入
-import * as fs from 'fs';              // 命名空间导入
-```
+import * as fs from 'fs';             // 命名空间导入
 
-### ES Modules 与 CommonJS 互操作
-
-```javascript
 // ES Modules 导入 CommonJS（总是默认导出）
 import crypto from 'crypto';
 
