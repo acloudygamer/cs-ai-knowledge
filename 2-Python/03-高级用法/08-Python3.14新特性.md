@@ -656,6 +656,6 @@ except ImportError as e:
 | 外部调试器接口 | 768 | 3.14 | 功能 |
 | UUID v6-v8 | - | 3.14 | 标准库 |
 | REPL 语法高亮 | - | 3.14 | 功能 |
-| asyncio 改进 | 765 | 3.14 | 标准库 |
+| asyncio 改进 | - | 3.14 | 标准库 |
 | Python 配置 API | 741 | 3.14 | 功能 |
 | Sigstore 验证 | 761 | 3.14 | 安全 |
