@@ -211,13 +211,7 @@ class TaskRunner:
         lines.append("- delete-reviewer: .claude/agents/delete-reviewer.md")
         lines.append("- agent-orchestrator: .claude/agents/agent-orchestrator.md")
         lines.append("")
-        lines.append("**执行方式：使用子 agent 直接 spawn 并行执行任务**")
-        lines.append("- 每个任务分配一个子 agent（run_in_background=True）")
-        lines.append("- 无需 TeamCreate，agents 之间无需通信")
-        lines.append("- Agent 领取后调用 `--update <task_id> working \"开始处理\"`")
-        lines.append("- 完成后调用 `--update <task_id> completed \"<结果>\"`")
-        lines.append("")
-        lines.append("**仲裁请求**：当遇到无法判断版本归属的代码时，调用 `--arbitrate_submit` 提交仲裁")
+        lines.append("**执行方式：每个任务分配一个子 agent（run_in_background=True）并行执行**")
 
         return "\n".join(lines)
 
@@ -232,7 +226,7 @@ class TaskRunner:
         total = len(all_tasks)
         completed = len([t for t in all_tasks if t.get("status") == "completed"])
         pending = len([t for t in all_tasks if t.get("status") == "pending"])
-        working = len([t for t in all_tasks if t.get("status") == "working")]
+        working = len([t for t in all_tasks if t.get("status") == "working"])
 
         lines = [
             "=" * 50,
