@@ -4,8 +4,8 @@
 
 > **机制演进说明**
 > - **tty/pts 机制**：Unix/Linux 的终端抽象，通过字符设备实现
-> - **Windows Terminal 变革**：Windows 11 提供现代终端体验，使用不同底层机制 (<latest>)
-> - **Ubuntu 24.04 Wayland**：pts 设备仍通过 DRM/KMS 交互 (<latest>)
+> - **Windows Terminal 变革**：Windows 11 提供现代终端体验，使用不同底层机制
+> - **Ubuntu 24.04 Wayland**：pts 设备仍通过 DRM/KMS 交互
 
 ## 核心概念
 
@@ -19,6 +19,16 @@
 用户输入 → 键盘 → 内核终端行规程 → Shell进程
 Shell输出 → 内核终端行规程 → 屏幕显示
 ```
+
+## 标准I/O重定向与管道
+
+Shell提供强大的I/O重定向能力，将命令的输入输出连接到文件或其他命令。管道将前一个命令的stdout连接到后一个的stdin，形成处理流水线。
+
+## 伪终端
+
+SSH等远程会话时使用伪终端（pty）。远程程序感觉像在本地终端运行，数据通过SSH加密隧道传输。
+
+> 详细内容见 [03-伪终端](./03-伪终端.md)。
 
 ### 参考样例
 
@@ -36,9 +46,7 @@ ls -l /dev/tty*
 # 切换虚拟终端
 Ctrl + Alt + F1   # 切换到tty1
 Ctrl + Alt + F7   # 返回图形界面
-```
 
-```bash
 # 常用控制字符
 Ctrl+C   # SIGINT - 中断进程
 Ctrl+Z   # SIGTSTP - 挂起进程（bg/fg恢复）
@@ -54,10 +62,6 @@ stty erase ^H             # 设置退格键
 stty -echo                 # 关闭回显（密码输入时）
 ```
 
-## 标准I/O重定向与管道
-
-Shell提供强大的I/O重定向能力，将命令的输入输出连接到文件或其他命令：
-
 ```bash
 # 重定向
 command > output.txt    # 标准输出重定向到文件（覆盖）
@@ -69,12 +73,6 @@ command &> all.txt      # 简写形式
 # 管道：前一个命令的stdout连接到后一个的stdin
 command1 | command2
 ```
-
-## 伪终端
-
-SSH等远程会话时使用伪终端（pty）。远程程序感觉像在本地终端运行，数据通过SSH加密隧道传输。
-
-> 详细内容见 [03-伪终端](./03-伪终端.md)。
 
 ```bash
 # SSH 伪终端工作原理
