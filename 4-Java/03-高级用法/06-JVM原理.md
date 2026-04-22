@@ -335,7 +335,7 @@ jstat -printcompilation <pid> 1000
 -Xmx512m           # 最大堆大小
 -Xmn128m           # 新生代大小
 
-# 方法区 (Java 8)
+# 方法区
 -XX:MetaspaceSize=128m
 -XX:MaxMetaspaceSize=256m
 
