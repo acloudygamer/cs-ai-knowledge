@@ -40,7 +40,6 @@ Java 8（Lambda/Stream）→ Java 11（HttpClient）→ Java 17（密封类）�
 ## 常用操作
 
 - [文件操作](./02-常用操作/01-文件操作.md)
-- [HTTP客户端对比](./02-常用操作/14-HTTP客户端对比.md)
 - [JSON处理](./02-常用操作/03-JSON处理.md)
 - [错误处理](./02-常用操作/04-错误处理.md)
 - [Stream API](./02-常用操作/05-Stream-API.md)
@@ -51,6 +50,7 @@ Java 8（Lambda/Stream）→ Java 11（HttpClient）→ Java 17（密封类）�
 - [日期时间](./02-常用操作/11-日期时间.md)
 - [网络编程](./02-常用操作/12-网络编程.md)
 - [Gradle](./02-常用操作/13-Gradle.md)
+- [HTTP客户端对比](./02-常用操作/14-HTTP客户端对比.md)
 
 ## 高级用法
 
