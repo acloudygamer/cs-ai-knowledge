@@ -347,7 +347,7 @@ public final class DeleteCommand implements Command {
 }
 ```
 
-## Instance Main Methods (Java 25)
+## Instance Main Methods (Java 25 版本新增)
 
 实例主方法简化 Java 程序入口，无需类声明。
 
@@ -376,7 +376,7 @@ void main() {
 // void main(String[] args) 也允许
 ```
 
-## Module Import Declaration (Java 25)
+## Module Import Declaration (Java 25 版本新增)
 
 `import module` 一次性导入模块所有公共类。
 
@@ -415,7 +415,7 @@ import java.io.FileReader;
 import java.io.PrintWriter;
 ```
 
-## Flexible Constructor Body (Java 25)
+## Flexible Constructor Body (Java 25 版本新增)
 
 允许在构造函数中 super()/this() 调用前执行初始化逻辑。
 
@@ -496,7 +496,7 @@ class Order {
 }
 ```
 
-## Scoped Values
+## Scoped Values (Java 22 版本新增)
 
 线程作用域变量，比 ThreadLocal 更适合虚拟线程。
 
@@ -547,7 +547,7 @@ void handleRequest(HttpRequest request) {
 | 继承性 | InheritableThreadLocal 可继承 | 通过 ScopedValue.where 传递 |
 | 适用场景 | 少量线程 | 大量虚拟线程 |
 
-## Primitive Types in Patterns（Java 25，第三预览）
+## Primitive Types in Patterns（Java 25 版本新增，第三预览）
 
 模式匹配支持基本类型。
 
@@ -596,7 +596,7 @@ void printSum(Object obj) {
 }
 ```
 
-## Key Derivation Function API（Java 25）
+## Key Derivation Function API（Java 25 版本新增）
 
 标准化的密码学密钥派生 API。
 
@@ -661,7 +661,7 @@ byte[] expandedKey = HKDFKeyFactory.doKeyDerivation(
 );
 ```
 
-## Unnamed Variables & Patterns (Java 22)
+## Unnamed Variables & Patterns (Java 22 版本新增)
 
 下划线 `_` 表示无需使用的变量，使代码更简洁。
 
@@ -709,7 +709,7 @@ String format(Object obj) {
 }
 ```
 
-## Markdown Documentation (Java 23)
+## Markdown Documentation (Java 23 版本新增)
 
 JavaDoc 支持 Markdown 格式的文档注释。
 
@@ -774,7 +774,7 @@ public class Calculator {
 | Markdown Documentation | 23 | JavaDoc 支持 Markdown |
 | Record Patterns | 21 | Record 解构 |
 | Virtual Threads | 21 | 轻量级线程 |
-| Scoped Values | 25 | 线程作用域变量 |
+| Scoped Values | 22 | 线程作用域变量 |
 | Primitive Types in Patterns | 25 | 模式匹配支持基本类型 |
 | Instance Main Methods | 25 | 简化的程序入口 |
 | Module Import | 25 | import module 语法 |

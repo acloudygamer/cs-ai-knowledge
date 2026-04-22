@@ -323,7 +323,7 @@ List<String> result = stream.collect(Collectors.toList());
 System.out.println("After terminal operation");
 ```
 
-## Stream Gatherers (Java 22+)
+## Stream Gatherers (Java 22 版本新增)
 
 > **版本说明**：Java 22 引入 `Stream.gather()` 方法，自定义中间操作器。
 
@@ -357,7 +357,7 @@ List<Integer> flat = nested.stream()
     .toList();  // [1, 2, 3, 4, 5, 6]
 ```
 
-### 内置 Gatherers (Java 22+)
+### 内置 Gatherers (Java 22 版本新增)
 
 ```java
 // 使用内置的 fold（左折叠）
