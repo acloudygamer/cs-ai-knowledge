@@ -1,12 +1,12 @@
 {
   "version": "4.0",
-  "updated": "2026-04-23T00:41:12.441745",
+  "updated": "2026-04-23T01:11:40.715045",
   "tasks": {
     "task_001_prereq": {
-      "target": "计算机基础-删除审查",
+      "target": "计算机基础-拓扑重组",
       "path": "0-计算机基础/",
       "agent": "topology-architect",
-      "status": "completed",
+      "status": "pending",
       "run_count": 59,
       "last_result": "开始执行前置审查：执行目录去重与低于 Windows 11 稳定版的物理清理。",
       "updated": "2026-04-23T00:35:30.361326",
@@ -19,17 +19,17 @@
       "blockedBy": [
         "task_001_prereq"
       ],
-      "status": "completed",
+      "status": "pending",
       "run_count": 61,
       "last_result": "开始执行内容精编：计算机基础目录，版本协调与交叉验证",
       "updated": "2026-04-23T00:40:05.327333",
       "result": "内容精编完毕。已修复版本标注格式问题（2处），验证了交叉引用链接有效，目录标号连续无跳号。"
     },
     "task_002_prereq": {
-      "target": "数据结构与算法-删除审查",
+      "target": "数据结构与算法-拓扑重组",
       "path": "1-数据结构与算法/",
       "agent": "topology-architect",
-      "status": "completed",
+      "status": "pending",
       "run_count": 59,
       "last_result": "开始执行前置审查：执行目录去重与低于 Python 3.12 版本的物理清理。",
       "updated": "2026-04-23T00:35:18.812783",
@@ -42,17 +42,17 @@
       "blockedBy": [
         "task_002_prereq"
       ],
-      "status": "completed",
+      "status": "pending",
       "run_count": 57,
       "last_result": "开始执行 [内容精编]：数据结构与算法目录，版本标记协调、交叉引用验证、句式优化",
       "updated": "2026-04-23T00:41:00.421650",
       "result": "数据结构与算法目录内容精编完成。版本标记协调：Python 3.12 与 versions.json 一致，README 版本说明正确；交叉引用验证：README 全部 28 条内部链接有效，RMQ 文件交叉引用正确；句式优化：位运算开篇已精简（移除冗余的「布隆过滤器哈希函数」），lowbit 定义补全为等式形式。所有目录标号连续(01-13/01-11/01-11/01)，无死链。"
     },
     "task_003_prereq": {
-      "target": "Python-删除审查",
+      "target": "Python-拓扑重组",
       "path": "2-Python/",
       "agent": "topology-architect",
-      "status": "completed",
+      "status": "pending",
       "run_count": 57,
       "last_result": "开始执行前置审查：执行目录去重与低于 Python 3.12 版本的物理清理。",
       "updated": "2026-04-23T00:35:59.977016",
@@ -65,19 +65,19 @@
       "blockedBy": [
         "task_003_prereq"
       ],
-      "status": "completed",
+      "status": "pending",
       "run_count": 55,
       "last_result": "开始执行 [内容精编]：2-Python/ 目录，版本标记协调、交叉引用验证、句式优化",
       "updated": "2026-04-23T00:41:12.441538",
       "result": "内容精编完毕。已清理5处版本标记冗余（移除标题和描述中重复的(<latest> 版本新增)标记），精简内存管理段落表述，交叉引用验证通过，目录标号连续无跳号。"
     },
     "task_004_prereq": {
-      "target": "C++-删除审查",
+      "target": "C++-拓扑重组",
       "path": "3-C++/",
       "agent": "topology-architect",
-      "status": "completed",
+      "status": "pending",
       "run_count": 59,
-      "last_result": "继续C++目录删除审查任务...",
+      "last_result": "继续C++目录拓扑重组任务...",
       "updated": "2026-04-23T00:36:44.895019",
       "result": "拓扑清理完毕。C++目录深度审查完成：共38个文件，0个删除，0个合并。C++20稳定版基准对齐正确，C++23/C++26特性均已正确标记<latest>标签。无低于stable版本的废弃内容。目录结构无需调整。"
     },
@@ -88,17 +88,17 @@
       "blockedBy": [
         "task_004_prereq"
       ],
-      "status": "completed",
+      "status": "pending",
       "run_count": 58,
       "last_result": "开始执行 [内容精编]：C++目录，版本协调与交叉引用验证",
       "updated": "2026-04-23T00:39:36.765433",
       "result": "内容精编完毕。C++目录版本标记正确（C++23/C++26正确标记为<latest>），交叉引用有效，目录标号连续(01-15/01-08/01-12/01-02)，无死链。"
     },
     "task_005_prereq": {
-      "target": "Java-删除审查",
+      "target": "Java-拓扑重组",
       "path": "4-Java/",
       "agent": "topology-architect",
-      "status": "completed",
+      "status": "pending",
       "run_count": 58,
       "last_result": "开始执行前置审查：执行目录去重与低于 Java 21 稳定版本的物理清理。",
       "updated": "2026-04-23T00:35:58.686153",
@@ -111,17 +111,17 @@
       "blockedBy": [
         "task_005_prereq"
       ],
-      "status": "completed",
+      "status": "pending",
       "run_count": 57,
       "last_result": "开始执行 [内容精编]：Java目录，版本标记协调、交叉引用验证、句式优化",
       "updated": "2026-04-23T00:39:36.119851",
       "result": "内容精编完毕。已移除 JVM原理.md 中的过期 (Java 8) 标记（Java 8 < 稳定版 Java 21），验证 README.md 所有交叉引用有效（100% 链接可用）。"
     },
     "task_006_prereq": {
-      "target": "JavaScript-删除审查",
+      "target": "JavaScript-拓扑重组",
       "path": "5-JavaScript/",
       "agent": "topology-architect",
-      "status": "completed",
+      "status": "pending",
       "run_count": 57,
       "last_result": "开始执行前置审查：执行目录去重与低于 stable 版本的物理清理。",
       "updated": "2026-04-23T00:36:14.934864",
@@ -134,17 +134,17 @@
       "blockedBy": [
         "task_006_prereq"
       ],
-      "status": "completed",
+      "status": "pending",
       "run_count": 56,
       "last_result": "开始执行 [内容精编]：JavaScript目录，版本标记协调、交叉引用验证、句式优化",
       "updated": "2026-04-23T00:40:38.143225",
       "result": "内容精编完成。版本标记协调：ES2026章节保留<latest>标记，子标题无冗余版本号；交叉引用验证：README及内部链接均有效；句式优化： subsection标题去重，结构更清晰。"
     },
     "task_007_prereq": {
-      "target": "Go-删除审查",
+      "target": "Go-拓扑重组",
       "path": "6-Go/",
       "agent": "topology-architect",
-      "status": "completed",
+      "status": "pending",
       "run_count": 57,
       "last_result": "开始执行前置审查：执行目录去重与低于 Go 1.24 版本的物理清理。",
       "updated": "2026-04-23T00:35:55.597356",
@@ -157,7 +157,7 @@
       "blockedBy": [
         "task_007_prereq"
       ],
-      "status": "completed",
+      "status": "pending",
       "run_count": 57,
       "last_result": "开始执行内容精编：Go目录，版本标记协调、交叉引用验证、句式优化",
       "updated": "2026-04-23T00:40:21.066813",
