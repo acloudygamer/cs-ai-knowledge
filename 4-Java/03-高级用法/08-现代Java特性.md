@@ -2,9 +2,9 @@
 
 ## 概述
 
-Java 17+ 引入了许多现代语言特性，让代码更简洁、更安全。本章涵盖最常用的新特性。
+Java 21 引入了许多现代语言特性，让代码更简洁、更安全。本章涵盖 Java 21 以来的最常用新特性。
 
-## Records (Java 16+, 正式版)
+## Records
 
 Records 是不可变数据类，用于替代笨重的类。
 
@@ -79,7 +79,7 @@ public record Point(int x, int y) {
 }
 ```
 
-### Record 与模式匹配 (Java 21+)
+### Record 与模式匹配
 
 ```java
 // Record 在 switch 中使用
@@ -94,7 +94,7 @@ String format(Object obj) {
 }
 ```
 
-## Sealed Classes (Java 17+, 正式版)
+## Sealed Classes
 
 密封类限制哪些类可以继承它。
 
@@ -153,7 +153,7 @@ double calculateArea(Shape shape) {
 
 ## Pattern Matching
 
-### instanceof 模式匹配 (Java 16+, 正式版)
+### instanceof 模式匹配
 
 ```java
 // 传统方式
@@ -171,7 +171,7 @@ if (obj instanceof String s) {
 ### Guarded Patterns
 
 ```java
-// 带条件的模式匹配 (Java 21+)
+// 带条件的模式匹配
 if (obj instanceof String s && s.length() > 5) {
     System.out.println(s.toUpperCase());
 }
@@ -200,7 +200,7 @@ void printCenter(Object obj) {
 }
 ```
 
-## Switch 表达式 (Java 14+, 正式版)
+## Switch 表达式
 
 ### 箭头表达式
 
@@ -262,7 +262,7 @@ String getMessage(Status status) {
 }
 ```
 
-## Text Blocks (Java 15+, 正式版)
+## Text Blocks
 
 多行字符串字面量。
 
@@ -324,55 +324,7 @@ String template = """
     """.formatted(name, age);
 ```
 
-## Local-Variable Type Inference (var)
-
-Java 10+ 支持使用 `var` 让编译器推断类型。
-
-### 基本用法
-
-```java
-// 编译器推断为 String
-var message = "Hello, Java!";
-
-// 编译器推断为 ArrayList<String>
-var names = new ArrayList<String>();
-
-// 编译器推断为 int[]
-var numbers = new int[]{1, 2, 3};
-```
-
-### 约束
-
-```java
-// 必须初始化
-// var x;  // 编译错误
-
-// 不能用于字段
-// class User {
-//     var name = "Alice";  // 编译错误
-// }
-
-// 不能用于方法参数
-// public void setName(var name) { }  // 编译错误
-
-// 不能用于数组初始化（需要类型）
-// var[] arr = {1, 2, 3};  // 编译错误
-var arr = new int[]{1, 2, 3};  // 正确
-```
-
-### 适用场景
-
-```java
-// 推荐：类型复杂、名称冗长时
-var stream = list.stream().filter(x -> x > 0).mapToInt(Integer::intValue);
-var map = new HashMap<String, List<Object>>();
-
-// 不推荐：类型不明显时
-var count = 5;        // int? long?
-var name = getName(); // String? 返回类型不明确时使用 var 会降低可读性
-```
-
-## Sealed Interfaces (Java 17+)
+## Sealed Interfaces
 
 接口也可以密封。
 
@@ -544,7 +496,7 @@ class Order {
 }
 ```
 
-## Scoped Values（Java 25）
+## Scoped Values
 
 线程作用域变量，比 ThreadLocal 更适合虚拟线程。
 
