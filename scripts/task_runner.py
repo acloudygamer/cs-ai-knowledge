@@ -53,6 +53,23 @@ def get_prompt_file(path: str) -> str:
     return ""
 
 
+def load_agent_definition(agent_name: str) -> str:
+    """加载 agent 定义文件的完整内容"""
+    agent_files = {
+        "topology-architect": ".claude/agents/topology-architect.md",
+        "agent-orchestrator": ".claude/agents/agent-orchestrator.md",
+    }
+    agent_file = agent_files.get(agent_name)
+    if not agent_file:
+        return ""
+    try:
+        file_path = SCRIPT_DIR.parent / agent_file
+        with open(file_path, 'r', encoding='utf-8') as f:
+            return f.read()
+    except Exception:
+        return ""
+
+
 class TaskRunner:
     """任务管理器"""
 
@@ -182,11 +199,24 @@ class TaskRunner:
         lines = ["# 待执行任务\n"]
         lines.append(f"Generated at: {datetime.now().isoformat()}\n")
 
+        # 预加载所有 agent 定义
+        agent_definitions = {}
+        for task in pending:
+            agent = task.get("agent", "general-purpose")
+            if agent and agent not in agent_definitions:
+                agent_definitions[agent] = load_agent_definition(agent)
+
         for task in pending:
             target = task.get("target", "")
             path = task.get('path', '')
             version = versions.get(path, "")
             agent = task.get("agent", "general-purpose")
+
+            # 包含完整的 agent 定义（关键！）
+            if agent in agent_definitions and agent_definitions[agent]:
+                lines.append(f"---\n\n## Agent 定义: {agent}\n")
+                lines.append(agent_definitions[agent])
+                lines.append("\n---")
 
             lines.append(f"### {target}")
             lines.append(f"- **工作目录** `{path}`")
@@ -203,15 +233,13 @@ class TaskRunner:
             if path.startswith("0-计算机基础"):
                 lines.append("- **说明**：内容为主，版本为辅。版本敏感度排序：Shell > 系统软件 > 其他。")
             lines.append("")
+            lines.append(f"**Spawn 命令**: 使用 `subagent_type: \"{agent}\"`，并将上述 Agent 定义内容注入到 prompt 开头。")
+            lines.append("")
 
-        # 参考文档
         lines.append("---")
         lines.append("")
-        lines.append("**参考文档**")
-        lines.append("- topology-architect: .claude/agents/topology-architect.md")
-        lines.append("- agent-orchestrator: .claude/agents/agent-orchestrator.md")
-        lines.append("")
         lines.append("**执行方式：每个任务分配一个子 agent（run_in_background=True）并行执行**")
+        lines.append("**重要：必须将上述 Agent 定义内容注入到每个 spawn 的 prompt 开头！**")
 
         return "\n".join(lines)
 

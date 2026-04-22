@@ -1,12 +1,12 @@
 {
   "version": "4.0",
-  "updated": "2026-04-23T02:39:15.187419",
+  "updated": "2026-04-23T02:42:55.903280",
   "tasks": {
     "task_001_prereq": {
       "target": "计算机基础-拓扑重组",
       "path": "0-计算机基础/",
       "agent": "topology-architect",
-      "status": "completed",
+      "status": "pending",
       "run_count": 65,
       "last_result": "开始执行拓扑重组：扫描碎片文件，执行语义合并与标号重排。",
       "updated": "2026-04-23T02:14:43.135706",
@@ -19,7 +19,7 @@
       "blockedBy": [
         "task_001_prereq"
       ],
-      "status": "completed",
+      "status": "pending",
       "run_count": 70,
       "last_result": "开始执行 [全量重修]：0-计算机基础/，以 Windows 11 为基准清理历史冗余",
       "updated": "2026-04-23T02:22:19.739151",
@@ -29,7 +29,7 @@
       "target": "数据结构与算法-拓扑重组",
       "path": "1-数据结构与算法/",
       "agent": "topology-architect",
-      "status": "completed",
+      "status": "pending",
       "run_count": 65,
       "last_result": "开始执行拓扑重组：扫描碎片文件，执行语义合并与标号重排。",
       "updated": "2026-04-23T02:14:32.054844",
@@ -42,7 +42,7 @@
       "blockedBy": [
         "task_002_prereq"
       ],
-      "status": "completed",
+      "status": "pending",
       "run_count": 63,
       "last_result": "开始执行 [内容精编]：1-数据结构与算法，以 Python 3.12 为基准",
       "updated": "2026-04-23T02:21:55.312852",
@@ -52,7 +52,7 @@
       "target": "Python-拓扑重组",
       "path": "2-Python/",
       "agent": "topology-architect",
-      "status": "completed",
+      "status": "pending",
       "run_count": 63,
       "last_result": "开始执行拓扑重组：扫描碎片文件，执行语义合并与标号重排。",
       "updated": "2026-04-23T02:14:27.416455",
@@ -65,7 +65,7 @@
       "blockedBy": [
         "task_003_prereq"
       ],
-      "status": "completed",
+      "status": "pending",
       "run_count": 61,
       "last_result": "开始执行内容精编：Python模块，以 Python 3.12 为基准",
       "updated": "2026-04-23T02:25:43.833679",
@@ -75,7 +75,7 @@
       "target": "C++-拓扑重组",
       "path": "3-C++/",
       "agent": "topology-architect",
-      "status": "completed",
+      "status": "pending",
       "run_count": 65,
       "last_result": "开始执行拓扑重组：扫描 3-C++/ 目录碎片文件，执行语义合并与标号重排。",
       "updated": "2026-04-23T02:15:08.459314",
@@ -88,7 +88,7 @@
       "blockedBy": [
         "task_004_prereq"
       ],
-      "status": "completed",
+      "status": "pending",
       "run_count": 64,
       "last_result": "开始执行 [内容精编]：3-C++，以 C++20 为基准清理历史冗余",
       "updated": "2026-04-23T02:36:14.746222",
@@ -98,7 +98,7 @@
       "target": "Java-拓扑重组",
       "path": "4-Java/",
       "agent": "topology-architect",
-      "status": "completed",
+      "status": "pending",
       "run_count": 64,
       "last_result": "开始执行拓扑重组：扫描碎片文件，执行语义合并与标号重排。",
       "updated": "2026-04-23T02:14:31.199651",
@@ -111,7 +111,7 @@
       "blockedBy": [
         "task_005_prereq"
       ],
-      "status": "completed",
+      "status": "pending",
       "run_count": 63,
       "last_result": "开始执行 [内容精编]：4-Java模块，以 Java 21 为基准清理历史冗余",
       "updated": "2026-04-23T02:39:15.187194",
@@ -121,7 +121,7 @@
       "target": "JavaScript-拓扑重组",
       "path": "5-JavaScript/",
       "agent": "topology-architect",
-      "status": "completed",
+      "status": "pending",
       "run_count": 63,
       "last_result": "开始执行拓扑重组：扫描碎片文件，执行语义合并与标号重排。",
       "updated": "2026-04-23T02:18:45.226195",
@@ -134,7 +134,7 @@
       "blockedBy": [
         "task_006_prereq"
       ],
-      "status": "completed",
+      "status": "pending",
       "run_count": 62,
       "last_result": "开始执行 [全量重修]：JavaScript内容精编，以 Node24+ES2024 为基准",
       "updated": "2026-04-23T02:24:28.509459",
@@ -144,7 +144,7 @@
       "target": "Go-拓扑重组",
       "path": "6-Go/",
       "agent": "topology-architect",
-      "status": "completed",
+      "status": "pending",
       "run_count": 63,
       "last_result": "开始执行拓扑重组：扫描碎片文件，执行语义合并与标号重排。",
       "updated": "2026-04-23T02:15:19.582589",
@@ -157,7 +157,7 @@
       "blockedBy": [
         "task_007_prereq"
       ],
-      "status": "completed",
+      "status": "pending",
       "run_count": 63,
       "last_result": "开始执行 [内容精编]：6-Go/，以 Go 1.24 为基准清理历史冗余",
       "updated": "2026-04-23T02:26:41.940373",
