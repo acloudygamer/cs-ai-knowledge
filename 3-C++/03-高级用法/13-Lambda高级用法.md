@@ -976,7 +976,7 @@ std::vector<int> squared(nums.size());
 std::ranges::transform(nums, squared.begin(),
     [](int n) { return n * n; });
 
-// C++23 to_array
+// std::ranges::to（C++23）
 auto arr = nums
     | std::views::filter([](int n) { return n % 2 == 1; })
     | std::views::transform([](int n) { return n * 2; })
