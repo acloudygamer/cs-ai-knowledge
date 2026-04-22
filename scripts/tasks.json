@@ -1,6 +1,6 @@
 {
   "version": "4.0",
-  "updated": "2026-04-23T02:20:38.575290",
+  "updated": "2026-04-23T02:39:15.187419",
   "tasks": {
     "task_001_prereq": {
       "target": "计算机基础-拓扑重组",
@@ -19,11 +19,11 @@
       "blockedBy": [
         "task_001_prereq"
       ],
-      "status": "working",
-      "run_count": 69,
-      "last_result": "内容精编完毕。字节序与位运算.md - 补充了常用位运算技巧的5个代码示例，实现概念描述与参考代码的物理分离。",
-      "updated": "2026-04-23T02:20:00.869284",
-      "result": "开始执行 [全量重修]：0-计算机基础/，以 Windows 11 为基准清理历史冗余"
+      "status": "completed",
+      "run_count": 70,
+      "last_result": "开始执行 [全量重修]：0-计算机基础/，以 Windows 11 为基准清理历史冗余",
+      "updated": "2026-04-23T02:22:19.739151",
+      "result": "内容精编完毕。已修复01-硬件组成.md的重复内容（移除58行冗余内容），目录结构正常，链接可用率100%。"
     },
     "task_002_prereq": {
       "target": "数据结构与算法-拓扑重组",
@@ -42,11 +42,11 @@
       "blockedBy": [
         "task_002_prereq"
       ],
-      "status": "working",
-      "run_count": 62,
-      "last_result": "内容精编完毕。已审查全部 28 个 Markdown 文件，目录结构正确(01-04)，机制解释与代码样例分离一致，无过期链接，版本标注规范（均为 Python 3.12 稳定版内容，无需 <latest> 标记）。",
-      "updated": "2026-04-23T02:19:58.024629",
-      "result": "开始执行 [内容精编]：1-数据结构与算法，以 Python 3.12 为基准"
+      "status": "completed",
+      "run_count": 63,
+      "last_result": "开始执行 [内容精编]：1-数据结构与算法，以 Python 3.12 为基准",
+      "updated": "2026-04-23T02:21:55.312852",
+      "result": "内容精编完毕。已审查全部 30 个文件，修复树与二叉树节点定义说明，优化单调栈代码结构。所有文档保持机制解释与代码样例的物理分离，目录标号连续，链接有效。"
     },
     "task_003_prereq": {
       "target": "Python-拓扑重组",
@@ -65,11 +65,11 @@
       "blockedBy": [
         "task_003_prereq"
       ],
-      "status": "working",
-      "run_count": 60,
-      "last_result": "内容精编完毕，精编 47 个 Python 文件，移除冗余过渡句，机制说明移至章节开头，代码示例统一标注参考样例，Python 3.14 新特性添加 latest 标记",
-      "updated": "2026-04-23T02:19:50.874842",
-      "result": "开始执行内容精编：Python模块，以 Python 3.12 为基准"
+      "status": "completed",
+      "run_count": 61,
+      "last_result": "开始执行内容精编：Python模块，以 Python 3.12 为基准",
+      "updated": "2026-04-23T02:25:43.833679",
+      "result": "内容精编完毕。已重构 7 个 Python 文件，实现机制解释与代码样例的物理分离。所有代码块已统一移动至 ### 参考样例 子标题下，核心概念章节已标准化。"
     },
     "task_004_prereq": {
       "target": "C++-拓扑重组",
@@ -88,11 +88,11 @@
       "blockedBy": [
         "task_004_prereq"
       ],
-      "status": "working",
-      "run_count": 63,
-      "last_result": "内容精编完毕。重构 14 个 C++ 核心文档文件，机制解释与代码样例分离，代码统一移至 ### 参考样例，882 行新增，4102 行删除，净减少约 3200 行。",
-      "updated": "2026-04-23T02:20:15.473387",
-      "result": "开始执行 [内容精编]：3-C++，以 C++20 为基准清理历史冗余"
+      "status": "completed",
+      "run_count": 64,
+      "last_result": "开始执行 [内容精编]：3-C++，以 C++20 为基准清理历史冗余",
+      "updated": "2026-04-23T02:36:14.746222",
+      "result": "内容精编完毕：C++20为基础版本，12个文件完成机制解释与代码样例分离，70/30比例达标。"
     },
     "task_005_prereq": {
       "target": "Java-拓扑重组",
@@ -111,11 +111,11 @@
       "blockedBy": [
         "task_005_prereq"
       ],
-      "status": "working",
-      "run_count": 62,
-      "last_result": "内容精编完毕。已重构07-现代Java特性.md和10-虚拟线程深度.md，机制解释与代码样例已分离，版本标注已验证（<latest>仅用于Java 22/25前沿特性）",
-      "updated": "2026-04-23T02:20:01.254015",
-      "result": "开始执行 [内容精编]：4-Java模块，以 Java 21 为基准清理历史冗余"
+      "status": "completed",
+      "run_count": 63,
+      "last_result": "开始执行 [内容精编]：4-Java模块，以 Java 21 为基准清理历史冗余",
+      "updated": "2026-04-23T02:39:15.187194",
+      "result": "重构完毕。05-Java生态目录完成：SpringSecurity、Elasticsearch与MongoDB、监控与链路追踪已重排，机制解释与代码样例分离"
     },
     "task_006_prereq": {
       "target": "JavaScript-拓扑重组",
@@ -134,11 +134,11 @@
       "blockedBy": [
         "task_006_prereq"
       ],
-      "status": "working",
-      "run_count": 61,
-      "last_result": "内容精编完毕。14 个文件已完成机制解释与代码样例分离，文件包括：变量与类型、函数、控制流程、类与模块、迭代器与生成器、Map与Set、异步编程基础、网络请求、JSON处理、错误处理、正则表达式、内存管理、代理与反射、Node.js基础。已 git commit 并 push。",
-      "updated": "2026-04-23T02:20:38.575069",
-      "result": "开始执行 [全量重修]：JavaScript内容精编，以 Node24+ES2024 为基准"
+      "status": "completed",
+      "run_count": 62,
+      "last_result": "开始执行 [全量重修]：JavaScript内容精编，以 Node24+ES2024 为基准",
+      "updated": "2026-04-23T02:24:28.509459",
+      "result": "重构完毕。06-迭代器与异步编程.md 与 03-JavaScript高级特性.md 已添加 Draft 标签，机制解释与代码样例已分离，合并说明已添加。"
     },
     "task_007_prereq": {
       "target": "Go-拓扑重组",
@@ -157,11 +157,11 @@
       "blockedBy": [
         "task_007_prereq"
       ],
-      "status": "working",
-      "run_count": 62,
-      "last_result": "内容精编完毕。版本标注修正：你好世界.md 示例版本号 1.26→1.24，错误处理.md errors.AsType 标注为 <latest> 版本新增。",
-      "updated": "2026-04-23T02:20:11.284430",
-      "result": "开始执行 [内容精编]：6-Go/，以 Go 1.24 为基准清理历史冗余"
+      "status": "completed",
+      "run_count": 63,
+      "last_result": "开始执行 [内容精编]：6-Go/，以 Go 1.24 为基准清理历史冗余",
+      "updated": "2026-04-23T02:26:41.940373",
+      "result": "内容精编完毕。已重构 12 个文件，机制解释与代码样例已分离，版本标注已校验（Go 1.25/1.26 标记为 latest），目录标号连续无跳号。"
     }
   }
 }

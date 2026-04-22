@@ -44,6 +44,8 @@ gu update native-image
 
 ### 项目配置
 
+Spring Boot 3 对 Native Image 有完整支持。
+
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
 <project xmlns="http://maven.apache.org/POM/4.0.0"
@@ -101,13 +103,6 @@ gu update native-image
                         </goals>
                         <phase>package</phase>
                     </execution>
-                    <execution>
-                        <id>test-native</id>
-                        <goals>
-                            <goal>test-no-fork</goal>
-                        </goals>
-                        <phase>test</phase>
-                    </execution>
                 </executions>
                 <configuration>
                     <imageName>native-demo</imageName>
@@ -139,57 +134,6 @@ management:
     web:
       exposure:
         include: health,info
-
-logging:
-  level:
-    root: INFO
-```
-
-## 快速启动示例
-
-### 简单 REST 控制器
-
-```java
-package com.example.nativedemo;
-
-import org.springframework.boot.SpringApplication;
-import org.springframework.boot.autoconfigure.SpringBootApplication;
-import org.springframework.web.bind.annotation.*;
-
-@SpringBootApplication
-@RestController
-@RequestMapping("/api")
-public class NativeDemoApplication {
-
-    public static void main(String[] args) {
-        SpringApplication.run(NativeDemoApplication.class, args);
-    }
-
-    @GetMapping("/hello")
-    public String hello(@RequestParam(defaultValue = "World") String name) {
-        return "Hello, " + name + "!";
-    }
-
-    @GetMapping("/health")
-    public HealthStatus health() {
-        return new HealthStatus("UP", System.currentTimeMillis());
-    }
-
-    record HealthStatus(String status, long timestamp) {}
-}
-```
-
-### 构建原生镜像
-
-```bash
-# Maven 构建
-./mvnw -Pnative package
-
-# 或使用 Gradle
-./gradlew nativeCompile
-
-# 直接运行
-./target/native-demo
 ```
 
 ## GraalVM 配置详解
@@ -211,28 +155,18 @@ Args=--verbose \
 
 ### 资源文件配置
 
-```properties
-# META-INF/native-image/resource-config.json
+```json
+// META-INF/native-image/resource-config.json
 {
   "resources": {
     "includes": [
-      {
-        "pattern": ".*\\.properties$"
-      },
-      {
-        "pattern": ".*\\.xml$"
-      },
-      {
-        "pattern": ".*\\.yml$"
-      },
-      {
-        "pattern": "org/springframework/boot/logback/.*"
-      }
+      { "pattern": ".*\\.properties$" },
+      { "pattern": ".*\\.xml$" },
+      { "pattern": ".*\\.yml$" },
+      { "pattern": "org/springframework/boot/logback/.*" }
     ],
     "excludes": [
-      {
-        "pattern": ".*/test/.*"
-      }
+      { "pattern": ".*/test/.*" }
     ]
   }
 }
@@ -249,43 +183,18 @@ Args=--verbose \
     "allDeclaredMethods": true,
     "allDeclaredFields": true,
     "fields": [
-      {
-        "name": "id",
-        "type": "long"
-      },
-      {
-        "name": "name",
-        "type": "java.lang.String"
-      }
-    ]
-  },
-  {
-    "name": "java.time.LocalDateTime",
-    "methods": [
-      {
-        "name": "now",
-        "parameterTypes": []
-      }
+      { "name": "id", "type": "long" },
+      { "name": "name", "type": "java.lang.String" }
     ]
   }
 ]
 ```
 
-### 动态代理配置
-
-```json
-// META-INF/native-image/proxy-config.json
-[
-  [
-    "java.lang.reflect.InvocationHandler",
-    "org.springframework.http.client.ClientHttpRequestFactory"
-  ]
-]
-```
-
 ## 动态类加载处理
 
-### 示例：Class.forName
+### Class.forName 处理
+
+GraalVM Native Image 需要预知要加载的类。动态类加载场景需要预注册。
 
 ```java
 @Service
@@ -293,7 +202,6 @@ public class PluginService {
 
     public Object loadPlugin(String className) {
         try {
-            // GraalVM 需要预知要加载的类
             Class<?> clazz = Class.forName(className);
             return clazz.getDeclaredConstructor().newInstance();
         } catch (ClassNotFoundException e) {
@@ -307,16 +215,6 @@ public class PluginService {
         "com.example.plugins.SmsPlugin",
         "com.example.plugins.PaymentPlugin"
     );
-}
-```
-
-### ConditionalOnClass 处理
-
-```java
-@Configuration
-@ConditionalOnClass(value = com.fasterxml.jackson.databind.ObjectMapper.class)
-public class JacksonAutoConfiguration {
-    // 只有当 Jackson 在类路径中时才加载
 }
 ```
 
@@ -341,52 +239,9 @@ native-image --features=NativeImageAgent \
              -H:+DashboardAll \
              -H:DashboardPath=build/dashboard \
              -jar target/app.jar
-
-# 查看分析结果
-ls -la build/dashboard/
-```
-
-### 调试构建
-
-```bash
-# 详细输出
-native-image --verbose \
-              -H:+VerboseSupport \
-              -H:+TraceClassInitialization \
-              -jar target/app.jar
-
-# 检查镜像内容
-native-image-inspect target/app
 ```
 
 ## 性能对比
-
-### 启动时间对比
-
-```java
-@SpringBootApplication
-public class StartupBenchmark {
-
-    public static void main(String[] args) {
-        // 记录启动时间
-        long start = System.currentTimeMillis();
-
-        var app = new SpringApplication(StartupBenchmark.class);
-        app.setBannerMode(Banner.Mode.OFF);
-
-        ConfigurableApplicationContext context = app.run(args);
-
-        long duration = System.currentTimeMillis() - start;
-
-        System.out.println("Startup time: " + duration + "ms");
-        System.out.println("Memory used: " +
-            Runtime.getRuntime().totalMemory() -
-            Runtime.getRuntime().freeMemory() + " bytes");
-
-        context.close();
-    }
-}
-```
 
 ### 典型对比数据
 
@@ -406,48 +261,18 @@ FROM ghcr.io/graalvm/native-image:ol9-java17 as builder
 
 WORKDIR /app
 
-# 复制 Maven 依赖
 COPY mvnw pom.xml ./
 COPY .mvn .mvn
 COPY src src
 
-# 下载依赖
 RUN ./mvnw dependency:go-offline
-
-# 构建
 RUN ./mvnw -Pnative package -DskipTests
 
-# 运行镜像
 FROM ghcr.io/graalvm/native-image:ol9-java17
 WORKDIR /app
 COPY --from=builder /app/target/native-demo /app/native-demo
 EXPOSE 8080
 ENTRYPOINT ["/app/native-demo"]
-```
-
-### Docker Compose
-
-```yaml
-version: '3.8'
-services:
-  app:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    ports:
-      - "8080:8080"
-    environment:
-      - SPRING_PROFILES_ACTIVE=prod
-      - JAVA_OPTS=-Xmx64m
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-    deploy:
-      resources:
-        limits:
-          memory: 128M
 ```
 
 ### Kubernetes 部署
@@ -493,67 +318,19 @@ spec:
             periodSeconds: 10
 ```
 
-## Spring Boot 3 特性
-
-### AOT 编译插件
-
-```xml
-<plugin>
-    <groupId>org.springframework.boot</groupId>
-    <artifactId>spring-boot-aot-maven-plugin</artifactId>
-    <version>3.4.0</version>
-    <executions>
-        <execution>
-            <id>prepare-aot</id>
-            <goals>
-                <goal>prepare-aot</goal>
-            </goals>
-        </execution>
-    </executions>
-</plugin>
-```
-
-### 可推断的依赖
-
-```java
-// Spring Boot 3 可以自动推断某些依赖
-@Configuration
-public class AutoConfiguration {
-
-    // 不需要显式指定数据源类
-    @Bean
-    public DataSource dataSource() {
-        return DataSourceBuilder.create()
-            .url("jdbc:h2:mem:testdb")
-            .driverClassName("org.h2.Driver")
-            .build();
-    }
-}
-```
-
 ## 常见问题与解决
 
 ### 反射问题
 
-```java
-// 问题：运行时反射失败
-public class ReflectionIssue {
+运行时反射失败，需要注册反射配置。
 
-    @JsonProperty("user_name")
-    private String userName;
-
-    // 解决：注册反射配置
-}
-
+```json
 // META-INF/native-image/reflect-config.json
 [
   {
     "name": "com.example.ReflectionIssue",
     "fields": [
-      {
-        "name": "userName",
-        "type": "java.lang.String"
-      }
+      { "name": "userName", "type": "java.lang.String" }
     ]
   }
 ]
@@ -561,37 +338,29 @@ public class ReflectionIssue {
 
 ### 资源加载问题
 
-```java
-// 问题：资源文件找不到
-InputStream is = getClass().getResourceAsStream("/config.json");
+资源文件找不到，需要注册资源模式。
 
-// 解决：注册资源
+```json
 // META-INF/native-image/resource-config.json
 {
   "resources": {
-    "includes": [{"pattern": "/config.json"}]
+    "includes": [{ "pattern": "/config.json" }]
   }
 }
 ```
 
 ### 类初始化顺序
 
-```java
-// 问题：类在错误的时间初始化
-public class StaticInit {
-    static {
-        // 构建时运行可能出问题
-    }
-}
+类在错误的时间初始化，通过 --initialize-at-build-time 指定。
 
-// 解决：指定初始化时机
-// native-image.properties
+```properties
+# native-image.properties
 Args =--initialize-at-build-time=com.example.StaticInit
 ```
 
 ## Quarkus 与 GraalVM
 
-### Quarkus 配置
+Quarkus 是为 GraalVM 优化的框架，Native Image 支持开箱即用。
 
 ```xml
 <dependency>
@@ -608,130 +377,22 @@ Args =--initialize-at-build-time=com.example.StaticInit
 # application.properties
 quarkus.native.additional-build-args=--initialize-at-build-time=org.hibernate
 quarkus.http.port=8080
-quarkus.datasource.db-kind=h2
-quarkus.datasource.jdbc.url=jdbc:h2:mem:testdb
-```
-
-### 构建 Quarkus
-
-```bash
-./mvnw package -Pnative -Dquarkus.native.enabled=true
-```
-
-## 最佳实践
-
-### 优化构建速度
-
-```bash
-# 使用构建缓存
-native-image --libc=glibc \
-             --enable-https \
-             --strict-image-bounds \
-             -jar target/app.jar
-
-# 并行构建
-native-image -jar target/app.jar \
-             -H:NumberOfThreads=4
-```
-
-### 减小镜像体积
-
-```bash
-# 剥离调试信息
-native-image --strip-debug-info \
-             -jar target/app.jar
-
-# 只包含需要的字符集
-native-image -H:+AddAllCharsets \
-             -jar target/app.jar
-```
-
-### 安全配置
-
-```bash
-# 安全加固
-native-image --enable-svm \
-             --install-exit-handlers \
-             -jar target/app.jar
-
-# 禁用不安全的功能
---allow-incomplete-classpath \
---report-unsupported-elements-at-runtime
-```
-
-### 内存配置
-
-```bash
-# 为 Native Image 配置内存
-./target/native-demo -Xmx64m -Xms32m
-```
-
-## 与 JMH 集成
-
-### 微基准测试
-
-```java
-@Warmup(iterations = 3, time = 1, timeUnit = TimeUnit.SECONDS)
-@Measurement(iterations = 5, time = 1, timeUnit = TimeUnit.SECONDS)
-@BenchmarkMode(Mode.Throughput)
-@OutputTimeUnit(TimeUnit.MILLISECONDS)
-public class NativeBenchmark {
-
-    @Benchmark
-    public void simpleOperation() {
-        IntStream.range(0, 1000).sum();
-    }
-
-    @Benchmark
-    public String stringConcat() {
-        return "Hello" + " " + "World";
-    }
-}
-```
-
-### 运行基准测试
-
-```bash
-# 编译基准测试
-javac -cp $JMH_HOME/jar/benchmarks.jar NativeBenchmark.java
-
-# 运行
-java -jar $JMH_HOME/jar/benchmarks.jar -prof gc NativeBenchmark
-```
-
-## 监控 Native Image
-
-### JMX 配置
-
-```bash
-./target/native-demo \
-    -Dcom.sun.management.jmxremote \
-    -Dcom.sun.management.jmxremote.port=9999 \
-    -Dcom.sun.management.jmxremote.authenticate=false
-```
-
-### Native Memory Tracking
-
-```bash
-./target/native-demo \
-    -XX:NativeMemoryTracking=summary
 ```
 
 ## 迁移指南
 
 ### 从传统 JVM 迁移
 
-1. **测试优先**：先在 JVM 模式确保测试通过
-2. **添加配置**：注册反射、资源、代理配置
-3. **迭代构建**：使用 `--verbose` 定位问题
-4. **性能调优**：根据实际情况调整参数
+1. 测试优先：先在 JVM 模式确保测试通过
+2. 添加配置：注册反射、资源、代理配置
+3. 迭代构建：使用 --verbose 定位问题
+4. 性能调优：根据实际情况调整参数
 
 ### 兼容性检查
 
 ```java
 @Component
 public class GraalVMChecker implements ApplicationRunner {
-
     @Override
     public void run(ApplicationArguments args) {
         String version = System.getProperty("java.vm.version");
@@ -744,12 +405,123 @@ public class GraalVMChecker implements ApplicationRunner {
 }
 ```
 
-## 总结
+## 参考样例
 
-GraalVM Native Image 是云原生 Java 的重要方向，特别适合：
-- 无服务器函数 (Serverless)
-- 容器化部署
-- 边缘计算
-- 需要快速启动的场景
+```bash
+# 安装 GraalVM
+curl -sL https://github.com/graalvm/graalvm-ce-builds/releases/download/vm-22.3.2/graalvm-ce-java17-linux-amd64-22.3.2.tar.gz | tar xz
+export GRAALVM_HOME=/path/to/graalvm-ce-java17-22.3.2
+gu install native-image
+```
 
-通过合理的配置和优化，Native Image 可以显著提升应用的启动速度和资源效率。
+```bash
+# 构建 Native Image
+./mvnw -Pnative package
+
+# 或使用 Gradle
+./gradlew nativeCompile
+
+# 直接运行
+./target/native-demo
+```
+
+```bash
+# 调试构建
+native-image --verbose \
+              -H:+VerboseSupport \
+              -H:+TraceClassInitialization \
+              -jar target/app.jar
+```
+
+```xml
+<!-- Spring Boot Native Image Maven 配置 -->
+<plugin>
+    <groupId>org.graalvm.buildtools</groupId>
+    <artifactId>native-maven-plugin</artifactId>
+    <version>0.9.24</version>
+    <configuration>
+        <imageName>native-demo</imageName>
+        <buildArgs>--no-fallback</buildArgs>
+    </configuration>
+</plugin>
+```
+
+```properties
+# native-image.properties
+Args=--verbose \
+     --initialize-at-build-time=org.slf4j.LoggerFactory \
+     --initialize-at-build-time=ch.qos.logback \
+     --no-fallback
+```
+
+```json
+// reflection-config.json
+[
+  {
+    "name": "com.example.model.User",
+    "allDeclaredConstructors": true,
+    "allDeclaredMethods": true,
+    "fields": [
+      { "name": "id", "type": "long" },
+      { "name": "name", "type": "java.lang.String" }
+    ]
+  }
+]
+```
+
+```dockerfile
+# 多阶段构建
+FROM ghcr.io/graalvm/native-image:ol9-java17 as builder
+WORKDIR /app
+COPY mvnw pom.xml ./
+RUN ./mvnw dependency:go-offline
+COPY src src
+RUN ./mvnw -Pnative package -DskipTests
+
+FROM ghcr.io/graalvm/native-image:ol9-java17
+WORKDIR /app
+COPY --from=builder /app/target/native-demo /app/native-demo
+ENTRYPOINT ["/app/native-demo"]
+```
+
+```java
+// GraalVM 检测
+String version = System.getProperty("java.vm.version");
+if (version.contains("GraalVM")) {
+    System.out.println("Running on GraalVM");
+}
+```
+
+```yaml
+# Kubernetes 部署配置
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: native-demo
+spec:
+  replicas: 3
+  template:
+    spec:
+      containers:
+        - name: native-demo
+          image: native-demo:1.0.0
+          resources:
+            limits:
+              memory: "128Mi"
+              cpu: "500m"
+```
+
+```java
+// 启动基准测试
+@SpringBootApplication
+public class StartupBenchmark {
+    public static void main(String[] args) {
+        long start = System.currentTimeMillis();
+        var app = new SpringApplication(StartupBenchmark.class);
+        app.setBannerMode(Banner.Mode.OFF);
+        var context = app.run(args);
+        System.out.println("Startup time: " + (System.currentTimeMillis() - start) + "ms");
+        context.close();
+    }
+}
+```

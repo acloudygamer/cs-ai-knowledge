@@ -27,52 +27,7 @@ my-project/
 
 ## pom.xml 基础
 
-```xml
-<?xml version="1.0" encoding="UTF-8"?>
-<project xmlns="http://maven.apache.org/POM/4.0.0">
-    <modelVersion>4.0.0</modelVersion>
-
-    <!-- GAV: GroupId, ArtifactId, Version -->
-    <groupId>com.example</groupId>
-    <artifactId>my-app</artifactId>
-    <version>1.0.0</version>
-    <packaging>jar</packaging>
-
-    <name>My Application</name>
-    <description>A sample Maven project</description>
-
-    <!-- 依赖 -->
-    <dependencies>
-        <dependency>
-            <groupId>org.junit.jupiter</groupId>
-            <artifactId>junit-jupiter</artifactId>
-            <version>5.10.0</version>
-            <scope>test</scope>
-        </dependency>
-
-        <dependency>
-            <groupId>com.google.guava</groupId>
-            <artifactId>guava</artifactId>
-            <version>32.1.3-jre</version>
-        </dependency>
-    </dependencies>
-
-    <!-- 构建配置 -->
-    <build>
-        <plugins>
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-compiler-plugin</artifactId>
-                <version>3.11.0</version>
-                <configuration>
-                    <source>25</source>
-                    <target>25</target>
-                </configuration>
-            </plugin>
-        </plugins>
-    </build>
-</project>
-```
+GAV: GroupId, ArtifactId, Version。
 
 ## 依赖范围（scope）
 
@@ -82,85 +37,84 @@ my-project/
 | `provided` | ✓ | ✗ | ✓ |
 | `runtime` | ✗ | ✓ | ✓ |
 | `test` | ✗ | ✗ | ✓ |
-| `import` | - | - | - |
-
-```xml
-<!-- servlet-api 在编译时需要，但部署容器已提供 -->
-<dependency>
-    <groupId>jakarta.servlet</groupId>
-    <artifactId>jakarta.servlet-api</artifactId>
-    <version>6.0.0</version>
-    <scope>provided</scope>
-</dependency>
-```
-
-## 常用命令
-
-```bash
-# 编译项目
-mvn compile
-
-# 运行测试
-mvn test
-
-# 打包（生成 jar）
-mvn package
-
-# 跳过测试打包
-mvn package -DskipTests
-
-# 清理并重新构建
-mvn clean package
-
-# 运行主类
-mvn exec:java -Dexec.mainClass="com.example.Main"
-
-# 查看依赖树
-mvn dependency:tree
-
-# 解决依赖冲突：查看哪些依赖引入了特定包
-mvn dependency:tree -Dincludes=com.google.guava
-
-# 跳过测试运行
-mvn clean install -DskipTests
-
-# 只构建指定模块（多模块项目）
-mvn clean install -pl module-a -am
-```
 
 ## 依赖版本管理
 
-### 依赖仲裁（Conflict Resolution）
+Maven 采用"最短路径"和"声明顺序"原则解决版本冲突。
 
-Maven 采用"最短路径"和"声明顺序"原则解决版本冲突：
+## Maven 仓库
 
-```bash
-# 查看依赖冲突
-mvn dependency:tree -Dverbose
+本地仓库位置 `~/.m2/repository`。
+
+## Spring Boot 的父 POM
+
+Spring Boot 项目继承 `spring-boot-starter-parent`，获得统一版本管理。
+
+## 多模块项目
+
+父 pom.xml 使用 `<modules>` 声明子模块，`<dependencyManagement>` 统一版本管理。
+
+## 常用插件
+
+### Maven Compiler Plugin
+
+### Spring Boot Maven Plugin
+
+## 构建生命周期
+
+```
+validate → compile → test → package → verify → install → deploy
 ```
 
-### 版本变量
+## 参考样例
 
 ```xml
-<project>
-    <properties>
-        <java.version>17</java.version>
-        <spring.version>6.1.0</spring.version>
-    </properties>
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>com.example</groupId>
+    <artifactId>my-app</artifactId>
+    <version>1.0.0</version>
+    <packaging>jar</packaging>
 
     <dependencies>
         <dependency>
-            <groupId>org.springframework</groupId>
-            <artifactId>spring-core</artifactId>
-            <version>${spring.version}</version>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <version>5.10.0</version>
+            <scope>test</scope>
         </dependency>
     </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>3.11.0</version>
+                <configuration>
+                    <source>21</source>
+                    <target>21</target>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
 </project>
 ```
 
-### 依赖排除
+```bash
+# 常用命令
+mvn compile           # 编译项目
+mvn test              # 运行测试
+mvn package           # 打包
+mvn clean package     # 清理并重新构建
+mvn dependency:tree    # 查看依赖树
+mvn clean install -DskipTests  # 跳过测试安装
+```
 
 ```xml
+<!-- 依赖排除 -->
 <dependency>
     <groupId>com.example</groupId>
     <artifactId>some-library</artifactId>
@@ -174,36 +128,8 @@ mvn dependency:tree -Dverbose
 </dependency>
 ```
 
-## Maven 仓库
-
-```bash
-# 本地仓库位置
-~/.m2/repository
-
-# 配置阿里云镜像（加速国内下载）
-# 编辑 ~/.m2/settings.xml
-```
-
 ```xml
-<mirrors>
-    <mirror>
-        <id>aliyun</id>
-        <name>Aliyun Maven</name>
-        <url>https://maven.aliyun.com/repository/public</url>
-        <mirrorOf>central</mirrorOf>
-    </mirror>
-</mirrors>
-```
-
-## Spring Boot 的父 POM
-
-Spring Boot 项目继承 `spring-boot-starter-parent`，获得：
-- 默认 Java 版本（当前是 17）
-- 资源编码配置
-- 测试框架配置
-- 依赖版本管理
-
-```xml
+<!-- Spring Boot 父 POM -->
 <parent>
     <groupId>org.springframework.boot</groupId>
     <artifactId>spring-boot-starter-parent</artifactId>
@@ -218,24 +144,8 @@ Spring Boot 项目继承 `spring-boot-starter-parent`，获得：
 </dependencies>
 ```
 
-## 创建 Spring Boot 项目
-
-```bash
-# 使用官方模板创建
-mvn archetype:generate \
-    -DgroupId=com.example \
-    -DartifactId=demo \
-    -DarchetypeArtifactId=maven-archetype-quickstart \
-    -DinteractiveMode=false
-
-# 或者使用 Spring Initializr（推荐）
-# 访问 https://start.spring.io/
-```
-
-## 多模块项目
-
 ```xml
-<!-- 父 pom.xml -->
+<!-- 多模块项目父 POM -->
 <project>
     <groupId>com.example</groupId>
     <artifactId>parent-project</artifactId>
@@ -246,58 +156,17 @@ mvn archetype:generate \
         <module>module-a</module>
         <module>module-b</module>
     </modules>
-
-    <!-- 统一版本管理 -->
-    <dependencyManagement>
-        <dependencies>
-            <dependency>
-                <groupId>com.google.guava</groupId>
-                <artifactId>guava</artifactId>
-                <version>32.1.3-jre</version>
-            </dependency>
-        </dependencies>
-    </dependencyManagement>
 </project>
 ```
 
-## 常用插件
-
-### Maven Compiler Plugin
-
 ```xml
-<plugin>
-    <groupId>org.apache.maven.plugins</groupId>
-    <artifactId>maven-compiler-plugin</artifactId>
-    <version>3.11.0</version>
-    <configuration>
-        <source>25</source>
-        <target>25</target>
-        <encoding>UTF-8</encoding>
-    </configuration>
-</plugin>
+<!-- 阿里云镜像 -->
+<mirrors>
+    <mirror>
+        <id>aliyun</id>
+        <name>Aliyun Maven</name>
+        <url>https://maven.aliyun.com/repository/public</url>
+        <mirrorOf>central</mirrorOf>
+    </mirror>
+</mirrors>
 ```
-
-### Spring Boot Maven Plugin
-
-```xml
-<plugin>
-    <groupId>org.springframework.boot</groupId>
-    <artifactId>spring-boot-maven-plugin</artifactId>
-</plugin>
-```
-
-## 构建生命周期
-
-```
-validate → compile → test → package → verify → install → deploy
-```
-
-| 阶段 | 说明 |
-|------|------|
-| `validate` | 验证项目结构是否正确 |
-| `compile` | 编译源代码 |
-| `test` | 运行单元测试 |
-| `package` | 打包成 jar/war |
-| `verify` | 运行集成测试 |
-| `install` | 安装到本地仓库 |
-| `deploy` | 部署到远程仓库 |

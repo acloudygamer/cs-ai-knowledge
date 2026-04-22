@@ -4,49 +4,16 @@
 
 ### 执行顺序
 
-```
-@BeforeAll → @BeforeEach → @Test → @AfterEach → @AfterAll
-```
-
-```java
-class LifecycleDemo {
-
-    @BeforeAll
-    static void initAll() {
-        // 静态方法，整个测试类开始前执行一次
-        System.out.println("初始化资源");
-    }
-
-    @BeforeEach
-    void setUp() {
-        // 每个测试方法前执行
-    }
-
-    @Test
-    void testOne() { }
-
-    @Test
-    void testTwo() { }
-
-    @AfterEach
-    void tearDown() {
-        // 每个测试方法后执行
-    }
-
-    @AfterAll
-    static void cleanupAll() {
-        // 静态方法，整个测试类结束后执行一次
-    }
-}
-```
+JUnit 5 的测试生命周期按以下顺序执行：@BeforeAll → @BeforeEach → @Test → @AfterEach → @AfterAll。
 
 ### @TestInstance 生命周期模式
+
+@TestInstance 有两种生命周期模式：PER_METHOD（默认）为每个测试方法创建新实例；PER_CLASS 整个类共用一个实例，@BeforeAll 方法可以是实例方法。
 
 ```java
 @TestInstance(TestInstance.Lifecycle.PER_METHOD)  // 默认：每个测试方法创建新实例
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)  // 整个类共用一个实例
 class SharedInstanceTest {
-
     @BeforeAll
     void init() {
         // PER_CLASS 模式下可以是实例方法
@@ -57,6 +24,8 @@ class SharedInstanceTest {
 ## 嵌套测试
 
 ### 嵌套结构
+
+@Nested 注解允许在测试类中定义嵌套测试类，形成层次化的测试组织。嵌套测试类可以共享外层类的资源，实现更精细的测试分组。
 
 ```java
 @DisplayName("用户管理")
@@ -87,14 +56,6 @@ class UserManagementTest {
             assertThrows(IllegalArgumentException.class,
                 () -> userService.createUser("", "alice@example.com"));
         }
-
-        @Test
-        @DisplayName("重复邮箱抛出异常")
-        void createUser_duplicateEmail_throws() {
-            userService.createUser("Alice", "alice@example.com");
-            assertThrows(DuplicateEmailException.class,
-                () -> userService.createUser("Bob", "alice@example.com"));
-        }
     }
 
     @Nested
@@ -107,36 +68,6 @@ class UserManagementTest {
             User found = userService.findById(created.getId());
             assertNotNull(found);
         }
-
-        @Test
-        void findById_nonExisting_returnsNull() {
-            User found = userService.findById(999L);
-            assertNull(found);
-        }
-    }
-}
-```
-
-### 嵌套测试共享资源
-
-```java
-class SharedResourceTest {
-
-    private UserService userService;
-
-    @BeforeEach
-    void createService() {
-        userService = new UserService();
-    }
-
-    @Nested
-    class UserCreationTests {
-        // 可以使用外层的 userService
-    }
-
-    @Nested
-    class UserQueryTests {
-        // 也可以使用外层的 userService
     }
 }
 ```
@@ -144,6 +75,8 @@ class SharedResourceTest {
 ## 断言进阶
 
 ### assertAll 组断言
+
+assertAll 允许对一组相关断言进行分组，所有断言都会执行，便于发现多个问题。
 
 ```java
 @Test
@@ -157,15 +90,11 @@ void testUserDetails() {
         () -> assertTrue(user.isActive())
     );
 }
-
-// 带消息的组断言
-assertAll("用户信息",
-    () -> assertEquals(expectedName, actualName, "名字不匹配"),
-    () -> assertEquals(expectedEmail, actualEmail, "邮箱不匹配")
-);
 ```
 
 ### assertThrows 异常断言
+
+assertThrows 验证代码抛出预期异常，并可获取异常对象进行更多断言验证。
 
 ```java
 @Test
@@ -177,21 +106,11 @@ void testDivideByZero() {
     );
     assertEquals("/ by zero", ex.getMessage());
 }
-
-// assertThrowsAndReturn - 获取异常对象进行更多断言
-@Test
-void testExceptionDetails() {
-    IllegalArgumentException ex = assertThrows(
-        IllegalArgumentException.class,
-        () -> userService.createUser("", "bad.email")
-    );
-
-    assertTrue(ex.getMessage().contains("name"));
-    assertTrue(ex.getMessage().contains("不能为空"));
-}
 ```
 
 ### assertTimeout 超时断言
+
+assertTimeout 验证操作在指定时间内完成；assertTimeoutPreemptively 超时时立即中断执行。
 
 ```java
 import static java.time.Duration.*;
@@ -199,22 +118,21 @@ import static java.time.Duration.*;
 @Test
 void testPerformance() {
     assertTimeout(ofSeconds(1), () -> {
-        // 操作应在 1 秒内完成
         complexCalculation();
     });
 }
 
-// 超时会失败，但不会中断执行
 @Test
 void testLongOperation() {
     assertTimeoutPreemptively(ofMillis(100), () -> {
-        // 如果超时，立即中断
         Thread.sleep(10000);
     });
 }
 ```
 
 ### assertThat 匹配器风格
+
+AssertJ 提供流式 API 的匹配器风格断言，语法更自然。
 
 ```java
 import static org.assertj.core.api.Assertions.*;
@@ -227,17 +145,14 @@ void testWithAssertJ() {
         .isNotNull()
         .extracting(User::getName, User::getEmail)
         .containsExactly("Alice", "alice@example.com");
-
-    assertThat(user.getFriends())
-        .hasSize(3)
-        .extracting("name")
-        .containsExactly("Bob", "Charlie", "David");
 }
 ```
 
 ## 动态测试
 
 ### @TestFactory 动态测试
+
+@TestFactory 生成动态测试，返回 DynamicTest 集合或流，适用于测试场景需要根据数据动态生成的场景。
 
 ```java
 @TestFactory
@@ -246,25 +161,14 @@ Collection<DynamicTest> dynamicTests() {
         DynamicTest.dynamicTest("加法: 2 + 3 = 5",
             () -> assertEquals(5, calculator.add(2, 3))),
         DynamicTest.dynamicTest("减法: 5 - 3 = 2",
-            () -> assertEquals(2, calculator.subtract(5, 3))),
-        DynamicTest.dynamicTest("乘法: 2 * 3 = 6",
-            () -> assertEquals(6, calculator.multiply(2, 3)))
+            () -> assertEquals(2, calculator.subtract(5, 3)))
     );
-}
-
-// 动态生成测试
-@TestFactory
-Stream<DynamicTest> dynamicTestsFromCollection() {
-    List<String> inputs = List.of("hello", "world", "test");
-    return inputs.stream()
-        .map(input -> DynamicTest.dynamicTest(
-            "测试: " + input,
-            () -> assertNotNull(input)
-        ));
 }
 ```
 
 ### DynamicContainer 动态容器
+
+DynamicContainer 允许将多个 DynamicTest 组合成层级结构。
 
 ```java
 @TestFactory
@@ -274,16 +178,15 @@ DynamicContainer dynamicContainerTest() {
         DynamicTest.dynamicTest("测试2", () -> { /* ... */ })
     );
 
-    return DynamicContainer.dynamicContainer(
-        "用户场景测试",
-        tests
-    );
+    return DynamicContainer.dynamicContainer("用户场景测试", tests);
 }
 ```
 
 ## 标签与过滤
 
 ### @Tag 标签注解
+
+@Tag 用于标记测试类或方法，配合构建工具实现选择性执行。
 
 ```java
 @Tag("slow")
@@ -296,7 +199,9 @@ void testFullWorkflow() { }
 void testUnitLogic() { }
 ```
 
-### Maven 过滤
+### Maven/Gradle 过滤
+
+通过构建工具配置根据标签过滤测试。
 
 ```xml
 <plugin>
@@ -309,8 +214,6 @@ void testUnitLogic() { }
 </plugin>
 ```
 
-### Gradle 过滤
-
 ```groovy
 test {
     useJUnitPlatform {
@@ -322,6 +225,8 @@ test {
 
 ## 重复测试
 
+@RepeatedTest 重复执行测试指定次数，适用于需要多次运行以验证稳定性的场景。
+
 ```java
 @RepeatedTest(10)
 @DisplayName("随机数测试")
@@ -331,7 +236,6 @@ void testRandomNumber() {
     assertTrue(number < 100);
 }
 
-// 获取重复次数信息
 @RepeatedTest(5)
 void testWithRepetitionInfo(RepetitionInfo repInfo) {
     System.out.println("第 " + repInfo.getCurrentRepetition() +
@@ -339,58 +243,29 @@ void testWithRepetitionInfo(RepetitionInfo repInfo) {
 }
 ```
 
-## 测试模板
-
-### @TestTemplate 多次调用
-
-```java
-@TestTemplate
-@ExtendWith(TemplateInvocationContextProvider.class)
-void testTemplate(TestInfo testInfo) {
-    // 测试模板逻辑
-}
-```
-
 ## 依赖注入
 
-### TestInfo
+### TestInfo / RepetitionInfo
+
+JUnit 5 提供 TestInfo 和 RepetitionInfo 注入，获取当前测试的元信息。
 
 ```java
 class TestInfoDemo implements BeforeEachCallback {
-
     @Override
     public void beforeEach(ExtensionContext context) {
         TestInfo testInfo = context.getRequiredTestMethod()
             .getAnnotation(TestInfo.class);
-
         System.out.println("测试方法: " + testInfo.displayName());
-        System.out.println("标签: " + Arrays.toString(testInfo.tags()));
-    }
-}
-```
-
-### RepetitionInfo
-
-```java
-class RepetitionDemo implements BeforeEachCallback {
-
-    @Override
-    public void beforeEach(ExtensionContext context) {
-        Optional<RepetitionInfo> repInfo =
-            context.getOptionalTestMethod()
-                   .getAnnotation(RepetitionInfo.class);
-
-        repInfo.ifPresent(info ->
-            System.out.println("Repetition " + info.currentRepetition()));
     }
 }
 ```
 
 ### ParameterResolver 自定义参数
 
+ParameterResolver 允许自定义参数解析器，实现测试参数注入。
+
 ```java
 class DatabaseParameterResolver implements ParameterResolver {
-
     @Override
     public boolean supports(ParameterContext paramCtx, ExtensionContext extCtx) {
         return paramCtx.getParameter().getType() == Database.class;
@@ -406,7 +281,147 @@ class DatabaseParameterResolver implements ParameterResolver {
 class MyTest {
     @Test
     void testWithDatabase(Database db) {
-        // 直接使用注入的 database
+        db.query("SELECT * FROM users");
+    }
+}
+```
+
+## 参考样例
+
+```java
+// 生命周期执行顺序
+class LifecycleDemo {
+    @BeforeAll
+    static void initAll() {
+        System.out.println("初始化资源");
+    }
+
+    @BeforeEach
+    void setUp() { }
+
+    @Test
+    void testOne() { }
+
+    @AfterEach
+    void tearDown() { }
+
+    @AfterAll
+    static void cleanupAll() { }
+}
+```
+
+```java
+// 嵌套测试
+@DisplayName("用户管理")
+class UserManagementTest {
+    @Nested
+    @DisplayName("创建用户")
+    class CreateUserTests {
+        @Test
+        @DisplayName("正常创建返回用户信息")
+        void createUser_success() {
+            User user = userService.createUser("Alice", "alice@example.com");
+            assertNotNull(user.getId());
+        }
+    }
+}
+```
+
+```java
+// assertAll 组断言
+@Test
+void testUserDetails() {
+    User user = userService.findById(1L);
+    assertAll("用户信息",
+        () -> assertEquals("Alice", user.getName()),
+        () -> assertEquals(30, user.getAge()),
+        () -> assertEquals("alice@example.com", user.getEmail())
+    );
+}
+```
+
+```java
+// assertThrows 异常断言
+@Test
+void testDivideByZero() {
+    ArithmeticException ex = assertThrows(
+        ArithmeticException.class,
+        () -> calculator.divide(1, 0)
+    );
+    assertEquals("/ by zero", ex.getMessage());
+}
+```
+
+```java
+// assertTimeout 超时断言
+@Test
+void testPerformance() {
+    assertTimeout(ofSeconds(1), () -> {
+        complexCalculation();
+    });
+}
+```
+
+```java
+// AssertJ 匹配器风格
+@Test
+void testWithAssertJ() {
+    User user = userService.findById(1L);
+    assertThat(user)
+        .isNotNull()
+        .extracting(User::getName, User::getEmail)
+        .containsExactly("Alice", "alice@example.com");
+}
+```
+
+```java
+// @TestFactory 动态测试
+@TestFactory
+Collection<DynamicTest> dynamicTests() {
+    return List.of(
+        DynamicTest.dynamicTest("加法: 2 + 3 = 5",
+            () -> assertEquals(5, calculator.add(2, 3))),
+        DynamicTest.dynamicTest("减法: 5 - 3 = 2",
+            () -> assertEquals(2, calculator.subtract(5, 3)))
+    );
+}
+```
+
+```java
+// 标签过滤
+@Tag("slow")
+@Tag("integration")
+@Test
+void testFullWorkflow() { }
+```
+
+```java
+// 重复测试
+@RepeatedTest(10)
+void testRandomNumber() {
+    int number = randomGenerator.nextInt(100);
+    assertTrue(number >= 0 && number < 100);
+}
+```
+
+```java
+// 自定义参数解析器
+class DatabaseParameterResolver implements ParameterResolver {
+    @Override
+    public boolean supports(ParameterContext paramCtx, ExtensionContext extCtx) {
+        return paramCtx.getParameter().getType() == Database.class;
+    }
+
+    @Override
+    public Object resolve(ParameterContext paramCtx, ExtensionContext extCtx) {
+        return Database.createTestInstance();
+    }
+}
+
+@ExtendWith(DatabaseParameterResolver.class)
+class MyTest {
+    @Test
+    void testWithDatabase(Database db) {
         db.query("SELECT * FROM users");
     }
 }

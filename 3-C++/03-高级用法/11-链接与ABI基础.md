@@ -4,6 +4,10 @@
 
 ### 基本概念
 
+每个 .cpp 文件是一个翻译单元。
+
+### 参考样例
+
 ```cpp
 // 每个 .cpp 文件是一个翻译单元
 // 编译: g++ -c main.cpp -o main.o
@@ -11,6 +15,8 @@
 ```
 
 ### 外部链接与内部链接
+
+### 参考样例
 
 ```cpp
 // 外部链接：可被其他翻译单元访问
@@ -29,6 +35,8 @@ inline int shared_func() { return 1; }
 
 ### 名字修饰（Name Mangling）
 
+### 参考样例
+
 ```cpp
 // C++ 编译器修改函数名以支持重载
 void process(int);      // 可能被修饰为 _Z8processi
@@ -39,6 +47,8 @@ extern "C" void c_func(int x);  // 不会被修饰
 ```
 
 ### 符号类型
+
+### 参考样例
 
 ```cpp
 // 强符号：初始化了的全局变量、函数定义
@@ -54,6 +64,8 @@ int weak;  // 弱符号
 
 ### 静态链接
 
+### 参考样例
+
 ```bash
 # 编译
 g++ -c a.cpp -o a.o
@@ -68,6 +80,8 @@ g++ main.o -L./ -lmyapp -o program
 
 ### 动态链接
 
+### 参考样例
+
 ```bash
 # 编译动态库
 g++ -fPIC -shared -o libmyapp.so a.cpp b.cpp
@@ -79,6 +93,8 @@ LD_LIBRARY_PATH=./ program
 
 ### 运行时加载
 
+### 参考样例
+
 ```cpp
 #include <dlfcn.h>
 
@@ -89,16 +105,16 @@ int main() {
         std::cerr << dlerror() << std::endl;
         return 1;
     }
-    
+
     // 获取符号
     using FuncPtr = int(*)(int);
     FuncPtr func = reinterpret_cast<FuncPtr>(dlsym(handle, "process"));
-    
+
     if (func) {
         int result = func(42);
         std::cout << result << std::endl;
     }
-    
+
     dlclose(handle);
 }
 ```
@@ -106,6 +122,8 @@ int main() {
 ## ABI（Application Binary Interface）
 
 ### 基本数据类型对齐
+
+### 参考样例
 
 ```cpp
 struct Aligned {
@@ -128,6 +146,8 @@ struct Packed {
 
 ### 调用约定
 
+### 参考样例
+
 ```cpp
 // cdecl（C 默认）
 void cdecl_func(int a, double b);
@@ -142,6 +162,8 @@ class MyClass {
 ```
 
 ### 符号可见性
+
+### 参考样例
 
 ```cpp
 // 导出符号
@@ -171,6 +193,8 @@ public:
 
 ### 静态库
 
+### 参考样例
+
 ```bash
 # 创建
 g++ -c foo.cpp -o foo.o
@@ -183,6 +207,8 @@ g++ main.cpp -lfoo -L./ -o program
 ```
 
 ### 动态库
+
+### 参考样例
 
 ```bash
 # 位置无关代码
@@ -200,6 +226,8 @@ g++ main.cpp -lfoo -o program
 
 ### 未定义引用
 
+### 参考样例
+
 ```cpp
 // a.cpp
 extern int shared_var;  // 声明
@@ -214,6 +242,8 @@ void func() {}          // 定义
 
 ### 重定义
 
+### 参考样例
+
 ```cpp
 // a.cpp
 int value = 10;  // 定义
@@ -225,6 +255,8 @@ int value = 20;  // 重定义！链接器报错
 ```
 
 ### 符号冲突
+
+### 参考样例
 
 ```bash
 # 使用 nm 查看符号
@@ -238,6 +270,8 @@ dumpbin /dependents program  # Windows
 ## API 与 ABI 兼容性
 
 ### 升级兼容
+
+### 参考样例
 
 ```cpp
 // v1.h
@@ -256,6 +290,8 @@ struct API_v2 {
 
 ### 虚函数与 ABI
 
+### 参考样例
+
 ```cpp
 class Renderer {
 public:
@@ -270,6 +306,8 @@ public:
 ```
 
 ## ODR（One Definition Rule）
+
+### 参考样例
 
 ```cpp
 // 头文件中的 inline 函数（C++17）
@@ -289,6 +327,8 @@ extern const int GLOBAL_SIZE;
 
 ### 编译时启用
 
+### 参考样例
+
 ```bash
 # GCC/Clang
 g++ -flto -O2 a.cpp b.cpp -o program
@@ -298,6 +338,8 @@ g++ -flto -O2 a.cpp b.cpp -o program
 ```
 
 ### 跨编译单元优化
+
+### 参考样例
 
 ```cpp
 // a.cpp
@@ -314,6 +356,8 @@ void optimize_this() {
 ```
 
 ## 链接器脚本（GCC）
+
+### 参考样例
 
 ```ld
 /* custom.ld */
@@ -339,6 +383,8 @@ ld -T custom.ld a.o b.o -o program
 
 ### 1. 静态初始化顺序
 
+### 参考样例
+
 ```cpp
 // a.cpp
 struct A { A() { std::cout << "A"; } };
@@ -353,6 +399,8 @@ B b;
 
 ### 2. 动态初始化顺序
 
+### 参考样例
+
 ```cpp
 // 同一翻译单元内按定义顺序
 // 不同翻译单元之间未定义
@@ -361,6 +409,8 @@ B b;
 ```
 
 ### 3. 模板实例化
+
+### 参考样例
 
 ```cpp
 // 模板在每个翻译单元中按需实例化

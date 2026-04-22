@@ -2,7 +2,7 @@
 
 ## Elasticsearch 概述
 
-Elasticsearch 是基于 Lucene 的分布式搜索和分析引擎，用于全文检索、结构化搜索和数据分析。
+Elasticsearch 是基于 Lucene 的分布式搜索和分析引擎，用于全文检索、结构化搜索和数据分析。数据以文档形式存储，索引由多个分片组成，支持水平扩展和高可用。
 
 ### 核心概念
 
@@ -14,28 +14,11 @@ Elasticsearch 是基于 Lucene 的分布式搜索和分析引擎，用于全文�
 | Replica | 副本，数据冗余备份 |
 | Mapping | 映射，定义字段类型 |
 
-### Spring Data Elasticsearch
-
-```xml
-<dependency>
-    <groupId>org.springframework.boot</groupId>
-    <artifactId>spring-boot-starter-data-elasticsearch</artifactId>
-</dependency>
-```
-
-### 配置
-
-```yaml
-spring:
-  elasticsearch:
-    uris: http://localhost:9200
-    username: elastic
-    password: password
-```
-
 ## Elasticsearch 基本操作
 
 ### 文档实体
+
+@Document 标记实体类，@Field 定义字段映射规则。Text 类型支持分词，Keyword 类型不分词用于精确匹配。
 
 ```java
 @Document(indexName = "products")
@@ -57,12 +40,12 @@ public class Product {
 
     @Field(type = FieldType.Boolean)
     private Boolean available;
-
-    // getters and setters
 }
 ```
 
-### Repository
+### Repository 查询
+
+Spring Data Elasticsearch Repository 支持方法名派生查询和 @Query 自定义查询。
 
 ```java
 public interface ProductRepository
@@ -79,26 +62,16 @@ public interface ProductRepository
 }
 ```
 
-### Service
+### 高级查询构建
+
+NativeQuery 提供类型安全的查询构建方式，支持布尔查询、聚合等复杂操作。
 
 ```java
 @Service
 public class ProductService {
 
     @Autowired
-    private ProductRepository productRepository;
-
-    @Autowired
     private ElasticsearchOperations elasticsearchOperations;
-
-    public Product create(Product product) {
-        product.setCreatedAt(LocalDateTime.now());
-        return productRepository.save(product);
-    }
-
-    public Optional<Product> findById(String id) {
-        return productRepository.findById(id);
-    }
 
     public List<Product> searchByName(String name) {
         Query query = new NativeQuery.Builder()
@@ -115,18 +88,8 @@ public class ProductService {
         Query query = new NativeQuery.Builder()
             .withQuery(q -> q
                 .bool(b -> b
-                    .should(s -> s
-                        .match(m -> m
-                            .field("name")
-                            .query(keyword)
-                        )
-                    )
-                    .should(s -> s
-                        .match(m -> m
-                            .field("category")
-                            .query(keyword)
-                        )
-                    )
+                    .should(s -> s.match(m -> m.field("name").query(keyword)))
+                    .should(s -> s.match(m -> m.field("category").query(keyword)))
                 )
             )
             .withPageable(PageRequest.of(page, size))
@@ -143,55 +106,12 @@ public class ProductService {
             hits.getTotalHits()
         );
     }
-
-    public void deleteById(String id) {
-        productRepository.deleteById(id);
-    }
 }
 ```
-
-### 批量操作
-
-```java
-@Service
-public class BulkOperationService {
-
-    @Autowired
-    private ElasticsearchOperations elasticsearchOperations;
-
-    public void bulkIndex(List<Product> products) {
-        List<IndexQuery> queries = products.stream()
-            .map(product -> new IndexQueryBuilder()
-                .withId(product.getId())
-                .withObject(product)
-                .build())
-            .collect(Collectors.toList());
-
-        elasticsearchOperations.bulkIndex(queries, Product.class);
-    }
-
-    public void bulkUpdate(List<Product> products) {
-        List<UpdateQuery> queries = products.stream()
-            .map(product -> UpdateQuery.builder(product.getId())
-                .withDocument(
-                    new Document(
-                        Map.of(
-                            "name", product.getName(),
-                            "price", product.getPrice()
-                        )
-                    )
-                )
-                .build())
-            .collect(Collectors.toList());
-
-        elasticsearchOperations.bulkUpdate(queries);
-    }
-}
-```
-
-## Elasticsearch 高级查询
 
 ### 布尔查询
+
+布尔查询组合 must、should、filter 等条件，实现复杂搜索逻辑。
 
 ```java
 public List<Product> complexSearch(ProductSearchCriteria criteria) {
@@ -202,32 +122,19 @@ public List<Product> complexSearch(ProductSearchCriteria criteria) {
 
                 if (criteria.getCategory() != null) {
                     boolBuilder.filter(f -> f
-                        .term(t -> t
-                            .field("category")
-                            .value(criteria.getCategory())
-                        )
+                        .term(t -> t.field("category").value(criteria.getCategory()))
                     );
                 }
 
                 if (criteria.getMinPrice() != null) {
                     boolBuilder.filter(f -> f
-                        .range(r -> r
-                            .number(n -> n
-                                .field("price")
-                                .gte(criteria.getMinPrice())
-                            )
-                        )
+                        .range(r -> r.number(n -> n.field("price").gte(criteria.getMinPrice())))
                     );
                 }
 
                 if (criteria.getMaxPrice() != null) {
                     boolBuilder.filter(f -> f
-                        .range(r -> r
-                            .number(n -> n
-                                .field("price")
-                                .lte(criteria.getMaxPrice())
-                            )
-                        )
+                        .range(r -> r.number(n -> n.field("price").lte(criteria.getMaxPrice())))
                     );
                 }
 
@@ -256,6 +163,8 @@ public List<Product> complexSearch(ProductSearchCriteria criteria) {
 ```
 
 ### 聚合查询
+
+聚合分析实现分组统计、均值计算等analytics功能。
 
 ```java
 public Map<String, Long> getCategoryAggregation() {
@@ -299,11 +208,50 @@ public Double getAveragePrice() {
 }
 ```
 
+### 批量操作
+
+BulkOperations 批量处理提升写入性能，建议分批执行（每批500-1000条）。
+
+```java
+@Service
+public class BulkOperationService {
+
+    @Autowired
+    private ElasticsearchOperations elasticsearchOperations;
+
+    public void bulkIndex(List<Product> products) {
+        List<IndexQuery> queries = products.stream()
+            .map(product -> new IndexQueryBuilder()
+                .withId(product.getId())
+                .withObject(product)
+                .build())
+            .collect(Collectors.toList());
+
+        elasticsearchOperations.bulkIndex(queries, Product.class);
+    }
+
+    public void bulkUpdate(List<Product> products) {
+        List<UpdateQuery> queries = products.stream()
+            .map(product -> UpdateQuery.builder(product.getId())
+                .withDocument(
+                    new Document(Map.of(
+                        "name", product.getName(),
+                        "price", product.getPrice()
+                    ))
+                )
+                .build())
+            .collect(Collectors.toList());
+
+        elasticsearchOperations.bulkUpdate(queries);
+    }
+}
+```
+
 ---
 
 ## MongoDB 概述
 
-MongoDB 是面向文档的 NoSQL 数据库，使用 JSON 风格的文档存储数据。
+MongoDB 是面向文档的 NoSQL 数据库，使用 JSON 风格的文档存储数据。文档存储在集合中，支持灵活的数据结构和丰富的查询语言。
 
 ### 核心概念
 
@@ -315,28 +263,11 @@ MongoDB 是面向文档的 NoSQL 数据库，使用 JSON 风格的文档存储�
 | _id | 主键，自动生成 ObjectId |
 | Embedded | 内嵌文档 |
 
-### Spring Data MongoDB
-
-```xml
-<dependency>
-    <groupId>org.springframework.boot</groupId>
-    <artifactId>spring-boot-starter-data-mongodb</artifactId>
-</dependency>
-```
-
-### 配置
-
-```yaml
-spring:
-  data:
-    mongodb:
-      uri: mongodb://localhost:27017/mydb
-      auto-index-creation: true
-```
-
 ## MongoDB 基本操作
 
 ### 文档实体
+
+@Document 标记实体，@Embedded 标记内嵌文档。MongoDB 支持灵活 Schema，但应避免文档过大（单文档限制16MB）。
 
 ```java
 @Document(collection = "users")
@@ -367,8 +298,6 @@ public class User {
 
     @Field("status")
     private UserStatus status;
-
-    // getters and setters
 }
 
 @Embedded
@@ -387,8 +316,6 @@ public class UserProfile {
 
     @Field("bio")
     private String bio;
-
-    // getters and setters
 }
 
 @Embedded
@@ -413,8 +340,6 @@ public class Address {
 
     @Field("is_default")
     private Boolean isDefault;
-
-    // getters and setters
 }
 
 public enum UserStatus {
@@ -426,7 +351,9 @@ public enum AddressType {
 }
 ```
 
-### Repository
+### Repository 查询
+
+MongoRepository 支持方法名派生查询、@Query 自定义查询和分页排序。
 
 ```java
 public interface UserRepository extends MongoRepository<User, String> {
@@ -452,63 +379,9 @@ public interface UserRepository extends MongoRepository<User, String> {
 }
 ```
 
-### Service
+### MongoTemplate 复杂查询
 
-```java
-@Service
-public class UserService {
-
-    @Autowired
-    private UserRepository userRepository;
-
-    @Autowired
-    private MongoTemplate mongoTemplate;
-
-    public User create(User user) {
-        user.setCreatedAt(LocalDateTime.now());
-        user.setUpdatedAt(LocalDateTime.now());
-        user.setStatus(UserStatus.ACTIVE);
-        return userRepository.save(user);
-    }
-
-    public Optional<User> findById(String id) {
-        return userRepository.findById(id);
-    }
-
-    public Optional<User> findByEmail(String email) {
-        return userRepository.findByEmail(email);
-    }
-
-    public User update(String id, UserUpdateRequest request) {
-        User user = userRepository.findById(id)
-            .orElseThrow(() -> new EntityNotFoundException("User not found"));
-
-        if (request.getProfile() != null) {
-            user.setProfile(request.getProfile());
-        }
-        if (request.getAddresses() != null) {
-            user.setAddresses(request.getAddresses());
-        }
-
-        user.setUpdatedAt(LocalDateTime.now());
-        return userRepository.save(user);
-    }
-
-    public void delete(String id) {
-        User user = userRepository.findById(id)
-            .orElseThrow(() -> new EntityNotFoundException("User not found"));
-        user.setStatus(UserStatus.DELETED);
-        user.setUpdatedAt(LocalDateTime.now());
-        userRepository.save(user);
-    }
-
-    public void hardDelete(String id) {
-        userRepository.deleteById(id);
-    }
-}
-```
-
-### 复杂查询
+MongoTemplate 提供更灵活的查询构建能力，支持动态条件组合。
 
 ```java
 @Service
@@ -551,25 +424,14 @@ public class UserQueryService {
 
         return mongoTemplate.find(query, User.class);
     }
-
-    public Page<User> findByStatusWithPage(UserStatus status, int page, int size) {
-        Query query = new Query(Criteria.where("status").is(status));
-        long total = mongoTemplate.count(query, User.class);
-
-        query.with(Sort.by(Sort.Direction.DESC, "createdAt"));
-        query.limit(size);
-        query.skip((long) page * size);
-
-        List<User> users = mongoTemplate.find(query, User.class);
-
-        return new PageImpl<>(users, PageRequest.of(page, size), total);
-    }
 }
 ```
 
 ## MongoDB 聚合管道
 
 ### 聚合查询
+
+聚合管道通过多个阶段处理文档，实现分组、统计、排序等复杂操作。
 
 ```java
 @Service
@@ -631,21 +493,15 @@ public class UserStatsByCity {
     private String city;
     private Long userCount;
     private List<String> emails;
-
-    // getters and setters
 }
 
 public class StatusCount {
     private String status;
     private Long count;
-
-    // getters and setters
 }
 
 public class AverageResult {
     private Double avgAge;
-
-    // getters and setters
 }
 ```
 
@@ -686,7 +542,9 @@ public List<UserActivitySummary> getUserActivitySummary() {
 
 ## MongoDB 索引
 
-### 创建索引
+### 索引配置
+
+索引提升查询性能，复合索引支持多字段排序和过滤。文本索引加速全文搜索，地理空间索引支持位置查询。
 
 ```java
 @Configuration
@@ -741,14 +599,14 @@ public class Product {
 
     @TextIndexed
     private String description;
-
-    // other fields
 }
 ```
 
 ## MongoDB 事务
 
 ### 单文档事务
+
+MongoDB 支持单文档原子操作，多文档事务需要副本集部署。
 
 ```java
 @Service
@@ -815,23 +673,16 @@ public class TransferService {
 
 ### Elasticsearch 最佳实践
 
+使用 bulk API 批量写入提升性能，滚动查询处理大数据量扫描。
+
 ```java
 // 使用 bulk API 批量写入
 public void bulkIndexProducts(List<Product> products) {
     if (products.size() > 1000) {
-        // 分批处理
         Lists.partition(products, 500).forEach(this::bulkIndexInternal);
     } else {
         bulkIndexInternal(products);
     }
-}
-
-private void bulkIndexInternal(List<Product> products) {
-    BulkOperations bulkOps = elasticsearchOperations.bulkOps(
-        Product.class
-    );
-    products.forEach(bulkOps::save);
-    bulkOps.refresh();
 }
 
 // 使用滚动查询处理大数据量
@@ -864,6 +715,8 @@ public void scrollSearchAllProducts(Consumer<Product> consumer) {
 ```
 
 ### MongoDB 最佳实践
+
+避免全表扫描，使用投影只返回需要的字段。引用而非内嵌大数组（超过1000个关联使用引用）。
 
 ```java
 // 避免全表扫描，使用投影只返回需要的字段
@@ -933,4 +786,157 @@ spring:
       max-connection-per-host: 100
       connection-timeout: 10s
       max-wait-time: 30s
+```
+
+## 参考样例
+
+```yaml
+# Elasticsearch 配置
+spring:
+  elasticsearch:
+    uris: http://localhost:9200
+    username: elastic
+    password: password
+```
+
+```java
+// Elasticsearch 文档实体
+@Document(indexName = "products")
+public class Product {
+    @Id
+    private String id;
+
+    @Field(type = FieldType.Text, analyzer = "standard")
+    private String name;
+
+    @Field(type = FieldType.Keyword)
+    private String category;
+
+    @Field(type = FieldType.Double)
+    private Double price;
+}
+```
+
+```java
+// Elasticsearch Repository
+public interface ProductRepository
+        extends ElasticsearchRepository<Product, String> {
+    List<Product> findByName(String name);
+    List<Product> findByCategory(String category);
+}
+```
+
+```java
+// Elasticsearch NativeQuery
+Query query = new NativeQuery.Builder()
+    .withQuery(q -> q.match(m -> m.field("name").query(name)))
+    .build();
+SearchHits<Product> hits = elasticsearchOperations.search(query, Product.class);
+```
+
+```java
+// MongoDB 配置
+spring:
+  data:
+    mongodb:
+      uri: mongodb://localhost:27017/mydb
+      auto-index-creation: true
+```
+
+```java
+// MongoDB 文档实体
+@Document(collection = "users")
+public class User {
+    @Id
+    private String id;
+
+    @Field("email")
+    private String email;
+
+    @Field("profile")
+    private UserProfile profile;
+
+    @Field("addresses")
+    private List<Address> addresses;
+
+    @Field("status")
+    private UserStatus status;
+}
+
+@Embedded
+public class UserProfile {
+    @Field("first_name")
+    private String firstName;
+
+    @Field("last_name")
+    private String lastName;
+}
+```
+
+```java
+// MongoDB Repository
+public interface UserRepository extends MongoRepository<User, String> {
+    Optional<User> findByEmail(String email);
+    List<User> findByStatus(UserStatus status);
+    @Query("{'addresses.city': ?0}")
+    List<User> findByCity(String city);
+}
+```
+
+```java
+// MongoTemplate 复杂查询
+Query query = new Query();
+List<Criteria> criteriaList = new ArrayList<>();
+if (criteria.getStatus() != null) {
+    criteriaList.add(Criteria.where("status").is(criteria.getStatus()));
+}
+if (!criteriaList.isEmpty()) {
+    query.addCriteria(new Criteria().andOperator(criteriaList.toArray(new Criteria[0])));
+}
+query.with(Sort.by(Sort.Direction.DESC, "createdAt"));
+query.limit(pageSize);
+query.skip((long) page * pageSize);
+return mongoTemplate.find(query, User.class);
+```
+
+```java
+// MongoDB 聚合管道
+Aggregation aggregation = Aggregation.newAggregation(
+    Aggregation.unwind("addresses"),
+    Aggregation.group("addresses.city")
+        .count().as("userCount")
+        .addToSet("email").as("emails"),
+    Aggregation.sort(Sort.Direction.DESC, "userCount")
+);
+AggregationResults<UserStatsByCity> results =
+    mongoTemplate.aggregate(aggregation, "users", UserStatsByCity.class);
+```
+
+```java
+// MongoDB 索引配置
+@PostConstruct
+public void initIndexes() {
+    mongoTemplate.indexOps(User.class)
+        .ensureIndex(new Index().on("email", Sort.Direction.ASC).unique());
+    mongoTemplate.indexOps(User.class)
+        .ensureIndex(new Index()
+            .on("status", Sort.Direction.ASC)
+            .on("createdAt", Sort.Direction.DESC)
+            .named("status_createdAt_idx")
+        );
+}
+```
+
+```java
+// MongoDB 事务
+mongoTemplate.execute(TransactionCallback.doInTransaction(() -> {
+    order.setStatus(OrderStatus.PENDING);
+    Order savedOrder = mongoTemplate.save(order);
+    mongoTemplate.updateFirst(
+        Query.query(Criteria.where("_id").is(order.getUserId())),
+        new Update().inc("orderCount", 1),
+        User.class
+    );
+    return savedOrder;
+}));
 ```

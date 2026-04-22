@@ -17,6 +17,8 @@ Java Persistence API 是 Java 持久化规范，Hibernate 是其实现。
 
 ### 基本注解
 
+@Entity 声明类为实体；@Table 指定表名；@Id 声明主键；@Column 配置列属性。
+
 ```java
 @Entity
 @Table(name = "users")
@@ -34,16 +36,17 @@ public class User {
 
     @Column(nullable = false)
     private Integer age;
-
-    @Temporal(TemporalType.DATE)
-    private Date birthDate;
-
-    @Transient
-    private String computedField;
 }
 ```
 
 ### 主键生成策略
+
+| 策略 | 说明 |
+|------|------|
+| IDENTITY | 自增 |
+| SEQUENCE | 序列 |
+| TABLE | ID 生成器表 |
+| UUID | UUID 生成 |
 
 ```java
 // 自增
@@ -53,27 +56,10 @@ public class User {
 @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "user_seq")
 @SequenceGenerator(name = "user_seq", sequenceName = "user_sequence")
 
-// Table 生成器
-@GeneratedValue(strategy = GenerationType.TABLE, generator = "user_gen")
-@TableGenerator(name = "user_gen", table = "id_generator")
-
 // UUID
 @Id
 @GeneratedValue(strategy = GenerationType.UUID)
 private String id;
-```
-
-### 列属性
-
-```java
-@Column(
-    name = "user_name",
-    nullable = false,
-    unique = true,
-    length = 100,
-    precision = 10,
-    scale = 2
-)
 ```
 
 ## 关系映射
@@ -81,7 +67,6 @@ private String id;
 ### 一对一 (@OneToOne)
 
 ```java
-// 主表
 @Entity
 public class User {
     @Id
@@ -91,17 +76,6 @@ public class User {
     @OneToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "profile_id")
     private UserProfile profile;
-}
-
-// 从表
-@Entity
-public class UserProfile {
-    @Id
-    @GeneratedValue
-    private Long id;
-
-    @OneToOne(mappedBy = "profile")
-    private User user;
 }
 ```
 
@@ -120,17 +94,6 @@ public class Department {
         orphanRemoval = true
     )
     private List<Employee> employees = new ArrayList<>();
-}
-
-@Entity
-public class Employee {
-    @Id
-    @GeneratedValue
-    private Long id;
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "department_id")
-    private Department department;
 }
 ```
 
@@ -151,26 +114,18 @@ public class Student {
     )
     private Set<Course> courses = new HashSet<>();
 }
-
-@Entity
-public class Course {
-    @Id
-    @GeneratedValue
-    private Long id;
-
-    @ManyToMany(mappedBy = "courses")
-    private Set<Student> students = new HashSet<>();
-}
 ```
 
 ## Repository
 
 ### 基本 CRUD
 
+Spring Data JPA 通过方法名派生查询。
+
 ```java
 public interface UserRepository extends JpaRepository<User, Long> {
 
-    // 直接方法名派生查询
+    // 方法名派生查询
     User findByUsername(String username);
     List<User> findByAgeGreaterThan(int age);
     List<User> findByNameContaining(String name);
@@ -178,20 +133,11 @@ public interface UserRepository extends JpaRepository<User, Long> {
     // 多条件
     User findByUsernameAndEmail(String username, String email);
 
-    // 或条件
-    List<User> findByUsernameOrEmail(String username, String email);
-
-    // 排序
-    List<User> findByAgeGreaterThanOrderByAgeDesc(int age);
-
     // 分页
     Page<User> findByAge(int age, Pageable pageable);
 
     // 计数
     long countByUsername(String username);
-
-    // 删除
-    void deleteByUsername(String username);
 
     // 存在性
     boolean existsByUsername(String username);
@@ -199,6 +145,8 @@ public interface UserRepository extends JpaRepository<User, Long> {
 ```
 
 ### @Query 自定义查询
+
+@Query 使用 JPQL 或原生 SQL。
 
 ```java
 public interface UserRepository extends JpaRepository<User, Long> {
@@ -214,26 +162,18 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     // 命名参数
     @Query("SELECT u FROM User u WHERE u.username = :name AND u.age = :age")
-    User findByUsernameAndAge(
-        @Param("name") String username,
-        @Param("age") int age
-    );
+    User findByUsernameAndAge(@Param("name") String username, @Param("age") int age);
 }
 ```
 
 ### @Modifying
 
+@Modifying 用于更新和删除操作。
+
 ```java
-public interface UserRepository extends JpaRepository<User, Long> {
-
-    @Modifying
-    @Query("UPDATE User u SET u.age = :age WHERE u.id = :id")
-    int updateAgeById(@Param("id") Long id, @Param("age") int age);
-
-    @Modifying
-    @Query("DELETE FROM User u WHERE u.username = :name")
-    void deleteByUsername(@Param("name") String username);
-}
+@Modifying
+@Query("UPDATE User u SET u.age = :age WHERE u.id = :id")
+int updateAgeById(@Param("id") Long id, @Param("age") int age);
 ```
 
 ## JPQL
@@ -251,7 +191,7 @@ SELECT u.username FROM User u
 SELECT u FROM User u WHERE u.age > 18
 
 // 排序
-SELECT u FROM User u ORDER BY u.age DESC, u.username ASC
+SELECT u FROM User u ORDER BY u.age DESC
 ```
 
 ### 聚合函数
@@ -267,24 +207,13 @@ double averageAge();
 List<Object[]> groupByDepartment();
 ```
 
-### JOIN
+### JOIN FETCH
+
+解决 N+1 问题。
 
 ```java
 @Query("SELECT u FROM User u JOIN FETCH u.profile WHERE u.id = :id")
 User findByIdWithProfile(@Param("id") Long id);
-
-@Query("SELECT DISTINCT u FROM User u JOIN u.roles r WHERE r.name = :roleName")
-List<User> findByRoleName(@Param("roleName") String roleName);
-```
-
-### 子查询
-
-```java
-@Query("SELECT u FROM User u WHERE u.age > (SELECT AVG(u2.age) FROM User u2)")
-List<User> findOlderThanAverage();
-
-@Query("SELECT u FROM User u WHERE u.department IN (SELECT d FROM Department d WHERE d.name = :deptName)")
-List<User> findByDepartmentName(@Param("deptName") String deptName);
 ```
 
 ## 生命周期
@@ -299,6 +228,16 @@ new → (persist) → managed → (remove) → removed
 
 ### 回调注解
 
+| 注解 | 时机 |
+|------|------|
+| @PrePersist | 插入前 |
+| @PostPersist | 插入后 |
+| @PreUpdate | 更新前 |
+| @PostUpdate | 更新后 |
+| @PreRemove | 删除前 |
+| @PostRemove | 删除后 |
+| @PostLoad | 加载后 |
+
 ```java
 @Entity
 @EntityListeners(UserListener.class)
@@ -308,53 +247,10 @@ public class User {
     private Long id;
 
     @PrePersist
-    public void beforeInsert() {
-        // 插入前
-    }
-
-    @PostPersist
-    public void afterInsert() {
-        // 插入后
-    }
-
-    @PreUpdate
-    public void beforeUpdate() {
-        // 更新前
-    }
-
-    @PostUpdate
-    public void afterUpdate() {
-        // 更新后
-    }
-
-    @PreRemove
-    public void beforeDelete() {
-        // 删除前
-    }
-
-    @PostRemove
-    public void afterDelete() {
-        // 删除后
-    }
+    public void beforeInsert() { }
 
     @PostLoad
-    public void afterLoad() {
-        // 加载后
-    }
-}
-```
-
-### 监听器
-
-```java
-public class UserListener {
-
-    @PrePersist
-    public void prePersist(Object entity) {
-        if (entity instanceof Auditable) {
-            ((Auditable) entity).setCreatedAt(Instant.now());
-        }
-    }
+    public void afterLoad() { }
 }
 ```
 
@@ -362,46 +258,22 @@ public class UserListener {
 
 ### Persistence Context
 
+同一事务内，多次查询相同对象，一级缓存避免重复查询。
+
 ```java
-@Service
-public class UserService {
-
-    @Autowired
-    private UserRepository userRepository;
-
-    @Transactional
-    public void testCaching() {
-        User u1 = userRepository.findById(1L); // 查询 DB
-        User u2 = userRepository.findById(1L); // 从缓存返回
-        // u1 == u2 为 true
-    }
-
-    @Transactional
-    public void testDirtyChecking() {
-        User user = userRepository.findById(1L);
-        user.setAge(30); // 自动更新到 DB
-        // 事务提交时
-    }
+@Transactional
+public void testCaching() {
+    User u1 = userRepository.findById(1L); // 查询 DB
+    User u2 = userRepository.findById(1L); // 从缓存返回
+    // u1 == u2 为 true
 }
 ```
 
 ## 二级缓存
 
-### EHCache 配置
-
-```xml
-<!-- ehcache.xml -->
-<config>
-    <cache name="users" maxElementsInMemory="1000"
-           eternal="false" timeToIdleSeconds="300"
-           timeToLiveSeconds="600" />
-</config>
-```
-
 ### 启用二级缓存
 
-```java
-// application.yml
+```yaml
 spring:
   jpa:
     properties:
@@ -409,8 +281,9 @@ spring:
         cache:
           use_second_level_cache: true
           region.factory_class: org.hibernate.cache.jcache.JCacheRegionFactory
+```
 
-// entity
+```java
 @Entity
 @Cacheable
 public class User {
@@ -430,18 +303,13 @@ public class UserService {
     public void createUser(String name) {
         User user = new User(name);
         userRepository.save(user);
-        // 异常会自动回滚
     }
 
     @Transactional(rollbackFor = Exception.class)
-    public void complexOperation() {
-        // 多步操作，自动回滚
-    }
+    public void complexOperation() { }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public void isolatedOperation() {
-        // 新事务
-    }
+    public void isolatedOperation() { }
 }
 ```
 
@@ -453,56 +321,28 @@ public class UserService {
 | REQUIRES_NEW | 总是创建新事务 |
 | SUPPORTS | 支持当前事务 |
 | MANDATORY | 必须有事务，否则异常 |
-| NEVER | 必须无事务 |
-| NOT_SUPPORTED | 挂起当前事务执行 |
 | NESTED | 嵌套事务（savepoint） |
 
 ## N+1 问题
 
-### 问题描述
+### 解决方案
 
-```sql
--- 1 次查询获取所有 User
-SELECT * FROM users;
-
--- N 次查询每个 User 的 Profile
-SELECT * FROM profiles WHERE user_id = 1;
-SELECT * FROM profiles WHERE user_id = 2;
-...
-```
-
-### @Fetch(FetchMode.JOIN)
+JOIN FETCH、@BatchSize、@EntityGraph 解决 N+1。
 
 ```java
-@OneToMany(fetch = FetchType.LAZY)
-@Fetch(FetchMode.JOIN)
-private List<Profile> profiles;
-```
-
-### @BatchSize
-
-```java
-@Entity
-public class User {
-    @OneToMany(fetch = FetchType.LAZY)
-    @BatchSize(size = 100)
-    private List<Profile> profiles;
-}
-```
-
-### JOIN FETCH
-
-```java
+// JOIN FETCH
 @Query("SELECT DISTINCT u FROM User u LEFT JOIN FETCH u.profiles")
 List<User> findAllWithProfiles();
-```
 
-###@EntityGraph
-
-```java
+// @EntityGraph
 @EntityGraph(attributePaths = {"profiles", "roles"})
 @Query("SELECT u FROM User u")
 List<User> findAllWithDetails();
+
+// @BatchSize
+@OneToMany(fetch = FetchType.LAZY)
+@BatchSize(size = 100)
+private List<Profile> profiles;
 ```
 
 ## 分页与排序
@@ -510,32 +350,16 @@ List<User> findAllWithDetails();
 ### Pageable
 
 ```java
-@Service
-public class UserService {
-
-    public Page<User> findUsers(int page, int size) {
-        Pageable pageable = PageRequest.of(page, size);
-        return userRepository.findAll(pageable);
-    }
-
-    public Page<User> findUsersSorted(int page, int size) {
-        Sort sort = Sort.by("age", "username").descending();
-        Pageable pageable = PageRequest.of(page, size, sort);
-        return userRepository.findAll(pageable);
-    }
-
-    public Page<User> findByAge(int age, int page, int size) {
-        Pageable pageable = PageRequest.of(page, size);
-        return userRepository.findByAge(age, pageable);
-    }
+public Page<User> findUsers(int page, int size) {
+    Pageable pageable = PageRequest.of(page, size);
+    return userRepository.findAll(pageable);
 }
-```
 
-### Slice
-
-```java
-// 返回 Slice，不包含总数
-Slice<User> findByAge(int age, Pageable pageable);
+public Page<User> findUsersSorted(int page, int size) {
+    Sort sort = Sort.by("age", "username").descending();
+    Pageable pageable = PageRequest.of(page, size, sort);
+    return userRepository.findAll(pageable);
+}
 ```
 
 ## 乐观锁
@@ -553,25 +377,6 @@ public class User {
     private Long version;
 
     private String name;
-}
-```
-
-### 异常处理
-
-```java
-@Service
-public class UserService {
-
-    @Transactional
-    public void updateUser(Long id, String name) {
-        try {
-            User user = userRepository.findById(id);
-            user.setName(name);
-        } catch (OptimisticLockingFailureException e) {
-            // 乐观锁冲突处理
-            throw new BusinessException("数据已被修改，请刷新后重试");
-        }
-    }
 }
 ```
 
@@ -605,4 +410,110 @@ public class UserDTO {
 
 @Query("SELECT new com.example.UserDTO(u.username, u.email) FROM User u")
 List<UserDTO> findAllDTOs();
+```
+
+## 参考样例
+
+```java
+// Entity 映射
+@Entity
+@Table(name = "users")
+public class User {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @Column(name = "username", nullable = false, unique = true)
+    private String username;
+
+    @Column(length = 255)
+    private String email;
+}
+```
+
+```java
+// Repository 派生查询
+public interface UserRepository extends JpaRepository<User, Long> {
+    User findByUsername(String username);
+    List<User> findByAgeGreaterThan(int age);
+    List<User> findByNameContaining(String name);
+    Page<User> findByAge(int age, Pageable pageable);
+    boolean existsByUsername(String username);
+}
+```
+
+```java
+// @Query 自定义查询
+@Query("SELECT u FROM User u WHERE u.username = :name AND u.age = :age")
+User findByUsernameAndAge(@Param("name") String username, @Param("age") int age);
+```
+
+```java
+// 关系映射 - 一对多
+@Entity
+public class Department {
+    @Id
+    @GeneratedValue
+    private Long id;
+
+    @OneToMany(mappedBy = "department", cascade = CascadeType.ALL)
+    private List<Employee> employees = new ArrayList<>();
+}
+```
+
+```java
+// 生命周期回调
+@Entity
+public class User {
+    @Id
+    @GeneratedValue
+    private Long id;
+
+    @PrePersist
+    public void beforeInsert() { }
+
+    @PostPersist
+    public void afterInsert() { }
+}
+```
+
+```java
+// 乐观锁
+@Entity
+public class User {
+    @Id
+    @GeneratedValue
+    private Long id;
+
+    @Version
+    private Long version;
+}
+```
+
+```java
+// 事务
+@Service
+public class UserService {
+    @Transactional
+    public void createUser(String name) {
+        userRepository.save(new User(name));
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public void complexOperation() { }
+}
+```
+
+```java
+// 分页
+public Page<User> findUsers(int page, int size) {
+    Pageable pageable = PageRequest.of(page, size);
+    return userRepository.findAll(pageable);
+}
+```
+
+```java
+// JOIN FETCH 解决 N+1
+@Query("SELECT DISTINCT u FROM User u LEFT JOIN FETCH u.profiles")
+List<User> findAllWithProfiles();
 ```

@@ -1,10 +1,12 @@
 # Lambda高级用法
 
-Lambda 表达式是 C++11 引入的强大特性，它允许在需要的地方定义匿名函数对象。本章深入讲解 Lambda 的高级用法，包括泛型 Lambda、模板 Lambda（ C++20）、捕获表达式以及与类型系统的交互。
+Lambda 表达式是 C++11 引入的强大特性，它允许在需要的地方定义匿名函数对象。
 
 ## Lambda 基础回顾
 
 ### Lambda 的本质
+
+### 参考样例
 
 ```cpp
 #include <functional>
@@ -27,6 +29,8 @@ std::function<int(int)> f = lambda;
 ```
 
 ### Lambda 结构解析
+
+### 参考样例
 
 ```cpp
 // [捕获列表](参数) -> 返回类型 { 函数体 }
@@ -52,6 +56,8 @@ exception                  // 异常说明
 ## 泛型 Lambda（C++14）
 
 ### auto 参数
+
+### 参考样例
 
 ```cpp
 // C++14 允许使用 auto 作为参数类型
@@ -90,6 +96,8 @@ std::for_each(words.begin(), words.end(), [](auto& s) {
 
 ### 泛型 Lambda 与模板的区别
 
+### 参考样例
+
 ```cpp
 // 函数模板
 template<typename T>
@@ -118,6 +126,8 @@ add<double>(1.0, 2.0);  // OK
 
 ### 泛型 Lambda 的限制
 
+### 参考样例
+
 ```cpp
 // 泛型 Lambda 的 operator() 是函数模板
 auto f = [](auto& x) { /* ... */ };
@@ -139,6 +149,8 @@ with_default(3.14);  // 指定 double
 ## 模板 Lambda（C++20）
 
 ### 显式模板参数
+
+### 参考样例
 
 ```cpp
 #include <iostream>
@@ -169,6 +181,8 @@ double d = as_double<int>(i);
 
 ### 模板 Lambda 与泛型 Lambda 的区别
 
+### 参考样例
+
 ```cpp
 // 泛型 Lambda（每个 auto 都是独立模板参数）
 auto generic = [](auto a, auto b) { return a + b; };
@@ -192,6 +206,8 @@ templated(1, 2.0); // 错误：要求相同类型
 ```
 
 ### 模板 Lambda 与 concept
+
+### 参考样例
 
 ```cpp
 #include <concepts>
@@ -219,6 +235,8 @@ print(42);        // OK
 
 ### 初始化捕获（Init Capture）
 
+### 参考样例
+
 ```cpp
 #include <memory>
 #include <utility>
@@ -245,6 +263,8 @@ auto lambda3 = [a = 1, b = std::move(ptr)](int x) {
 ```
 
 ### 移动捕获完整示例
+
+### 参考样例
 
 ```cpp
 #include <memory>
@@ -285,6 +305,8 @@ int main() {
 
 ### 泛型 Lambda 与捕获
 
+### 参考样例
+
 ```cpp
 #include <memory>
 
@@ -317,6 +339,8 @@ print_all();  // 输出: 1 2 3 hello
 
 ### 类型擦除
 
+### 参考样例
+
 ```cpp
 #include <functional>
 #include <string>
@@ -341,6 +365,8 @@ std::function<int()> f_with_capture = [x]() { return x; };
 ```
 
 ### Lambda 作为函数参数
+
+### 参考样例
 
 ```cpp
 #include <functional>
@@ -396,6 +422,8 @@ int main() {
 
 ### decltype 与 Lambda
 
+### 参考样例
+
 ```cpp
 #include <type_traits>
 
@@ -426,6 +454,8 @@ constexpr auto invoke(Lambda&& l) {
 
 ### Lambda 类型作为模板参数
 
+### 参考样例
+
 ```cpp
 #include <functional>
 
@@ -451,6 +481,8 @@ sort_with_comparator(v, comparator);
 ## Lambda 与成员函数
 
 ### 成员函数捕获
+
+### 参考样例
 
 ```cpp
 #include <iostream>
@@ -490,6 +522,8 @@ public:
 ```
 
 ### Lambda 作为成员变量
+
+### 参考样例
 
 ```cpp
 #include <functional>
@@ -533,6 +567,8 @@ public:
 
 ### 函数组合
 
+### 参考样例
+
 ```cpp
 #include <functional>
 
@@ -562,6 +598,8 @@ add(5)(3);     // 8
 ```
 
 ### 函子（Functor）模式
+
+### 参考样例
 
 ```cpp
 #include <vector>
@@ -593,6 +631,8 @@ int main() {
 ```
 
 ### 延迟执行
+
+### 参考样例
 
 ```cpp
 #include <functional>
@@ -646,6 +686,8 @@ int result = lazy_val.get();  // 实际执行计算
 
 ### Y 组合子
 
+### 参考样例
+
 ```cpp
 #include <functional>
 
@@ -681,6 +723,8 @@ fibonacci(10);  // 55
 
 ### std::function 实现递归
 
+### 参考样例
+
 ```cpp
 #include <functional>
 
@@ -710,6 +754,8 @@ factorial_v2(factorial_v2, 5);  // 120
 ## Lambda 与内存管理
 
 ### 防止空悬捕获
+
+### 参考样例
 
 ```cpp
 #include <memory>
@@ -755,6 +801,8 @@ public:
 
 ### Lambda 内存泄漏预防
 
+### 参考样例
+
 ```cpp
 #include <memory>
 #include <functional>
@@ -793,6 +841,8 @@ public:
 
 ### 内联优化
 
+### 参考样例
+
 ```cpp
 #include <chrono>
 
@@ -817,6 +867,8 @@ call_twice([](int n) { return n * 2; }, x);  // 可能内联
 ```
 
 ### 避免不必要的捕获
+
+### 参考样例
 
 ```cpp
 #include <iostream>
@@ -846,6 +898,8 @@ constexpr int result = add(3, 4);  // 编译时计算
 
 ### 模板 Lambda 完整示例
 
+### 参考样例
+
 ```cpp
 // C++20 模板 Lambda
 auto add_template = []<typename T>(T a, T b) {
@@ -872,6 +926,8 @@ auto generic_constrained = []<typename T>(T x) requires std::integral<T> {
 
 ### Lambda 与 pack expansion
 
+### 参考样例
+
 ```cpp
 // C++20: Lambda 参数包展开
 auto print_all = []<typename... Args>(Args&&... args) {
@@ -892,6 +948,8 @@ printer();  // 输出: 1 2 3
 ```
 
 ### 立即调用 Lambda
+
+### 参考样例
 
 ```cpp
 // IIFE（立即调用函数表达式）
@@ -917,6 +975,8 @@ constexpr int computed = compile_time_add(3, 4);
 ## 实际应用场景
 
 ### 算法中的复杂 Lambda
+
+### 参考样例
 
 ```cpp
 #include <algorithm>
@@ -954,6 +1014,8 @@ int sum_of_squares = std::accumulate(nums.begin(), nums.end(), 0,
 
 ### 范围库中的 Lambda
 
+### 参考样例
+
 ```cpp
 #include <ranges>
 #include <vector>
@@ -984,6 +1046,8 @@ auto arr = nums
 ```
 
 ### 作用域锁与 Lambda
+
+### 参考样例
 
 ```cpp
 #include <mutex>

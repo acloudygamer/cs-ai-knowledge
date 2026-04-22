@@ -6,6 +6,8 @@ RTTI（Run-Time Type Information）提供了在运行时查询和处理类型信
 
 ### 基本用法
 
+### 参考样例
+
 ```cpp
 #include <typeinfo>
 #include <iostream>
@@ -13,13 +15,15 @@ RTTI（Run-Time Type Information）提供了在运行时查询和处理类型信
 int main() {
     int x = 42;
     double d = 3.14;
-    
+
     std::cout << typeid(x).name() << std::endl;   // i (int)
     std::cout << typeid(d).name() << std::endl;   // d (double)
 }
 ```
 
 ### 多态类型识别
+
+### 参考样例
 
 ```cpp
 class Base {
@@ -45,6 +49,8 @@ void process(Base* ptr) {
 ## dynamic_cast
 
 ### 指针转换
+
+### 参考样例
 
 ```cpp
 class Base {
@@ -75,6 +81,8 @@ if (fail_ptr == nullptr) {
 
 ### 引用转换
 
+### 参考样例
+
 ```cpp
 class Base {
 public:
@@ -100,19 +108,21 @@ void process_ref(Base& base) {
 
 ### 成员函数
 
+### 参考样例
+
 ```cpp
 #include <typeinfo>
 #include <iostream>
 
 int main() {
     int a = 1, b = 2;
-    
+
     // 相等性比较
     std::cout << (typeid(a) == typeid(b)) << std::endl;  // 1 (true)
-    
+
     // 名称
     std::cout << typeid(a).name() << std::endl;  // i
-    
+
     // before（C++11 起已废弃）
     // std::cout << typeid(a).before(typeid(b)) << std::endl;
 }
@@ -120,8 +130,10 @@ int main() {
 
 ### 哈希值
 
+### 参考样例
+
 ```cpp
-#include <typeinfo>
+#include <typeindex>
 
 size_t h1 = typeid(int).hash_code();
 size_t h2 = typeid(double).hash_code();
@@ -133,6 +145,8 @@ type_names[std::type_index(typeid(int))] = "integer";
 
 ## std::type_index
 
+### 参考样例
+
 ```cpp
 #include <typeindex>
 #include <unordered_map>
@@ -140,17 +154,19 @@ type_names[std::type_index(typeid(int))] = "integer";
 
 int main() {
     std::unordered_map<std::type_index, std::string> type_map;
-    
+
     type_map[std::type_index(typeid(int))] = "int";
     type_map[std::type_index(typeid(double))] = "double";
-    
+
     std::cout << type_map[std::type_index(typeid(int))] << std::endl;  // int
 }
 ```
 
 ## 虚函数表（vtable）
 
-运行时类型信息依赖于虚函数表：
+运行时类型信息依赖于虚函数表。
+
+### 参考样例
 
 ```cpp
 class Base {
@@ -173,6 +189,8 @@ public:
 
 ### 编译期类型信息
 
+### 参考样例
+
 ```cpp
 #include <type_traits>
 #include <iostream>
@@ -182,11 +200,11 @@ int main() {
     std::cout << std::is_integral<int>::value << std::endl;      // 1
     std::cout << std::is_floating_point<double>::value << std::endl;  // 1
     std::cout << std::is_class<std::string>::value << std::endl;  // 1
-    
+
     // 类型关系
     std::cout << std::is_same<int, int>::value << std::endl;     // 1
     std::cout << std::is_base_of<Base, Derived>::value << std::endl;  // 1
-    
+
     // 类型属性
     std::cout << std::is_const<const int>::value << std::endl;   // 1
     std::cout << std::is_pointer<int*>::value << std::endl;      // 1
@@ -196,11 +214,11 @@ int main() {
 
 ## RTTI 的开销
 
-```cpp
-// RTTI 会增加内存和时间开销：
-// 1. 每个多态类型需要存储 type_info
-// 2. dynamic_cast 需要遍历类层次
+RTTI 会增加内存和时间开销：每个多态类型需要存储 type_info，dynamic_cast 需要遍历类层次。
 
+### 参考样例
+
+```cpp
 // 关闭 RTTI（部分编译器支持）
 // g++: -fno-rtti
 // MSVC: /GR-
@@ -229,6 +247,8 @@ void process(Base* obj) {
 ## RTTI 与设计模式
 
 ### Visitor 模式
+
+### 参考样例
 
 ```cpp
 class Visitor;
@@ -265,6 +285,8 @@ void process_element(Element& e) {
 
 ### 1. 需要虚函数表
 
+### 参考样例
+
 ```cpp
 class NoRTTI {
     int data;
@@ -279,6 +301,8 @@ class WithRTTI {
 
 ### 2. 类型名称不可移植
 
+### 参考样例
+
 ```cpp
 // type_info::name() 返回的实现相关名称
 // GCC: int -> i, double -> d, std::string -> Ss
@@ -289,6 +313,8 @@ class WithRTTI {
 
 ### 3. 性能考虑
 
+### 参考样例
+
 ```cpp
 // dynamic_cast 在复杂类层次中可能较慢
 // 如果频繁调用，考虑其他模式
@@ -297,6 +323,8 @@ class WithRTTI {
 ```
 
 ## 完整示例
+
+### 参考样例
 
 ```cpp
 #include <iostream>
@@ -331,7 +359,7 @@ void process_shape(Shape* shape) {
     } else if (Rectangle* r = dynamic_cast<Rectangle*>(shape)) {
         std::cout << "Rectangle with area " << r->area() << "\n";
     }
-    
+
     // 使用 typeid
     std::cout << "Type: " << typeid(*shape).name() << "\n";
 }
@@ -339,7 +367,7 @@ void process_shape(Shape* shape) {
 int main() {
     std::unique_ptr<Shape> s1 = std::make_unique<Circle>(5.0);
     std::unique_ptr<Shape> s2 = std::make_unique<Rectangle>(3, 4);
-    
+
     process_shape(s1.get());
     process_shape(s2.get());
 }

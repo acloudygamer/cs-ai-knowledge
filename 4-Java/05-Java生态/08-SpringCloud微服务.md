@@ -17,57 +17,9 @@ Spring Cloud 是微服务架构的工具集，封装了分布式系统所需的�
 
 ## 服务注册与发现
 
-### Eureka（已停止维护，仅做了解）
-
-```
-┌─────────────┐     ┌─────────────┐
-│  Eureka    │     │  Eureka    │
-│  Server    │←──→ │  Server    │
-└──────┬──────┘     └─────────────┘
-       │
-   ┌───┴───┐
-   ↓       ↓
-┌──────┐ ┌──────┐
-│Service│ │Service│
-│  A    │ │  B    │
-└──────┘ └──────┘
-```
-
-```yaml
-# Eureka Server
-spring:
-  application:
-    name: eureka-server
-  eureka:
-    instance:
-      hostname: localhost
-    client:
-      register-with-eureka: false
-      fetch-registry: false
-```
-
-```java
-@SpringBootApplication
-@EnableEurekaServer
-public class EurekaServerApplication {
-    public static void main(String[] args) {
-        SpringApplication.run(EurekaServerApplication.class, args);
-    }
-}
-```
-
 ### Nacos（推荐）
 
 ```yaml
-# Nacos Server 依赖
-<dependency>
-    <groupId>com.alibaba.cloud</groupId>
-    <artifactId>spring-cloud-starter-alibaba-nacos-discovery</artifactId>
-</dependency>
-```
-
-```yaml
-# application.yml
 spring:
   cloud:
     nacos:
@@ -94,9 +46,9 @@ public class ServiceApplication {
 ```java
 @Configuration
 public class RestTemplateConfig {
-    
+
     @Bean
-    @LoadBalanced  // 启用负载均衡
+    @LoadBalanced
     public RestTemplate restTemplate() {
         return new RestTemplate();
     }
@@ -104,14 +56,13 @@ public class RestTemplateConfig {
 
 @Service
 public class UserService {
-    
+
     @Autowired
     private RestTemplate restTemplate;
-    
+
     public User getUserById(Long id) {
-        // 使用服务名代替 IP:Port
         return restTemplate.getForObject(
-            "http://user-service/users/" + id, 
+            "http://user-service/users/" + id,
             User.class
         );
     }
@@ -119,6 +70,8 @@ public class UserService {
 ```
 
 ### OpenFeign（推荐）
+
+OpenFeign 是声明式 HTTP 客户端，简化服务间调用。
 
 ```xml
 <dependency>
@@ -139,13 +92,10 @@ public class OrderApplication {
 // 声明式接口
 @FeignClient(name = "user-service", path = "/users")
 public interface UserClient {
-    
+
     @GetMapping("/{id}")
     User getUserById(@PathVariable("id") Long id);
-    
-    @GetMapping
-    List<User> getAllUsers();
-    
+
     @PostMapping
     User createUser(@RequestBody UserRequest request);
 }
@@ -155,10 +105,10 @@ public interface UserClient {
 // 使用
 @Service
 public class OrderService {
-    
+
     @Autowired
     private UserClient userClient;
-    
+
     public Order createOrder(Long userId) {
         User user = userClient.getUserById(userId);
         // 创建订单...
@@ -174,90 +124,32 @@ spring:
     openfeign:
       client:
         config:
-          user-service:  # 指定服务
+          user-service:
             connect-timeout: 5000
             read-timeout: 5000
-            logger-level: full
       circuitbreaker:
-        enabled: true  # 启用熔断
-```
-
-```java
-// 自定义配置
-@FeignClient(name = "user-service", configuration = FeignConfig.class)
-public interface UserClient { }
-
-// Feign 配置类
-@Configuration
-public class FeignConfig {
-    
-    @Bean
-    public Decoder feignDecoder() {
-        return new JacksonDecoder();
-    }
-    
-    @Bean
-    public Logger.Level feignLogger() {
-        return Logger.Level.FULL;
-    }
-}
+        enabled: true
 ```
 
 ## 负载均衡
 
-### Ribbon
-
-```java
-@Configuration
-public class RibbonConfig {
-    
-    @Bean
-    public IRule ribbonRule() {
-        // 轮询（默认）
-        return new RoundRobinRule();
-        
-        // 随机
-        // return new RandomRule();
-        
-        // 重试（先轮询，失败后重试其他）
-        // return new RetryRule();
-        
-        // 权重
-        // return new WeightedResponseTimeRule();
-    }
-}
-```
-
 ### Spring Cloud LoadBalancer（新版）
+
+Ribbon 已停止维护，Spring Cloud LoadBalancer 是新版替代方案。
 
 ```yaml
 spring:
   cloud:
     loadbalancer:
       ribbon:
-        enabled: false  # 禁用 Ribbon，使用新版
-```
-
-```java
-// 自定义负载均衡策略
-@Configuration
-public class CustomLoadBalancerConfig {
-    
-    @Bean
-    public ReactorLoadBalancer<ServiceInstance> randomServiceInstance(
-            LoadBalancerClientFactory factory) {
-        
-        return new RandomLoadBalancer(
-            factory.getLazyProvider(null, ServiceInstanceListSupplier.class),
-            "user-service"
-        );
-    }
-}
+        enabled: false
 ```
 
 ## 熔断器
 
-### Resilience4j（推荐，Hystrix 已停止维护）
+### Resilience4j（推荐）
+
+Resilience4j 是轻量级熔断器库，支持超时、重试、限流、舱壁模式。
 
 ```xml
 <dependency>
@@ -274,35 +166,31 @@ resilience4j:
         sliding-window-size: 10
         failure-rate-threshold: 50
         wait-duration-in-open-state: 60s
-        permitted-number-of-calls-in-half-open-state: 3
-        slow-call-duration-threshold: 2s
-        slow-call-rate-threshold: 100
 ```
 
 ```java
 @Service
 public class UserService {
-    
+
     @Autowired
     private CircuitBreakerFactory circuitBreakerFactory;
-    
+
     public User getUserById(Long id) {
         CircuitBreaker circuitBreaker = circuitBreakerFactory.create("userService");
-        
+
         return circuitBreaker.run(
             () -> userClient.getUserById(id),
             throwable -> fallback(throwable)
         );
     }
-    
+
     private User fallback(Throwable throwable) {
-        // 降级处理
         return new DefaultUser();
     }
 }
 ```
 
-### 带超时和重试
+### 超时和重试
 
 ```yaml
 resilience4j:
@@ -310,51 +198,19 @@ resilience4j:
     instances:
       userService:
         timeout-duration: 3s
-        timeout-callable-type: cancellable
-```
 
-```java
-// 超时示例
-User user = circuitBreaker.run(
-    () -> {
-        // 设置单独的超时
-        return circuitBreaker.executeSupplier(
-            () -> userClient.getUserById(id)
-        );
-    },
-    throwable -> fallback()
-);
-```
-
-### Retry
-
-```yaml
-resilience4j:
   retry:
     instances:
       userService:
         max-attempts: 3
         wait-duration: 500ms
-        retry-exceptions:
-          - java.io.IOException
-          - java.util.concurrent.TimeoutException
-```
-
-```java
-// 重试示例
-Retry retry = Retry.of("userService", RetryConfig.custom()
-    .maxAttempts(3)
-    .waitDuration(Duration.ofMillis(500))
-    .retryExceptions(IOException.class)
-    .build());
-
-Supplier<User> supplier = Retry.decorateSupplier(retry, () -> userClient.getUserById(id));
-User user = supplier.get();
 ```
 
 ## API 网关
 
 ### Spring Cloud Gateway
+
+Gateway 是基于 Spring WebFlux 的响应式网关。
 
 ```xml
 <dependency>
@@ -369,16 +225,12 @@ spring:
     gateway:
       routes:
         - id: user-service
-          uri: lb://user-service  # lb = loadbalance
+          uri: lb://user-service
           predicates:
             - Path=/users/**
           filters:
             - StripPrefix=1
-            - name: RequestRateLimiter
-              args:
-                redis-rate-limiter.replenishRate: 10
-                redis-rate-limiter.burstCapacity: 20
-        
+
         - id: order-service
           uri: lb://order-service
           predicates:
@@ -387,93 +239,30 @@ spring:
             - StripPrefix=1
 ```
 
-### 动态路由
-
-```yaml
-spring:
-  cloud:
-    gateway:
-      discovery:
-        locator:
-          enabled: true  # 自动发现服务
-          lower-case-service-id: true
-```
-
 ### 全局过滤器
 
 ```java
 @Component
 public class AuthFilter implements GlobalFilter {
-    
+
     @Override
-    public Mono<Void> filter(ServerWebExchange exchange, 
+    public Mono<Void> filter(ServerWebExchange exchange,
                              GatewayFilterChain chain) {
         String token = exchange.getRequest().getHeaders()
             .getFirst("Authorization");
-        
+
         if (StringUtils.isBlank(token)) {
             exchange.getResponse().setStatusCode(
                 HttpStatus.UNAUTHORIZED);
             return exchange.getResponse().setComplete();
         }
-        
+
         return chain.filter(exchange);
     }
 }
 ```
 
-### 熔断配置
-
-```yaml
-spring:
-  cloud:
-    gateway:
-      routes:
-        - id: user-service
-          uri: lb://user-service
-          filters:
-            - name: CircuitBreaker
-              args:
-                name: userCircuitBreaker
-                fallbackUri: forward:/fallback
-```
-
 ## 配置中心
-
-### Spring Cloud Config
-
-```yaml
-# Config Server
-spring:
-  cloud:
-    config:
-      server:
-        git:
-          uri: https://github.com/example/config-repo
-          default-label: main
-```
-
-```java
-@SpringBootApplication
-@EnableConfigServer
-public class ConfigServerApplication {
-    public static void main(String[] args) {
-        SpringApplication.run(ConfigServerApplication.class, args);
-    }
-}
-```
-
-### 客户端使用
-
-```yaml
-# Config Client
-spring:
-  cloud:
-    config:
-      uri: http://localhost:8888
-      name: user-service
-      profile: dev
-```
 
 ### Nacos 配置中心（推荐）
 
@@ -487,20 +276,18 @@ spring:
         server-addr: localhost:8848
         file-extension: yaml
         namespace: dev
-        group: DEFAULT_GROUP
-        refresh-enabled: true  # 动态刷新
+        refresh-enabled: true
 ```
 
+### 动态刷新配置
+
 ```java
-// 动态刷新配置
 @RestController
 @RefreshScope
 public class UserController {
-    
+
     @Value("${app.feature-flag:false}")
     private boolean featureFlag;
-    
-    // 配置变化后自动更新
 }
 ```
 
@@ -526,7 +313,7 @@ spring:
     base-url: http://localhost:9411
   sleuth:
     sampling:
-      probability: 0.1  # 10% 采样率
+      probability: 0.1
 ```
 
 ### Micrometer（指标）
@@ -547,26 +334,11 @@ spring:
 
 ### 服务拆分原则
 
-```
-单一职责
-高内聚低耦合
-业务边界清晰
-独立部署
-```
+单一职责、高内聚低耦合、业务边界清晰、独立部署。
 
 ### 服务间通信
 
-```
-同步：HTTP（OpenFeign）/ gRPC
-异步：Kafka / RabbitMQ
-```
-
-### 事务一致性
-
-```
-Saga 模式：补偿事务
-可靠消息：RocketMQ / Kafka
-```
+同步：HTTP（OpenFeign）/ gRPC；异步：Kafka / RabbitMQ。
 
 ### 健康检查
 
@@ -579,4 +351,133 @@ management:
   endpoint:
     health:
       show-details: when-authorized
+```
+
+## 参考样例
+
+```yaml
+# Nacos 配置
+spring:
+  cloud:
+    nacos:
+      discovery:
+        server-addr: localhost:8848
+        namespace: dev
+```
+
+```java
+// OpenFeign 声明式接口
+@FeignClient(name = "user-service", path = "/users")
+public interface UserClient {
+    @GetMapping("/{id}")
+    User getUserById(@PathVariable("id") Long id);
+
+    @PostMapping
+    User createUser(@RequestBody UserRequest request);
+}
+```
+
+```java
+// 使用 Feign Client
+@Service
+public class OrderService {
+    @Autowired
+    private UserClient userClient;
+
+    public Order createOrder(Long userId) {
+        User user = userClient.getUserById(userId);
+        return createOrderWithUser(user);
+    }
+}
+```
+
+```yaml
+# Gateway 路由
+spring:
+  cloud:
+    gateway:
+      routes:
+        - id: user-service
+          uri: lb://user-service
+          predicates:
+            - Path=/users/**
+          filters:
+            - StripPrefix=1
+```
+
+```java
+// 全局过滤器
+@Component
+public class AuthFilter implements GlobalFilter {
+    @Override
+    public Mono<Void> filter(ServerWebExchange exchange,
+                             GatewayFilterChain chain) {
+        String token = exchange.getRequest().getHeaders()
+            .getFirst("Authorization");
+
+        if (StringUtils.isBlank(token)) {
+            exchange.getResponse().setStatusCode(
+                HttpStatus.UNAUTHORIZED);
+            return exchange.getResponse().setComplete();
+        }
+
+        return chain.filter(exchange);
+    }
+}
+```
+
+```yaml
+# Resilience4j 熔断配置
+resilience4j:
+  circuitbreaker:
+    instances:
+      userService:
+        sliding-window-size: 10
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 60s
+```
+
+```java
+// 熔断器使用
+@Service
+public class UserService {
+    @Autowired
+    private CircuitBreakerFactory circuitBreakerFactory;
+
+    public User getUserById(Long id) {
+        CircuitBreaker circuitBreaker = circuitBreakerFactory.create("userService");
+        return circuitBreaker.run(
+            () -> userClient.getUserById(id),
+            throwable -> fallback(throwable)
+        );
+    }
+}
+```
+
+```yaml
+# Sleuth + Zipkin 配置
+spring:
+  zipkin:
+    base-url: http://localhost:9411
+  sleuth:
+    sampling:
+      probability: 0.1
+```
+
+```yaml
+# Docker Compose 微服务
+services:
+  gateway:
+    build: ./gateway
+    ports:
+      - "8080:8080"
+  user-service:
+    build: ./user-service
+    depends_on:
+      postgres:
+        condition: service_healthy
+  postgres:
+    image: postgres:15-alpine
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
 ```

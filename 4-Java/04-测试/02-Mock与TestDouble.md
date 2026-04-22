@@ -4,6 +4,8 @@
 
 ### 五种类型
 
+Test Double 是测试中替代真实组件的对象，根据用途分为五种类型：
+
 | 类型 | 用途 | 特点 |
 |------|------|------|
 | Dummy | 填充参数列表 | 从不使用 |
@@ -16,6 +18,8 @@
 
 ### 添加依赖
 
+Spring Boot 项目已包含 Mockito。独立项目需要添加依赖：
+
 ```xml
 <dependency>
     <groupId>org.mockito</groupId>
@@ -25,22 +29,21 @@
 </dependency>
 ```
 
-Spring Boot 项目已包含。
-
 ### 基本注解
+
+@ExtendWith(MockitoExtension.class) 启用 Mockito 注解支持；@Mock 创建模拟对象；@Spy 部分模拟真实对象；@InjectMocks 自动注入 @Mock 字段。
 
 ```java
 @ExtendWith(MockitoExtension.class)
 class UserServiceTest {
-
     @Mock
     private UserRepository userRepository;
 
     @Spy
-    private UserService userService; // 真实对象，部分模拟
+    private UserService userService;
 
     @InjectMocks
-    private UserService service; // 自动注入 @Mock 字段
+    private UserService service;
 }
 ```
 
@@ -75,25 +78,22 @@ class Test3 {
 
 ### 基本 stub
 
+when().thenReturn() 预设方法返回值。
+
 ```java
 @ExtendWith(MockitoExtension.class)
 class StubDemo {
-
     @Mock
     private UserRepository userRepository;
 
     @Test
     void testStub() {
-        // 预设行为
         when(userRepository.findById(1L))
             .thenReturn(new User("Alice"));
         when(userRepository.findById(2L))
             .thenReturn(new User("Bob"));
 
-        // 执行
         User user = userRepository.findById(1L);
-
-        // 验证
         assertEquals("Alice", user.getName());
     }
 }
@@ -101,10 +101,11 @@ class StubDemo {
 
 ### 多次调用不同返回值
 
+多次调用依次返回不同值，最后一次的值会重复返回。
+
 ```java
 @Test
 void testMultipleReturns() {
-    // 依次返回不同值
     when(mock.get())
         .thenReturn("first")
         .thenReturn("second")
@@ -113,14 +114,13 @@ void testMultipleReturns() {
     assertEquals("first", mock.get());
     assertEquals("second", mock.get());
     assertEquals("third", mock.get());
-    assertEquals("third", mock.get()); // 之后都返回 "third"
+    assertEquals("third", mock.get());
 }
-
-// 更简洁写法
-when(mock.get()).thenReturn("first", "second", "third");
 ```
 
 ### 抛出异常
+
+thenThrow() 预设方法抛出异常。
 
 ```java
 @Test
@@ -131,14 +131,11 @@ void testThrowException() {
     assertThrows(UserNotFoundException.class,
         () -> userRepository.findById(999L));
 }
-
-// 先返回值再抛异常
-when(mock.method())
-    .thenReturn("success")
-    .thenThrow(new RuntimeException());
 ```
 
 ### Answer 自定义行为
+
+thenAnswer() 允许自定义返回逻辑，基于传入参数计算返回值。
 
 ```java
 @Test
@@ -154,41 +151,21 @@ void testWithAnswer() {
 }
 ```
 
-### doReturn-when 风格
-
-```java
-// 用于 void 方法或特殊场景
-doReturn("stubbed").when(mock).method();
-
-// void 方法
-doNothing().when(mock).setName(anyString());
-doThrow(new RuntimeException()).when(mock).delete(anyLong());
-
-// 连续调用不同行为
-doNothing().when(mock).firstCall();
-doThrow(new RuntimeException()).when(mock).secondCall();
-```
-
 ## 参数匹配
 
 ### anyXxx 任意参数
 
+anyLong()、any(User.class) 等匹配任意值；eq() 精确匹配。
+
 ```java
 when(mock.findById(anyLong())).thenReturn(user);
 when(mock.save(any(User.class))).thenReturn(user);
-when(mock.getName()).thenReturn("Mocked");
-
 verify(mock).findById(anyLong());
 ```
 
-### eq 精确匹配
-
-```java
-when(mock.findById(eq(1L))).thenReturn(user1);
-when(mock.findById(eq(2L))).thenReturn(user2);
-```
-
 ### argThat 自定义匹配
+
+argThat() 允许自定义匹配逻辑。
 
 ```java
 when(mock.createUser(argThat(
@@ -200,18 +177,11 @@ verify(mock).createUser(argThat(
 ));
 ```
 
-### 组合匹配
-
-```java
-when(mock.findByNameAndAge(
-    argThat(name -> name.length() > 0),
-    eq(25)
-)).thenReturn(user);
-```
-
 ## 验证调用
 
 ### verify 基础
+
+verify() 验证方法被调用次数和参数。
 
 ```java
 @Test
@@ -220,7 +190,6 @@ void testVerify() {
 
     service.findById(1L);
 
-    // 验证方法被调用
     verify(userRepository).findById(1L);
     verify(userRepository, times(1)).findById(1L);
 }
@@ -228,16 +197,18 @@ void testVerify() {
 
 ### 调用次数
 
+times() 精确次数；atLeast() 最少次数；atMost() 最多次数；never() 从未调用。
+
 ```java
-verify(mock, times(2)).method();     // 精确 2 次
-verify(mock, atLeast(1)).method();   // 至少 1 次
-verify(mock, atLeastOnce()).method();// 至少 1 次
-verify(mock, atMost(3)).method();    // 最多 3 次
-verify(mock, never()).method();      // 从未调用
-verify(mock, only()).method();       // 只调用了这一次
+verify(mock, times(2)).method();
+verify(mock, atLeast(1)).method();
+verify(mock, atMost(3)).method();
+verify(mock, never()).method();
 ```
 
 ### 调用顺序
+
+InOrder 验证调用顺序。
 
 ```java
 @Test
@@ -247,36 +218,20 @@ void testOrder() {
     inOrder.verify(mockA).first();
     inOrder.verify(mockA).second();
     inOrder.verify(mockB).third();
-
-    // 或者只验证相对顺序
-    inOrder.verify(mockB, after(100).milliseconds()).process();
-}
-```
-
-### 交互验证
-
-```java
-@Test
-void testNoMoreInteractions() {
-    // 执行测试逻辑
-    service.process();
-
-    // 验证没有更多交互
-    verifyNoMoreInteractions(userRepository);
-    verify(userRepository, never()).delete(anyLong());
 }
 ```
 
 ### 验证没有发生交互
 
+verifyNoMoreInteractions() 验证除了已验证的调用外没有其他调用。
+
 ```java
 @Test
-void testNeverCalled() {
-    // 执行
-    service.getUser(999L);
+void testNoMoreInteractions() {
+    service.process();
 
-    // 验证从未调用 save
-    verify(userRepository, never()).save(any());
+    verifyNoMoreInteractions(userRepository);
+    verify(userRepository, never()).delete(anyLong());
 }
 ```
 
@@ -284,24 +239,22 @@ void testNeverCalled() {
 
 ### 基本用法
 
+@Spy 创建部分模拟对象，默认调用真实方法，可通过 doReturn().when() 预设特定方法。
+
 ```java
 @ExtendWith(MockitoExtension.class)
 class SpyDemo {
-
     @Spy
     private UserService userService;
 
     @Test
     void testSpy() {
-        // 真实调用
         User result = userService.findById(1L);
 
-        // 模拟特定方法
         doReturn(new User("Mocked"))
             .when(userService)
             .findByName(anyString());
 
-        // findById 真实调用，findByName 被模拟
         User mocked = userService.findByName("test");
     }
 }
@@ -309,22 +262,25 @@ class SpyDemo {
 
 ### @Spy vs @Mock
 
+@Mock 完全模拟，所有方法预设返回；@Spy 部分模拟，默认调用真实方法。
+
 ```java
 @Mock
-private UserRepository mockRepo; // 完全模拟
+private UserRepository mockRepo;
 
 @Spy
-private UserRepository spyRepo; // 真实对象，可部分模拟
+private UserRepository spyRepo;
 ```
 
 ## @InjectMocks 自动注入
 
 ### 构造器注入
 
+@InjectMocks 自动将 @Mock 字段注入构造器。
+
 ```java
 @ExtendWith(MockitoExtension.class)
 class InjectMocksDemo {
-
     @Mock
     private UserRepository userRepository;
 
@@ -336,7 +292,6 @@ class InjectMocksDemo {
 
     @Test
     void testAutoInjection() {
-        // userService 已自动注入 userRepository 和 emailService
         when(userRepository.findById(1L))
             .thenReturn(new User("Alice"));
 
@@ -347,28 +302,11 @@ class InjectMocksDemo {
 }
 ```
 
-### Setter 注入
-
-```java
-class UserService {
-    private UserRepository userRepository;
-    private EmailService emailService;
-
-    @InjectMocks
-    public void setUserRepository(UserRepository repo) {
-        this.userRepository = repo;
-    }
-
-    @InjectMocks
-    public void setEmailService(EmailService emailService) {
-        this.emailService = emailService;
-    }
-}
-```
-
 ## Mock 静态方法
 
 ### Mockito.mockStatic
+
+mockStatic() 模拟静态方法，需要在 try-with-resources 中使用。
 
 ```java
 @Test
@@ -385,21 +323,6 @@ void testStaticMock() {
 }
 ```
 
-## Mock 泛型
-
-### withSettings 泛型配置
-
-```java
-@Mock(name = "userRepository")
-private UserRepository<User> userRepository;
-
-@Mock
-private Map<String, Object> map;
-
-@Spy
-private List<String> spyList = new ArrayList<>();
-```
-
 ## 常用场景
 
 ### 模拟 List
@@ -407,7 +330,6 @@ private List<String> spyList = new ArrayList<>();
 ```java
 @ExtendWith(MockitoExtension.class)
 class ListMockDemo {
-
     @Mock
     private List<String> mockList;
 
@@ -421,7 +343,6 @@ class ListMockDemo {
 
         assertEquals(2, mockList.size());
         assertEquals("first", mockList.get(0));
-        assertNull(mockList.get(1)); // 默认返回 null
 
         verify(mockList).add("one");
         verify(mockList, times(2)).add(anyString());
@@ -444,25 +365,11 @@ void testIteratorMock() {
 }
 ```
 
-### 模拟 Stream
-
-```java
-@Test
-void testStreamMock() {
-    Stream<String> stream = mock(Stream.class);
-    when(stream.map(Function.identity())).thenReturn(stream);
-    when(stream.filter(any())).thenReturn(stream);
-    when(stream.count()).thenReturn(5L);
-
-    assertEquals(5L, stream.count());
-}
-```
-
 ## 常见问题
 
-### 降级到 mockito-core 4.x
+### 降级到 mockito-inline
 
-如果 JDK 17+ 出现问题：
+JDK 17+ 如果出现问题，使用 mockito-inline：
 
 ```xml
 <dependency>
@@ -474,22 +381,139 @@ void testStreamMock() {
 
 ### 忽略不必要的 stub
 
+lenient() 使 stub 配置宽松化。
+
 ```java
 @Test
 void testWithLenient() {
     lenient().when(mock.method()).thenReturn(value);
-    // 或者
-    Mockito.framework().clearInlineMocks();
 }
 ```
 
-### 验证 stubbed 调用
+## 参考样例
 
 ```java
+// Test Double 五种类型
+// Dummy - 填充参数列表
+void test(Dummy dummy) { }
+// Fake - 简化实现
+class InMemoryUserRepository implements UserRepository { }
+// Stub - 预设返回值
+when(mock.findById(1L)).thenReturn(user);
+// Spy - 部分模拟
+doReturn(value).when(spy).method();
+// Mock - 行为验证
+verify(mock).save(any());
+```
+
+```java
+// Mockito 基本用法
+@ExtendWith(MockitoExtension.class)
+class UserServiceTest {
+    @Mock
+    private UserRepository userRepository;
+
+    @Spy
+    private UserService userService;
+
+    @InjectMocks
+    private UserService service;
+
+    @Test
+    void testFindById() {
+        when(userRepository.findById(1L)).thenReturn(new User("Alice"));
+        User result = service.findById(1L);
+        assertEquals("Alice", result.getName());
+        verify(userRepository).findById(1L);
+    }
+}
+```
+
+```java
+// Stub 预设返回值
 @Test
-void testStubbedCalled() {
-    // 即使没有 assert，也可以验证 stub 被调用
-    verify(userRepository, atLeastOnce()).findById(anyLong());
-    verifyNoInteractions(userRepository);
+void testStub() {
+    when(userRepository.findById(1L)).thenReturn(new User("Alice"));
+    when(userRepository.findById(2L)).thenReturn(new User("Bob"));
+    assertEquals("Alice", userRepository.findById(1L).getName());
+}
+```
+
+```java
+// 多次调用不同返回值
+@Test
+void testMultipleReturns() {
+    when(mock.get()).thenReturn("first", "second", "third");
+    assertEquals("first", mock.get());
+    assertEquals("second", mock.get());
+    assertEquals("third", mock.get());
+}
+```
+
+```java
+// 抛出异常
+@Test
+void testThrowException() {
+    when(userRepository.findById(999L))
+        .thenThrow(new UserNotFoundException("用户不存在"));
+    assertThrows(UserNotFoundException.class,
+        () -> userRepository.findById(999L));
+}
+```
+
+```java
+// 参数匹配
+@Test
+void testArgumentMatching() {
+    when(mock.findById(anyLong())).thenReturn(user);
+    when(mock.save(argThat(u -> u.getName() != null))).thenReturn(user);
+    verify(mock).findById(anyLong());
+}
+```
+
+```java
+// 验证调用
+@Test
+void testVerify() {
+    service.findById(1L);
+    verify(userRepository).findById(1L);
+    verify(userRepository, times(1)).findById(1L);
+    verify(userRepository, atLeast(1)).findById(1L);
+    verify(userRepository, never()).delete(anyLong());
+}
+```
+
+```java
+// Spy 部分模拟
+@Test
+void testSpy() {
+    User result = userService.findById(1L);
+    doReturn(new User("Mocked"))
+        .when(userService)
+        .findByName(anyString());
+    User mocked = userService.findByName("test");
+}
+```
+
+```java
+// 静态方法 Mock
+@Test
+void testStaticMock() {
+    try (MockedStatic<StaticUtil> mocked = mockStatic(StaticUtil.class)) {
+        mocked.when(StaticUtil::getInstance).thenReturn("mocked");
+        assertEquals("mocked", StaticUtil.getInstance());
+    }
+}
+```
+
+```java
+// List Mock 示例
+@Test
+void testListMock() {
+    when(mockList.size()).thenReturn(2);
+    when(mockList.get(0)).thenReturn("first");
+    assertEquals(2, mockList.size());
+    assertEquals("first", mockList.get(0));
+    verify(mockList, times(2)).add(anyString());
 }
 ```

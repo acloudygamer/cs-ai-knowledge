@@ -20,6 +20,8 @@ ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar /app/myapp.jar"]
 
 ### 多阶段构建
 
+多阶段构建使用一个阶段构建，另一个阶段运行，优化镜像大小。
+
 ```dockerfile
 # 阶段 1: 构建
 FROM maven:3.9-eclipse-temurin-25 AS builder
@@ -39,6 +41,8 @@ ENTRYPOINT ["java", "-jar", "/app/myapp.jar"]
 ```
 
 ### Maven 构建插件
+
+Jib 是 Google 提供的容器镜像构建插件，无需 Docker daemon。
 
 ```xml
 <plugin>
@@ -68,28 +72,6 @@ ENTRYPOINT ["java", "-jar", "/app/myapp.jar"]
 </plugin>
 ```
 
-### Gradle 构建插件
-
-```groovy
-plugins {
-    id 'com.google.cloud.tools.jib' version '3.3.2'
-}
-
-jib {
-    from {
-        image = 'eclipse-temurin:25-jre-alpine'
-    }
-    to {
-        image = 'docker.io/myuser/myapp'
-        tags = ['${project.version}', 'latest']
-    }
-    container {
-        jvmFlags = ['-Xmx512m']
-        ports = ['8080']
-    }
-}
-```
-
 ## Docker Compose
 
 ### 基本配置
@@ -110,8 +92,6 @@ services:
     depends_on:
       - db
       - redis
-    networks:
-      - mynet
 
   db:
     image: postgres:15-alpine
@@ -121,13 +101,9 @@ services:
       - POSTGRES_PASSWORD=password
     volumes:
       - postgres_data:/var/lib/postgresql/data
-    networks:
-      - mynet
 
   redis:
     image: redis:7-alpine
-    networks:
-      - mynet
 
 volumes:
   postgres_data:
@@ -137,58 +113,11 @@ networks:
     driver: bridge
 ```
 
-### 完整微服务配置
-
-```yaml
-version: '3.8'
-
-services:
-  gateway:
-    build: ./gateway
-    ports:
-      - "8080:8080"
-    depends_on:
-      - user-service
-      - order-service
-
-  user-service:
-    build: ./user-service
-    environment:
-      - SPRING_PROFILES_ACTIVE=prod
-      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/users
-    depends_on:
-      postgres:
-        condition: service_healthy
-
-  order-service:
-    build: ./order-service
-    environment:
-      - SPRING_PROFILES_ACTIVE=prod
-      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/orders
-      - SPRING_REDIS_HOST=redis
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_started
-
-  postgres:
-    image: postgres:15-alpine
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-
-  redis:
-    image: redis:7-alpine
-```
-
 ## Kubernetes
 
 ### Pod
+
+Pod 是 Kubernetes 的最小调度单元，包含一个或多个容器。
 
 ```yaml
 apiVersion: v1
@@ -231,6 +160,8 @@ spec:
 
 ### Deployment
 
+Deployment 管理 Pod 的副本数、滚动更新、回滚等。
+
 ```yaml
 apiVersion: apps/v1
 kind: Deployment
@@ -251,9 +182,6 @@ spec:
           image: myuser/myapp:1.0.0
           ports:
             - containerPort: 8080
-          env:
-            - name: SPRING_PROFILES_ACTIVE
-              value: "prod"
           resources:
             requests:
               memory: "256Mi"
@@ -261,21 +189,11 @@ spec:
             limits:
               memory: "512Mi"
               cpu: "500m"
-          livenessProbe:
-            httpGet:
-              path: /actuator/health/liveness
-              port: 8080
-            initialDelaySeconds: 60
-            periodSeconds: 10
-          readinessProbe:
-            httpGet:
-              path: /actuator/health/readiness
-              port: 8080
-            initialDelaySeconds: 30
-            periodSeconds: 5
 ```
 
 ### Service
+
+Service 为 Pod 提供稳定的访问入口。
 
 ```yaml
 apiVersion: v1
@@ -293,6 +211,8 @@ spec:
 ```
 
 ### Ingress
+
+Ingress 提供 HTTP/HTTPS 路由。
 
 ```yaml
 apiVersion: networking.k8s.io/v1
@@ -317,6 +237,8 @@ spec:
 
 ### ConfigMap
 
+ConfigMap 存储非敏感配置。
+
 ```yaml
 apiVersion: v1
 kind: ConfigMap
@@ -329,21 +251,11 @@ data:
         active: prod
     server:
       port: 8080
----
-# Pod 引用
-spec:
-  containers:
-    - name: myapp
-      volumeMounts:
-        - name: config
-          mountPath: /app/config
-  volumes:
-    - name: config
-      configMap:
-        name: myapp-config
 ```
 
 ### Secret
+
+Secret 存储敏感数据，如密码、密钥。
 
 ```yaml
 apiVersion: v1
@@ -352,17 +264,9 @@ metadata:
   name: myapp-secret
 type: Opaque
 data:
-  DB_PASSWORD: cGFzc3dvcmQ=  # base64 编码
+  DB_PASSWORD: cGFzc3dvcmQ=
 stringData:
   SPRING_DATASOURCE_USERNAME: admin
----
-# Pod 引用
-env:
-  - name: DB_PASSWORD
-    valueFrom:
-      secretKeyRef:
-        name: myapp-secret
-        key: DB_PASSWORD
 ```
 
 ## Spring Boot on K8s
@@ -383,25 +287,22 @@ management:
 
 ### Helm Chart
 
+Helm 是 Kubernetes 的包管理器。
+
 ```yaml
 # Chart.yaml
 apiVersion: v2
 name: myapp
 version: 1.0.0
-appVersion: "1.0.0"
 
 # values.yaml
 replicaCount: 3
-
 image:
   repository: myuser/myapp
   tag: "1.0.0"
-  pullPolicy: IfNotPresent
-
 service:
   type: ClusterIP
   port: 80
-
 resources:
   requests:
     memory: 256Mi
@@ -409,56 +310,13 @@ resources:
   limits:
     memory: 512Mi
     cpu: 500m
-
-autoscaling:
-  enabled: true
-  minReplicas: 2
-  maxReplicas: 10
-  targetCPUUtilizationPercentage: 70
-```
-
-### Kubernetes Java Client
-
-```xml
-<dependency>
-    <groupId>io.kubernetes</groupId>
-    <artifactId>client-java</artifactId>
-    <version>18.0.0</version>
-</dependency>
-```
-
-```java
-@Configuration
-public class KubernetesConfig {
-
-    @Bean
-    public CoreV1Api coreV1Api() throws IOException {
-        return new ClientBuilder().build()
-            .runtimeClient(CoreV1Api.class);
-    }
-}
-
-@Service
-public class PodService {
-
-    @Autowired
-    private CoreV1Api coreV1Api;
-
-    public String getCurrentNamespace() throws IOException {
-        String context = new DefaultKubernetesClient().getContext();
-        return context != null ? context : "default";
-    }
-
-    public List<Pod> listPods(String namespace) throws IOException {
-        return coreV1Api.listNamespacedPod(namespace)
-            .getItems();
-    }
-}
 ```
 
 ## 最佳实践
 
 ### 镜像优化
+
+使用轻量级基础镜像、最小化层数、非 root 用户运行。
 
 ```dockerfile
 # 使用轻量级基础镜像
@@ -479,37 +337,18 @@ HEALTHCHECK --interval=30s CMD wget -qO- http://localhost:8080/actuator/health |
 ```yaml
 resources:
   requests:
-    memory: "256Mi"    # 调度依据
+    memory: "256Mi"
     cpu: "250m"
   limits:
-    memory: "512Mi"    # 超过后 OOM
-    cpu: "500m"        # CPU 限制
-```
-
-### 健康检查
-
-```yaml
-livenessProbe:
-  httpGet:
-    path: /actuator/health/liveness
-    port: 8080
-  failureThreshold: 3
-  periodSeconds: 10
-
-readinessProbe:
-  httpGet:
-    path: /actuator/health/readiness
-    port: 8080
-  failureThreshold: 1
-  periodSeconds: 5
-  initialDelaySeconds: 30
+    memory: "512Mi"
+    cpu: "500m"
 ```
 
 ### 优雅关闭
 
 ```yaml
 spec:
-  terminationGracePeriodSeconds: 60  # 等待时间
+  terminationGracePeriodSeconds: 60
   containers:
     - name: myapp
       lifecycle:
@@ -518,9 +357,125 @@ spec:
             command: ["sh", "-c", "sleep 10"]
 ```
 
-### Pod 中断预算
+## 参考样例
+
+```dockerfile
+# 多阶段构建
+FROM maven:3.9-eclipse-temurin-25 AS builder
+WORKDIR /build
+COPY pom.xml .
+RUN mvn dependency:go-offline
+COPY src ./src
+RUN mvn package -DskipTests
+
+FROM eclipse-temurin:25-jre-alpine
+WORKDIR /app
+COPY --from=builder /build/target/myapp.jar /app/myapp.jar
+ENTRYPOINT ["java", "-jar", "/app/myapp.jar"]
+```
 
 ```yaml
+# Docker Compose 微服务
+services:
+  gateway:
+    build: ./gateway
+    ports:
+      - "8080:8080"
+  user-service:
+    build: ./user-service
+    depends_on:
+      postgres:
+        condition: service_healthy
+  postgres:
+    image: postgres:15-alpine
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+```
+
+```yaml
+# Kubernetes Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: myapp-deployment
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: myapp
+  template:
+    metadata:
+      labels:
+        app: myapp
+    spec:
+      containers:
+        - name: myapp
+          image: myuser/myapp:1.0.0
+          ports:
+            - containerPort: 8080
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "250m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+```
+
+```yaml
+# Kubernetes Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: myapp-service
+spec:
+  selector:
+    app: myapp
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 8080
+  type: ClusterIP
+```
+
+```yaml
+# Ingress
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: myapp-ingress
+spec:
+  rules:
+    - host: myapp.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: myapp-service
+                port:
+                  number: 80
+```
+
+```yaml
+# 探针配置
+management:
+  endpoint:
+    health:
+      probes: true
+  health:
+    livenessState:
+      enabled: true
+    readinessState:
+      enabled: true
+```
+
+```yaml
+# PodDisruptionBudget
 apiVersion: policy/v1
 kind: PodDisruptionBudget
 metadata:

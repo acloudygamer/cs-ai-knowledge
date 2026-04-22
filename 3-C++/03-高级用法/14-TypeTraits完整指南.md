@@ -1,10 +1,12 @@
 # Type Traits 完整指南
 
-Type traits 是 C++ 标准库提供的编译期类型查询和操作工具，它们在 `<type_traits>` 头文件中定义。本章全面讲解标准库 type traits 的使用方法，以及如何创建自定义 type traits。
+Type traits 是 C++ 标准库提供的编译期类型查询和操作工具，它们在 `<type_traits>` 头文件中定义。
 
 ## 类型类别（Type Categories）
 
 ### 基本类型类别
+
+### 参考样例
 
 ```cpp
 #include <type_traits>
@@ -32,6 +34,8 @@ int main() {
 ```
 
 ### 复合类型类别
+
+### 参考样例
 
 ```cpp
 #include <type_traits>
@@ -66,6 +70,8 @@ int main() {
 
 ### 成员指针类型
 
+### 参考样例
+
 ```cpp
 #include <type_traits>
 
@@ -86,6 +92,8 @@ int main() {
 ## 类型关系（Type Relationships）
 
 ### 类型同一性
+
+### 参考样例
 
 ```cpp
 #include <type_traits>
@@ -108,6 +116,8 @@ int main() {
 
 ### 类型继承关系
 
+### 参考样例
+
 ```cpp
 #include <type_traits>
 
@@ -128,12 +138,12 @@ int main() {
     struct A { int a; double b; };
     struct B { int a; double b; };
     static_assert(std::is_layout_compatible_v<A, B>);      // true
-
-    // is_pointer_interconvertible：指针可互转（C++20）
 }
 ```
 
 ### aggregate 关系
+
+### 参考样例
 
 ```cpp
 #include <type_traits>
@@ -152,6 +162,8 @@ int main() {
 ## 类型属性（Type Properties）
 
 ### const/volatile 属性
+
+### 参考样例
 
 ```cpp
 #include <type_traits>
@@ -176,6 +188,8 @@ int main() {
 
 ### 引用属性
 
+### 参考样例
+
 ```cpp
 #include <type_traits>
 
@@ -197,6 +211,8 @@ int main() {
 
 ### 指针属性
 
+### 参考样例
+
 ```cpp
 #include <type_traits>
 
@@ -213,6 +229,8 @@ int main() {
 ```
 
 ### 生命周期属性
+
+### 参考样例
 
 ```cpp
 #include <type_traits>
@@ -244,6 +262,8 @@ int main() {
 ```
 
 ### 可构造属性
+
+### 参考样例
 
 ```cpp
 #include <type_traits>
@@ -280,6 +300,8 @@ int main() {
 
 ### 可赋值属性
 
+### 参考样例
+
 ```cpp
 #include <type_traits>
 
@@ -306,6 +328,8 @@ int main() {
 
 ### 可销毁属性
 
+### 参考样例
+
 ```cpp
 #include <type_traits>
 
@@ -330,6 +354,8 @@ int main() {
 ## 类型修改（Type Transformations）
 
 ### const/volatile 修改
+
+### 参考样例
 
 ```cpp
 #include <type_traits>
@@ -356,6 +382,8 @@ int main() {
 
 ### 引用修改
 
+### 参考样例
+
 ```cpp
 #include <type_traits>
 
@@ -378,6 +406,8 @@ int main() {
 
 ### 指针修改
 
+### 参考样例
+
 ```cpp
 #include <type_traits>
 
@@ -393,6 +423,8 @@ int main() {
 ```
 
 ### 数组修改
+
+### 参考样例
 
 ```cpp
 #include <type_traits>
@@ -412,6 +444,8 @@ int main() {
 
 ### 符号修改
 
+### 参考样例
+
 ```cpp
 #include <type_traits>
 
@@ -429,6 +463,8 @@ int main() {
 ```
 
 ### 大小和对齐
+
+### 参考样例
 
 ```cpp
 #include <type_traits>
@@ -456,6 +492,8 @@ int main() {
 ## 类型查询（Type Queries）
 
 ### 类型特性和值
+
+### 参考样例
 
 ```cpp
 #include <type_traits>
@@ -485,6 +523,8 @@ int main() {
 
 ### conditional
 
+### 参考样例
+
 ```cpp
 #include <type_traits>
 
@@ -503,6 +543,8 @@ int main() {
 ```
 
 ### enable_if
+
+### 参考样例
 
 ```cpp
 #include <type_traits>
@@ -548,6 +590,8 @@ int main() {
 
 ### underlying_type
 
+### 参考样例
+
 ```cpp
 #include <type_traits>
 #include <iostream>
@@ -566,6 +610,8 @@ int main() {
 ```
 
 ### result_of / invoke_result
+
+### 参考样例
 
 ```cpp
 #include <type_traits>
@@ -597,6 +643,8 @@ int main() {
 ## 类型组合（Type Composition）
 
 ### conjunction / disjunction
+
+### 参考样例
 
 ```cpp
 #include <type_traits>
@@ -633,6 +681,8 @@ int main() {
 ```
 
 ### void_t（C++17）
+
+### 参考样例
 
 ```cpp
 #include <type_traits>
@@ -679,6 +729,8 @@ static_assert(!IsCallable<decltype(lambda), std::string>::value);  // false
 
 ### 类型选择器
 
+### 参考样例
+
 ```cpp
 #include <type_traits>
 
@@ -700,6 +752,8 @@ using IntOrT = std::conditional_t<std::is_same_v<T, char>, int, T>;
 ```
 
 ### 类型验证
+
+### 参考样例
 
 ```cpp
 #include <type_traits>
@@ -730,6 +784,8 @@ struct TrivialContainer {
 
 ### 函数重载选择
 
+### 参考样例
+
 ```cpp
 #include <type_traits>
 #include <iostream>
@@ -758,6 +814,8 @@ int main() {
 
 ### 委托构造函数
 
+### 参考样例
+
 ```cpp
 #include <type_traits>
 
@@ -776,6 +834,8 @@ public:
 ```
 
 ### 返回类型推导
+
+### 参考样例
 
 ```cpp
 #include <type_traits>
@@ -804,6 +864,8 @@ int main() {
 ```
 
 ### POD 类型检测
+
+### 参考样例
 
 ```cpp
 #include <type_traits>
@@ -835,6 +897,8 @@ static_assert(!is_pod_v<NonTrivial>);        // true
 
 ### 简单 Type Traits
 
+### 参考样例
+
 ```cpp
 #include <type_traits>
 
@@ -860,6 +924,8 @@ static_assert(!is_smart_pointer_v<int*>);                  // false
 ```
 
 ### 复合 Type Traits
+
+### 参考样例
 
 ```cpp
 #include <type_traits>
@@ -895,6 +961,8 @@ struct has_clear_method<T,
 
 ### Type Traits 类模板
 
+### 参考样例
+
 ```cpp
 #include <type_traits>
 
@@ -921,6 +989,8 @@ T add(T a, T b) {
 ```
 
 ### Type Traits 与 SFINAE
+
+### 参考样例
 
 ```cpp
 #include <type_traits>
@@ -959,6 +1029,8 @@ int main() {
 
 ### C++20 概念（Concepts）
 
+### 参考样例
+
 ```cpp
 #include <type_traits>
 #include <concepts>
@@ -989,6 +1061,8 @@ T add(T a, T b) {
 
 ### 序列化框架
 
+### 参考样例
+
 ```cpp
 #include <type_traits>
 
@@ -1009,6 +1083,8 @@ public:
 ```
 
 ### 类型安全的消息分发
+
+### 参考样例
 
 ```cpp
 #include <type_traits>
@@ -1039,6 +1115,8 @@ public:
 ```
 
 ### 类型桥接
+
+### 参考样例
 
 ```cpp
 #include <type_traits>
