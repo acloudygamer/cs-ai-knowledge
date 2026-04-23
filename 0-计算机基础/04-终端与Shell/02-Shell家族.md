@@ -34,7 +34,7 @@ Shell通过Fork+Exec创建子进程执行命令：
 | bash | 5.2.x (GNU) | Linux默认，兼容sh | Linux |
 | zsh | 5.9+ (Linux) / 5.7.2 (macOS) | 兼容bash，插件丰富 | macOS (Catalina+, zsh 5.7.2) |
 | fish | 3.6+ | 开箱即用，语法高亮 | - |
-| PowerShell | 7.6.0 | 对象管道，跨平台 | Windows |
+| PowerShell | 7.6.0 | 对象管道，跨平台 | Windows/Mac/Linux |
 
 ### bash
 
