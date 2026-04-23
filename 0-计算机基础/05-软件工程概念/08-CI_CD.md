@@ -127,7 +127,7 @@ jobs:
           COVERAGE: true
 
       - name: Upload coverage
-        uses: codecov/codecov-action@v3
+        uses: codecov/codecov-action@v4
 
   build:
     needs: test

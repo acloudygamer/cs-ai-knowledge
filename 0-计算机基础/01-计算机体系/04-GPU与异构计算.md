@@ -41,12 +41,12 @@ GPU
 |------|------|------|
 | Fermi | GF100 | 首个完整 CUDA 架构 |
 | Kepler | GK110 | 动态并行，GPU 直接启动 kernel |
-| Maxwell | GM204 | 效率优化，指令级并行 |
+| Maxwell | GM204 | 效率优化，SM设计改进，每SM性能提升 |
 | Pascal | GP100 | NVLink，HBM2 内存 |
 | Volta | GV100 | Tensor Core，混合精度 |
 | Turing | TU102 | RT Core，光线追踪 |
 | Ampere | GA100 | 第三代 Tensor Core，结构化稀疏 |
-| Ada | AD102 | 第四代 Tensor Core，DLSS 3 |
+| Ada | AD102 | 第四代 Tensor Core，DLSS 3超分辨率技术 |
 | Hopper | GH100 | Transformer 引擎，更大共享内存 |
 | Blackwell | GB100 | 第五代 Tensor Core，FP8 支持，神经网络架构 |
 
@@ -239,7 +239,7 @@ CPU (主机)                    GPU (设备)
 串行任务                     并行任务
 ────                        ─────
 内存: DDR5/DDR6              内存: GDDR6X/HBM2e
-带宽: 50-100 GB/s (双通道)    带宽: 500-2500 GB/s
+带宽: 38.4-100+ GB/s (双通道，典型值)    带宽: 500-2500 GB/s (典型值)
 延迟: 低                     延迟: 高
 ```
 

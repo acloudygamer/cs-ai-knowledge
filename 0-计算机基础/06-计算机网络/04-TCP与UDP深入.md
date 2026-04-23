@@ -266,9 +266,9 @@ cwnd
 
 | 算法 | 特点 | 使用场景 |
 |------|------|----------|
-| Reno | 标准快速恢复 | 较新Linux默认 |
+| Reno | 标准快速恢复 | 早期Linux版本 |
 | NewReno | 改进快速恢复 | 多个丢包场景 |
-| CUBIC | 高BDP网络 | Linux默认 |
+| CUBIC | 高BDP网络 | Linux 2.6+默认 |
 | BBR | 基于模型 | 高延迟高丢包 |
 | Westwood | 改进慢启动 | 无线网络 |
 

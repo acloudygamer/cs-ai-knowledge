@@ -32,7 +32,7 @@ Shell通过Fork+Exec创建子进程执行命令：
 |-------|------|------|----------|
 | sh (Bourne) | POSIX标准 | 最早标准，语法基础 | Solaris |
 | bash | 5.2 (GNU) | Linux默认，兼容sh | Linux |
-| zsh | 5.9+ | 兼容bash，插件丰富 | macOS (Catalina+) |
+| zsh | 5.8 (macOS内置) / 5.9+ | 兼容bash，插件丰富 | macOS (Catalina+) |
 | fish | 3.6+ | 开箱即用，语法高亮 | - |
 | PowerShell | 7.4.x | 对象管道，跨平台 | Windows |
 
@@ -55,7 +55,7 @@ GNU Bash 5.2.x。 (<latest> Ubuntu 24.04 默认 5.2.21; WSL/MSYS2 环境可达 5
 
 ### PowerShell
 
-PowerShell 7+。 (<latest> 7.6.0 为 Ubuntu 24.04 默认版本，跨平台支持 Windows/Mac/Linux)
+PowerShell 7.4.x (最新稳定版)。跨平台支持 Windows/Mac/Linux (<latest> 7.6.0 为最新特性版本)
 
 ```powershell
 # 变量（$开头）

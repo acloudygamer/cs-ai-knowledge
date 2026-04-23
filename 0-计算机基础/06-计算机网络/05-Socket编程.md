@@ -854,14 +854,19 @@ while true; do echo -e "HTTP/1.1 200 OK\r\n\r\n$(date)"; done | nc -l -p 8080
 
 ## 常见Socket错误
 
-| 错误码 | 常量 | 说明 |
-|--------|------|------|
-| 10048 | WSAEADDRINUSE | 地址已被占用 |
-| 10049 | WSAEADDRNOTAVAIL | 地址不可用 |
-| 10053 | WSAECONNABORTED | 连接被中止 |
-| 10054 | WSAECONNRESET | 连接被重置 |
-| 10060 | WSAETIMEDOUT | 连接超时 |
-| 111 | ECONNREFUSED | 连接被拒绝 |
+> **Windows (WSAE\*)** / **Unix (ECONNREFUSED)**
+>
+> 注意：Unix系统的ECONNREFUSED对应Windows的WSAECONNREFUSED=10061，而非111。
+
+| 错误码 | 平台 | 常量 | 说明 |
+|--------|------|------|------|
+| 10048 | Windows | WSAEADDRINUSE | 地址已被占用 |
+| 10049 | Windows | WSAEADDRNOTAVAIL | 地址不可用 |
+| 10053 | Windows | WSAECONNABORTED | 连接被中止 |
+| 10054 | Windows | WSAECONNRESET | 连接被重置 |
+| 10060 | Windows | WSAETIMEDOUT | 连接超时 |
+| 10061 | Windows | WSAECONNREFUSED | 连接被拒绝（Unix的ECONNREFUSED对应此码） |
+| 111 | Unix | ECONNREFUSED | 连接被拒绝 |
 
 ```python
 import errno

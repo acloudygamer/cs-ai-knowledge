@@ -589,6 +589,21 @@ Sec-WebSocket-Accept: s3pPLMBiTxaQ9kYGzzhZRbK+xOo=
 
 ## HTTP安全头
 
+```bash
+# 使用curl检查响应头
+curl -I https://example.com
+```
+
+```powershell
+# PowerShell: 发送请求并查看响应头
+Invoke-WebRequest -Uri https://example.com -Method Head | Select-Object -Property Headers
+
+# PowerShell: 查看完整响应头
+$response = Invoke-WebRequest -Uri https://example.com
+$response.Headers
+```
+
+常用安全响应头：
 ```
 X-Content-Type-Options: nosniff       # 禁止MIME sniffing
 X-Frame-Options: DENY                # 禁止iframe嵌入
