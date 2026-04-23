@@ -126,7 +126,7 @@ chrome://net-internals/#dns
 # macOS: sudo killall -HUP mDNSResponder
 
 # 查看TTL (Linux)
-dig +ttlid example.com
+dig +nottlid example.com
 ```
 
 ## DNS安全问题

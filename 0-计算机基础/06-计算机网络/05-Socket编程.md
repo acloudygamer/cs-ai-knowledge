@@ -761,17 +761,34 @@ while inputs:
                 print(f"Received: {data}")
                 outputs.append(s)
             else:
-                inputs.remove(s)
+                inputs_to_remove.append(s)
+                outputs_to_remove.append(s)
                 s.close()
-                outputs.remove(s) if s in outputs else None
+
+    for s in inputs_to_remove:
+        inputs.remove(s)
+    for s in outputs_to_remove:
+        if s in outputs:
+            outputs.remove(s)
 
     for s in writable:
         s.sendall(b"ACK")
-        outputs.remove(s)
+        outputs_to_remove.append(s)
+
+    for s in outputs_to_remove:
+        if s in outputs:
+            outputs.remove(s)
 
     for s in exceptional:
-        inputs.remove(s)
-        outputs.remove(s) if s in outputs else None
+        inputs_to_remove.append(s)
+        outputs_to_remove.append(s)
+
+    for s in inputs_to_remove:
+        if s in inputs:
+            inputs.remove(s)
+    for s in outputs_to_remove:
+        if s in outputs:
+            outputs.remove(s)
         s.close()
 ```
 
@@ -837,7 +854,7 @@ nc localhost 8080
 
 # UDP测试
 nc -u -l 8080                  # 监听UDP端口 (Linux/Mac)
-# Windows nc不支持UDP监听，使用其他工具如ncat
+# Windows nc不支持UDP监听，请使用 ncat 或 PowerShell
 
 # 端口扫描
 nc -zv localhost 8000-9000     # 扫描端口范围

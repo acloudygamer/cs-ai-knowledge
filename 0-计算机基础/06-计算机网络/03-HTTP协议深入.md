@@ -607,7 +607,7 @@ $response.Headers
 ```
 X-Content-Type-Options: nosniff       # 禁止MIME sniffing
 X-Frame-Options: DENY                # 禁止iframe嵌入
-X-XSS-Protection: 1; mode=block     # XSS过滤器（已废弃，Chrome 78+已移除）
+X-XSS-Protection: 1; mode=block     # XSS过滤器（已废弃）
 Strict-Transport-Security: max-age=31536000  # 强制HTTPS
 Content-Security-Policy: default-src 'self'  # CSP策略
 ```
