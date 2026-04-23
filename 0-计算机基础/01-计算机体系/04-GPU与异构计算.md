@@ -238,8 +238,8 @@ CPU (主机)                    GPU (设备)
 复杂分支判断                 规则数据操作
 串行任务                     并行任务
 ────                        ─────
-内存: DDR5/DDR6              内存: GDDR6X/HBM2e
-带宽: 38.4-100+ GB/s (双通道，典型值)    带宽: 500-2500 GB/s (典型值)
+内存: DDR5/DDR6 (Windows 11 / Ubuntu 24.04 典型)  内存: GDDR6X/HBM3
+带宽: 38.4-100+ GB/s (双通道 DDR5，典型值)    带宽: 500-2500 GB/s (典型值)
 延迟: 低                     延迟: 高
 ```
 
@@ -320,8 +320,8 @@ FPGA (现场可编程门阵列) 用于特定场景，通过OpenCL或RTL设计实
 | 互联技术 | 带宽 | 说明 |
 |----------|------|------|
 | PCIe 4.0 x16 | 32 GB/s | 标准 CPU-GPU 互联 |
-| NVLink | 300-900 GB/s | 多 GPU 或 CPU-GPU 直连 |
-| NVLink C2C | 900 GB/s | 芯片间互联 |
+| NVLink | 300-900 GB/s | 多 GPU 或 CPU-GPU 直连（因架构代际不同） |
+| NVLink C2C | 900 GB/s | 芯片间互联（CPU-GPU 直连，Grace Hopper 超级芯片采用） |
 
 ### 统一内存
 
