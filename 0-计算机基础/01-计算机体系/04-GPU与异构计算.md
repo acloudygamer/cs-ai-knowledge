@@ -239,7 +239,7 @@ CPU (主机)                    GPU (设备)
 串行任务                     并行任务
 ────                        ─────
 内存: DDR5 (Windows 11 / Ubuntu 24.04 典型)  内存: GDDR6X / HBM3 / HBM3e
-带宽: 76.8-128 GB/s (DDR5-4800 至 DDR5-8000，双通道）  带宽: GDDR6X: ~1000 GB/s；HBM3: ~1024 GB/s；HBM3e: 2048-2560 GB/s
+带宽: 76.8-102.4 GB/s (DDR5-4800 双通道约 76.8 GB/s，DDR5-6400 双通道约 102.4 GB/s）  带宽: GDDR6X: ~1000 GB/s；HBM3: ~1024 GB/s；HBM3e: 2048-2560 GB/s
 延迟: 低                     延迟: 高
 ```
 
@@ -317,12 +317,12 @@ FPGA (现场可编程门阵列) 用于特定场景，通过OpenCL或RTL设计实
 
 ### NVLink 与 C2C
 
-| 互联技术 | 带宽 | 说明 |
-|----------|------|------|
+| 互联技术 | 带宽（单向） | 说明 |
+|----------|-------------|------|
 | PCIe 4.0 x16 | 32 GB/s | 标准 CPU-GPU 互联 |
 | PCIe 5.0 x16 | 128 GB/s | 标准 CPU-GPU 互联 |
-| NVLink (Volta/Ampere) | 300-600 GB/s | 多 GPU 互联 |
-| NVLink (Ada/Hopper) | 450-900 GB/s | 多 GPU 或 CPU-GPU 直连 |
+| NVLink (Volta/Ampere) | 300-600 GB/s | 多 GPU 互联（Ada 达 600 GB/s） |
+| NVLink (Ada/Hopper) | 450-900 GB/s | 多 GPU 或 CPU-GPU 直连（Hopper 达 900 GB/s） |
 | NVLink C2C | 900 GB/s | 芯片间互联（Grace Hopper 超级芯片采用） |
 
 ### 统一内存
