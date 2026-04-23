@@ -48,7 +48,7 @@ Shell通过Fork+Exec创建子进程执行命令：
 
 ### bash
 
-GNU Bash 5.2.x。 (Ubuntu 24.04 默认 5.2.21; WSL/MSYS2 环境 5.2.x; Windows 11 Git Bash 5.2.x)
+GNU Bash 5.2.x (GNU Bash 5.2 系列)
 
 ```bash
 # bash配置
@@ -67,7 +67,8 @@ GNU Bash 5.2.x。 (Ubuntu 24.04 默认 5.2.21; WSL/MSYS2 环境 5.2.x; Windows 1
 
 PowerShell 7.6.0 (最新稳定版)。跨平台支持 Windows/Mac/Linux
 
-```powershell  # PowerShell 7.6.0
+```powershell
+# PowerShell 7.6.0
 # 变量（$开头）
 $name = "Alice"
 
