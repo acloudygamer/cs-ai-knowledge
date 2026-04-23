@@ -837,8 +837,7 @@ nc localhost 8080
 
 # UDP测试
 nc -u -l 8080                  # 监听UDP端口 (Linux/Mac)
-# Windows: nc -u -L 8080
-nc -u localhost 8080            # 连接UDP端口
+# Windows nc不支持UDP监听，使用其他工具如ncat
 
 # 端口扫描
 nc -zv localhost 8000-9000     # 扫描端口范围
