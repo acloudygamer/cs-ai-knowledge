@@ -163,7 +163,7 @@ crypto.pbkdf2('password', 'salt', 100000, 64, 'sha512', (err, key) => {});
 zlib.deflate('data', (err, buffer) => {});
 ```
 
-**线程池默认大小**：4（可通过`UV_THREADPOOL_SIZE`环境变量调整，最大256）
+**线程池默认大小**：4（可通过`UV_THREADPOOL_SIZE`环境变量调整，Node.js 18+最大可配置到1024）
 
 ```bash
 # 调整线程池大小（需在启动前设置）
