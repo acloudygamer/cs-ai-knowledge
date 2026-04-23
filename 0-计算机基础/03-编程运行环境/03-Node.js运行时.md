@@ -23,22 +23,22 @@ JavaScript代码 → V8引擎(解析/编译) → Node.js API(libuv) → 操作�
 ┌─────────────────────────────────────┐
 │           JavaScript Code           │
 ├─────────────────────────────────────┤
-│              V8 Engine              │
-│   ├─ Parser (解析)                   │
-│   ├─ Ignition (解释器/字节码)       │
+│              V8 Engine             │
+│   ├─ Parser (解析)                  │
+│   ├─ Ignition (解释器/字节码)        │
 │   └─ Turbofan (优化编译器)          │
 ├─────────────────────────────────────┤
 │           Node.js Core API          │
 │   ├─ Buffer, Events, Stream         │
 │   └─ fs, net, http, crypto, path   │
 ├─────────────────────────────────────┤
-│              libuv                   │
+│              libuv                  │
 │   ├─ 事件循环 (Event Loop)          │
 │   ├─ 线程池 (Thread Pool)          │
 │   └─ 跨平台I/O抽象 (epoll/kqueue)   │
 ├─────────────────────────────────────┤
 │         Operating System            │
-│   (epoll/kqueue/IOCP, syscalls)    │
+│   (epoll/kqueue/IOCP, syscalls)   │
 └─────────────────────────────────────┘
 ```
 
@@ -108,7 +108,7 @@ setImmediate(() => console.log('setImmediate'));
 
 ```
    ┌───────────────────────────┐
-   │         启动              │
+   │         启动               │
    └─────────────┬─────────────┘
                  ▼
    ┌───────────────────────────┐
@@ -120,7 +120,7 @@ setImmediate(() => console.log('setImmediate'));
    └─────────────┬─────────────┘
                  ▼
    ┌───────────────────────────┐
-   │  idle, prepare           │  ← 内部使用
+   │  idle, prepare            │  ← 内部使用
    └─────────────┬─────────────┘
                  ▼
    ┌───────────────────────────┐
@@ -129,7 +129,7 @@ setImmediate(() => console.log('setImmediate'));
    └─────────────┬─────────────┘
                  ▼
    ┌───────────────────────────┐
-   │         check             │  ← 执行 setImmediate 回调
+   │         check              │  ← 执行 setImmediate 回调
    └─────────────┬─────────────┘
                  ▼
    ┌───────────────────────────┐
@@ -261,4 +261,3 @@ readStream.on('data', (chunk) => { console.log('Received', chunk.length, 'bytes'
 | 网络 | net, http, dns | Fetch, WebSocket |
 | 调试 | --inspect, DevTools | DevTools |
 | 运行环境 | 服务器端 | 浏览器端 |
-
