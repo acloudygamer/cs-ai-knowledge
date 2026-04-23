@@ -12,6 +12,6 @@ Java 企业级开发核心技术栈，涵盖 Spring 全家桶、持久化、消�
 - [06-Docker与K8s](./06-Docker与K8s.md) - Docker 容器化与 Kubernetes 编排
 - [07-MyBatis](./07-MyBatis.md) - MyBatis 持久层框架、SQL-Mapping 理念
 - [08-SpringCloud微服务](./08-SpringCloud微服务.md) - Spring Cloud 微服务架构
-- [09-Spring Security](./09-Spring%20Security.md) - Spring Security 认证与授权
+- [09-SpringSecurity](./09-SpringSecurity.md) - Spring Security 认证与授权
 - [10-Elasticsearch与MongoDB](./10-Elasticsearch与MongoDB.md) - 全文检索与 NoSQL 数据库
 - [11-监控与链路追踪](./11-监控与链路追踪.md) - Spring Boot Actuator、Prometheus、Grafana、分布式链路追踪
