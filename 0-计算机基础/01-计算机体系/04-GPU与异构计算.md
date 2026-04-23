@@ -283,7 +283,7 @@ void vector_add(queue &q, const std::vector<float> &a,
 
 ```python
 # 确保内存对齐到 256 字节
-d_data = cuda.aligned_array(1024, dtype=np.float32)  # 256 字节对齐
+d_data = cuda.device_array(1024, dtype=np.float32)  # Numba 自动保证基本对齐
 ```
 
 ### 共享内存银行冲突
@@ -335,8 +335,7 @@ import numpy as np
 # 分配统一内存 - CPU/GPU 都可以访问
 data = cuda.device_array(shape, dtype=np.float32)  # 自动在 CPU/GPU 间迁移
 
-# 或使用 cuda.pinned_array for page-locked内存
-# OS 和驱动自动在 CPU/GPU 之间迁移数据
+# 或使用 cuda.pinned_host_alloc for page-locked内存
 ```
 
 ### 多实例 GPU (MIG)
