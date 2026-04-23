@@ -268,8 +268,8 @@ spec:
 kubectl rollout status deployment/myapp
 kubectl rollout undo deployment/myapp  # 回滚
 
-# Docker Compose 滚动更新
-docker-compose up -d --scale myapp=3 --interval 10s
+# Docker Compose 缩放服务
+docker-compose up -d --scale myapp=3
 ```
 
 ## 自动化测试
