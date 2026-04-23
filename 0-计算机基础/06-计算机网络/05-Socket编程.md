@@ -471,7 +471,7 @@ import (
 )
 
 func main() {
-    // 连接服务器（UDP不需要真正的connect，这里解析地址）
+    // 连接服务器（UDP无需握手，但net.DialUDP会建立UDP连接）
     addr, err := net.ResolveUDPAddr("udp", "localhost:8080")
     if err != nil {
         fmt.Printf("地址解析失败: %v\n", err)

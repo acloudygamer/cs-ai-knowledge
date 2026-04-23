@@ -123,8 +123,8 @@ jobs:
 
       - name: Run tests
         run: npm test
-        with:
-          coverage: true
+        env:
+          COVERAGE: true
 
       - name: Upload coverage
         uses: codecov/codecov-action@v3

@@ -16,7 +16,7 @@ CPU适合灵活的单线程控制，GPU适合高吞吐量数据并行计算。�
 
 | 特性 | CPU | GPU |
 |------|-----|-----|
-| 核心数 | 4-64 (少) | 数千 (多) |
+| 核心数 | 4-128+ (少)，取决于定位 | 数千 (多) |
 | 设计目标 | 低延迟，单线程性能 | 高吞吐，数据并行 |
 | 缓存 | 大型分层缓存 | 较小，高带宽 |
 | 控制逻辑 | 复杂，分支预测 | 简单，线程束(Warp) |
@@ -238,7 +238,7 @@ CPU (主机)                    GPU (设备)
 复杂分支判断                 规则数据操作
 串行任务                     并行任务
 ────                        ─────
-内存: DDR4/DDR5              内存: GDDR6X/HBM2e
+内存: DDR5/DDR6              内存: GDDR6X/HBM2e
 带宽: 50-100 GB/s (双通道)    带宽: 500-2500 GB/s
 延迟: 低                     延迟: 高
 ```
@@ -251,7 +251,7 @@ CPU (主机)                    GPU (设备)
 | OpenCL | 跨平台开放标准 | 多厂商 GPU/FPGA |
 | ROCm | AMD GPU 计算 | AMD GPU |
 | oneAPI | Intel 统一编程 | CPU/GPU/FPGA |
-| OpenMP | 编译器指令 | CPU+GPU |
+| OpenMP | 编译器指令 | CPU多线程（GPU支持需扩展） |
 
 ### oneAPI Data Parallel C++
 
@@ -311,46 +311,7 @@ def fast_math_kernel(a, b, c):
 
 ## FPGA 异构计算
 
-FPGA (现场可编程门阵列) 用于特定场景：
-
-```c
-// Intel FPGA OpenCL
-#include <CL/cl.h>
-
-// kernel 定义 (在 .cl 文件中)
-__kernel
-void vector_add(__global const float* a,
-                 __global const float* b,
-                 __global float* c,
-                 int n) {
-    int id = get_global_id(0);
-    if (id < n) {
-        c[id] = a[id] + b[id];
-    }
-}
-
-// host code
-cl_context context = clCreateContextFromType(NULL, CL_DEVICE_TYPE_ACCELERATOR, NULL, NULL, NULL);
-cl_device_id* devices = get_fpga_devices(context);
-cl_program program = create_program_from_binary(context, devices, "kernel.aocx");
-cl_kernel kernel = clCreateKernel(program, "vector_add", NULL);
-
-// 设置 kernel 参数
-clSetKernelArg(kernel, 0, sizeof(cl_mem), &buf_a);
-clSetKernelArg(kernel, 1, sizeof(cl_mem), &buf_b);
-clSetKernelArg(kernel, 2, sizeof(cl_mem), &buf_c);
-
-// 执行
-size_t global = N;
-clEnqueueNDRangeKernel(queue, kernel, 1, NULL, &global, NULL, 0, NULL, NULL);
-```
-
-| 处理器 | 特点 | 适用场景 |
-|--------|------|----------|
-| CPU | 通用灵活 | 控制流，串行任务 |
-| GPU | 高并行 | 深度学习，图形 |
-| FPGA | 低延迟，可定制 | 网络处理，实时 |
-| ASIC | 最高效率 | 比特币挖矿，AI 推理 |
+FPGA (现场可编程门阵列) 用于特定场景，通过OpenCL或RTL设计实现定制化计算。
 
 ## GPU 技术趋势
 

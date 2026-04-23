@@ -2,7 +2,7 @@
 
 ## 概念
 
-HTTP（超文本传输协议）是Web的核心协议，基于请求-响应模型，无状态，面向连接。
+HTTP（超文本传输协议）是Web的核心协议，基于请求-响应模型，无状态，HTTP/1.1默认使用持久连接。
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -172,7 +172,7 @@ status_5xx = {
 ```http
 Cache-Control: max-age=3600, must-revalidate
 Connection: keep-alive
-Date: Wed, 21 Oct 2025 07:28:00 GMT
+Date: Wed, 21 Oct 2020 07:28:00 GMT
 Transfer-Encoding: chunked
 Upgrade: h2c
 ```
@@ -189,7 +189,7 @@ Authorization: Bearer <token>            # 认证凭证
 Cookie: session_id=abc123; theme=dark     # Cookie数据
 Referer: https://www.example.com/page     # 来源页面
 Origin: https://www.example.com           # 请求来源（CORS）
-If-Modified-Since: Wed, 21 Oct 2025 07:00:00 GMT  # 协商缓存
+If-Modified-Since: Wed, 21 Oct 2020 07:00:00 GMT  # 协商缓存
 If-None-Match: "33a64df551425fcc55e4d42a148795"     # 实体标签
 Range: bytes=0-999                                      # 范围请求
 ```
@@ -202,7 +202,7 @@ Content-Length: 12345                       # 内容长度
 Content-Encoding: gzip                      # 编码方式
 Content-Language: zh-CN                      # 内容语言
 Content-Disposition: attachment; filename="report.pdf"  # 下载文件名
-Last-Modified: Wed, 21 Oct 2025 07:00:00 GMT
+Last-Modified: Wed, 21 Oct 2020 07:00:00 GMT
 ETag: "33a64df551425fcc55e4d42a148795"
 Location: https://www.example.com/new       # 重定向目标
 Server: nginx/1.21.0                        # 服务器信息
@@ -436,7 +436,7 @@ Server Push:
 
 ### QUIC协议
 
-HTTP/3基于QUIC（Quick UDP Internet Connections），运行在UDP之上：
+HTTP/3基于QUIC协议，运行在UDP之上：
 
 ```
 ┌─────────────────────────────────────────────────────────────┐

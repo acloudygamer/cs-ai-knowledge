@@ -169,7 +169,7 @@ Certificate:
 |------|------|------|
 | DV (Domain Validation) | 仅验证域名控制权 | 个人站点 |
 | OV (Organization Validation) | 验证组织信息 | 企业 |
-| EV (Extended Validation) | 严格验证，显示绿色地址栏 | 银行、电商 |
+| EV (Extended Validation) | 严格验证，高安全性 | 银行、电商 |
 
 ### 证书链
 
@@ -359,7 +359,7 @@ security_headers = {
         "值": "DENY 或 SAMEORIGIN"
     },
     "X-XSS-Protection": {
-        "作用": "XSS过滤器（现代浏览器已内置）",
+        "作用": "XSS过滤器（已废弃，现代浏览器内置防护）",
         "值": "1; mode=block"
     },
     "Referrer-Policy": {

@@ -5,7 +5,7 @@
 > **机制演进说明**
 > - **tty/pts 机制**：Unix/Linux 的终端抽象，通过字符设备实现
 > - **Windows Terminal 变革**：Windows 11 提供现代终端体验，使用不同底层机制
-> - **Ubuntu 24.04 Wayland**：pts 设备仍通过 DRM/KMS 交互
+> - **pts与DRM/KMS关系**：pts设备仍属于Linux tty子系统，Wayland主要影响图形显示层（DRM/KMS），但终端会话仍通过传统tty/pts机制工作
 
 ## 核心概念
 
@@ -39,9 +39,9 @@ tty
 
 # 查看所有tty设备
 ls -l /dev/tty*
-# ttyS0, ttyS1...  串口终端
-# tty1-tty6        虚拟终端 (Ctrl+Alt+F1-F6切换)
-# pts/0, pts/1...  伪终端
+# 输出: ttyS0, ttyS1...  串口终端
+#       tty1-tty6        虚拟终端 (Ctrl+Alt+F1-F6切换)
+#       pts/0, pts/1...  伪终端
 
 # 切换虚拟终端
 Ctrl + Alt + F1   # 切换到tty1
