@@ -121,7 +121,7 @@ DNS缓存存在于多个层级：
 chrome://net-internals/#dns
 
 # 清除系统DNS缓存
-# Linux: systemd-resolve --flush-caches
+# Linux: resolvectl flush-caches  # Ubuntu 24.04
 # Windows: ipconfig /flushdns
 # macOS: sudo killall -HUP mDNSResponder
 
