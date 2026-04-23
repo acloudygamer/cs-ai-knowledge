@@ -320,7 +320,7 @@ FPGA (现场可编程门阵列) 用于特定场景，通过OpenCL或RTL设计实
 | 互联技术 | 带宽 | 说明 |
 |----------|------|------|
 | PCIe 4.0 x16 | 32 GB/s | 标准 CPU-GPU 互联 |
-| PCIe 5.0 x16 | 64 GB/s | 标准 CPU-GPU 互联 |
+| PCIe 5.0 x16 | 128 GB/s | 标准 CPU-GPU 互联 |
 | NVLink (Volta/Ampere) | 300-600 GB/s | 多 GPU 互联 |
 | NVLink (Ada/Hopper) | 450-900 GB/s | 多 GPU 或 CPU-GPU 直连 |
 | NVLink C2C | 900 GB/s | 芯片间互联（Grace Hopper 超级芯片采用） |
