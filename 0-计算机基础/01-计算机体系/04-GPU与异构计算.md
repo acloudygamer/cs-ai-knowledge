@@ -320,7 +320,7 @@ FPGA (现场可编程门阵列) 用于特定场景，通过OpenCL或RTL设计实
 | 互联技术 | 带宽 | 说明 |
 |----------|------|------|
 | PCIe 4.0 x16 | 32 GB/s | 标准 CPU-GPU 互联 |
-| NVLink | 300-900 GB/s (1-3代) / ~1.8 TB/s (Blackwell 4代) | 多 GPU 或 CPU-GPU 直连（因架构代际不同） |
+| NVLink | 300-900 GB/s (1-3代) / 900 GB/s (Blackwell 4代芯片间) | 多 GPU 或 CPU-GPU 直连（因架构代际不同） |
 | NVLink C2C | 900 GB/s | 芯片间互联（CPU-GPU 直连，Grace Hopper 超级芯片采用） |
 
 ### 统一内存

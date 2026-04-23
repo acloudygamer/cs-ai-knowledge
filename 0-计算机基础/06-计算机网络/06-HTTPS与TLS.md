@@ -115,7 +115,7 @@ tls_history = {
 ### 密钥导出
 
 ```
-主密钥 (Master Secret) 派生:
+主密钥 (Master Secret) 派生 (TLS 1.2):
 master_secret = PRF(pre_master_secret, "master secret", ClientRandom + ServerRandom)
 
 会话密钥:
@@ -537,7 +537,7 @@ recommended_config = {
     "TLS版本": "TLS 1.2 + TLS 1.3",
     "密钥交换": "ECDHE (P-256或X25519)",
     "加密算法": "AES-128-GCM或ChaCha20",
-    "签名算法": "SHA-256以上",
+    "签名算法": "SHA-256或SHA-384（TLS 1.3禁用SHA-1）",
     "证书类型": "RSA 2048+或ECDSA P-256+"
 }
 ```
