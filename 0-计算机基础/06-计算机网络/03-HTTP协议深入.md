@@ -188,7 +188,7 @@ Accept-Language: zh-CN,zh;q=0.9,en;q=0.8  # 可接受的语言
 Authorization: Bearer <token>            # 认证凭证
 Cookie: session_id=abc123; theme=dark     # Cookie数据
 Referer: https://www.example.com/page     # 来源页面
-Origin: https://www.example.com           # 请求来源（ CORS）
+Origin: https://www.example.com           # 请求来源（CORS）
 If-Modified-Since: Wed, 21 Oct 2025 07:00:00 GMT  # 协商缓存
 If-None-Match: "33a64df551425fcc55e4d42a148795"     # 实体标签
 Range: bytes=0-999                                      # 范围请求

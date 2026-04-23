@@ -38,7 +38,7 @@ Shell通过Fork+Exec创建子进程执行命令：
 
 ### bash
 
-GNU Bash 5.2。 (<latest> Ubuntu 24.04 默认 5.2.21; WSL/MSYS2 环境可达 5.2.37; Windows 11 的 Git Bash 5.2.37)
+GNU Bash 5.2.x。 (<latest> Ubuntu 24.04 默认 5.2.21; WSL/MSYS2 环境可达 5.2.x; Windows 11 的 Git Bash 5.2.x)
 
 ```bash
 # bash配置
@@ -72,9 +72,12 @@ $PSVersionTable.PSVersion
 
 ```bash
 # bash 配置
-~/.bashrc        # 每次打开新终端执行
+~/.bashrc        # 每次打开新终端执行（非登录shell）
 ~/.bash_profile  # 登录shell执行
 ~/.bash_history  # 命令历史记录
+
+# 注意：很多系统会显式在 ~/.bash_profile 中 source ~/.bashrc
+# 这样登录shell也会加载非登录shell的配置
 
 # zsh 配置
 ~/.zshrc         # 主配置
