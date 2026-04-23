@@ -830,14 +830,14 @@ opt_val = sock.getsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR)
 ```bash
 # 创建简单的TCP测试服务器
 nc -l 8080                      # 监听TCP端口 (Linux/Mac)
-# Windows: 使用 nc -l -p 8080 或 nc -l 8080
+# Windows: nc -l 8080
 
 # 连接TCP服务器
 nc localhost 8080
 
 # UDP测试
 nc -u -l 8080                  # 监听UDP端口 (Linux/Mac)
-# Windows: nc -u -l -p 8080
+# Windows: nc -u -l 8080
 nc -u localhost 8080            # 连接UDP端口
 
 # 端口扫描
