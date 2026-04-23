@@ -1,5 +1,11 @@
 # Shell编程
 
+---
+updated: 2026-04-20
+versions:
+  "0-计算机基础/04-终端与Shell/": Windows 11 / Ubuntu 24.04 / WSL 2.6 / PowerShell 7.6.0 / GNU Bash 5.2
+---
+
 ## 解决什么问题
 
 人机交互需要一种方式将用户命令转换为系统操作。Shell作为命令解释器，提供文本界面让用户高效地与操作系统交互，适用于自动化脚本、远程管理、文本处理等场景。
@@ -38,8 +44,6 @@ Shell通过Fork+Exec创建子进程执行命令：
 |-------|------|------|----------|
 | sh (Bourne) | POSIX标准 | 最早标准，语法基础 | Unix传统 |
 | bash | 5.2.x (GNU) | Linux默认，兼容sh | Linux |
-| zsh | 5.9+ | 兼容bash，插件丰富 | macOS/Linux |
-| fish | 4.6.0 | 开箱即用，语法高亮 | - |
 | PowerShell | 7.6.0 | 对象管道，跨平台 | Windows/Mac/Linux |
 
 ### bash

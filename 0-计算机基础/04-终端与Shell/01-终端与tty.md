@@ -1,5 +1,11 @@
 # 终端与tty
 
+---
+updated: 2026-04-20
+versions:
+  "0-计算机基础/04-终端与Shell/": Windows 11 / Ubuntu 24.04 / WSL 2.6 / PowerShell 7.6.0 / GNU Bash 5.2
+---
+
 终端（Terminal）是将键盘输入和屏幕输出抽象为字符流的基础接口，允许用户与操作系统进行文本交互。终端模拟器（如 GNOME Terminal、Windows Terminal）模拟硬件终端行为，Shell（如 bash、zsh）接收命令并返回结果。
 
 > **机制演进说明**
@@ -148,15 +154,15 @@ cat /dev/ptmx
 
 ## Windows ConPTY
 
-Windows 10 1809+ 原生支持 ConPTY：
+Windows 10 1809+ 原生支持 ConPTY (Console Pseudo Terminal)，Windows Terminal 通过 ConPTY 与控制台程序交互：
 
 ```powershell
 # Windows Terminal 使用ConPTY
-# ConPTY = Console Pseudo Terminal
+# 查看伪终端列表（ConPTY创建虚拟终端）
+Get-Process | Where-Object {$_.MainWindowTitle -ne ""} | Select-Object Name, Id, MainWindowTitle
 
-# 查看是否支持
-Get-Process | Select-Object Name, Id
-
+# 查看是否支持ConPTY（Windows 11默认启用）
+winget list --name "Windows Terminal"
 ```
 
 ## PTY 核心机制
