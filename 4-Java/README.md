@@ -63,9 +63,7 @@ Java 8（Lambda/Stream）→ Java 11（HttpClient）→ Java 17（密封类）�
 - [现代Java特性](./03-高级用法/07-现代Java特性.md)
 - [响应式编程](./03-高级用法/08-响应式编程.md)
 - [安全编码](./03-高级用法/09-安全编码.md)
-- [虚拟线程深度](./03-高级用法/10-虚拟线程深度.md)
-- [Lombok](./03-高级用法/11-Lombok.md)
-- [GraalVM与NativeImage](./03-高级用法/12-GraalVM与NativeImage.md)
+- [GraalVM与NativeImage](./03-高级用法/10-GraalVM与NativeImage.md)
 
 ## 测试
 

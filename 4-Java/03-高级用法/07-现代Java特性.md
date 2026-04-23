@@ -777,6 +777,94 @@ String Templates 在 Java 21/22 预览后被撤回：
 
 未来可能会以不同的设计重新引入。
 
+## 虚拟线程（Virtual Threads）
+
+> Java 21 引入的革命性特性，解决传统线程的高成本问题。
+
+### 核心概念
+
+传统线程模型采用 1:1 映射，每个线程占用约 1MB 堆栈。虚拟线程采用 M:N 映射，堆栈按需增长（通常几 KB）。
+
+### 线程模型对比
+
+| 特性 | 阻塞（传统） | 挂起（虚拟线程） |
+|------|-------------|-----------------|
+| 线程状态 | BLOCKED | WAITING（但线程本身被释放）|
+| OS 资源 | 占用 OS 线程 | 不占用（只占用内存）|
+| 其他任务 | 无法运行 | 载体线程可运行其他 VT |
+
+### 创建方式
+
+```java
+// Thread.ofVirtual()
+Thread virtual = Thread.ofVirtual()
+    .name("my-vt-")
+    .start(() -> System.out.println("Hello"));
+
+// Executors.newVirtualThreadPerTaskExecutor()
+try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor()) {
+    Future<String> future = executor.submit(() -> "Hello");
+    String result = future.get();
+}
+```
+
+### 深度用法
+
+**synchronized 注意事项**：长时持有 synchronized 内置锁会阻塞载体线程。推荐使用 ReentrantLock。
+
+```java
+// 推荐方式
+private final ReentrantLock lock = new ReentrantLock();
+public void increment() {
+    lock.lock();
+    try {
+        count++;
+    } finally {
+        lock.unlock();
+    }
+}
+```
+
+**ThreadLocal 问题**：100 万虚拟线程会有 100 万个 ThreadLocal 副本。使用 ScopedValue（Java 22）替代。
+
+```java
+// ScopedValue 解决方案
+static final ScopedValue<String> USER_ID = ScopedValue.newInstance();
+
+ScopedValue.where(USER_ID, "user-123")
+    .run(() -> {
+        String id = USER_ID.get();
+        processWithUser(id);
+    });
+```
+
+### 结构化并发（Structured Concurrency）
+
+将多个并发任务视为单一工作单元，生命周期统一管理。
+
+```java
+// ShutdownOnSuccess：任意一个任务成功即返回
+try (var scope = new StructuredTaskScope.ShutdownOnSuccess<User>()) {
+    ids.forEach(id -> scope.fork(() -> checkUserAvailable(id)));
+    scope.join();
+    return scope.result();
+}
+
+// ShutdownOnFailure：所有任务失败才结束
+try (var scope = new StructuredTaskScope.ShutdownOnFailure()) {
+    tasks.forEach(task -> scope.fork(() -> process(task)));
+    scope.join();
+    scope.throwIfFailed();
+}
+```
+
+### 最佳实践
+
+- 不要池化虚拟线程（每任务一个线程）
+- 使用 ScopedValue 替代 ThreadLocal
+- 谨慎使用 synchronized，优先使用 ReentrantLock
+- 数据库连接池可以更小（虚拟线程挂起时不占连接）
+
 ## 版本选择建议
 
 ```

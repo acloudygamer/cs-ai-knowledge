@@ -1,7 +1,7 @@
 # 终端与Shell
 
 ---
-updated: 2026-04-20
+updated: 2026-04-23
 versions:
   "0-计算机基础/04-终端与Shell/": Windows 11 / Ubuntu 24.04 / WSL 2.6 / PowerShell 7.6.0 / GNU Bash 5.2
 ---

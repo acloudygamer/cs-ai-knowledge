@@ -1,8 +1,66 @@
-# 浏览器 API
+# 浏览器 API 与网络
 
-## Fetch API
+现代 JavaScript 提供多种网络请求方式：XMLHttpRequest（传统）、fetch（原生）、WebSocket（双向）、GraphQL（查询语言）。选择依据是功能需求而非技术偏好。
 
-### 基本用法
+## XMLHttpRequest（传统方式）
+
+XMLHttpRequest 是浏览器早期的异步请求 API，基于事件回调，已被 fetch 取代。适合需要进度追踪、旧项目兼容场景。
+
+### 参考样例
+
+```javascript
+// 基本 GET 请求
+const xhr = new XMLHttpRequest();
+xhr.open('GET', 'https://api.example.com/data', true);
+
+xhr.onload = function() {
+  if (xhr.status >= 200 && xhr.status < 300) {
+    const data = JSON.parse(xhr.responseText);
+    console.log(data);
+  } else {
+    console.error('Request failed:', xhr.status);
+  }
+};
+
+xhr.onerror = function() {
+  console.error('Network error');
+};
+
+xhr.send();
+
+// POST 请求
+const xhrPost = new XMLHttpRequest();
+xhrPost.open('POST', 'https://api.example.com/data', true);
+xhrPost.setRequestHeader('Content-Type', 'application/json');
+
+xhrPost.onload = function() {
+  console.log('Response:', xhrPost.responseText);
+};
+
+xhrPost.send(JSON.stringify({ name: 'Alice', age: 25 }));
+
+// 设置超时
+xhrPost.timeout = 5000;
+xhrPost.ontimeout = function() {
+  console.error('Request timed out');
+};
+
+// 追踪进度
+xhr.upload.onprogress = function(e) {
+  if (e.lengthComputable) {
+    const percent = (e.loaded / e.total) * 100;
+    console.log(`Upload: ${percent.toFixed(2)}%`);
+  }
+};
+```
+
+## fetch API（原生）
+
+fetch 是现代浏览器的原生网络请求 API，基于 Promise，支持流式处理、Request/Response 对象、AbortController 取消。
+
+### 基础用法
+
+### 参考样例
 
 ```javascript
 // GET 请求
@@ -19,100 +77,425 @@ const response = await fetch('https://api.example.com/data', {
   body: JSON.stringify({ name: 'Alice', age: 25 })
 });
 
-// 响应状态检查
+// 处理响应状态
 if (!response.ok) {
   throw new Error(`HTTP error! status: ${response.status}`);
 }
+
+// 获取不同类型
+response.json()      // JSON
+response.text()      // 文本
+response.blob()       // 二进制
+response.arrayBuffer() // 数组缓冲
+
+// 设置超时
+const controller = new AbortController();
+setTimeout(() => controller.abort(), 5000);
+const response = await fetch(url, { signal: controller.signal });
 ```
 
-### 响应类型
+### fetch 进阶用法
+
+### 参考样例
 
 ```javascript
-const response = await fetch('/data');
+// 并行请求
+const [usersResponse, postsResponse] = await Promise.all([
+  fetch('/api/users'),
+  fetch('/api/posts')
+]);
+const [users, posts] = await Promise.all([
+  usersResponse.json(),
+  postsResponse.json()
+]);
 
-// 读取不同类型
-await response.json();        // JSON
-await response.text();        // 纯文本
-await response.blob();         // 二进制 Blob
-await response.arrayBuffer(); // ArrayBuffer
-await response.formData();     // FormData
+// 流式处理（大文件下载）
+const response = await fetch('https://api.example.com/large-data');
+const reader = response.body.getReader();
+const decoder = new TextDecoder();
 
-// 读取首部信息
-response.headers.get('Content-Type');
-response.headers.get('Content-Length');
-```
-
-### 请求配置
-
-```javascript
-fetch('/api/data', {
-  method: 'GET',
-  headers: new Headers({
-    'Content-Type': 'application/json',
-    'Accept': 'application/json'
-  }),
-  credentials: 'include',  // 发送 cookies
-  cache: 'no-cache',       // 缓存策略
-  mode: 'cors'             // CORS 模式
-});
-```
-
-### 超时处理
-
-```javascript
-function fetchWithTimeout(url, options = {}, timeout = 5000) {
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), timeout);
-
-  return fetch(url, {
-    ...options,
-    signal: controller.signal
-  })
-    .finally(() => clearTimeout(timeoutId));
+while (true) {
+  const { done, value } = await reader.read();
+  if (done) break;
+  const chunk = decoder.decode(value, { stream: true });
+  console.log('Received chunk:', chunk);
 }
 
+// Request 对象
+const request = new Request('/api/data', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ key: 'value' })
+});
+const response = await fetch(request);
+
+// 克隆请求（流式Body只能读取一次）
+const response1 = await fetch('/api/data');
+const response2 = response1.clone();
+
+const text1 = await response1.text();
+const text2 = await response2.text();
+```
+
+## axios（常用库）
+
+axios 是最流行的 HTTP 请求库，提供拦截器、自动 JSON 转换、取消请求、错误处理等完善功能。
+
+### 参考样例
+
+```javascript
+import axios from 'axios';
+
+// GET
+const { data } = await axios.get('/api/users');
+
+// POST
+const { data } = await axios.post('/api/users', { name: 'Alice' });
+
+// 配置
+axios({
+  method: 'POST',
+  url: '/api/data',
+  data: { key: 'value' },
+  headers: { 'X-Custom-Header': 'value' },
+  timeout: 5000,
+  params: { page: 1, limit: 10 }  // URL 参数
+});
+
+// 拦截器
+axios.interceptors.request.use(config => {
+  config.headers.Authorization = `Bearer ${token}`;
+  return config;
+});
+
+axios.interceptors.response.use(
+  response => response.data,
+  error => {
+    if (error.response?.status === 401) {
+      // 处理未授权
+    }
+    return Promise.reject(error);
+  }
+);
+
+// 并发请求
+const [users, posts] = await Promise.all([
+  axios.get('/api/users'),
+  axios.get('/api/posts')
+]);
+
+// 取消请求
+const controller = new AbortController();
+const response = await axios.get('/api/data', {
+  signal: controller.signal
+});
+controller.abort();  // 取消请求
+
+// 错误处理
 try {
-  const data = await fetchWithTimeout('/api/data', {}, 3000);
+  const { data } = await axios.get('/api/protected', {
+    validateStatus: status => status < 500  // 不抛出 4xx 错误
+  });
 } catch (error) {
-  if (error.name === 'AbortError') {
-    console.log('Request timed out');
+  if (axios.isCancel(error)) {
+    console.log('Request was cancelled');
   }
 }
 ```
 
-### 文件上传
+## WebSocket（实时通信）
+
+WebSocket 提供双向实时通信通道，建立一次连接后可双向传输数据。适用于聊天、实时数据推送、游戏等场景。
+
+### 原生 WebSocket
+
+### 参考样例
 
 ```javascript
-const formData = new FormData();
-formData.append('file', fileInput.files[0]);
-formData.append('name', 'my-file');
+// 连接服务器
+const ws = new WebSocket('wss://echo.websocket.org');
 
-const response = await fetch('/api/upload', {
+ws.onopen = function() {
+  console.log('Connected to server');
+  ws.send('Hello Server!');
+};
+
+ws.onmessage = function(event) {
+  console.log('Received:', event.data);
+};
+
+ws.onerror = function(error) {
+  console.error('WebSocket error:', error);
+};
+
+ws.onclose = function(event) {
+  console.log('Connection closed:', event.code, event.reason);
+};
+
+// 发送消息
+ws.send(JSON.stringify({ type: 'message', content: 'Hi' }));
+
+// 关闭连接
+ws.close(1000, 'Normal closure');
+
+// 心跳保活
+setInterval(() => {
+  if (ws.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify({ type: 'ping' }));
+  }
+}, 30000);
+```
+
+### WebSocket 封装示例
+
+### 参考样例
+
+```javascript
+class WebSocketClient {
+  constructor(url) {
+    this.url = url;
+    this.ws = null;
+    this.reconnectAttempts = 0;
+    this.maxReconnectAttempts = 5;
+  }
+
+  connect() {
+    return new Promise((resolve, reject) => {
+      this.ws = new WebSocket(this.url);
+
+      this.ws.onopen = () => {
+        this.reconnectAttempts = 0;
+        resolve();
+      };
+
+      this.ws.onerror = (error) => {
+        reject(error);
+      };
+
+      this.ws.onmessage = (event) => {
+        this.handleMessage(JSON.parse(event.data));
+      };
+
+      this.ws.onclose = (event) => {
+        this.handleClose(event);
+      };
+    });
+  }
+
+  handleMessage(data) {
+    // 子类重写
+    console.log('Message:', data);
+  }
+
+  handleClose(event) {
+    if (this.reconnectAttempts < this.maxReconnectAttempts) {
+      this.reconnectAttempts++;
+      setTimeout(() => {
+        console.log(`Reconnecting... (${this.reconnectAttempts})`);
+        this.connect();
+      }, 1000 * this.reconnectAttempts);
+    }
+  }
+
+  send(data) {
+    if (this.ws?.readyState === WebSocket.OPEN) {
+      this.ws.send(JSON.stringify(data));
+    }
+  }
+
+  close() {
+    this.maxReconnectAttempts = 0;  // 防止重连
+    this.ws?.close();
+  }
+}
+```
+
+## GraphQL
+
+GraphQL 是 API 查询语言，客户端精确声明所需数据，避免过度获取。query（查询）、mutation（变体）、subscription（订阅）是三种操作类型。
+
+### 基础查询
+
+### 参考样例
+
+```javascript
+// 使用 fetch 发送 GraphQL 请求
+const query = `
+  query GetUser($id: ID!) {
+    user(id: $id) {
+      id
+      name
+      email
+      posts {
+        title
+      }
+    }
+  }
+`;
+
+const variables = { id: '123' };
+
+const response = await fetch('/graphql', {
   method: 'POST',
-  body: formData
-  // 不需要 Content-Type，fetch 会自动设置
+  headers: {
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${token}`
+  },
+  body: JSON.stringify({ query, variables })
+});
+
+const { data, errors } = await response.json();
+if (errors) {
+  console.error('GraphQL errors:', errors);
+}
+console.log(data.user);
+
+// 变体操作（增删改）
+const mutation = `
+  mutation CreateUser($input: CreateUserInput!) {
+    createUser(input: $input) {
+      id
+      name
+    }
+  }
+`;
+
+const mutationResponse = await fetch('/graphql', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    query: mutation,
+    variables: {
+      input: { name: 'Alice', email: 'alice@example.com' }
+    }
+  })
 });
 ```
 
-### 并发请求
+### 使用 graphql-request 库
+
+### 参考样例
 
 ```javascript
-// Promise.all 并发
-const [users, posts] = await Promise.all([
-  fetch('/api/users').then(r => r.json()),
-  fetch('/api/posts').then(r => r.json())
-]);
+import { GraphQLClient, gql } from 'graphql-request';
 
-// AbortController 取消所有
-const controller = new AbortController();
-const requests = [
-  fetch('/api/1', { signal: controller.signal }),
-  fetch('/api/2', { signal: controller.signal }),
-  fetch('/api/3', { signal: controller.signal })
-];
+const client = new GraphQLClient('/graphql', {
+  headers: { Authorization: `Bearer ${token}` }
+});
 
-// 取消所有请求
-controller.abort();
+// 查询
+const getUser = gql`
+  query GetUser($id: ID!) {
+    user(id: $id) {
+      id
+      name
+      email
+    }
+  }
+`;
+
+const user = await client.request(getUser, { id: '123' });
+
+// 变体
+const createUser = gql`
+  mutation CreateUser($input: CreateUserInput!) {
+    createUser(input: $input) {
+      id
+      name
+    }
+  }
+`;
+
+const newUser = await client.request(createUser, {
+  input: { name: 'Alice', email: 'alice@example.com' }
+});
+```
+
+## 网络请求对比
+
+| 特性 | XMLHttpRequest | fetch | axios | WebSocket | GraphQL |
+|------|----------------|-------|-------|-----------|---------|
+| 双向通信 | 否 | 否 | 否 | 是 | 否 |
+| 实时性 | 轮询 | 轮询 | 轮询 | 原生支持 | 轮询 |
+| API 风格 | 回调 | Promise | Promise | 事件 | 查询语言 |
+| 自动 JSON | 否 | 否 | 是 | 否 | 是 |
+| 取消请求 | 手动 | AbortController | CancelToken | close() | 取消 |
+| 拦截器 | 无 | 包装 | 原生 | 无 | 无 |
+| 进度追踪 | onprogress | Body.readable | 支持 | 无 | 无 |
+
+## 选择指南
+
+### 参考样例
+
+```javascript
+// 简单 REST API - fetch 或 axios
+const data = await fetch('/api/users').then(r => r.json());
+
+// 复杂配置需求 - axios
+axios.get('/api/users', { params, headers, timeout });
+
+// 实时双向通信 - WebSocket
+const ws = new WebSocket('wss://chat.example.com');
+
+// 精确数据需求 - GraphQL
+const { user, posts } = await graphqlRequest(`
+  query {
+    user { name }
+    posts(limit: 10) { title }
+  }
+`);
+
+// 文件上传进度 - XMLHttpRequest 或 fetch
+xhr.upload.onprogress = (e) => updateProgress(e.loaded / e.total);
+
+// 服务端发送事件 - SSE
+const eventSource = new EventSource('/api/events');
+eventSource.onmessage = (e) => console.log(e.data);
+```
+
+## 错误处理最佳实践
+
+### 参考样例
+
+```javascript
+async function requestWithRetry(url, options = {}, retries = 3) {
+  for (let i = 0; i < retries; i++) {
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 5000);
+
+      const response = await fetch(url, {
+        ...options,
+        signal: controller.signal
+      });
+
+      clearTimeout(timeout);
+
+      if (!response.ok) {
+        throw new HttpError(response.status, await response.text());
+      }
+
+      return await response.json();
+    } catch (error) {
+      if (error.name === 'AbortError') {
+        console.error('Request timeout');
+      }
+
+      if (i === retries - 1) throw error;
+
+      // 指数退避
+      await new Promise(r => setTimeout(r, 2 ** i * 1000));
+    }
+  }
+}
+
+class HttpError extends Error {
+  constructor(status, body) {
+    super(`HTTP ${status}`);
+    this.status = status;
+    this.body = body;
+  }
+}
 ```
 
 ---
