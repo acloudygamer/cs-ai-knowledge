@@ -239,7 +239,7 @@ CPU (主机)                    GPU (设备)
 串行任务                     并行任务
 ────                        ─────
 内存: DDR5 (Windows 11 / Ubuntu 24.04 典型)  内存: GDDR6X / HBM3 / HBM3e
-带宽: 76.8-128 GB/s (DDR5-4800 至 DDR5-8000，双通道）  带宽: GDDR6X: ~1000 GB/s；HBM3: ~1024 GB/s；HBM3e: 2048-2500 GB/s
+带宽: 76.8-128 GB/s (DDR5-4800 至 DDR5-8000，双通道）  带宽: GDDR6X: ~1000 GB/s；HBM3: ~1024 GB/s；HBM3e: 2048-2560 GB/s
 延迟: 低                     延迟: 高
 ```
 
