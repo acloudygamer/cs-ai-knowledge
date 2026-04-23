@@ -30,12 +30,11 @@ Shell通过Fork+Exec创建子进程执行命令：
 ```bash
 # REPL循环
 1. 读取输入 (Read)
-2. 解析命令 (Evaluate) - 分离命令、参数、管道、重定向
-3. 在PATH中查找可执行文件
-4. 创建子进程执行 (Fork + Exec)
-5. 等待进程结束 (Wait)
-6. 打印输出 (Print)
-7. 回到步骤1 (Loop)
+2. 解析命令 (Evaluate) - 分离命令、参数、管道、重定向，在PATH中查找可执行文件
+3. 创建子进程执行 (Fork + Exec)
+4. 等待进程结束 (Wait)
+5. 打印输出 (Print)
+6. 回到步骤1 (Loop)
 ```
 
 ## 主要Shell类型
