@@ -268,7 +268,7 @@ cwnd
 |------|------|----------|
 | Reno | 标准快速恢复 | 早期Linux版本 |
 | NewReno | 改进快速恢复 | 多个丢包场景 |
-| CUBIC | 高BDP网络 | Linux 2.6+默认 |
+| CUBIC | 高BDP网络 | Linux 2.6-5.x 默认 |
 | BBR | 基于模型 | 高延迟高丢包 |
 | Westwood | 改进慢启动 | 无线网络 |
 
@@ -298,8 +298,11 @@ sudo tcpdump -i eth0 'tcp[tcpflags] & (tcp-syn|tcp-fin|tcp-rst) != 0' -A
 # 抓取特定端口的TCP流量
 sudo tcpdump -i eth0 port 80 -A
 
-# 抓取TCP重传
-sudo tcpdump -i eth0 'tcp[tcpflags] & tcp-ack != 0' | grep "retransmission"
+# 抓取TCP重传 (Linux)
+sudo tcpdump -i eth0 'tcp.analysis.retransmission'
+
+# 或使用原始标志过滤
+sudo tcpdump -i eth0 'tcp[tcpflags] & tcp-rexmit != 0'
 
 # 查看TCP连接状态
 ss -tnap

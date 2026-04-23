@@ -173,7 +173,7 @@ test:
     - npm ci
     - npm run lint
     - npm test
-  coverage: '/All files[^|]*\|[^|]*\s+([\d\.]+)/'
+  coverage: "/All files[^|]*\|[^|]*\\s+([\\d\\.]+)/"
 
 deploy:
   stage: deploy
@@ -464,4 +464,4 @@ npm run test:smoke
 | GitLab CI | CI/CD | GitLab 集成 |
 | CircleCI | CI/CD | 云托管 |
 | ArgoCD | CD (Kubernetes) | GitOps |
-| Spinnaker | CD | 多云支持 |
+| Spinnaker | CD | 多云支持, Netflix 开源 (活跃度下降) |

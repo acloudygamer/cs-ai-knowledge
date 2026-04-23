@@ -31,14 +31,14 @@ Shell通过Fork+Exec创建子进程执行命令：
 | Shell | 版本 | 特点 | 默认系统 |
 |-------|------|------|----------|
 | sh (Bourne) | POSIX标准 | 最早标准，语法基础 | Solaris |
-| bash | 5.2 (GNU) | Linux默认，兼容sh | Linux |
-| zsh | 5.8 (macOS内置) / 5.9+ | 兼容bash，插件丰富 | macOS (Catalina+) |
+| bash | 5.2.x (GNU) | Linux默认，兼容sh | Linux |
+| zsh | 5.9+ (Linux) / 5.9 (macOS 14+) | 兼容bash，插件丰富 | macOS (Catalina+, zsh 5.7.2) |
 | fish | 3.6+ | 开箱即用，语法高亮 | - |
-| PowerShell | 7.4.x | 对象管道，跨平台 | Windows |
+| PowerShell | 7.6.0 | 对象管道，跨平台 | Windows |
 
 ### bash
 
-GNU Bash 5.2.x。 (<latest> Ubuntu 24.04 默认 5.2.21; WSL/MSYS2 环境可达 5.2.x; Windows 11 的 Git Bash 5.2.x)
+GNU Bash 5.2.x。 (Ubuntu 24.04 默认 5.2.21; WSL/MSYS2 环境 5.2.x; Windows 11 Git Bash 5.2.x)
 
 ```bash
 # bash配置
@@ -55,9 +55,9 @@ GNU Bash 5.2.x。 (<latest> Ubuntu 24.04 默认 5.2.21; WSL/MSYS2 环境可达 5
 
 ### PowerShell
 
-PowerShell 7.4.x (最新稳定版)。跨平台支持 Windows/Mac/Linux (<latest> 7.6.0 为最新特性版本)
+PowerShell 7.6.0 (最新稳定版)。跨平台支持 Windows/Mac/Linux
 
-```powershell
+```powershell  # PowerShell 7.6.0
 # 变量（$开头）
 $name = "Alice"
 

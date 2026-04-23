@@ -463,7 +463,7 @@ git push origin v1.0.0
 git push origin --tags   # 推送所有标签
 
 # 删除标签
-git tag -d v1.0.0            # 本地
+git tag -d v1.0.0           # 本地
 git push origin --delete v1.0.0  # 远程
 ```
 

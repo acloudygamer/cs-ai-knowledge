@@ -829,27 +829,28 @@ opt_val = sock.getsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR)
 
 ```bash
 # 创建简单的TCP测试服务器
-nc -l -p 8080                    # 监听TCP端口
-nc -l -p 8080 -c "echo hello"   # 自动回复
+nc -l 8080                      # 监听TCP端口 (Linux/Mac)
+# Windows: 使用 nc -l -p 8080 或 nc -l 8080
 
 # 连接TCP服务器
 nc localhost 8080
 
 # UDP测试
-nc -u -l -p 8080                # 监听UDP端口
-nc -u localhost 8080             # 连接UDP端口
+nc -u -l 8080                  # 监听UDP端口 (Linux/Mac)
+# Windows: nc -u -l -p 8080
+nc -u localhost 8080            # 连接UDP端口
 
 # 端口扫描
-nc -zv localhost 8000-9000       # 扫描端口范围
+nc -zv localhost 8000-9000     # 扫描端口范围
 
 # 传输文件
 # 服务器端
-nc -l -p 8080 < file.txt
+nc -l 8080 < file.txt           # Linux/Mac
 # 客户端
 nc server_ip 8080 > file.txt
 
 # 创建简单的Web服务器
-while true; do echo -e "HTTP/1.1 200 OK\r\n\r\n$(date)"; done | nc -l -p 8080
+while true; do echo -e "HTTP/1.1 200 OK\r\n\r\n$(date)"; done | nc -l 8080
 ```
 
 ## 常见Socket错误

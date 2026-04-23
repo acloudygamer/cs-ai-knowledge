@@ -94,7 +94,7 @@ console.log('4');              // 同步，立即执行
 ```
 
 **微任务 vs 宏任务**：
-- **微任务**：Promise.then、process.nextTick、queueMicrotask
+- **微任务**：Promise.then、process.nextTick、`queueMicrotask`（HTML Standard 定义，浏览器/Node 均支持）
 - **宏任务**：setTimeout、setImmediate、I/O回调、setInterval
 
 ```javascript

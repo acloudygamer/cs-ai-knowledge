@@ -48,7 +48,7 @@ GPU
 | Ampere | GA100 | 第三代 Tensor Core，结构化稀疏 |
 | Ada | AD102 | 第四代 Tensor Core，DLSS 3超分辨率技术 |
 | Hopper | GH100 | Transformer 引擎，更大共享内存 |
-| Blackwell | GB100 | 第五代 Tensor Core，FP8 支持，神经网络架构 |
+| Blackwell | GB100 | 第五代 Tensor Core，FP8 支持，专为大规模 AI 推理设计 |
 
 ### CUDA 编程模型
 
