@@ -1,5 +1,11 @@
 # 终端与Shell
 
+---
+updated: 2026-04-20
+versions:
+  "0-计算机基础/04-终端与Shell/": Windows 11 / Ubuntu 24.04 / WSL 2.6 / PowerShell 7.6.0 / GNU Bash 5.2
+---
+
 本部分涵盖命令行交互的基础知识，包括终端、Shell、脚本编程等核心概念。
 
 ## 目录

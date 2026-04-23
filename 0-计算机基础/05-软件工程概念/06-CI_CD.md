@@ -112,7 +112,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '26'
+          node-version: '22'
           cache: 'npm'
 
       - name: Install dependencies
@@ -168,7 +168,7 @@ build:
 
 test:
   stage: test
-  image: node:26
+  image: node:22
   script:
     - npm ci
     - npm run lint
@@ -349,7 +349,7 @@ describe('GET /api/users', () => {
 
 ```dockerfile
 # Dockerfile 示例
-FROM node:26-alpine AS builder
+FROM node:22-alpine AS builder
 WORKDIR /app
 
 COPY package*.json ./
@@ -358,7 +358,7 @@ RUN npm ci --only=production
 COPY . .
 RUN npm run build
 
-FROM node:26-alpine AS runner
+FROM node:22-alpine AS runner
 WORKDIR /app
 
 ENV NODE_ENV=production
