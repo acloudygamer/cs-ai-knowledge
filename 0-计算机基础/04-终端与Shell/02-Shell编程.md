@@ -1,8 +1,10 @@
-# Shell家族
+# Shell编程
 
 ## 解决什么问题
 
 人机交互需要一种方式将用户命令转换为系统操作。Shell作为命令解释器，提供文本界面让用户高效地与操作系统交互，适用于自动化脚本、远程管理、文本处理等场景。
+
+命令行操作适合简单任务，但复杂或重复的任务需要脚本。Shell脚本将一系列命令文本化，实现自动化、批量处理、定时执行，减少人工操作和错误。
 
 ## 核心概念
 
@@ -10,6 +12,10 @@
 - 交互模式：读取→解析→执行→等待→显示结果的循环
 - 脚本是Shell可执行的文本文件，扩展了命令行能力
 - 各Shell语法不完全兼容，bash是Linux默认
+- 脚本通过shebang指定解释器
+- 变量无需声明，直接赋值使用，`$var`引用
+- 条件判断用`[]`或`[[]]`，循环有for/while，函数封装可复用逻辑
+- `set -euo pipefail`是脚本安全最佳实践
 
 ## Shell执行流程
 
@@ -274,3 +280,161 @@ Get-Service
 Get-Process | Where-Object CPU -gt 100 | Sort-Object CPU
 ```
 
+## 脚本编程基础
+
+### 怎么用
+
+```bash
+#!/bin/bash
+# shebang指定解释器
+
+name="World"
+echo "Hello, $name!"
+
+# 条件
+if [ -f "file.txt" ]; then
+    echo "exists"
+fi
+
+# 循环
+for f in *.log; do
+    echo "$f"
+done
+```
+
+### 变量与特殊变量
+
+```bash
+name="Alice"
+echo $name "${name}'s friend"   # 引用
+
+$0    # 脚本名
+$1    # 第一个参数
+$@    # 所有参数
+$$    # 当前进程ID
+$?    # 上一条命令退出码（管道中返回最后命令退出码，需 set -o pipefail 获取管道中任一命令失败）
+```
+
+### 条件测试
+
+```bash
+# 文件测试
+[ -f "file" ] && echo "普通文件"
+[ -d "dir" ] && echo "目录"
+[ -x "file" ] && echo "可执行"
+
+# 字符串
+[ -z "$str" ]        # 空字符串
+[ "$a" = "$b" ]       # 相等（POSIX标准，== 为 bash 扩展）
+
+# 数字
+[ $a -eq $b ]         # 相等
+[ $a -gt $b ]         # 大于
+```
+
+### 循环
+
+```bash
+# for循环
+for i in 1 2 3; do
+    echo $i
+done
+
+# C风格 (bash)
+for ((i=0; i<5; i++)); do
+    echo $i
+done
+
+# while读取
+while read line; do
+    echo $line
+done < file.txt
+```
+
+### 函数
+
+```bash
+get_sum() {
+    echo $(($1 + $2))
+}
+
+result=$(get_sum 10 20)
+```
+
+### 数组
+
+```bash
+arr=(one two three)
+echo ${arr[0]}        # 第一个元素
+echo ${arr[@]}        # 全部
+echo ${#arr[@]}       # 长度
+
+# 关联数组
+declare -A dict
+dict["name"]="Alice"
+```
+
+### 字符串处理
+
+```bash
+str="Hello World"
+echo ${#str}           # 长度
+echo ${str:0:5}        # 子串
+echo ${str/Hello/Hi}   # 替换
+echo ${str^^}          # 转大写
+echo ${str,,}          # 转小写
+```
+
+### 命令替换与进程替换
+
+```bash
+files=$(ls)             # 命令输出
+diff <(ls /dir1) <(ls /dir2)  # 进程替换
+```
+
+### 信号捕获
+
+```bash
+trap 'cleanup' EXIT     # 退出时清理
+trap 'echo "Ctrl+C"' INT # 中断信号
+```
+
+### 实用模式
+
+```bash
+# 安全脚本模板
+#!/bin/bash
+# set -euo pipefail 含义:
+# -e: 命令失败时立即退出
+# -u: 使用未定义变量时报错
+# -o pipefail: 管道返回值是最后一个失败命令的退出码，全成功才返回0
+set -euo pipefail
+
+# 错误处理
+error_exit() {
+    echo "Error: $1" >&2
+    exit 1
+}
+[ -f "$file" ] || error_exit "File not found"
+
+# getopts选项解析
+while getopts "f:v" opt; do
+    case $opt in
+        f) file="$OPTARG" ;;
+        v) verbose=true ;;
+    esac
+done
+
+# 临时文件
+tmp=$(mktemp)
+trap 'rm -f "$tmp"' EXIT
+```
+
+### 调试
+
+```bash
+set -x    # 打印命令及参数
+set -e    # 遇错退出
+bash -x script.sh   # 命令行调试
+bash -n script.sh   # 语法检查
+```
