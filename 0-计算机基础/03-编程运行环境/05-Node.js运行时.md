@@ -205,7 +205,7 @@ const Calculator = require('./calculator');
 ```
 
 ```javascript
-// ES模块 (Node.js 14+ stable，或 Node.js 12+ experimental)
+// ES模块 (Node.js 18+ stable)
 import fs from 'fs';
 import { readFile } from 'fs/promises';
 import path from 'path';
