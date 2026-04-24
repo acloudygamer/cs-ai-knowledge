@@ -1,0 +1,36 @@
+{
+  "updated": "2026-04-20",
+  "versions": {
+    "0-计算机基础/": {
+      "env": "Windows 11 / Ubuntu 24.04 / WSL 2.6 / PowerShell 7.6.0 / GNU Bash 5.2"
+    },
+    "1-数据结构与算法/": {
+      "env": "Python 3.12 (代码示例)"
+    },
+    "2-Python/": {
+      "env": "Python 3.12 / Python 3.14",
+      "stable": "Python 3.12",
+      "latest": "Python 3.14"
+    },
+    "3-C++/": {
+      "env": "C++ 20 / C++ 23 / C++ 26",
+      "stable": "C++ 20",
+      "latest": ["C++ 23", "C++ 26"]
+    },
+    "4-Java/": {
+      "env": "Java 21 / Java 25",
+      "stable": "Java 21",
+      "latest": "Java 25"
+    },
+    "5-JavaScript/": {
+      "env": "JavaScript Node24+ES2024 / Node26+ES2026",
+      "stable": "Node24+ES2024",
+      "latest": "Node26+ES2026"
+    },
+    "6-Go/": {
+      "env": "Go 1.24 / Go 1.26",
+      "stable": "Go 1.24",
+      "latest": "Go 1.26"
+    }
+  }
+}

@@ -4,10 +4,8 @@ description: 全局重构与内容编排 Agent。专为 AI 时代开发者设计
 ---
 
 # 运行环境 (Environment Context)
-- **工作目录** `<path>`：[由 tasks.json 注入]
 - **稳定版** `<stable>`：[由 versions.json 注入]
 - **前沿版** `<latest>`：[由 versions.json 注入]
-- **任务编号** `<task_id>`：[由 tasks.json 注入]
 
 ---
 
@@ -63,44 +61,6 @@ description: 全局重构与内容编排 Agent。专为 AI 时代开发者设计
 
 ---
 
-# 黄金样例 (Target Format Example)
-
-严格按照以下格式输出最终的 Markdown 结构（以嵌套循环跳转为例）：
-
-```markdown
-<Draft>底层机制：嵌套循环跳转本质是跨作用域的 JMP 指令控制。强行跳转（如 goto）易导致状态机异常与 RAII 资源泄漏。样例剥离：将 <stable> 的 Lambda 规避法与 <latest> 的原生标签跳转代码，干净地提取至尾部。历史包袱：彻底物理删除陈旧且危险的 goto 示例及相关废话描述。</Draft>
-
-嵌套循环的跳转控制在处理多层嵌套循环时，精准控制底层指令的跳转目标是核心挑战。单层循环的 break 仅能作用于当前最内层作用域，无法直接修改外层循环的状态机上下文。强行跨作用域跳转不仅破坏结构化设计，还极易绕过 RAII 机制引发资源泄漏。
-
-> **机制演进说明**
-> - **`<stable>` 机制**：绝对弃用 goto。必须将逻辑提取为独立的 Lambda 或内联函数，通过 return 实现干净的作用域出栈与多层跳出。
-> - **`<latest>` 变革**：原生引入了多维循环标签（Loop Labels）。允许 break 和 continue 直接携带标签标识符，实现 $O(1)$ 级别、安全且无额外状态开销的精确作用域逃逸。
-
-### 参考样例
-
-```cpp
-// 1. <stable> 机制：通过 Lambda 封装实现多层跳出
-auto process = [&]() {
-    for (int i = 0; i < 3; i++) {
-        for (int j = 0; j < 5; j++) {
-            if (condition(i, j)) return; // 干净地跳出所有循环
-        }
-    }
-};
-
-// 2. <latest> 变革：原生循环标签 (<latest> 版本新增)
-outer_loop:
-for (int i = 0; i < 3; i++) {
-    for (int j = 0; j < 5; j++) {
-        if (condition(i, j)) {
-            break outer_loop;  // 直接打破外层状态机
-        }
-    }
-}
-```
-
----
-
 # 增强型结束条件 (Exit Criteria)
 
 必须**同时满足**以下所有条件，才可终止循环并输出结果：
@@ -109,19 +69,3 @@ for (int i = 0; i < 3; i++) {
 2. **零历史包袱**：所有低于 `<stable>` 版本的旧逻辑及旧代码段已**全部物理删除**，系统仅由通用的 `<stable>` 底座与前沿的 `<latest>` 特性构成。
 3. **零死链与断层**：README 及内部索引文档的链接 100% 有效，目录标号严格连续（无跳号、无重复）。
 4. **彻底的垃圾回收**：全量重修产生的旧文件、无用注释已全部清理完毕。
-
----
-
-# 汇报协议
-
-在工作流启动与终结时，通过标准命令进行系统级状态同步：
-
-```bash
-# 启动任务时
-python scripts/task_runner.py --update <task_id> working "开始执行 [全量重修]：<目标模块>，以 <stable> 为基准清理历史冗余"
-
-# 遇到无法判断版本归属的代码时，提交仲裁请求
-python scripts/task_runner.py --arbitrate_submit <task_id> <path> <reason> <content>
-
-# 满足增强结束条件后
-python scripts/task_runner.py --update <task_id> completed "重构完毕。已重排目录标号，旧逻辑已销毁，机制解释与样例已分离，链接可用率100%。"
