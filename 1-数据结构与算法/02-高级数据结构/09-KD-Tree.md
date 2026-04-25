@@ -1,291 +1,60 @@
 ## KD-Tree
 
-### 解决什么问题
-K 维空间索引结构，用于最近邻搜索、范围查询、聚类分析等高维数据处理。是 kNN 算法、特征点匹配等场景的底层数据结构。
+### 定义
 
-### 核心概念
-- 每个节点代表 k 维空间中的一个点
-- 交替使用各维度作为划分依据（第 i 层用第 i % k 维）
-- 类似 BST，但维度交替划分
-- 最近邻搜索期望 O(log n)，高维退化至 O(n)
+KD-Tree 是 k 维空间中的二叉搜索树，第 $d$ 层按第 $(d \bmod k)$ 维划分空间，交替维度保证各维均匀分割。
 
----
+**数学模型**
 
-## 实现
+构建（递归中位数分割）：
 
-### 参考样例
+$$
+\text{splitDim} = \text{depth} \bmod k
+$$
+
+$$
+\text{median} = \text{sortByDim}(P,\ \text{splitDim})[\lfloor|P|/2\rfloor]
+$$
+
+树的期望高度：$O(\log n)$（均匀分布时）
+
+最近邻搜索复杂度：平均 $O(\log n)$，高维退化至 $O(n)$
+
+维度灾难：设 $d$ 为维数，当 $d > 20$ 时，$n^{1-1/d} \approx n$，暴力搜索可能更优。
+
+**数据流**
+
+<pre>
+2D 空间点 [(2,3), (5,4), (9,6), (4,7), (8,1), (7,2)]
+
+depth=0, dim=0 (x): 中位数 7 → 根 (7,2)
+左: [(2,3),(5,4),(4,7)]  右: [(9,6),(8,1)]
+depth=1, dim=1 (y): 左中位数 4 → (5,4), 右中位数 8 → (8,1)
+</pre>
+
+**机制**
+
+最近邻搜索时，维护当前最近距离 $D$。若目标点在当前维度与节点的距离平方超过 $D$，则该维度的另一侧子树可剪枝。当维度升高，剪枝效率急剧下降——即维度灾难，此时应考虑 LSH 或 HNSW。
+
+**参考存根**
 
 ```python
 class KDNode:
-    def __init__(self, point, dim):
-        self.point = point
-        self.dim = dim
-        self.left = None
-        self.right = None
-
+    def __init__(self, pt, dim):
+        self.pt, self.dim = pt, dim
+        self.left = self.right = None
 
 class KDTree:
     def __init__(self, k=2):
-        self.k = k
-        self.root = None
+        self.k, self.root = k, None
 
-    def build(self, points):
-        def build_node(points, depth):
-            if not points:
-                return None
-
-            dim = depth % self.k
-            points.sort(key=lambda x: x[dim])
-            mid = len(points) // 2
-
-            node = KDNode(points[mid], dim)
-            node.left = build_node(points[:mid], depth + 1)
-            node.right = build_node(points[mid + 1:], depth + 1)
-            return node
-
-        self.root = build_node(points, 0)
-        return self.root
-
-    def insert(self, point):
-        def insert_node(node, point, depth):
-            if node is None:
-                return KDNode(point, depth % self.k)
-
-            dim = depth % self.k
-            if point[dim] < node.point[dim]:
-                node.left = insert_node(node.left, point, depth + 1)
-            else:
-                node.right = insert_node(node.right, point, depth + 1)
-            return node
-
-        self.root = insert_node(self.root, point, 0)
-
-    def search(self, target):
-        def search_nearest(node, target, depth, best):
-            if node is None:
-                return best
-
-            dim = depth % self.k
-            dist = self._distance(node.point, target)
-
-            if dist < self._distance(best, target):
-                best = node.point
-
-            if target[dim] < node.point[dim]:
-                next_branch = node.left
-                other_branch = node.right
-            else:
-                next_branch = node.right
-                other_branch = node.left
-
-            best = search_nearest(next_branch, target, depth + 1, best)
-
-            if abs(target[dim] - node.point[dim]) < self._distance(best, target):
-                best = search_nearest(other_branch, target, depth + 1, best)
-
-            return best
-
-        if self.root is None:
-            return None
-        return search_nearest(self.root, target, 0, self.root.point)
-
-    def range_query(self, lo, hi):
-        result = []
-
-        def query_node(node, bounds, depth):
-            if node is None:
-                return
-
-            dim = depth % self.k
-            point = node.point
-
-            in_bounds = all(lo[i] <= point[i] <= hi[i] for i in range(self.k))
-            if in_bounds:
-                result.append(point)
-
-            if point[dim] >= lo[dim]:
-                query_node(node.left, bounds, depth + 1)
-            if point[dim] <= hi[dim]:
-                query_node(node.right, bounds, depth + 1)
-
-        query_node(self.root, (lo, hi), 0)
-        return result
-
-    @staticmethod
-    def _distance(p1, p2):
-        return sum((a - b) ** 2 for a, b in zip(p1, p2)) ** 0.5
+    def build(self, pts, depth=0):
+        if not pts: return None
+        d = depth % self.k
+        pts.sort(key=lambda x: x[d])
+        mid = len(pts) // 2
+        node = KDNode(pts[mid], d)
+        node.left = self.build(pts[:mid], depth + 1)
+        node.right = self.build(pts[mid + 1:], depth + 1)
+        return node
 ```
-
----
-
-## 最近邻搜索
-
-### 参考样例
-
-```python
-def k_nearest_neighbors(tree, target, k=1):
-    candidates = []
-
-    def search(node, depth):
-        if node is None:
-            return
-
-        dim = depth % tree.k
-        point = node.point
-        dist = tree._distance(point, target)
-
-        if len(candidates) < k:
-            candidates.append((dist, point))
-            candidates.sort(reverse=True)
-        elif dist < candidates[0][0]:
-            candidates[0] = (dist, point)
-            candidates.sort(reverse=True)
-
-        if target[dim] < point[dim]:
-            near, far = node.left, node.right
-        else:
-            near, far = node.right, node.left
-
-        search(near, depth + 1)
-
-        if len(candidates) < k or abs(target[dim] - point[dim]) < candidates[0][0]:
-            search(far, depth + 1)
-
-    search(tree.root, 0)
-    return [p for _, p in sorted(candidates)]
-```
-
----
-
-## 应用场景
-
-| 场景 | 说明 |
-|------|------|
-| 最近邻搜索 | 图像识别、推荐系统 |
-| 范围查询 | 地理信息系统 (GIS) |
-| 聚类分析 | K-Means 初始化 |
-| 异常检测 | 寻找距离异常远的点 |
-| 碰撞检测 | 游戏开发中的空间划分 |
-
----
-
-## KD-Tree vs 其他结构
-
-| 结构 | 适用维度 | 最近邻查询 | 范围查询 |
-|------|---------|-----------|---------|
-| KD-Tree | < 20 维 | O(log n) 平均 | 高效 |
-| Ball Tree | 高维 | O(n^(1-1/d)) | 高效 |
-| R-Tree | 2-3 维 | 高效 | 高效 |
-| 暴力搜索 | 任意 | O(n) | O(n) |
-
----
-
-## 维度灾难
-
-KD-Tree 的性能随维度增加而退化：
-
-- **理论**：在 d 维空间中，KD-Tree 的查询复杂度退化为 O(n^(1-1/d))
-- **经验法则**：当维度 d > 20 时，KD-Tree 的性能可能不如暴力搜索
-
-### 应对策略
-
-| 策略 | 说明 |
-|------|------|
-| PCA 降维 | 先用主成分分析降维 |
-| 局部敏感哈希 (LSH) | 适合高维近似最近邻 |
-| 分层可导航小世界图 (HNSW) | 更适合高维向量检索 |
-
----
-
-## 平衡 KD-Tree
-
-上述 `KDTree.build` 已使用中位数分割保证平衡，每层按维度排序取中间点，使树高为 O(log n)。
-
----
-
-## 实战例题
-
-### 二维平面最近点对
-
-### 参考样例
-
-```python
-def closest_pair(points):
-    """
-    找到二维平面中最近的点对
-    LeetCode 279 (变体)
-    方法：分治 + KD-Tree 优化
-    """
-    import math
-
-    def distance(p1, p2):
-        return math.sqrt((p1[0] - p2[0])**2 + (p1[1] - p2[1])**2)
-
-    kdtree = KDTree()
-    kdtree.build(points)
-
-    min_dist = float('inf')
-    closest = None
-
-    for p in points:
-        neighbor = kdtree.search(p)
-        if neighbor:
-            d = distance(p, neighbor)
-            if 0 < d < min_dist:
-                min_dist = d
-                closest = (p, neighbor)
-
-    return closest, min_dist
-```
-
-### K 近邻分类
-
-### 参考样例
-
-```python
-def knn_classify(train_data, test_point, k=5):
-    """
-    K 近邻分类器（使用 KD-Tree 加速）
-    train_data: [(point, label), ...]
-    """
-    points = [d[0] for d in train_data]
-    kdtree = KDTree()
-    kdtree.build(points)
-
-    neighbors = kdtree.k_nearest_neighbors(test_point, k)
-
-    label_count = {}
-    for i, p in enumerate(neighbors):
-        idx = kdtree.root.search_index(p)
-        label = train_data[idx][1]
-        label_count[label] = label_count.get(label, 0) + 1
-
-    return max(label_count, key=label_count.get)
-```
-
-### 范围搜索 for 图像处理
-
-### 参考样例
-
-```python
-def range_search_image(points, query_box):
-    """
-    图像处理中的颜色空间搜索
-    points: [(r, g, b), ...]
-    query_box: [(r_min, g_min, b_min), (r_max, g_max, b_max)]
-    """
-    kdtree = KDTree(k=3)
-    kdtree.build(points)
-
-    lo, hi = query_box
-    return kdtree.range_query(lo, hi)
-```
-
----
-
-## 局限性
-
-- 高维情况下效率退化（维度灾难）
-- 动态插入删除效率较低
-- 适合静态数据集或定期重建
-- 对于非常不均匀分布的数据，平衡可能变差

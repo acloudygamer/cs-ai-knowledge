@@ -1,9 +1,9 @@
 # 终端与Shell
 
 ---
-updated: 2026-04-23
+updated: 2026-04-25
 versions:
-  "0-计算机基础/04-终端与Shell/": Windows 11 / Ubuntu 24.04 / WSL 2.6 / PowerShell 7.6.0 / GNU Bash 5.2
+  "0-计算机基础/04-终端与Shell/": Windows 11 / Ubuntu 24.04 / WSL 2.6 / PowerShell 7.6.1 / GNU Bash 5.2
 ---
 
 本部分涵盖命令行交互的基础知识，包括终端、Shell、脚本编程等核心概念。
@@ -11,16 +11,16 @@ versions:
 ## 目录
 
 ### [01-终端与tty](./01-终端与tty.md)
-终端概念、tty设备、伪终端、SSH远程登录原理
+终端概念、tty设备、行规程、伪终端(PTY)、SSH远程登录原理、信号传递链
 
 ### [02-Shell编程](./02-Shell编程.md)
-Shell家族、脚本编程、进程与作业控制
+Shell家族、fork+exec模型、管道组合律、环境变量、I/O重定向、作业控制、脚本执行
 
 ### [03-终端高级操作](./03-终端高级操作.md)
-终端多路复用器tmux/screen
+终端多路复用器tmux/screen、会话生命周期、窗口与面板、复制模式、配置加载、同步面板
 
 ## 学习路径
 
-1. **先终端基础**：理解终端和 tty 的概念，掌握伪终端工作原理
+1. **先终端基础**：理解终端和 tty 的概念，掌握行规程与 PTY 工作原理
 2. **再Shell家族**：掌握主流 Shell 的特点和脚本编程
 3. **最后扩展**：终端复用器 tmux/screen 高级操作技巧

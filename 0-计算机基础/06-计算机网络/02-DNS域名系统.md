@@ -1,233 +1,127 @@
 # DNS域名系统
 
-## 概念
+## 定义
 
-**DNS (Domain Name System)** 是互联网的电话簿——将人类可读的域名（如 `www.example.com`）转换为机器可读的IP地址（如 `93.184.216.34`）。
+DNS是由分布式数据库构成的层级命名系统，通过将人类可读的域名映射为机器可读的IP地址，实现域名到IP地址的全球统一解析服务。
 
-```
-用户输入: www.example.com
-           ↓ DNS解析
-IP地址返回: 93.184.216.34
-           ↓
-建立HTTP连接
-```
+## 数学模型
 
-## 关系
+DNS解析可建模为递归/迭代查询的有限状态机。设域名 $d$ 的解析结果为 $\text{Query}(d)$：
 
-**关键连接**：
-- DNS → **UDP**：DNS查询通常使用UDP端口53
-- DNS → **缓存**：浏览器/OS/Resolver多级缓存加速解析
-- DNS → **负载均衡**：一个域名对应多个IP实现流量分发
-- HTTP → **DNS**：HTTP建立连接前必须先DNS解析
-- CDN → **DNS**：CDN通过DNS实现就近访问
+$$
+\text{Query}(d) = \begin{cases}
+\text{LocalCache}(d) & \text{命中缓存} \\
+\text{Resolver}(d) & \text{递归查询} \\
+\text{Iterative}(d, \text{root}) & \text{迭代查询}
+\end{cases}
+$$
 
-## DNS分层结构
+迭代查询状态转换：
 
-```
-根域名服务器 (.)
-    │
-    ├── .com (.net, .org...) TLD服务器
-    │       │
-    │       ├── example.com 权威服务器
-    │       │       │
-    │       │       ├── www.example.com
-    │       │       ├── api.example.com
-    │       │       └── mail.example.com
-    │       │
-    │       └── other.com
-    │
-    └── .cn, .jp... 其他TLD
-```
+$$
+\text{Iterative}(d, \text{current\_server}) \rightarrow \begin{cases}
+\text{Answer}(d) & \text{当前服务器有权威答案} \\
+\text{Iterative}(d, \text{next\_server}(tld)) & \text{返回TLD服务器地址} \\
+\text{Iterative}(d, \text{next\_server}(ns)) & \text{返回权威NS地址}
+\end{cases}
+$$
 
-**DNS查询流程**：
-1. **根域名服务器**：全球13组根服务器，返回顶级域(TLD)服务器地址
-2. **TLD服务器**：返回权威域名服务器地址（如example.com的NS记录）
-3. **权威服务器**：返回目标域名的具体记录（IP、别名等）
+DNS记录类型与映射关系：
 
-## DNS记录类型
-
-| 记录类型 | 用途 | 示例 |
-|----------|------|------|
-| **A** | 域名 → IPv4地址 | `example.com → 93.184.216.34` |
-| **AAAA** | 域名 → IPv6地址 | `example.com → 2606:2800:220:1::` |
-| **CNAME** | 域名别名 | `www.example.com → example.com` |
-| **MX** | 邮件服务器 | `example.com → mail.example.com` |
-| **NS** | 域名服务器 | `example.com → ns1.example.com` |
-| **TXT** | 文本记录 | 用于验证、SPF邮件安全 |
-| **PTR** | IP → 域名 (反向解析) | `93.184.216.34 → example.com` |
-| **SOA** | 权威信息 | 区域配置（TTL、Serial等） |
-
-```bash
-# 查看DNS记录
-dig example.com A          # A记录查询
-dig example.com MX         # 邮件服务器
-dig example.com ANY         # 所有记录（被部分服务器禁用）
-dig -x 93.184.216.34       # PTR反向查询
-
-# nslookup（Windows/Linux通用）
-nslookup www.example.com
-nslookup -type=MX example.com
-```
-
-## DNS解析过程
-
-### 递归查询 vs 迭代查询
-
-```
-递归查询（用户 → Local DNS Resolver）：
-用户浏览器 → Local DNS Resolver → (递归)根→TLD→权威服务器 → 返回结果
-
-迭代查询（Resolver → 各级服务器）：
-Local DNS Resolver → 根服务器 (返回TLD地址)
-                → TLD服务器 (返回权威服务器地址)
-                → 权威服务器 (返回最终结果)
-```
-
-**实际流程**：
-```
-1. 浏览器缓存检查 (Chrome: chrome://net-internals/#dns)
-2. 操作系统缓存检查 (gethostbyname)
-3. 本地DNS解析器缓存检查 (如 114.114.114.114, 8.8.8.8)
-4. 若缓存未命中，向根服务器发起迭代查询
-5. 结果逐级返回并缓存
-```
-
-```python
-# Python DNS查询示例
-import socket
-
-# 底层使用系统配置的DNS服务器
-ip = socket.gethostbyname("www.example.com")
-print(ip)  # 93.184.216.34
-
-# 多级域名解析
-hostname, _, _ = socket.gethostbyaddr("93.184.216.34")
-print(hostname)  # example.com
-```
-
-## DNS缓存
-
-DNS缓存存在于多个层级：
-
-| 缓存位置 | 生存时间 | 说明 |
+| 记录类型 | 函数形式 | 示例 |
 |----------|----------|------|
-| 浏览器 | 数分钟 | Chrome的DNS缓存受 TTL 影响 |
-| 操作系统 | TTL | Windows/ipconfig/displaydns |
-| Local Resolver | TTL | 运营商或公共DNS(如8.8.8.8) |
-| 递归DNS | TTL | DNS查询结果会缓存到TTL到期 |
+| A | $f(\text{domain}) \rightarrow \text{IPv4}$ | `example.com → 93.184.216.34` |
+| AAAA | $f(\text{domain}) \rightarrow \text{IPv6}$ | `example.com → 2606:2800:220:1::` |
+| CNAME | $f(\text{alias}) \rightarrow \text{canonical}$ | `www.example.com → example.com` |
+| MX | $f(\text{domain}) \rightarrow (\text{priority}, \text{mail})$ | `example.com → (10, mail.example.com)` |
+| NS | $f(\text{domain}) \rightarrow \text{name\_server}$ | `example.com → ns1.example.com` |
+| PTR | $f(\text{IP}) \rightarrow \text{domain}$ | `93.184.216.34 → example.com` |
 
-```bash
-# 查看Chrome DNS缓存
-chrome://net-internals/#dns
+TTL约束：缓存条目在 $T_{\text{cache}} = \min(\text{TTL}, T_{\text{max}})$ 后失效，必须重新查询。
 
-# 清除系统DNS缓存
-# Linux: resolvectl flush-caches  # Ubuntu 24.04
-# Windows: ipconfig /flushdns
-# macOS: sudo killall -HUP mDNSResponder
+## 数据流
 
-# 查看TTL (Linux)
-dig +nottlid example.com
+<pre>
+递归查询流程（浏览器 → 递归DNS服务器）：
+
+浏览器
+  │
+  ├─→ [查询 www.example.com]
+  │    本地缓存检查 ──命中？──否──→
+  │         ↓
+  │    操作系统缓存（gethostbyname）
+  │         ↓
+  │    递归DNS服务器（114.114.114.114 / 8.8.8.8）
+  │         ↓
+  │    迭代查询开始：
+  │         ↓
+  ├─→ 根服务器 (.) ──返回──→ .com TLD服务器地址
+  │         ↓
+  ├─→ .com TLD服务器 ──返回──→ example.com 权威NS地址
+  │         ↓
+  ├─→ example.com 权威服务器 ──返回──→ IP: 93.184.216.34
+  │         ↓
+  │    结果缓存，TTL生效
+  │
+浏览器 ◀── [IP: 93.184.216.34]
+</pre>
+
+DNS数据包结构（UDP/53）：
+
+```
+┌──────────┬──────────┬──────────────┬─────────────┐
+│ Header   │ Question  │   Answer     │  Authority  │
+│ (12字节) │  (查询)   │  (回答)       │  (权威)     │
+└──────────┴──────────┴──────────────┴─────────────┘
+
+Header:
+  ┌────────────────┬────────────────┐
+  │ ID (16bit)     │ Flags (16bit)  │
+  ├────────────────┼────────────────┤
+  │ QDCOUNT (16bit)│ ANCOUNT       │
+  ├────────────────┼────────────────┤
+  │ NSCOUNT        │ ARCOUNT       │
+  └────────────────┴────────────────┘
 ```
 
-## DNS安全问题
+数据形态变换：
 
-### DNSSEC
-DNS安全扩展，通过数字签名验证DNS响应真实性：
-
-```bash
-# 查看DNSSEC状态
-dig +dnssec example.com
-# 响应中会有 RRSIG 记录（签名）
+```
+域名字符串 "www.example.com"
+  ↓ 标签编码（每个标签前加长度）
+DNS Question Section: [3]www[7]example[3]com[0]
+  ↓ 递归查询，沿DNS树向下
+响应Answer Section: [3]www[7]example[3]com[0] IN A 93.184.216.34
+  ↓ 提取
+IP字节串: 93.184.216.34 (32位IPv4)
 ```
 
-### DNS污染与劫持
-- **DNS污染**：DNS响应被篡改，返回伪造IP
-- **DNS劫持**：运营商或恶意软件修改DNS设置
-- **DOH/DoT**：DNS over HTTPS/TLS，加密DNS流量防止中间人篡改
+## 机制
 
-```bash
-# 使用加密DNS (DoH)
-# Chrome: 设置 → 安全 → 使用安全DNS (选择Google/Cloudflare)
-# curl 通过 DoH 查询
-curl -H 'accept: application/dns-json' \
-  'https://dns.google/resolve?name=example.com&type=A'
-```
+**为什么分层**：全球域名空间无法集中管理，分层将权威管理权下放到各顶级域（TLD）注册局，实现可扩展的分布式管理。
 
-### 常见DNS攻击
+**约束**：
+- 每个域名必须有至少2个权威NS服务器（冗余）
+- TLD服务器不存储具体域名，只返回下级权威服务器引用
+- DNS响应最大512字节（UDP），大响应需TCP
 
-| 攻击类型 | 原理 | 防御手段 |
-|----------|------|----------|
-| DNS欺骗 | 伪造DNS响应 | DNSSEC |
-| DNS隧道 | DNS查询携带隐蔽数据 | 深度包检测 |
-| DNS放大 | 小查询诱发大响应 | RRL(Response Rate Limiting) |
-| 缓存投毒 | 注入伪造DNS记录 | 随机查询ID、端口 |
-| 域名抢注 | 注册相似域名钓鱼 | 品牌监控 |
+**违规后果**：
+- 单点权威故障导致域名不可解析
+- TTL设置过短增加DNS查询负载，过长导致故障切换缓慢
 
-## 负载均衡与DNS
+**CDN就近性**：CDN的DNS调度系统根据查询源IP的地理位置（通过GeoIP库），返回最近的边缘节点IP，实现anycast类似的就近访问效果。
 
-DNS可以实现简单负载均衡：
+**DoH/DoT**：DNS查询加密通过HTTPS（DoH，端口443）或TLS（DoT，端口853）传输，防止中间人篡改DNS响应。传统DNS为明文UDP/53，易受污染。
+
+## 参考存根
 
 ```python
-# DNS轮询：多个IP按顺序返回
-# 假设有3台服务器
-servers = ["1.2.3.4", "1.2.3.5", "1.2.3.6"]
-# 第一次查询返回 1.2.3.4
-# 第二次查询返回 1.2.3.5
-# 第三次查询返回 1.2.3.6
-# 第四次又回到 1.2.3.4
-
-# 局限性：无法感知服务器负载，不支持健康检查
-# 解决方案：配合GSLB(全局负载均衡)或Anycast
-```
-
-**CDN如何通过DNS实现就近访问**：
-```
-用户 → 访问 www.cdn.com
-     → 当地ISP DNS → CDN DNS解析服务
-     → CDN DNS根据用户IP判断地理位置
-     → 返回最近的边缘节点IP
-     → 用户直接访问最近的CDN节点
-```
-
-## 实战：DNS配置示例
-
-```bash
-# 查看域名的完整DNS信息
-dig example.com +trace     # 完整追踪解析路径
-
-# 检查NS记录传播（域名服务器是否生效）
-dig NS example.com
-# 对比不同DNS服务器的返回结果
-dig @8.8.8.8 example.com
-dig @1.1.1.1 example.com
-
-# 检查MX记录（邮件是否正确配置）
-dig MX example.com +short
-
-# 检测SPF记录（防止邮件伪造）
-dig TXT example.com
-# 期望看到类似：v=spf1 include:_spf.example.com ~all
-```
-
-## DNS in Kubernetes
-
-Kubernetes中的DNS服务（CoreDNS）：
-
-```yaml
-# Service发现机制
-# my-svc.my-namespace.svc.cluster.local
-# 自动生成DNS记录，Pod可通过服务名直接访问
-
-# Headless Service（无ClusterIP）
-# 每个Pod生成独立DNS A记录
-# 用于有状态服务或自定义负载均衡
+import socket
+ip = socket.gethostbyname("www.example.com")  # 底层用系统DNS
+hostname, _, _ = socket.gethostbyaddr("93.184.216.34")  # PTR查询
 ```
 
 ```bash
-# 查看Kubernetes DNS
-kubectl get configmap coredns -n kube-system -o yaml
-
-# 在Pod内测试DNS
-kubectl exec -it my-pod -- nslookup kubernetes.default
-kubectl exec -it my-pod -- nslookup my-svc.my-namespace
+dig example.com A +trace       # 完整迭代路径追踪
+nslookup www.example.com        # 通用DNS查询
 ```
