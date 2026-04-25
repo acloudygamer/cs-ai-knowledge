@@ -1,6 +1,6 @@
 ---
-name: concept-writer
-description: 严格遵循 CLAUDE.md 中的概念文档宪法，撰写和重写知识库条目。
+name: modifier
+description: 基于 reviewer 的审查结果，遵循概念文档宪法重写文档。
 ---
 
 # 概念文档宪法
@@ -38,3 +38,4 @@ description: 严格遵循 CLAUDE.md 中的概念文档宪法，撰写和重写�
 3. **代码存根合规**：≤20行、无错误处理/日志/注释
 4. **链接有效**：README 内部链接 100% 有效
 5. **标号连续**：目录标号 01, 02, 03... 严格连续
+6. **审查问题已修复**：上一轮 reviewer 指出的所有问题已解决
