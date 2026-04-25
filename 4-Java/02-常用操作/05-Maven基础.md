@@ -1,83 +1,72 @@
 # Maven 基础
 
-## 概述
+> **本质断言**：Maven 通过约定优于配置（Convention over Configuration）和依赖传递图解析，将项目构建定义为一个有向无环图（DAG）的拓扑排序过程。
 
-Maven 是 Java 主流的构建工具和依赖管理工具，通过 `pom.xml` 声明项目依赖和构建配置。
+## 依赖解析算法
 
-核心功能：
-- **依赖管理**：自动下载、更新、解决依赖冲突
-- **构建自动化**：编译、打包、测试、部署
-- **项目模板**：使用 Archetype 创建标准项目结构
-- **统一构建**：保证团队构建一致性问题
+<pre>
+依赖图构建：
+A → B:1.0
+A → C:2.0
+B → D:1.5
+C → D:2.0  (冲突)
 
-## 项目结构
+Maven 最短路径原则：
+A → B → D:1.5  (路径长度2)
+A → C → D:2.0  (路径长度2) → 声明顺序/Circular选择
 
-```
+冲突解决：选择路径最短的版本；若等长，选择声明靠前的
+</pre>
+
+`dependencyManagement` 节点的作用是将版本号提升到父 POM，作为所有子模块引用的版本约束来源，避免版本信息散落在各子模块。
+
+## 项目结构约定
+
+<pre>
 my-project/
-├── pom.xml              # 项目配置
-├── src/
-│   ├── main/
-│   │   ├── java/        # Java 源码
-│   │   └── resources/   # 资源文件
-│   └── test/
-│       ├── java/        # 测试源码
-│       └── resources/   # 测试资源
-└── target/              # 编译输出目录
-```
+├── pom.xml
+├── src/main/java/        ← 编译输出到 target/classes
+├── src/main/resources/   ← 资源文件复制到 target/classes
+├── src/test/java/        ← 测试编译输出到 target/test-classes
+└── target/               ← 所有构建产物
+</pre>
 
-## pom.xml 基础
-
-GAV: GroupId, ArtifactId, Version。
-
-## 依赖范围（scope）
-
-| scope | 编译时可用 | 打包时包含 | 测试可用 |
-|-------|-----------|-----------|---------|
-| `compile` | ✓ | ✓ | ✓ |
-| `provided` | ✓ | ✗ | ✓ |
-| `runtime` | ✗ | ✓ | ✓ |
-| `test` | ✗ | ✗ | ✓ |
-
-## 依赖版本管理
-
-Maven 采用"最短路径"和"声明顺序"原则解决版本冲突。
-
-## Maven 仓库
-
-本地仓库位置 `~/.m2/repository`。
-
-## Spring Boot 的父 POM
-
-Spring Boot 项目继承 `spring-boot-starter-parent`，获得统一版本管理。
-
-## 多模块项目
-
-父 pom.xml 使用 `<modules>` 声明子模块，`<dependencyManagement>` 统一版本管理。
-
-## 常用插件
-
-### Maven Compiler Plugin
-
-### Spring Boot Maven Plugin
+约定优于配置意味着：如果遵循标准目录结构，`pom.xml` 可以极简；如果自定义源码目录（如将 Java 源码放在 `src/java`），则需显式配置 `<sourceDirectory>`。
 
 ## 构建生命周期
 
-```
+<pre>
 validate → compile → test → package → verify → install → deploy
-```
+  │         │        │       │         │        │        │
+  │         │        │       │         │        │        └── 推送到远程仓库
+  │         │        │       │         │        └── 安装到本地 .m2
+  │         │        │       │         └── 运行集成测试
+  │         │        │       └── jar/war/zip
+  │         │        └── 运行单元测试（surefire）
+  │         └── 编译 src/main/java
+  └── 验证项目结构正确
+</pre>
+
+每个阶段（phase）绑定一个或多个插件目标（goal）。`mvn package` 实际执行 `process-classes → jar:jar` 等。
+
+## 依赖范围（scope）
+
+| scope | 编译可见 | 打包包含 | 测试可见 | 典型用途 |
+|-------|---------|---------|---------|---------|
+| `compile` | ✓ | ✓ | ✓ | 默认，主代码依赖 |
+| `provided` | ✓ | ✗ | ✓ | JDK/容器提供的 API |
+| `runtime` | ✗ | ✓ | ✓ | 实现类，如 JDBC 驱动 |
+| `test` | ✗ | ✗ | ✓ | 仅测试代码依赖 |
 
 ## 参考样例
 
 ```xml
-<?xml version="1.0" encoding="UTF-8"?>
-<project xmlns="http://maven.apache.org/POM/4.0.0">
+<!-- 最小 pom.xml（≤20行）-->
+<project>
     <modelVersion>4.0.0</modelVersion>
-
     <groupId>com.example</groupId>
     <artifactId>my-app</artifactId>
     <version>1.0.0</version>
-    <packaging>jar</packaging>
-
     <dependencies>
         <dependency>
             <groupId>org.junit.jupiter</groupId>
@@ -86,38 +75,14 @@ validate → compile → test → package → verify → install → deploy
             <scope>test</scope>
         </dependency>
     </dependencies>
-
-    <build>
-        <plugins>
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-compiler-plugin</artifactId>
-                <version>3.11.0</version>
-                <configuration>
-                    <source>21</source>
-                    <target>21</target>
-                </configuration>
-            </plugin>
-        </plugins>
-    </build>
 </project>
 ```
 
-```bash
-# 常用命令
-mvn compile           # 编译项目
-mvn test              # 运行测试
-mvn package           # 打包
-mvn clean package     # 清理并重新构建
-mvn dependency:tree    # 查看依赖树
-mvn clean install -DskipTests  # 跳过测试安装
-```
-
 ```xml
-<!-- 依赖排除 -->
+<!-- 依赖排除（解决冲突）-->
 <dependency>
     <groupId>com.example</groupId>
-    <artifactId>some-library</artifactId>
+    <artifactId>some-lib</artifactId>
     <version>1.0.0</version>
     <exclusions>
         <exclusion>
@@ -135,23 +100,15 @@ mvn clean install -DskipTests  # 跳过测试安装
     <artifactId>spring-boot-starter-parent</artifactId>
     <version>3.4.0</version>
 </parent>
-
-<dependencies>
-    <dependency>
-        <groupId>org.springframework.boot</groupId>
-        <artifactId>spring-boot-starter-web</artifactId>
-    </dependency>
-</dependencies>
 ```
 
 ```xml
-<!-- 多模块项目父 POM -->
+<!-- 多模块父 POM -->
 <project>
     <groupId>com.example</groupId>
     <artifactId>parent-project</artifactId>
     <version>1.0.0</version>
     <packaging>pom</packaging>
-
     <modules>
         <module>module-a</module>
         <module>module-b</module>
@@ -164,9 +121,16 @@ mvn clean install -DskipTests  # 跳过测试安装
 <mirrors>
     <mirror>
         <id>aliyun</id>
-        <name>Aliyun Maven</name>
         <url>https://maven.aliyun.com/repository/public</url>
         <mirrorOf>central</mirrorOf>
     </mirror>
 </mirrors>
+```
+
+```bash
+# 常用命令
+mvn compile        # 编译
+mvn test            # 运行测试
+mvn package         # 打包
+mvn dependency:tree  # 查看依赖树
 ```

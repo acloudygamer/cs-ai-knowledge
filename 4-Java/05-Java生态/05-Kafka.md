@@ -1,347 +1,109 @@
 # Kafka
 
-## Kafka 概述
+## 本质断言
 
-Kafka 是分布式流处理平台，用于构建实时数据管道和流应用。
+Kafka 是分布式流处理平台，其本质是通过顺序写磁盘实现高吞吐，通过分区（Partition）实现水平扩展，通过消费者组（Consumer Group）实现负载均衡和消息冗余消费，通过持久化日志（Log）实现消息回溯。
 
-### 核心概念
+## 核心概念
 
-| 概念 | 说明 |
-|------|------|
-| Producer | 消息生产者 |
-| Consumer | 消息消费者 |
-| Consumer Group | 消费者组 |
-| Topic | 消息主题 |
-| Partition | 分区 |
-| Broker | Kafka 节点 |
-| Offset | 消费位移 |
+### Topic 与 Partition
 
-### 架构
+<pre>
+Kafka 存储结构：
+Topic: orders（3 个 Partition）
+    ↓
+Partition 0: [msg0, msg1, msg3, msg5] → Broker 1
+Partition 1: [msg0, msg2, msg4]       → Broker 2
+Partition 2: [msg0, msg1, msg4, msg6] → Broker 3
 
-```
-Producer → Broker1/Broker2/Broker3
-              ↓
-           Topic (3 partitions)
-              ↓
-Consumer Group1 → [P0, P1, P2]
-Consumer Group2 → [P0, P1, P2]
-```
+消息路由：Producer 根据 key 哈希 → Partition 编号
+消费分配：Consumer Group 内每个 Partition 只能被一个 Consumer 消费
+</pre>
 
-## Spring Kafka
+### Offset 的本质
 
-### 配置
+Offset 是消息在 Partition 内的唯一递增序号。Consumer 通过提交 Offset 告诉 Broker "我已经消费到哪条了"，实现消息仅处理一次的语义（at-least-once + 幂等）。
 
-```yaml
-spring:
-  kafka:
-    bootstrap-servers: localhost:9092
-    consumer:
-      group-id: my-group
-      auto-offset-reset: earliest
-      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
-      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
-    producer:
-      key-serializer: org.apache.kafka.common.serialization.StringSerializer
-      value-serializer: org.apache.kafka.common.serialization.StringSerializer
-```
+## 生产者
 
-## Producer
+### 发送确认（ACKS）机制
 
-### 基本发送
+<pre>
+ACKS 配置与持久性：
+acks=0：发出去即成功，丢消息风险最高
+acks=1：Leader 写入成功即返回，可能丢消息（Follower 未同步）
+acks=all：ISR 全部写入成功才返回，最强持久性
+</pre>
 
-```java
-@Service
-public class KafkaProducerService {
+### 分区策略
 
-    @Autowired
-    private KafkaTemplate<String, String> kafkaTemplate;
+Producer 根据 key 计算哈希后决定写入哪个 Partition。默认哈希是 key.hashCode() % partitionCount。自定义分区器可实现基于业务规则的分区（如按地区、用户 ID）。
 
-    public void send(String topic, String key, String value) {
-        kafkaTemplate.send(topic, key, value)
-            .whenComplete((result, ex) -> {
-                if (ex == null) {
-                    System.out.println("Sent: " + value);
-                } else {
-                    System.out.println("Failed: " + ex.getMessage());
-                }
-            });
-    }
+## 消费者
 
-    public void send(String topic, String value) {
-        kafkaTemplate.send(topic, value);
-    }
-}
-```
+### 消费者组机制
 
-### 自定义配置
+<pre>
+消费者组消费模型：
+Consumer Group A：[P0, P1]（2 个 Consumer）
+Consumer Group B：[P0, P1, P2]（3 个 Consumer）
+    ↓
+每个 Partition 只能被同组内一个 Consumer 消费
+不同组之间相互独立，都可以消费全量消息
+</pre>
 
-```java
-@Bean
-public ProducerFactory<String, String> producerFactory() {
-    Map<String, Object> configProps = new HashMap<>();
-    configProps.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, "localhost:9092");
-    configProps.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
-    configProps.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
-    configProps.put(ProducerConfig.ACKS_CONFIG, "all");
-    configProps.put(ProducerConfig.RETRIES_CONFIG, 3);
-    configProps.put(ProducerConfig.BATCH_SIZE_CONFIG, 16384);
-    configProps.put(ProducerConfig.LINGER_MS_CONFIG, 1);
-    return new DefaultKafkaProducerFactory<>(configProps);
-}
-```
+### 提交模式
 
-### 发送 JSON
+<pre>
+提交方式对比：
+自动提交（enable.auto.commit=true）：
+    每隔 auto.commit.interval.ms 提交一次
+    可能重复消费（提交后崩溃）
 
-```java
-@Bean
-public ProducerFactory<String, User> jsonProducerFactory() {
-    Map<String, Object> configProps = new HashMap<>();
-    configProps.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, "localhost:9092");
-    configProps.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
-    configProps.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, JsonSerializer.class);
-    return new DefaultKafkaProducerFactory<>(configProps);
-}
-
-@Service
-public class UserProducer {
-    @Autowired
-    private KafkaTemplate<String, User> kafkaTemplate;
-
-    public void sendUser(User user) {
-        kafkaTemplate.send("users", user.getId().toString(), user);
-    }
-}
-```
-
-## Consumer
-
-### 基本消费
-
-```java
-@Service
-public class KafkaConsumerService {
-
-    @KafkaListener(topics = "my-topic", groupId = "my-group")
-    public void listen(String message) {
-        System.out.println("Received: " + message);
-    }
-}
-```
-
-### 手动提交
-
-```java
-@KafkaListener(topics = "my-topic", groupId = "my-group")
-public void listen(ConsumerRecord<String, String> record, Acknowledgment ack) {
-    try {
-        process(record.value());
-        ack.acknowledge();
-    } catch (Exception e) {
-        // 处理失败，可以重试或发送到死信队列
-    }
-}
-```
-
-### 指定分区
-
-```java
-@KafkaListener(
-    topicPartitions = @TopicPartition(
-        topic = "my-topic",
-        partitions = {"0", "1"}
-    )
-)
-public void listenPartition(ConsumerRecord<String, String> record) {
-    System.out.println("Partition " + record.partition() + ": " + record.value());
-}
-```
-
-## 序列化
-
-### JSON 序列化
-
-```java
-@Bean
-public ConsumerFactory<String, User> jsonConsumerFactory() {
-    Map<String, Object> props = new HashMap<>();
-    props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, "localhost:9092");
-    props.put(ConsumerConfig.GROUP_ID_CONFIG, "my-group");
-    props.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
-    props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, JsonDeserializer.class);
-    props.put(JsonDeserializer.TRUSTED_PACKAGES, "com.example.model");
-    props.put(JsonDeserializer.VALUE_DEFAULT_TYPE, User.class.getName());
-
-    return new DefaultKafkaConsumerFactory<>(
-        props,
-        new StringDeserializer(),
-        new JsonDeserializer<>(User.class)
-    );
-}
-```
+手动提交：
+    ack.acknowledge() 同步提交
+    失败可重试，确保 exactly-once（结合事务）
+</pre>
 
 ## 错误处理
 
-### 异常处理器
+### 重试机制
 
-```java
-@Bean
-public CommonErrorHandler errorHandler() {
-    return new DefaultErrorHandler(
-        new FixedBackOff(1000L, 3)
-    );
-}
-```
-
-### 死信队列
-
-```java
-@Bean
-public ErrorHandler errorHandler(KafkaTemplate<String, String> template) {
-    DeadLetterPublishingRecoverer recoverer =
-        new DeadLetterPublishingRecoverer(template,
-            (record, ex) -> new TopicPartition("my-topic.DLT", record.partition())
-        );
-    return new DefaultErrorHandler(recoverer, new FixedBackOff(1000L, 3));
-}
-```
-
-### 消息重试
-
-```java
-@Bean
-public RetryTemplate retryTemplate() {
-    RetryTemplate retryTemplate = new RetryTemplate();
-    ExponentialBackOffPolicy policy = new ExponentialBackOffPolicy();
-    policy.setInitialInterval(1000);
-    policy.setMultiplier(2.0);
-    policy.setMaxInterval(10000);
-    retryTemplate.setBackOffPolicy(policy);
-    return retryTemplate;
-}
-```
+<pre>
+Kafka 重试拓扑：
+消息发送失败 → 重试（retries 配置次数）
+    ↓
+超过重试次数 → 进入重试队列或死信队列（DLT）
+    ↓
+死信队列保留无法处理的消息供人工干预
+</pre>
 
 ## 事务
 
-### 发送端事务
+### 事务的原子性保证
 
-```java
-@Service
-public class TransactionalProducer {
-    @Autowired
-    private KafkaTemplate<String, String> kafkaTemplate;
-
-    @Transactional
-    public void sendInTransaction(String topic, String key, String value) {
-        kafkaTemplate.send(topic, key, value);
-    }
-}
-```
-
-### 消费端事务
-
-```java
-@KafkaListener(topics = "input-topic")
-public void consumeWithTransaction(
-        @Payload String message,
-        Acknowledgment acknowledgment) {
-    try {
-        process(message);
-        acknowledgment.acknowledge();
-    } catch (Exception e) {
-        // 处理失败，不提交，等待重试
-    }
-}
-```
+Kafka 事务通过 PID（Producer ID）和序列号（Sequence Number）实现 exactly-once 语义：同一 PID 的消息序列号必须连续，Broker 拒绝接受序列号跳跃的消息。
 
 ## Spring Cloud Stream
 
-### 概念
+### 绑定器抽象
 
-```
+<pre>
+Spring Cloud Stream 架构：
 Source → Channel → Binder → Kafka
          ↓
       Processor
          ↓
       Sink
-```
 
-### 使用
-
-```java
-@SpringBootApplication
-@EnableBinding(Source.class)
-public class ProducerApplication {
-    @Autowired
-    private Source source;
-
-    public void send(String message) {
-        source.output().send(MessageBuilder.withPayload(message).build());
-    }
-}
-
-@SpringBootApplication
-@EnableBinding(Sink.class)
-public class ConsumerApplication {
-    @StreamListener(Sink.INPUT)
-    public void listen(String message) {
-        System.out.println("Received: " + message);
-    }
-}
-```
-
-## 消费者组
-
-### 概念
-
-同一消费者组的消费者共同消费主题分区，一个分区只被一个消费者消费；不同消费者组相互独立。
-
-### 配置
-
-```yaml
-spring:
-  kafka:
-    consumer:
-      group-id: my-group
-      max-poll-records: 500
-```
-
-## 最佳实践
-
-### 分区策略
-
-```java
-// 指定分区
-kafkaTemplate.send("topic", partition, key, value);
-
-// 自定义分区器
-public class CustomPartitioner implements Partitioner {
-    @Override
-    public int partition(String topic, Object key, byte[] keyBytes,
-                        Object value, byte[] valueBytes, Cluster cluster) {
-        return Math.abs(key.hashCode()) %
-            cluster.partitionsForTopic(topic).size();
-    }
-}
-```
-
-### 性能优化
-
-```java
-// Producer
-props.put(ProducerConfig.BATCH_SIZE_CONFIG, 32768);
-props.put(ProducerConfig.LINGER_MS_CONFIG, 10);
-props.put(ProducerConfig.BUFFER_MEMORY_CONFIG, 67108864);
-
-// Consumer
-props.put(ConsumerConfig.MAX_POLL_RECORDS_CONFIG, 500);
-props.put(ConsumerConfig.FETCH_MIN_BYTES_CONFIG, 1024);
-props.put(ConsumerConfig.FETCH_MAX_WAIT_MS_CONFIG, 500);
-```
+Binder：对接具体消息中间件（Kafka / RabbitMQ）
+Channel：应用与 Binder 之间的队列抽象
+Source/Sink：预定义的输入/输出端点
+</pre>
 
 ## 参考样例
 
 ```yaml
-# Spring Kafka 配置
 spring:
   kafka:
     bootstrap-servers: localhost:9092
@@ -354,104 +116,45 @@ spring:
 ```
 
 ```java
-// Producer 发送
 @Service
 public class KafkaProducerService {
-    @Autowired
-    private KafkaTemplate<String, String> kafkaTemplate;
-
+    private final KafkaTemplate<String, String> kafkaTemplate;
     public void send(String topic, String key, String value) {
-        kafkaTemplate.send(topic, key, value)
-            .whenComplete((result, ex) -> {
-                if (ex == null) {
-                    System.out.println("Sent: " + value);
-                } else {
-                    System.out.println("Failed: " + ex.getMessage());
-                }
-            });
-    }
-}
-```
-
-```java
-// Consumer 消费
-@Service
-public class KafkaConsumerService {
-    @KafkaListener(topics = "my-topic", groupId = "my-group")
-    public void listen(String message) {
-        System.out.println("Received: " + message);
-    }
-}
-```
-
-```java
-// 手动提交
-@KafkaListener(topics = "my-topic")
-public void listen(ConsumerRecord<String, String> record, Acknowledgment ack) {
-    try {
-        process(record.value());
-        ack.acknowledge();
-    } catch (Exception e) {
-        // 处理失败
-    }
-}
-```
-
-```java
-// JSON 发送
-@Service
-public class UserProducer {
-    @Autowired
-    private KafkaTemplate<String, User> kafkaTemplate;
-
-    public void sendUser(User user) {
-        kafkaTemplate.send("users", user.getId().toString(), user);
-    }
-}
-```
-
-```java
-// 错误处理 - 死信队列
-@Bean
-public ErrorHandler errorHandler(KafkaTemplate<String, String> template) {
-    DeadLetterPublishingRecoverer recoverer =
-        new DeadLetterPublishingRecoverer(template,
-            (record, ex) -> new TopicPartition("my-topic.DLT", record.partition())
-        );
-    return new DefaultErrorHandler(recoverer, new FixedBackOff(1000L, 3));
-}
-```
-
-```java
-// 重试机制
-@Bean
-public RetryTemplate retryTemplate() {
-    RetryTemplate retryTemplate = new RetryTemplate();
-    ExponentialBackOffPolicy policy = new ExponentialBackOffPolicy();
-    policy.setInitialInterval(1000);
-    policy.setMultiplier(2.0);
-    policy.setMaxInterval(10000);
-    retryTemplate.setBackOffPolicy(policy);
-    return retryTemplate;
-}
-```
-
-```java
-// 事务
-@Service
-public class TransactionalProducer {
-    @Autowired
-    private KafkaTemplate<String, String> kafkaTemplate;
-
-    @Transactional
-    public void sendInTransaction(String topic, String key, String value) {
         kafkaTemplate.send(topic, key, value);
     }
 }
 ```
 
 ```java
-// 性能优化配置
+@KafkaListener(topics = "my-topic", groupId = "my-group")
+public void listen(String message) { }
+```
+
+```java
+@KafkaListener(topics = "my-topic")
+public void listen(ConsumerRecord<String, String> record, Acknowledgment ack) {
+    process(record.value());
+    ack.acknowledge();
+}
+```
+
+```java
+@Bean
+public ErrorHandler errorHandler(KafkaTemplate<String, String> template) {
+    DeadLetterPublishingRecoverer recoverer = new DeadLetterPublishingRecoverer(template,
+        (record, ex) -> new TopicPartition("my-topic.DLT", record.partition()));
+    return new DefaultErrorHandler(recoverer, new FixedBackOff(1000L, 3));
+}
+```
+
+```java
+@Transactional
+public void sendInTransaction(String topic, String key, String value) {
+    kafkaTemplate.send(topic, key, value);
+}
+```
+
+```java
 props.put(ProducerConfig.BATCH_SIZE_CONFIG, 32768);
 props.put(ProducerConfig.LINGER_MS_CONFIG, 10);
 props.put(ConsumerConfig.MAX_POLL_RECORDS_CONFIG, 500);

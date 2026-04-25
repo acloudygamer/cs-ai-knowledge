@@ -1,95 +1,89 @@
 # JDBC 数据库操作
 
-## 概述
+> **本质断言**：JDBC 是基于驱动注册的数据库无关抽象，Connection 对应一次数据库会话，PreparedStatement 将 SQL 编译和参数绑定分离——前者确保 SQL 结构固定无法注入，后者复用编译计划提升性能。
 
-JDBC (Java Database Connectivity) 是 Java 操作数据库的标准 API。
+## 架构与数据流
 
-## JDBC 架构
+<pre>
+Java App
+   │
+   │  JDBC API (java.sql / javax.sql)
+   ▼
+DriverManager ────► 注册的 Driver 实现
+   │
+   │  物理连接 (TCP / Unix Socket)
+   ▼
+Database Server (MySQL / PostgreSQL / Oracle...)
+</pre>
 
-```
-Java 应用 → JDBC API → JDBC Driver Manager → 数据库驱动 → 数据库服务器
-```
+`DriverManager.getConnection()` 遍历已注册的 `Driver` 实现，尝试建立连接。连接参数（URL、用户名、密码）格式为 `{vendor}://host:port/dbname`，由各厂商驱动解析。
 
-## JDBC 基本步骤
+## PreparedStatement 防 SQL 注入原理
 
-1. 获取连接
-2. 创建语句
-3. 执行 SQL
-4. 处理结果
-5. 关闭资源
+<pre>
+传统 Statement:
+"SELECT * FROM users WHERE name='" + name + "'"
+// name = "Alice' OR '1'='1"
+→ SELECT * FROM users WHERE name='Alice' OR '1'='1'  // 注入成功
 
-## CRUD 操作
+PreparedStatement:
+"SELECT * FROM users WHERE name=?" + setString(1, name)
+// 参数作为字面值发送，不参与 SQL 结构解析
+→ SELECT * FROM users WHERE name='Alice'' OR ''1''=''1'  // 全部作为数据
+</pre>
 
-### 创建表
+预编译的原理：数据库先收到 `SELECT * FROM users WHERE name=?`，编译执行计划（该计划对任何参数值都相同），然后发送参数值。攻击者的 `' OR '1'='1` 作为字面值被插入，不会改变查询结构。
 
-### 插入数据
+## 事务隔离级别
 
-### 查询数据
+| 级别 | 脏读 | 不可重复读 | 幻读 |
+|------|------|-----------|------|
+| READ_UNCOMMITTED | 可能 | 可能 | 可能 |
+| READ_COMMITTED | ✗ | 可能 | 可能 |
+| REPEATABLE_READ | ✗ | ✗ | 可能 |
+| SERIALIZABLE | ✗ | ✗ | ✗ |
 
-### 更新数据
+MySQL 默认 `REPEATABLE_READ`，PostgreSQL 默认 `READ_COMMITTED`。隔离级别越高，并发性能越差，因为需要更多锁。
 
-### 删除数据
+## 连接池原理
 
-## 事务管理
+<pre>
+应用请求 Connection
+        │
+        ▼
+HikariCP 连接池
+  ├─ 已分配连接列表 (active)
+  └─ 空闲连接队列 (idle)
+        │
+        ▼
+物理数据库连接复用 (避免频繁建立/断开 TCP 连接)
+</pre>
 
-通过 setAutoCommit(false) 开启手动提交，commit() 提交，rollback() 回滚。
-
-## JDBC 工具类
-
-简化 JDBC 操作的工具类，提供 queryForObject、query、update 等方法。
-
-## Spring JDBC
-
-Spring Boot 项目推荐使用 `JdbcTemplate`。
-
-## 常见问题
-
-### SQL 注入防护
-
-必须使用 PreparedStatement，禁止字符串拼接 SQL。
-
-### 批量操作
-
-使用 addBatch() 添加批次，executeBatch() 执行。
-
-### BLOB/CLOB 处理
-
-## 数据库连接池
-
-推荐使用 HikariCP（Spring Boot 默认）。
+连接池的核心价值：数据库连接建立成本高（TCP 握手 + 认证 + 初始化查询），通过复用避免每次操作都重新建立。HikariCP 以"太空舱"设计著称，连接对象在借用和归还时不包装任何代理对象，直接返回原始 JDBC Connection。
 
 ## 参考样例
 
 ```java
-// 基本步骤
-try (Connection conn = DriverManager.getConnection(url, username, password);
+// 基本步骤（≤20行）
+try (Connection conn = DriverManager.getConnection(url, user, pwd);
      Statement stmt = conn.createStatement();
      ResultSet rs = stmt.executeQuery("SELECT * FROM users")) {
-
-    while (rs.next()) {
-        long id = rs.getLong("id");
-        String name = rs.getString("name");
-    }
+    while (rs.next())
+        System.out.println(rs.getString("name"));
 }
 ```
 
 ```java
-// 插入数据
-String insertSql = "INSERT INTO users (name, email, age) VALUES (?, ?, ?)";
+// PreparedStatement 插入
+String sql = "INSERT INTO users (name, email) VALUES (?, ?)";
 try (Connection conn = getConnection();
-     PreparedStatement pstmt = conn.prepareStatement(insertSql,
+     PreparedStatement pstmt = conn.prepareStatement(sql,
              Statement.RETURN_GENERATED_KEYS)) {
-
     pstmt.setString(1, "Alice");
     pstmt.setString(2, "alice@example.com");
-    pstmt.setInt(3, 30);
-
-    int affected = pstmt.executeUpdate();
-    try (ResultSet keys = pstmt.getGeneratedKeys()) {
-        if (keys.next()) {
-            long id = keys.getLong(1);
-        }
-    }
+    pstmt.executeUpdate();
+    ResultSet keys = pstmt.getGeneratedKeys();
+    if (keys.next()) System.out.println(keys.getLong(1));
 }
 ```
 
@@ -98,62 +92,17 @@ try (Connection conn = getConnection();
 try (Connection conn = getConnection()) {
     conn.setAutoCommit(false);
     try {
-        // 操作 1
-        // 操作 2
+        // 操作1; 操作2;
         conn.commit();
-    } catch (Exception e) {
-        conn.rollback();
-        throw e;
-    }
-}
-```
-
-```java
-// Spring JdbcTemplate
-@Service
-public class UserRepository {
-    private final JdbcTemplate jdbc;
-
-    public Optional<User> findById(Long id) {
-        String sql = "SELECT id, name, email, age FROM users WHERE id = ?";
-        return jdbc.query(sql, (rs, rowNum) ->
-            new User(rs.getLong("id"), rs.getString("name"),
-                rs.getString("email"), rs.getInt("age")), id
-        ).stream().findFirst();
-    }
-
-    public long insert(User user) {
-        String sql = "INSERT INTO users (name, email, age) VALUES (?, ?, ?)";
-        KeyHolder keyHolder = new GeneratedKeyHolder();
-        jdbc.update(connection -> {
-            PreparedStatement ps = connection.prepareStatement(sql, new String[]{"id"});
-            ps.setString(1, user.name());
-            ps.setString(2, user.email());
-            ps.setInt(3, user.age());
-            return ps;
-        }, keyHolder);
-        return keyHolder.getKey().longValue();
-    }
+    } catch (Exception e) { conn.rollback(); throw e; }
 }
 ```
 
 ```java
 // SQL 注入防护
-String sql = "SELECT * FROM users WHERE name = ?";
+String sql = "SELECT * FROM users WHERE name=?";
 PreparedStatement pstmt = conn.prepareStatement(sql);
 pstmt.setString(1, name);
-```
-
-```java
-// 批量操作
-conn.setAutoCommit(false);
-for (User user : users) {
-    pstmt.setString(1, user.name());
-    pstmt.setString(2, user.email());
-    pstmt.addBatch();
-}
-int[] results = pstmt.executeBatch();
-conn.commit();
 ```
 
 ```yaml

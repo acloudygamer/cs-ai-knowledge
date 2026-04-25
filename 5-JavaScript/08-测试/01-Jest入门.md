@@ -1,489 +1,193 @@
 # Jest 入门
 
-## 简介
+> **版本基准**：Node24+ES2024 | Node26+ES2026
 
-Jest 是 Facebook 开发的 JavaScript 测试框架，支持零配置、自动捕获断言、隔离测试、实时监控等特性。
+## 本质断言
 
-### 安装
-
-```bash
-# npm
-npm install --save-dev jest
-
-# yarn
-yarn add --dev jest
-
-# pnpm
-pnpm add -D jest
-```
-
-### 配置
-
-```javascript
-// jest.config.js
-module.exports = {
-  // 测试环境
-  testEnvironment: 'node', // 或 'jsdom'
-
-  // 测试文件匹配模式
-  testMatch: [
-    '**/__tests__/**/*.js',
-    '**/?(*.)+(spec|test).js'
-  ],
-
-  // 忽略的文件
-  testPathIgnorePatterns: [
-    '/node_modules/',
-    '/dist/'
-  ],
-
-  // 收集覆盖率的文件
-  collectCoverageFrom: [
-    'src/**/*.js',
-    '!src/**/*.test.js'
-  ],
-
-  // 覆盖率目录
-  coverageDirectory: 'coverage',
-
-  // 覆盖率报告
-  coverageReporters: ['text', 'lcov', 'html'],
-
-  // 映射
-  moduleNameMapper: {
-    '^@/(.*)$': '<rootDir>/src/$1'
-  },
-
-  // 设置/清理
-  setupFilesAfterEnv: ['<rootDir>/jest.setup.js'],
-
-  // 超时
-  testTimeout: 10000
-};
-```
+**Jest 是 Facebook 开发的 JavaScript 测试框架，通过隔离执行和快照比对实现零配置自动化验证。**
 
 ---
 
-## 基本语法
+## 设计机制
 
-### describe 和 it/test
+### 隔离执行模型
+
+Jest 在子进程或 worker 线程中运行每个测试文件，通过 `vm` 模块创建独立上下文，使全局状态（模块缓存、变量）无法跨文件共享。
+
+```
+测试套件A ──┬── 进程1 ── 独立vm上下文
+           │
+测试套件B ──┴── 进程2 ── 独立vm上下文
+```
+
+### 快照比对机制
+
+首次执行时将输出序列化存储为 `.snap` 文件，后续运行逐字节比对，差异即失败——此设计使 UI 组件的渲染结果可被回归测试。
+
+### 自动 mock 注入
+
+`jest.mock()` 拦截模块加载路径，返回 `jest.fn()` 伪造实现，而非执行真实 I/O、网络或文件系统操作。
+
+---
+
+## 核心概念
+
+### 测试结构：describe-it
+
+<pre>
+describe(套件名, () => {
+  it(用例名, () => {
+    expect(实际值).toBe(期望值)
+  })
+})
+</pre>
+
+- `describe` 分组相关用例，控制生命周期钩子作用域
+- `it` / `test` 语义等价，均为最小测试单元
+- `expect` 返回链路式断言对象，调用匹配器完成验证
+
+### 匹配器分类
+
+| 类型 | 典型匹配器 | 设计意图 |
+|------|-----------|---------|
+| 相等 | `toBe`/`toEqual` | `toBe` 用 `Object.is`（精确相等），`toEqual` 深度递归比较 |
+| 布尔 | `toBeTruthy`/`toBeFalsy` | 隐式类型转换后的真假判断 |
+| 类型 | `toBeNull`/`toBeUndefined` | 精确类型，而非真假 |
+| 包含 | `toContain` | 数组含元素、字符串含子串、iterable 含项 |
+| 属性 | `toHaveProperty` | 检查路径存在性，支持 `a.b.c` 深路径 |
+| 异常 | `toThrow` | 封装 `try-catch`，验证抛出内容 |
+
+### 生命周期钩子作用域
+
+<pre>
+外层 describe
+  ├── beforeAll ─── 本层及所有子层之前执行一次
+  ├── beforeEach ─── 每个用例之前执行
+  │
+  └── 内层 describe（独立作用域）
+        ├── beforeAll ─── 仅内层之前
+        ├── afterAll  ─── 仅内层之后
+        ├── beforeEach
+        └── it / test
+</pre>
+
+**设计原因**：钩子与最近的 `describe` 绑定，内外层钩子按 setup→子层setup→用例→子层teardown→外层teardown 顺序执行，保证跨层设置的隔离性。
+
+### Mock 函数状态机
+
+```
+jest.fn() ──mockReturnValue──► 已配置（同步返回值）
+        ──mockResolvedValue──► 已配置（Promise 穿透）
+        ──mockImplementation──► 已配置（自定义逻辑）
+        │
+        └── clearAllMocks() ──► 调用记录清空，配置保留
+             resetAllMocks() ──► 调用记录+配置均清空
+                  restoreAllMocks() ──► 若由 spyOn 生成，恢复原始实现
+```
+
+### Timer Mock 隔离原理
+
+`jest.useFakeTimers()` 将 `setTimeout`/`setInterval` 替换为内存中模拟时钟，时间推进由 `jest.advanceTimersByTime()` 控制——此设计使异步测试在同步控制流中确定性执行。
+
+---
+
+## 参考实现
 
 ```javascript
-// 基本结构
-describe('Calculator', () => {
-  describe('add', () => {
-    it('should add two numbers', () => {
-      expect(1 + 2).toBe(3);
-    });
-
-    test('should handle negative numbers', () => {
-      expect(-1 + 2).toBe(1);
-    });
-  });
+// 最小测试单元
+it('adds two numbers', () => {
+  expect(1 + 2).toBe(3);
 });
 ```
 
-### 匹配器（Matchers）
-
 ```javascript
-// 常用匹配器
-expect(1 + 1).toBe(2);           // ===
-expect([1, 2, 3]).toContain(2);  // 包含
-expect({ name: 'Alice' }).toHaveProperty('name');  // 属性存在
-expect(null).toBeNull();         // null
-expect(undefined).toBeUndefined(); // undefined
-expect('').toBeFalsy();          // 假值
-expect(1).toBeTruthy();          // 真值
-expect(1).toEqual(1);            // 值相等（深比较）
-expect(1).not.toBe(2);           // 取反
+// 同步匹配器
+expect(null).toBeNull();
+expect(undefined).toBeUndefined();
+expect('').toBeFalsy();
 ```
 
-### 数值匹配器
-
 ```javascript
-expect(0.1 + 0.2).toBeCloseTo(0.3);  // 浮点数比较
-expect(5).toBeGreaterThan(3);         // >
-expect(3).toBeLessThan(5);            // <
-expect(3).toBeGreaterThanOrEqual(3);  // >=
-expect(3).toBeLessThanOrEqual(3);     // <=
-```
-
-### 字符串匹配器
-
-```javascript
-expect('Hello World').toMatch(/World/);  // 正则匹配
-expect('Hello').toHaveLength(5);         // 长度
-expect('hello').toContain('ell');        // 子串
-expect('hello').toStartWith('he');       // 开头
-expect('hello').toEndWith('lo');         // 结尾
-```
-
-### 数组/可迭代对象匹配器
-
-```javascript
+// 数组包含
 expect([1, 2, 3]).toContain(2);
-expect([1, 2, 3]).toHaveLength(3);
-expect([{ name: 'Alice' }]).toContainEqual({ name: 'Alice' });
-
-// 数组元素满足条件
-expect([1, 2, 3]).toEqual(
-  expect.arrayContaining([1, 2])
-);
 ```
 
-### 对象匹配器
-
 ```javascript
-expect({ name: 'Alice', age: 25 }).toEqual(
-  expect.objectContaining({ name: 'Alice' })
-);
-
-expect(Object.keys({})).toHaveLength(0);  // 检查空对象
-
-expect({ a: 1, b: 2 }).toHaveProperty('a');
-expect({ a: 1 }).toEqual({ a: 1 });  // 严格相等（undefined 不同）
+// 对象深比较
+expect({ a: 1 }).toEqual({ a: 1 });
 ```
 
-### 异常匹配器
-
 ```javascript
-function throwError() {
-  throw new Error('Something went wrong');
-}
-
-expect(throwError).toThrow();
-expect(throwError).toThrow('Something went wrong');
-expect(throwError).toThrow(Error);
+// 异常断言
+const throwFn = () => { throw new Error('err'); };
+expect(throwFn).toThrow('err');
 ```
 
-### 异步匹配器
-
 ```javascript
-// Promise
+// 异步 Promise
 test('resolves', () => {
   return expect(Promise.resolve(1)).resolves.toBe(1);
 });
+```
 
-test('rejects', () => {
-  return expect(Promise.reject(new Error('error'))).rejects.toThrow();
-});
-
+```javascript
 // async/await
-test('async function', async () => {
-  const result = await asyncFunction();
+test('async', async () => {
+  const result = await someFn();
   expect(result).toBe(42);
 });
 ```
 
----
-
-## 生命周期
-
-### 钩子函数
-
 ```javascript
-describe('hooks', () => {
-  // 所有测试之前执行一次
-  beforeAll(() => {
-    // 连接数据库等
-  });
-
-  // 所有测试之后执行一次
-  afterAll(() => {
-    // 关闭连接等
-  });
-
-  // 每个测试之前执行
-  beforeEach(() => {
-    // 重置状态
-  });
-
-  // 每个测试之后执行
-  afterEach(() => {
-    // 清理
-  });
-});
+// mock 返回值
+const fn = jest.fn().mockReturnValue(42);
+expect(fn()).toBe(42);
 ```
 
-### 作用域
-
 ```javascript
-describe('outer', () => {
-  beforeAll(() => console.log('outer beforeAll'));
-
-  describe('inner', () => {
-    beforeAll(() => console.log('inner beforeAll'));
-    afterAll(() => console.log('inner afterAll'));
-  });
-
-  afterAll(() => console.log('outer afterAll'));
-});
-
-// 执行顺序: outer beforeAll -> inner beforeAll -> inner afterAll -> outer afterAll
+// mock 异步
+const asyncFn = jest.fn().mockResolvedValue('ok');
+await expect(asyncFn()).resolves.toBe('ok');
 ```
 
----
-
-## Mock 函数
-
-### 基本用法
-
 ```javascript
-const mockFn = jest.fn();
-
-mockFn();  // 调用
-expect(mockFn).toHaveBeenCalled();        // 被调用
-expect(mockFn).toHaveBeenCalledTimes(1);  // 调用次数
-expect(mockFn).toHaveBeenCalledWith('arg'); // 调用参数
-
-// 返回值
-mockFn.mockReturnValue(42);
-expect(mockFn()).toBe(42);
-
-// 异步
-mockFn.mockResolvedValue(42);
-await expect(mockFn()).resolves.toBe(42);
-
-mockFn.mockRejectedValue(new Error('error'));
-await expect(mockFn()).rejects.toThrow('error');
-
-// 实现
-mockFn.mockImplementation((x) => x * 2);
+// spyOn + mockReturnValue
+const obj = { method: () => 'orig' };
+jest.spyOn(obj, 'method').mockReturnValue('mocked');
+expect(obj.method()).toBe('mocked');
 ```
 
-### 清除/重置
-
 ```javascript
-afterEach(() => {
-  jest.clearAllMocks();  // 清除调用记录
-  jest.resetAllMocks();   // 重置为初始状态
-  jest.restoreAllMocks(); // 恢复原始实现
-});
-```
-
-### spy
-
-```javascript
-const obj = {
-  method: () => 'original'
-};
-
-// spy
-const spy = jest.spyOn(obj, 'method');
-
-obj.method();  // 被监控
-expect(spy).toHaveBeenCalled();
-
-obj.method.mockReturnValue('mocked');
-obj.method();  // 返回 mocked
-
-spy.mockRestore();  // 恢复原始实现
-```
-
----
-
-## 模块 Mock
-
-### jest.mock
-
-```javascript
-// mock 整个模块
-jest.mock('./api');
-const api = require('./api');
-api.fetchData.mockResolvedValue({ name: 'Alice' });
-```
-
-### jest.doMock
-
-```javascript
-// 动态 mock
-jest.doMock('./api', () => ({
-  fetchData: jest.fn()
-}));
-```
-
-### jest.unmock
-
-```javascript
-jest.unmock('./api');  // 取消 mock
-```
-
----
-
-## Timer Mock
-
-### 模拟时间
-
-```javascript
-// 模拟 setTimeout
+// fake timers
 jest.useFakeTimers();
-
-test('delayed function', () => {
-  const callback = jest.fn();
-
-  setTimeout(callback, 1000);
-
-  jest.advanceTimersByTime(1000);  // 快进 1 秒
-  expect(callback).toHaveBeenCalled();
-});
-
-// 等待所有定时器
-test('all timers', () => {
-  jest.useFakeTimers();
-
-  const callback = jest.fn();
-  setTimeout(callback, 1000);
-
-  jest.runAllTimers();  // 运行所有定时器
-  expect(callback).toHaveBeenCalled();
-});
+const cb = jest.fn();
+setTimeout(cb, 1000);
+jest.advanceTimersByTime(1000);
+expect(cb).toHaveBeenCalled();
 ```
 
----
-
-## 测试用例
-
-### 同步测试
+```javascript
+// 生命周期钩子
+beforeAll(() => { /* 全局setup */ });
+afterEach(() => { jest.clearAllMocks(); });
+```
 
 ```javascript
-function add(a, b) {
-  return a + b;
-}
-
-describe('add', () => {
-  test('adds two positive numbers', () => {
-    expect(add(1, 2)).toBe(3);
-  });
-
-  test('adds negative numbers', () => {
-    expect(add(-1, -2)).toBe(-3);
-  });
-
-  test('adds zero', () => {
-    expect(add(0, 5)).toBe(5);
+// describe 分组
+describe('Calculator', () => {
+  describe('add', () => {
+    it('adds positive', () => {
+      expect(1 + 2).toBe(3);
+    });
   });
 });
 ```
 
-### 异步测试
-
 ```javascript
-// Promise
-function fetchUser(id) {
-  return Promise.resolve({ id, name: 'Alice' });
-}
-
-test('fetches user', () => {
-  return fetchUser(1).then(user => {
-    expect(user.name).toBe('Alice');
-  });
+// AAA 模式
+it('sums numbers', () => {
+  const input = [1, 2, 3];
+  const result = sum(...input);
+  expect(result).toBe(6);
 });
-
-// async/await
-test('fetches user async', async () => {
-  const user = await fetchUser(1);
-  expect(user.name).toBe('Alice');
-});
-
-// resolves/rejects
-test('fetches user resolves', () => {
-  return expect(fetchUser(1)).resolves.toEqual({ id: 1, name: 'Alice' });
-});
-```
-
-### 回调测试
-
-```javascript
-function fetchData(callback) {
-  setTimeout(() => callback(null, 'data'), 100);
-}
-
-test('fetches data', (done) => {
-  fetchData((err, data) => {
-    if (err) return done(err);
-    expect(data).toBe('data');
-    done();
-  });
-});
-```
-
----
-
-## 常用配置
-
-### package.json
-
-```json
-{
-  "scripts": {
-    "test": "jest",
-    "test:watch": "jest --watch",
-    "test:coverage": "jest --coverage",
-    "test:ci": "jest --ci --coverage"
-  },
-  "jest": {
-    "testEnvironment": "node",
-    "collectCoverageFrom": ["src/**/*.js"]
-  }
-}
-```
-
-### babel 配置
-
-```javascript
-// babel.config.js
-module.exports = {
-  presets: [
-    ['@babel/preset-env', { targets: { node: 'current' } }]
-  ]
-};
-```
-
-### TypeScript 配置
-
-```javascript
-// jest.config.js
-module.exports = {
-  preset: 'ts-jest',
-  testEnvironment: 'node',
-  globals: {
-    'ts-jest': {
-      tsconfig: 'tsconfig.json'
-    }
-  }
-};
-```
-
----
-
-## 调试
-
-### VS Code 调试
-
-```json
-// .vscode/launch.json
-{
-  "type": "node",
-  "request": "launch",
-  "name": "Jest Debug",
-  "program": "${workspaceFolder}/node_modules/.bin/jest",
-  "args": ["--runInBand", "--no-cache"],
-  "console": "integratedTerminal",
-  "internalConsoleOptions": "neverOpen"
-}
-```
-
-### 单独运行文件
-
-```bash
-npx jest src/__tests__/calculator.test.js
-npx jest src/__tests__/calculator.test.js --watch
-```
-
-### 过滤测试
-
-```bash
-jest --testNamePattern="adds two"  # 按名称过滤
-jest --testPathPattern="calculator"  # 按路径过滤
-jest --grep="add"  # grep 模式
 ```

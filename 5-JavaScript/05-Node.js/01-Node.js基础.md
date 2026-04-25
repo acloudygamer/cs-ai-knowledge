@@ -1,538 +1,141 @@
 # Node.js 基础
 
-Node.js 是基于 Chrome V8 引擎的 JavaScript 运行时，使用事件驱动、非阻塞 I/O 模型。核心模块（events、fs、path、os、buffer、crypto）提供系统级能力。模块系统支持 CommonJS（require/module.exports）和 ES Modules（import/export）。
+Node.js 是基于 Chrome V8 引擎的 JavaScript 运行时，使用事件驱动、非阻塞 I/O 模型，以单线程承载高并发，以 C++ Addon 桥接系统级能力。
 
-## 简介
+## 事件驱动架构
 
-Node.js 的事件驱动模型基于 EventEmitter 模式。非阻塞 I/O 使高并发成为可能，单线程避免线程切换开销，但 CPU 密集型任务需借助 Worker Threads 或 child_process。
+Node.js 的本质是**事件循环 + 回调队列**：I/O 操作发起后立即返回，操作系统通过事件回调通知完成，单线程按序处理队列中的回调。
 
-### 核心概念
+<pre>
+┌─────────────────────────────────────────────────────────────┐
+│                      V8 Engine                             │
+│  ┌─────────────────────────────────────────────────────┐   │
+│  │               JavaScript Thread                       │   │
+│  │  ┌──────────┐    ┌──────────┐    ┌──────────┐      │   │
+│  │  │  Call    │───▶│  Event   │───▶│ Callback │      │   │
+│  │  │  Stack   │    │  Loop    │    │  Queue   │      │   │
+│  │  └──────────┘    └──────────┘    └──────────┘      │   │
+│  └─────────────────────────────────────────────────────┘   │
+│                              │                            │
+│                    ┌─────────▼─────────┐                  │
+│                    │   libuv Thread    │◀── OS I/O        │
+│                    │   Pool (4 threads)│                   │
+│                    └───────────────────┘                  │
+└─────────────────────────────────────────────────────────────┘
+</pre>
 
-```javascript
-// 事件驱动
-const EventEmitter = require('events');
-const emitter = new EventEmitter();
+### 核心机制
 
-emitter.on('greet', (name) => {
-  console.log(`Hello, ${name}!`);
-});
-
-emitter.emit('greet', 'Alice');
-```
-
-### 模块系统
-
-Node.js 14+ 支持 ES Modules，通过 package.json 的 type 字段或 .mjs 扩展名启用。
-
-### 参考样例
-
-```javascript
-// CommonJS 模块
-const fs = require('fs');
-const { join } = require('path');
-const myModule = require('./myModule');
-
-// ES Modules（Node.js 14+）
-import fs from 'fs';
-import { join } from 'path';
-import myModule from './myModule.mjs';
-```
-
----
-
-## 全局对象
-
-Node.js 提供 `__dirname`、`__filename`、`require`、`exports`、`module` 等全局变量。`process` 对象提供进程控制能力。`globalThis` 是跨环境的全局对象。
-
-### 特殊全局变量
+**EventEmitter 是观察者模式的实现**：发布者维护监听器列表，emit 同步遍历并调用所有监听器，回调抛出的异常会导致整个事件循环崩溃。
 
 ```javascript
-// __dirname：当前文件所在目录的绝对路径（Windows 上为反斜杠）
-console.log(__dirname);  // D:\project\src (Windows) 或 /home/user/project/src (Linux/macOS)
-
-// __filename：当前文件的绝对路径
-console.log(__filename);  // D:\project\src\index.js (Windows) 或 /home/user/project/src/index.js (Linux/macOS)
-
-// require：加载模块（仅 CommonJS）
-const module = require('./module');
-
-// exports：导出模块（仅 CommonJS）
-exports.myFunc = function() { };
-module.exports = { };  // 或整体导出
-
-// module：当前模块信息
-console.log(module.id);         // '.'
-console.log(module.filename);    // '/path/to/file.js'
-console.log(module.loaded);      // false (if not yet loaded)
-console.log(module.children);    // [loaded modules]
-```
-
-### 全局函数
-
-```javascript
-// setTimeout / setInterval
-setTimeout(() => console.log('after 1s'), 1000);
-setInterval(() => console.log('every 2s'), 2000);
-
-// setImmediate（微任务，在 I/O 回调之后执行）
-setImmediate(() => console.log('immediate'));
-
-// process.nextTick（在当前操作完成后立即执行）
-process.nextTick(() => console.log('next tick'));
-
-// queueMicrotask
-queueMicrotask(() => console.log('microtask'));
+const { EventEmitter } = require('events');
+const ee = new EventEmitter();
+ee.on('data', (x) => x);
+ee.once('ready', () => {});
+ee.emit('data', 42);
+const listeners = ee.rawListeners('data');
+console.log(listeners.length);
 ```
 
 ---
 
-## process 对象
+## 模块系统
 
-process 对象是全局对象，提供当前进程的信息和控制能力。包括版本、平台、架构、进程ID、工作目录、环境变量、命令行参数、标准流、退出等。
+Node.js 模块系统的本质是**文件作用域隔离 + 导出对象引用传递**：每个文件拥有独立作用域，module.exports 是导出对象的引用，require 返回的是该对象的引用。
 
-### 参考样例
+<pre>
+┌─────────────┐    require()    ┌─────────────┐
+│   app.js    │ ────────────▶  │  module.js │
+│             │                │             │
+│ const m =   │ ◀──────────────│ module.exports = {} │
+│   require() │   m is reference to the same object   │
+└─────────────┘                └─────────────┘
+</pre>
+
+### 模块解析顺序
+
+内置模块 > 文件模块（相对/绝对路径）> node_modules 目录（向上遍历）
 
 ```javascript
-// 进程信息
-console.log(process.version);       // Node.js 版本
-console.log(process.platform);       // win32 | linux | darwin
-console.log(process.arch);           // x64 | arm64
-console.log(process.pid);            // 进程 ID
-console.log(process.cwd());          // 当前工作目录
-
-// 环境变量
-process.env.NODE_ENV;                // 'development' | 'production'
-process.env.PORT;                    // 自定义环境变量
-
-// 命令行参数
-// node app.js --port 3000
-process.argv.forEach((arg, i) => console.log(`${i}: ${arg}`));
-// [node路径, 脚本路径, --port, 3000]
-
-// 标准流
-process.stdin.resume();
-process.stdin.setEncoding('utf8');
-process.stdin.on('data', (chunk) => {
-  process.stdout.write(`Received: ${chunk}`);
-});
-
-// 退出
-process.exit(0);  // 正常退出
-process.exit(1);  // 异常退出
+require('fs');
+require('./utils');
+require('/etc/config');
+require('express');
 ```
 
----
+### ES Modules vs CommonJS
 
-## 文件系统（fs）
-
-fs 模块提供文件系统操作。Node.js 10+ 的 fs.promises API 支持 async/await。流操作适合大文件处理。
-
-### 同步 vs 异步
-
-### 参考样例
+ESM 的本质是**静态导入声明**（编译时解析）与 **CJS 的动态 require**（运行时解析）之间的设计权衡：ESM 支持 tree-shaking 但无法条件导入，CJS 可动态但无法优化。
 
 ```javascript
-const fs = require('fs');
-
-// 同步（阻塞）
-const data = fs.readFileSync('./file.txt', 'utf8');
-
-// 异步回调
-fs.readFile('./file.txt', 'utf8', (err, data) => {
-  if (err) throw err;
-  console.log(data);
-});
-
-// 异步 Promise（Node.js 10+）
-const fsPromises = require('fs').promises;
-await fsPromises.readFile('./file.txt', 'utf8');
-
-// 或
 import { readFile } from 'fs/promises';
+export const version = 1;
 ```
 
-### 常用操作
+---
 
-### 参考样例
+## 全局对象与进程
+
+`process` 对象的本质是**当前进程实例的句柄**：提供进程级信息的只读属性（pid/platform/arch），以及控制进程行为的写入接口（exit/kill）。
 
 ```javascript
-const fs = require('fs/promises');
-
-// 读取
-const content = await readFile('./file.txt', 'utf8');
-
-// 写入
-await writeFile('./file.txt', 'Hello World', 'utf8');
-
-// 追加
-await appendFile('./file.txt', '\nNew line', 'utf8');
-
-// 检查存在
-const exists = await access('./file.txt').then(() => true).catch(() => false);
-
-// 创建目录
-await mkdir('./dir', { recursive: true });
-
-// 读取目录
-const files = await readdir('./dir');
-
-// 删除文件
-await unlink('./file.txt');
-
-// 删除目录
-await rmdir('./dir');
-
-// 重命名
-await rename('./old.txt', './new.txt');
-
-// 复制
-await copyFile('./src.txt', './dest.txt');
+process.pid;
+process.platform;
+process.exit(0);
+process.kill(pid, 'SIGTERM');
 ```
 
-### 流操作
+---
 
-流操作通过管道连接，适合大文件处理。Transform 流可在传输过程中修改数据。
+## 文件系统与流
 
-### 参考样例
+Node.js I/O 的本质是**缓冲区双阶段传递**：数据从磁盘到内核缓冲区（内核态），再复制到用户缓冲区（用户态），中间经历两次拷贝。
+
+<pre>
+磁盘 ──▶ 内核缓冲区 ──▶ 用户缓冲区 ──▶ 应用
+         (read syscall)   (memcpy)
+</pre>
+
+流的核心价值在于**背压机制**：写入方通过 pipeline 自动感知读取方处理速度，积压时自动暂停，避免内存溢出。
 
 ```javascript
-const fs = require('fs');
 const { pipeline } = require('stream/promises');
-
-// 读取流
-const readStream = fs.createReadStream('./large-file.txt', 'utf8');
-
-readStream.on('data', (chunk) => {
-  console.log(`Received ${chunk.length} bytes`);
-});
-
-readStream.on('end', () => {
-  console.log('Finished');
-});
-
-// 写入流
-const writeStream = fs.createWriteStream('./output.txt');
-
-writeStream.write('Hello ');
-writeStream.write('World\n');
-writeStream.end();
-
-// 管道（复制文件）
-await pipeline(
-  fs.createReadStream('./source.txt'),
-  fs.createWriteStream('./dest.txt')
-);
-
-// 使用流处理大文件
-const { Transform } = require('stream');
-
-const upperCase = new Transform({
-  transform(chunk, encoding, callback) {
-    this.push(chunk.toString().toUpperCase());
-    callback();
-  }
-});
-
+const fs = require('fs');
 pipeline(
-  fs.createReadStream('./input.txt'),
-  upperCase,
-  fs.createWriteStream('./output.txt')
+  fs.createReadStream('in.txt'),
+  fs.createWriteStream('out.txt'),
+  () => {}
 );
-```
-
----
-
-## path 模块
-
-path 模块处理路径字符串，提供跨平台路径操作。Windows 使用反斜杠，Unix 使用正斜杠。
-
-### 参考样例
-
-```javascript
-const path = require('path');
-
-// 路径拼接
-path.join(__dirname, '..', 'public', 'index.html');
-// '/home/user/project/public/index.html'
-
-// 解析为绝对路径
-path.resolve('./public', 'index.html');
-// '/home/user/project/public/index.html'
-
-// 获取路径组成部分
-path.basename('/foo/bar/baz.txt');  // 'baz.txt'
-path.basename('/foo/bar/baz.txt', '.txt');  // 'baz'
-path.dirname('/foo/bar/baz.txt');   // '/foo/bar'
-path.extname('/foo/bar/baz.txt');   // '.txt'
-
-// 解析路径
-path.parse('/foo/bar/baz.txt');
-// { root: '/', dir: '/foo/bar', base: 'baz.txt', ext: '.txt', name: 'baz' }
-
-// 判断路径
-path.isAbsolute('/foo/bar');  // true
-path.isAbsolute('./foo/bar');  // false
-```
-
----
-
-## os 模块
-
-os 模块提供操作系统信息，包括 CPU、内存、网络、用户等。
-
-### 参考样例
-
-```javascript
-const os = require('os');
-
-// 系统信息
-os.hostname();           // 'my-computer'
-os.platform();           // 'win32' | 'linux'
-os.release();            // '10.0.19043'
-os.arch();               // 'x64'
-os.cpus();               // CPU 信息
-os.totalmem();           // 总内存（字节）
-os.freemem();            // 空闲内存（字节）
-os.homedir();            // 主目录
-os.tmpdir();            // 临时目录
-os.uptime();            // 系统运行时间（秒）
-
-// EOL
-os.EOL;  // '\n' (Linux/macOS) | '\r\n' (Windows)
-
-// 用户信息
-os.userInfo();
-// { uid: 1000, gid: 1000, username: 'user', homedir: '/home/user', shell: '/bin/bash' }
-```
-
----
-
-## events 模块
-
-EventEmitter 是 Node.js 事件驱动模型的核心。`on()` 注册监听器，`emit()` 触发事件，`once()` 只触发一次，`off()` 移除监听器。
-
-### 参考样例
-
-```javascript
-const EventEmitter = require('events');
-
-class MyEmitter extends EventEmitter {
-  constructor() {
-    super();
-  }
-}
-
-const emitter = new MyEmitter();
-
-// 监听事件
-emitter.on('greet', (name) => {
-  console.log(`Hello, ${name}!`);
-});
-
-// 只触发一次
-emitter.once('once', () => {
-  console.log('This will only print once');
-});
-
-// 移除监听
-function listener() { console.log('listener'); }
-emitter.on('event', listener);
-emitter.off('event', listener);  // Node.js 10+
-
-// 监听错误
-emitter.on('error', (err) => {
-  console.error('Error:', err);
-});
-
-// 手动触发
-emitter.emit('greet', 'Alice');
-emitter.emit('error', new Error('Something went wrong'));
-
-// 查看监听器数量
-console.log(emitter.listenerCount('greet'));
-
-// 查看所有监听器
-console.log(emitter.listeners('greet'));
-```
-
----
-
-## buffer 模块
-
-Buffer 用于处理二进制数据。Node.js 6+ 的 Buffer.from() / Buffer.alloc() 是创建 Buffer 的标准方式。
-
-### 参考样例
-
-```javascript
-// 创建 Buffer
-const buf1 = Buffer.alloc(10);          // 10 字节，初始化为 0
-const buf2 = Buffer.allocUnsafe(10);     // 10 字节，未初始化
-const buf3 = Buffer.from([1, 2, 3]);    // 从数组
-const buf4 = Buffer.from('Hello');       // 从字符串
-
-// 字符串编解码
-const buf = Buffer.from('Hello', 'utf8');
-buf.toString('utf8');  // 'Hello'
-buf.toString('hex');   // '48656c6c6f'
-buf.toString('base64'); // 'SGVsbG8='
-
-// 写入
-buf.write('Hi', 0, 'utf8');
-
-// 读取
-buf[0];  // 第一个字节的数值
-buf.toString('utf8', 0, 2);  // 'He'
-
-// 拼接
-const bufA = Buffer.from('Hello');
-const bufB = Buffer.from(' World');
-Buffer.concat([bufA, bufB]).toString();  // 'Hello World'
-
-// 复制
-const bufSrc = Buffer.from('Source');
-const bufDest = Buffer.alloc(10);
-bufSrc.copy(bufDest, 0, 0, bufSrc.length);
-```
-
----
-
-## crypto 模块
-
-crypto 模块提供加密功能，包括哈希、HMAC、AES、随机数、UUID、PBKDF2 等。
-
-### 参考样例
-
-```javascript
-const crypto = require('crypto');
-
-// 哈希
-const hash = crypto.createHash('sha256');
-hash.update('Hello');
-console.log(hash.digest('hex'));
-
-// HMAC
-const hmac = crypto.createHmac('sha256', 'secret');
-hmac.update('Hello');
-console.log(hmac.digest('hex'));
-
-// AES 加密
-const algorithm = 'aes-256-cbc';
-const key = crypto.randomBytes(32);
-const iv = crypto.randomBytes(16);
-
-const cipher = crypto.createCipheriv(algorithm, key, iv);
-let encrypted = cipher.update('Hello World', 'utf8', 'hex');
-encrypted += cipher.final('hex');
-
-const decipher = crypto.createDecipheriv(algorithm, key, iv);
-let decrypted = decipher.update(encrypted, 'hex', 'utf8');
-decrypted += decipher.final('utf8');
-
-// 随机数
-crypto.randomBytes(16).toString('hex');
-
-// UUID
-const { v4: uuidv4 } = require('uuid');
-const id = uuidv4();
-
-// PBKDF2
-crypto.pbkdf2('password', 'salt', 100000, 64, 'sha512', (err, key) => {
-  console.log(key.toString('hex'));
-});
 ```
 
 ---
 
 ## 错误处理
 
-Node.js 错误包含 code（如 ENOENT）、message、path 等属性。同步代码用 try/catch，异步回调需在回调中处理错误，Promise 错误用 .catch() 或 try/catch。
-
-### 参考样例
+Node.js 错误的本质是**错误对象沿着回调链向上传播**：同步代码用 try/catch 捕获，异步回调中错误作为第一个参数传递，Promise 链中错误触发 reject。
 
 ```javascript
-// 同步错误
-try {
-  const data = fs.readFileSync('./not-exist.txt', 'utf8');
-} catch (err) {
-  console.error('Error:', err.code);     // 'ENOENT'
-  console.error('Message:', err.message);
-  console.error('Path:', err.path);
-}
-
-// 异步错误（回调）
-fs.readFile('./not-exist.txt', 'utf8', (err, data) => {
-  if (err) {
-    console.error('Error:', err);
-    return;
-  }
-  console.log(data);
-});
-
-// Promise 错误
-try {
-  const data = await fsPromises.readFile('./not-exist.txt', 'utf8');
-} catch (err) {
-  console.error('Error:', err);
-}
-
-// 自定义错误
-class AppError extends Error {
-  constructor(message, code) {
-    super(message);
-    this.code = code;
-    this.name = 'AppError';
-  }
-}
-
-throw new AppError('Something went wrong', 'ERR_SOMETHING');
+try { JSON.parse(invalid); } catch (e) {}
+fs.readFile('x', (err, data) => { if (err) return; });
+readFile('x').catch(e => {});
 ```
 
 ---
 
-## Node.js 版本特性
+## 缓冲与加密
 
-### package.json type 字段
-
-```json
-{
-  "type": "module"
-}
-```
-
-当 `type` 为 `module` 时，`.js` 文件默认使用 ES Modules。
-
-### 模块解析算法
-
-1. 内置模块（crypto, fs, path...）
-2. 文件模块（./module 或 /module）
-3. node_modules 目录
-4. 目录：package.json main → index.js → package.json exports
-
-### ES Modules 与 CommonJS 互操作
-
-ES Modules 导入 CommonJS 总是获取默认导出。CommonJS 导入 ES Modules 需使用动态 import()。
-
-### 参考样例
+Buffer 是 V8 外部原始内存的包装器，内存分配在 C++ 堆而非 V8 堆，这使得它可以高效处理二进制数据而无需经过 V8 垃圾回收。
 
 ```javascript
-// 导入 'module'
-// 1. 内置模块（crypto, fs, path...）
-// 2. 文件模块（./module 或 /module）
-// 3. node_modules 目录
+Buffer.alloc(10);
+Buffer.from('hello', 'utf8');
+Buffer.concat([a, b]);
+```
 
-// 导入目录
-// 1. package.json 的 main 字段
-// 2. index.js
-// 3. package.json 的 exports 字段
+crypto 模块本质是对 OpenSSL 的封装，提供摘要、对称加密、非对称加密、密钥派生等能力。
 
-// ES Modules 导入
-import crypto from 'crypto';           // 默认导入
-import { createHash } from 'crypto';   // 命名导入
-import * as fs from 'fs';             // 命名空间导入
-
-// ES Modules 导入 CommonJS（总是默认导出）
-import crypto from 'crypto';
-
-// CommonJS 导入 ES Modules（需要动态 import）
-const fs = await import('fs');
+```javascript
+const { createHash } = require('crypto');
+createHash('sha256').update('x').digest('hex');
 ```

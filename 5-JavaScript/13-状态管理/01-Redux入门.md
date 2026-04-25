@@ -1,687 +1,181 @@
 # Redux 入门
 
-> Redux 是 JavaScript 应用的可预测状态容器，提供集中式状态管理和时间旅行调试能力
+> Redux 是 JavaScript 应用的**可预测状态容器**，通过单向数据流和纯函数 reducer 实现状态不可变更新。
 
-## 核心概念
+## 核心机制
 
-### 单一数据源
+### 单向数据流
 
-整个应用的 state 被存储在一棵唯一的对象树中。
+<pre>
+┌─────────────┐   dispatch   ┌─────────────┐
+│    UI 层    │ ──────────→ │   Action    │
+│ (React 等)  │             │  { type }   │
+└─────────────┘             └──────┬──────┘
+       ↑                            │
+       │ store.getState()            │
+       │◀────────────────────────────┘
+       │                      ┌──────▼──────┐
+       │                      │   Reducer   │
+       │                      │  (pure fn)  │
+       │                      └──────┬──────┘
+       │                             │
+       │ new state                   │
+       │◀────────────────────────────┘
+</pre>
 
-```javascript
-// 简单的 Redux 数据流
-import { createStore } from 'redux';
+Action 描述"发生了什么"，Reducer 根据 Action 计算新状态，状态树全局唯一且不可变。
 
-// Action Types
-const INCREMENT = 'INCREMENT';
-const DECREMENT = 'DECREMENT';
+### 不可变性
 
-// Action Creators
-function increment() {
-  return { type: INCREMENT };
-}
+状态只读，Reducer 返回全新对象：
 
-function decrement() {
-  return { type: DECREMENT };
-}
+```
+state + action → newState (new object)
+```
 
-// Reducer
-function counterReducer(state = { count: 0 }, action) {
-  switch (action.type) {
-    case INCREMENT:
-      return { count: state.count + 1 };
-    case DECREMENT:
-      return { count: state.count - 1 };
-    default:
-      return state;
-  }
-}
+纯函数设计使时间旅行调试成为可能。
 
-// Store
-const store = createStore(counterReducer);
+### 中间件
 
-console.log(store.getState()); // { count: 0 }
+中间件位于 dispatch 和 Reducer 之间，形成洋葱模型：
 
-store.dispatch(increment());
-console.log(store.getState()); // { count: 1 }
-
-store.dispatch(decrement());
-console.log(store.getState()); // { count: 0 }
+```
+dispatch → middleware₁ → middleware₂ → reducer → state
+                ↑              ↑
+            log/async      transform
 ```
 
 ---
 
-## Redux Toolkit（现代 Redux）
+## 核心 API
 
-Redux Toolkit 是官方推荐的方式，简化了 Redux 的使用。
+### createStore
+
+```javascript
+import { createStore } from 'redux';
+
+const store = createStore(reducer, initialState);
+store.dispatch({ type: 'INCREMENT' });
+store.getState();
+```
+
+### combineReducers
+
+```javascript
+import { combineReducers } from 'redux';
+
+const rootReducer = combineReducers({
+  counter: counterReducer,
+  user: userReducer,
+});
+```
+
+---
+
+## Redux Toolkit（官方推荐）
 
 ### configureStore
 
 ```javascript
 import { configureStore } from '@reduxjs/toolkit';
-import counterReducer from './counterSlice';
-import userReducer from './userSlice';
-import { api } from './apiSlice';
 
-// 配置 Store
 const store = configureStore({
   reducer: {
     counter: counterReducer,
     user: userReducer,
-    [api.reducerPath]: api.reducer, // RTK Query
   },
-
-  // 中间件配置
-  middleware: (getDefaultMiddleware) =>
-    getDefaultMiddleware({
-      serializableCheck: {
-        // 忽略这些 action types
-        ignoredActions: ['persist/PERSIST'],
-        // 忽略这些 paths
-        ignoredPaths: ['user.lastLogin'],
-      },
-    }),
-
-  // 开发工具配置
-  devTools: process.env.NODE_ENV !== 'production',
 });
-
-export default store;
-
-// 类型定义
-export type RootState = ReturnType<typeof store.getState>;
-export type AppDispatch = typeof store.dispatch;
 ```
 
 ### createSlice
 
 ```javascript
-import { createSlice, PayloadAction } from '@reduxjs/toolkit';
-
-interface CounterState {
-  value: number;
-  lastUpdated: number | null;
-}
-
-const initialState: CounterState = {
-  value: 0,
-  lastUpdated: null,
-};
+import { createSlice } from '@reduxjs/toolkit';
 
 const counterSlice = createSlice({
   name: 'counter',
-  initialState,
+  initialState: { value: 0 },
   reducers: {
-    increment: (state) => {
-      state.value += 1;
-      state.lastUpdated = Date.now();
-    },
-
-    decrement: (state) => {
-      state.value -= 1;
-      state.lastUpdated = Date.now();
-    },
-
-    incrementByAmount: (state, action: PayloadAction<number>) => {
-      state.value += action.payload;
-      state.lastUpdated = Date.now();
-    },
-
-    reset: (state) => {
-      state.value = 0;
-      state.lastUpdated = null;
-    },
+    increment: (state) => { state.value += 1; },
+    decrement: (state) => { state.value -= 1; },
   },
 });
-
-export const { increment, decrement, incrementByAmount, reset } = counterSlice.actions;
-export default counterSlice.reducer;
 ```
 
 ### createAsyncThunk
 
-处理异步逻辑。
-
 ```javascript
-import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
+import { createAsyncThunk } from '@reduxjs/toolkit';
 
-interface User {
-  id: string;
-  name: string;
-  email: string;
-}
-
-interface UsersState {
-  items: User[];
-  loading: 'idle' | 'pending' | 'succeeded' | 'failed';
-  error: string | null;
-}
-
-const initialState: UsersState = {
-  items: [],
-  loading: 'idle',
-  error: null,
-};
-
-// 异步 Thunk
-export const fetchUsers = createAsyncThunk(
-  'users/fetchUsers',
-  async (_, { rejectWithValue }) => {
-    try {
-      const response = await fetch('/api/users');
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch users');
-      }
-
-      const data = await response.json();
-      return data as User[];
-    } catch (error) {
-      return rejectWithValue((error as Error).message);
-    }
+const fetchUser = createAsyncThunk(
+  'users/fetch',
+  async (userId) => {
+    const res = await fetch(`/api/users/${userId}`);
+    return res.json();
   }
 );
-
-const usersSlice = createSlice({
-  name: 'users',
-  initialState,
-  reducers: {
-    addUser: (state, action: PayloadAction<User>) => {
-      state.items.push(action.payload);
-    },
-
-    updateUser: (state, action: PayloadAction<User>) => {
-      const index = state.items.findIndex(u => u.id === action.payload.id);
-      if (index !== -1) {
-        state.items[index] = action.payload;
-      }
-    },
-
-    removeUser: (state, action: PayloadAction<string>) => {
-      state.items = state.items.filter(u => u.id !== action.payload);
-    },
-  },
-
-  extraReducers: (builder) => {
-    builder
-      .addCase(fetchUsers.pending, (state) => {
-        state.loading = 'pending';
-        state.error = null;
-      })
-      .addCase(fetchUsers.fulfilled, (state, action) => {
-        state.loading = 'succeeded';
-        state.items = action.payload;
-      })
-      .addCase(fetchUsers.rejected, (state, action) => {
-        state.loading = 'failed';
-        state.error = action.payload as string;
-      });
-  },
-});
-
-export const { addUser, updateUser, removeUser } = usersSlice.actions;
-export default usersSlice.reducer;
 ```
 
 ---
 
-## React 与 Redux 集成
+## React 集成
 
-### Provider 和 Hooks
+### Provider + Hooks
 
 ```javascript
-import React from 'react';
-import { Provider } from 'react-redux';
-import { useSelector, useDispatch } from 'react-redux';
-import store, { RootState, AppDispatch } from './store';
+import { Provider, useSelector, useDispatch } from 'react-redux';
 
-// App 组件
-function App() {
-  return (
-    <Provider store={store}>
-      <Counter />
-      <UserList />
-    </Provider>
-  );
-}
+<Provider store={store}>
+  <App />
+</Provider>
 
-// Typed Hooks
-function useAppSelector<T>(selector: (state: RootState) => T): T {
-  return useSelector(selector);
-}
-
-function useAppDispatch(): AppDispatch {
-  return useDispatch<AppDispatch>();
-}
-
-// Counter 组件
-function Counter() {
-  const count = useAppSelector(state => state.counter.value);
-  const dispatch = useAppDispatch();
-
-  return (
-    <div>
-      <p>Count: {count}</p>
-      <button onClick={() => dispatch(increment())}>
-        Increment
-      </button>
-      <button onClick={() => dispatch(decrement())}>
-        Decrement
-      </button>
-      <button onClick={() => dispatch(incrementByAmount(5))}>
-        +5
-      </button>
-    </div>
-  );
-}
+const count = useSelector(state => state.counter.value);
+const dispatch = useDispatch();
+dispatch({ type: 'counter/increment' });
 ```
 
-### createSelector 性能优化
+### createSelector
 
 ```javascript
 import { createSelector } from '@reduxjs/toolkit';
-import { RootState } from './store';
 
-// 基本选择器
-const selectUsers = (state: RootState) => state.users.items;
-const selectFilter = (state: RootState) => state.users.filter;
+const selectItems = state => state.cart.items;
+const selectFilter = state => state.cart.filter;
 
-// 创建记忆化选择器
-const selectFilteredUsers = createSelector(
-  [selectUsers, selectFilter],
-  (users, filter) => {
-    console.log('Computing filtered users...');
-    return users.filter(user =>
-      user.name.toLowerCase().includes(filter.toLowerCase())
-    );
-  }
+const selectFiltered = createSelector(
+  [selectItems, selectFilter],
+  (items, filter) => items.filter(i => i.name.includes(filter))
 );
-
-// 嵌套记忆化
-const selectUserById = createSelector(
-  [selectUsers, (_: RootState, userId: string) => userId],
-  (users, userId) => {
-    return users.find(user => user.id === userId) ?? null;
-  }
-);
-
-// 组件中使用
-function UserList() {
-  const users = useAppSelector(selectFilteredUsers);
-
-  return (
-    <ul>
-      {users.map(user => (
-        <li key={user.id}>{user.name}</li>
-      ))}
-    </ul>
-  );
-}
-
-function UserDetail({ userId }: { userId: string }) {
-  const user = useAppSelector(state => selectUserById(state, userId));
-
-  if (!user) return <div>User not found</div>;
-
-  return (
-    <div>
-      <h2>{user.name}</h2>
-      <p>{user.email}</p>
-    </div>
-  );
-}
-```
-
----
-
-## 中间件
-
-### 自定义中间件
-
-```javascript
-// 日志中间件
-const loggerMiddleware = (storeAPI) => (next) => (action) => {
-  console.log('dispatching:', action);
-  const result = next(action);
-  console.log('next state:', storeAPI.getState());
-  return result;
-};
-
-// 异步请求中间件
-const asyncRequestMiddleware = (storeAPI) => (next) => (action) => {
-  if (typeof action === 'function') {
-    return action(storeAPI.dispatch, storeAPI.getState);
-  }
-  return next(action);
-};
-
-// 组合中间件
-const store = configureStore({
-  reducer: rootReducer,
-  middleware: (getDefaultMiddleware) =>
-    getDefaultMiddleware()
-      .concat(loggerMiddleware)
-      .concat(asyncRequestMiddleware)
-      .prepend(anotherMiddleware),
-});
-```
-
-### RTK Query
-
-强大的数据获取和缓存解决方案。
-
-```javascript
-import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query';
-import type { BaseQueryFn } from '@reduxjs/toolkit/query';
-
-const baseQuery = fetchBaseQuery({ baseUrl: '/api' });
-
-const baseQueryWithAuth: BaseQueryFn = async (args, api, extraOptions) => {
-  const token = localStorage.getItem('token');
-
-  const result = await baseQuery(args, api, {
-    ...extraOptions,
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
-  });
-
-  return result;
-};
-
-export const api = createApi({
-  reducerPath: 'api',
-  baseQuery: baseQueryWithAuth,
-  tagTypes: ['User', 'Post', 'Comment'],
-
-  endpoints: (builder) => ({
-    // 查询
-    getUsers: builder.query<User[], void>({
-      query: () => '/users',
-      providesTags: ['User'],
-    }),
-
-    getUserById: builder.query<User, string>({
-      query: (id) => `/users/${id}`,
-      providesTags: (_result, _error, id) => [{ type: 'User', id }],
-    }),
-
-    // 突变
-    createUser: builder.mutation<User, Partial<User>>({
-      query: (body) => ({
-        url: '/users',
-        method: 'POST',
-        body,
-      }),
-      invalidatesTags: ['User'],
-    }),
-
-    updateUser: builder.mutation<User, { id: string; changes: Partial<User> }>({
-      query: ({ id, changes }) => ({
-        url: `/users/${id}`,
-        method: 'PATCH',
-        body: changes,
-      }),
-      invalidatesTags: (_result, _error, { id }) => [{ type: 'User', id }],
-    }),
-
-    deleteUser: builder.mutation<void, string>({
-      query: (id) => ({
-        url: `/users/${id}`,
-        method: 'DELETE',
-      }),
-      invalidatesTags: ['User'],
-    }),
-
-    // 条件查询
-    getPostsByUser: builder.query<Post[], string>({
-      query: (userId) => `/users/${userId}/posts`,
-      providesTags: (result) =>
-        result
-          ? [
-              ...result.map(({ id }) => ({ type: 'Post' as const, id })),
-              { type: 'Post', id: 'LIST' },
-            ]
-          : [{ type: 'Post', id: 'LIST' }],
-    }),
-  }),
-});
-
-export const {
-  useGetUsersQuery,
-  useGetUserByIdQuery,
-  useCreateUserMutation,
-  useUpdateUserMutation,
-  useDeleteUserMutation,
-  useGetPostsByUserQuery,
-} = api;
-```
-
-### 在组件中使用 RTK Query
-
-```javascript
-import { api } from './apiSlice';
-
-// 自动缓存和重fetch
-function UserList() {
-  const {
-    data: users,
-    error,
-    isLoading,
-    isFetching,
-    refetch,
-  } = useGetUsersQuery();
-
-  if (isLoading) return <div>Loading...</div>;
-  if (error) return <div>Error: {error.message}</div>;
-
-  return (
-    <div>
-      <button onClick={refetch}>Refetch</button>
-      {isFetching && <span>Fetching...</span>}
-      <ul>
-        {users?.map(user => (
-          <li key={user.id}>{user.name}</li>
-        ))}
-      </ul>
-    </div>
-  );
-}
-
-// 突变使用
-function CreateUserForm() {
-  const [createUser, { isLoading }] = useCreateUserMutation();
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-
-    const formData = new FormData(e.target);
-    const newUser = {
-      name: formData.get('name') as string,
-      email: formData.get('email') as string,
-    };
-
-    try {
-      await createUser(newUser).unwrap();
-      // 成功后清空表单或跳转
-    } catch (err) {
-      console.error('Failed to create user:', err);
-    }
-  }
-
-  return (
-    <form onSubmit={handleSubmit}>
-      <input name="name" required />
-      <input name="email" type="email" required />
-      <button type="submit" disabled={isLoading}>
-        {isLoading ? 'Creating...' : 'Create User'}
-      </button>
-    </form>
-  );
-}
 ```
 
 ---
 
 ## 高级模式
 
-### 切片模式
+### Middleware
 
 ```javascript
-// features/users/userSlice.ts
-import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-
-export interface User {
-  id: string;
-  name: string;
-  email: string;
-  role: 'admin' | 'user' | 'guest';
-}
-
-export interface UsersState {
-  entities: Record<string, User>;
-  ids: string[];
-  selectedId: string | null;
-  loading: boolean;
-  error: string | null;
-}
-
-const initialState: UsersState = {
-  entities: {},
-  ids: [],
-  selectedId: null,
-  loading: false,
-  error: null,
+const logger = (storeAPI) => (next) => (action) => {
+  const result = next(action);
+  return result;
 };
-
-export const fetchUserById = createAsyncThunk(
-  'users/fetchById',
-  async (id: string) => {
-    const response = await fetch(`/api/users/${id}`);
-    return await response.json() as User;
-  }
-);
-
-const userSlice = createSlice({
-  name: 'users',
-  initialState,
-  reducers: {
-    selectUser: (state, action: PayloadAction<string>) => {
-      state.selectedId = action.payload;
-    },
-
-    addUser: (state, action: PayloadAction<User>) => {
-      const user = action.payload;
-      state.entities[user.id] = user;
-      if (!state.ids.includes(user.id)) {
-        state.ids.push(user.id);
-      }
-    },
-
-    updateUser: (state, action: PayloadAction<User>) => {
-      const user = action.payload;
-      if (state.entities[user.id]) {
-        state.entities[user.id] = { ...state.entities[user.id], ...user };
-      }
-    },
-
-    removeUser: (state, action: PayloadAction<string>) => {
-      const id = action.payload;
-      delete state.entities[id];
-      state.ids = state.ids.filter(userId => userId !== id);
-      if (state.selectedId === id) {
-        state.selectedId = null;
-      }
-    },
-  },
-
-  extraReducers: (builder) => {
-    builder
-      .addCase(fetchUserById.pending, (state) => {
-        state.loading = true;
-        state.error = null;
-      })
-      .addCase(fetchUserById.fulfilled, (state, action) => {
-        state.loading = false;
-        const user = action.payload;
-        state.entities[user.id] = user;
-        if (!state.ids.includes(user.id)) {
-          state.ids.push(user.id);
-        }
-      })
-      .addCase(fetchUserById.rejected, (state, action) => {
-        state.loading = false;
-        state.error = action.error.message ?? 'Unknown error';
-      });
-  },
-});
-
-export const { selectUser, addUser, updateUser, removeUser } = userSlice.actions;
-
-// Selectors
-export const selectAllUsers = (state: { users: UsersState }) =>
-  state.users.ids.map(id => state.users.entities[id]);
-
-export const selectUserById = (state: { users: UsersState }, id: string) =>
-  state.users.entities[id];
-
-export const selectSelectedUser = (state: { users: UsersState }) =>
-  state.users.selectedId
-    ? state.users.entities[state.users.selectedId]
-    : null;
-
-export const selectUsersLoading = (state: { users: UsersState }) =>
-  state.users.loading;
 ```
 
-### Store 持久化
+### RTK Query
 
 ```javascript
-import { configureStore, combineReducers } from '@reduxjs/toolkit';
-import {
-  persistStore,
-  persistReducer,
-  FLUSH,
-  REHYDRATE,
-  PAUSE,
-  PERSIST,
-  PURGE,
-  REGISTER,
-} from 'redux-persist';
-import rootReducer from './rootReducer';
+import { createApi } from '@reduxjs/toolkit/query';
 
-const persistConfig = {
-  key: 'root',
-  version: 1,
-  storage: localStorage,
-  whitelist: ['auth', 'settings'], // 只持久化这些 reducer
-  blacklist: ['ui'], // 忽略这些 reducer
-};
-
-const persistedReducer = persistReducer(persistConfig, rootReducer);
-
-export const store = configureStore({
-  reducer: persistedReducer,
-  middleware: (getDefaultMiddleware) =>
-    getDefaultMiddleware({
-      serializableCheck: {
-        ignoredActions: [FLUSH, REHYDRATE, PAUSE, PERSIST, PURGE, REGISTER],
-      },
+const api = createApi({
+  reducerPath: 'api',
+  baseQuery: fetchBaseQuery({ baseUrl: '/api' }),
+  endpoints: (builder) => ({
+    getUser: builder.query({
+      query: (id) => `/users/${id}`,
+      providesTags: ['User'],
     }),
+  }),
 });
-
-export const persistor = persistStore(store);
-
-// 使用
-import { PersistGate } from 'redux-persist/integration/react';
-
-function App() {
-  return (
-    <Provider store={store}>
-      <PersistGate loading={<div>Loading...</div>} persistor={persistor}>
-        <RootComponent />
-      </PersistGate>
-    </Provider>
-  );
-}
 ```
 
 ---
@@ -693,101 +187,27 @@ function App() {
 ```
 src/
   features/
-    users/
-      usersSlice.ts
-      usersSelectors.ts
-      usersHooks.ts
-      UserList.tsx
-      UserDetail.tsx
-    posts/
-      postsSlice.ts
-      postsSelectors.ts
+    counter/
+      counterSlice.ts
+      counterSelectors.ts
+      Counter.tsx
   store/
     index.ts
     rootReducer.ts
-    storeHooks.ts
   app/
     App.tsx
-    store.ts
 ```
 
 ### Immutability
 
+Immer（Redux Toolkit 内置）允许"可变"语法写不可变更新：
+
 ```javascript
-import { produce } from 'immer';
-
-// 使用 Immer（Redux Toolkit 内置）
-const todosReducer = createSlice({
-  name: 'todos',
-  initialState: [],
-  reducers: {
-    addTodo: (state, action: PayloadAction<string>) => {
-      // Immer 允许"可变"语法
-      state.push({
-        id: Date.now(),
-        text: action.payload,
-        completed: false,
-      });
-    },
-
-    toggleTodo: (state, action: PayloadAction<number>) => {
-      const todo = state.find(t => t.id === action.payload);
-      if (todo) {
-        todo.completed = !todo.completed;
-      }
-    },
-
-    removeTodo: (state, action: PayloadAction<number>) => {
-      return state.filter(t => t.id !== action.payload);
-    },
-
-    updateTodo: {
-      reducer: (state, action: PayloadAction<{ id: number; text: string }>) => {
-        const todo = state.find(t => t.id === action.payload.id);
-        if (todo) {
-          todo.text = action.payload.text;
-        }
-      },
-      prepare: ({ id, text }) => ({
-        payload: { id, text },
-        meta: { timestamp: Date.now() },
-      }),
-    },
+reducers: {
+  addItem: (state, action) => {
+    state.items.push(action.payload);
   },
-});
-```
-
-### 错误处理
-
-```javascript
-// 统一的错误处理
-export const fetchUser = createAsyncThunk(
-  'users/fetchUser',
-  async (userId: string, { rejectWithValue }) => {
-    try {
-      const response = await fetch(`/api/users/${userId}`);
-
-      if (!response.ok) {
-        const error = await response.json();
-        return rejectWithValue(error.message);
-      }
-
-      return await response.json();
-    } catch (error) {
-      return rejectWithValue('Network error');
-    }
-  }
-);
-
-// 组件中处理
-function UserProfile({ userId }: { userId: string }) {
-  const dispatch = useAppDispatch();
-  const { data: user, error, isError } = useGetUserByIdQuery(userId);
-
-  if (isError) {
-    return <div className="error">Error: {error}</div>;
-  }
-
-  // ...
 }
 ```
+
+实际生成新的状态树。

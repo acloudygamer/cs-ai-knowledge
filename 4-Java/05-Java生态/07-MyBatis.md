@@ -1,326 +1,97 @@
 # MyBatis
 
-## 概述
+## 本质断言
 
-MyBatis 是 Java 主流的持久层框架，相比 JPA/Hibernate 提供了更细粒度的 SQL 控制。
+MyBatis 的本质是 SQL 映射框架，将 SQL 语句从 Java 代码中分离到 XML/注解中，通过 JDBC 的 PreparedStatement 参数绑定和结果集映射实现数据库操作，开发者完全掌控 SQL 执行计划。
 
-### 核心特点
+## 核心机制
 
-- **SQL 与代码分离**：XML 或注解配置 SQL，Java 代码保持清洁
-- **手动控制 SQL**：可优化复杂 SQL，支持动态 SQL
-- **轻量级**：没有 JPA 的 Entity 管理和 N+1 问题
-- **自动映射**：ResultSet 自动映射到 Java 对象
+### SQL 映射原理
 
-## 快速上手
+<pre>
+MyBatis 执行流程：
+1. Mapper 接口方法调用
+2. MyBatis 根据方法签名找到对应 SQL（XML id / 注解）
+3. 创建 PreparedStatement
+4. 参数绑定（#{} → setString/setInt）
+5. 执行 SQL
+6. ResultSet 映射回 Java 对象（自动驼峰转换）
+</pre>
 
-### 添加依赖
+### XML vs 注解映射选择
 
-```xml
-<dependencies>
-    <dependency>
-        <groupId>org.mybatis.spring.boot</groupId>
-        <artifactId>mybatis-spring-boot-starter</artifactId>
-        <version>3.0.3</version>
-    </dependency>
-
-    <dependency>
-        <groupId>com.mysql</groupId>
-        <artifactId>mysql-connector-j</artifactId>
-        <scope>runtime</scope>
-    </dependency>
-</dependencies>
-```
-
-### 配置
-
-```yaml
-mybatis:
-  mapper-locations: classpath:mapper/*.xml
-  type-aliases-package: com.example.entity
-  configuration:
-    map-underscore-to-camel-case: true
-    log-impl: org.apache.ibatis.logging.slf4j.Slf4jImpl
-```
-
-### Mapper 接口
-
-```java
-@Mapper
-public interface UserMapper {
-
-    @Select("SELECT * FROM users WHERE id = #{id}")
-    User findById(Long id);
-
-    @Insert("INSERT INTO users(user_name, email) VALUES(#{userName}, #{email})")
-    @Options(useGeneratedKeys = true, keyProperty = "id")
-    int insert(User user);
-
-    @Update("UPDATE users SET user_name = #{userName}, email = #{email} WHERE id = #{id}")
-    int update(User user);
-
-    @Delete("DELETE FROM users WHERE id = #{id}")
-    int delete(Long id);
-}
-```
-
-## XML 映射
-
-### 基础 XML Mapper
-
-resultMap 定义结果映射，SQL 语句使用 OGNL 表达式获取参数。
-
-```xml
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
-    "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
-
-<mapper namespace="com.example.mapper.UserMapper">
-
-    <resultMap id="BaseResultMap" type="com.example.entity.User">
-        <id column="id" property="id"/>
-        <result column="user_name" property="userName"/>
-        <result column="email" property="email"/>
-        <result column="create_time" property="createTime"/>
-    </resultMap>
-
-    <select id="findById" resultMap="BaseResultMap">
-        SELECT * FROM users WHERE id = #{id}
-    </select>
-
-    <select id="findAll" resultMap="BaseResultMap">
-        SELECT * FROM users ORDER BY create_time DESC
-    </select>
-
-    <insert id="insert" useGeneratedKeys="true" keyProperty="id">
-        INSERT INTO users(user_name, email, create_time)
-        VALUES(#{userName}, #{email}, #{createTime})
-    </insert>
-
-    <update id="update">
-        UPDATE users
-        SET user_name = #{userName}, email = #{email}
-        WHERE id = #{id}
-    </update>
-
-    <delete id="delete">
-        DELETE FROM users WHERE id = #{id}
-    </delete>
-</mapper>
-```
+<pre>
+XML vs 注解场景选择：
+XML：复杂 SQL（多表JOIN、动态SQL嵌套）、SQL 较长
+注解：简单 CRUD、SQL 不超过 3-5 行
+</pre>
 
 ## 动态 SQL
 
-### if 条件
+### OGNL 表达式本质
 
-```xml
-<select id="search" resultMap="BaseResultMap">
-    SELECT * FROM users
-    <where>
-        <if test="userName != null">
-            AND user_name LIKE CONCAT('%', #{userName}, '%')
-        </if>
-        <if test="email != null">
-            AND email = #{email}
-        </if>
-    </where>
-</select>
-```
+MyBatis 动态 SQL 使用 OGNL（Object-Graph Navigation Language）表达式语言访问对象属性。if/test 中的表达式最终由 OGNL 求值为 true/false，决定对应 SQL 片段是否包含。
 
-### choose 多条件选择
+<pre>
+动态 SQL if 原理：
+<if test="name != null">
+  AND name = #{name}
+</if>
+    ↓
+OGNL 求值：name != null → true
+    ↓
+生成 SQL 片段：AND name = ?
+</pre>
 
-```xml
-<select id="findByCondition" resultMap="BaseResultMap">
-    SELECT * FROM users
-    <where>
-        <choose>
-            <when test="id != null">
-                AND id = #{id}
-            </when>
-            <when test="userName != null">
-                AND user_name = #{userName}
-            </when>
-            <otherwise>
-                AND status = 'ACTIVE'
-            </otherwise>
-        </choose>
-    </where>
-</select>
-```
+### where/set 标签的作用
 
-### foreach 循环
-
-```xml
-<select id="findByIds" resultMap="BaseResultMap">
-    SELECT * FROM users
-    WHERE id IN
-    <foreach collection="ids" item="id" open="(" separator="," close=")">
-        #{id}
-    </foreach>
-</select>
-
-<insert id="batchInsert">
-    INSERT INTO users(user_name, email) VALUES
-    <foreach collection="users" item="user" separator=",">
-        (#{user.userName}, #{user.email})
-    </foreach>
-</insert>
-```
-
-### set 更新
-
-```xml
-<update id="updateSelective">
-    UPDATE users
-    <set>
-        <if test="userName != null">user_name = #{userName},</if>
-        <if test="email != null">email = #{email},</if>
-    </set>
-    WHERE id = #{id}
-</update>
-```
+\<where> 标签自动处理 AND/OR 前缀（移除多余关键词）。\<set> 标签在 UPDATE 语句中自动移除末尾逗号，避免"SET col1 = ?, col2 = ?, "的语法错误。
 
 ## 关联查询
 
-### 一对一 association
+### N+1 问题的本质
 
-```xml
-<resultMap id="OrderDetailMap" type="com.example.entity.Order">
-    <id column="order_id" property="orderId"/>
-    <result column="total_amount" property="totalAmount"/>
+<pre>
+MyBatis N+1 产生机制（未配置关联加载）：
+1. SELECT * FROM users → N 条 User 记录
+2. 遍历每个 User：
+   SELECT * FROM orders WHERE user_id = ?（循环 N 次）
+总 SQL 数：1 + N（与 JPA Hibernate N+1 相同）
+</pre>
 
-    <association property="user" javaType="com.example.entity.User">
-        <id column="user_id" property="id"/>
-        <result column="user_name" property="userName"/>
-        <result column="email" property="email"/>
-    </association>
-</resultMap>
+### association/collection 的嵌套查询
 
-<select id="findOrderWithUser" resultMap="OrderDetailMap">
-    SELECT o.id as order_id, o.total_amount,
-           u.id as user_id, u.user_name, u.email
-    FROM orders o
-    JOIN users u ON o.user_id = u.id
-    WHERE o.id = #{orderId}
-</select>
-```
+MyBatis 通过 nested select 属性实现关联对象的懒加载查询：先查主表，返回后按外键值触发第二次查询。JOIN FETCH 则通过一次 SQL 解决 N+1。
 
-### 一对多 collection
+## 缓存
 
-```xml
-<resultMap id="UserWithOrdersMap" type="com.example.entity.User">
-    <id column="user_id" property="id"/>
-    <result column="user_name" property="userName"/>
+### 一级缓存 vs 二级缓存
 
-    <collection property="orders" ofType="com.example.entity.Order">
-        <id column="order_id" property="orderId"/>
-        <result column="total_amount" property="totalAmount"/>
-    </collection>
-</resultMap>
+<pre>
+MyBatis 缓存作用域：
+一级缓存（SqlSession）：同一 SqlSession 内共享，close 后清除
+二级缓存（Mapper）：跨 SqlSession 共享，需要 POJO implements Serializable
+</pre>
 
-<select id="findUserWithOrders" resultMap="UserWithOrdersMap">
-    SELECT u.id as user_id, u.user_name,
-           o.id as order_id, o.total_amount
-    FROM users u
-    LEFT JOIN orders o ON u.id = o.user_id
-    WHERE u.id = #{userId}
-</select>
-```
+MyBatis 二级缓存是 Mapper 级别的，缓存的是查询结果而非 Entity 对象，与 Hibernate 的二级缓存设计不同。
 
-## 分页查询
+## 插件机制
 
-### PageHelper 插件
+### 插件拦截点
 
-```xml
-<dependency>
-    <groupId>com.github.pagehelper</groupId>
-    <artifactId>pagehelper-spring-boot-starter</artifactId>
-    <version>2.1.0</version>
-</dependency>
-```
+<pre>
+MyBatis 可拦截的四大对象：
+Executor（方法级）：update / query / flushStatements / commit / rollback
+StatementHandler（SQL构建）：prepare / parameterize / batch / query / update
+ParameterHandler（参数处理）：getParameterObject / setParameters
+ResultSetHandler（结果处理）：handleResultSets / handleOutputParameters
+</pre>
 
-```java
-@Service
-public class UserService {
-
-    @Autowired
-    private UserMapper userMapper;
-
-    public PageInfo<User> findPage(int pageNum, int pageSize) {
-        PageHelper.startPage(pageNum, pageSize);
-        List<User> users = userMapper.findAll();
-        return new PageInfo<>(users);
-    }
-}
-```
-
-## 高级特性
-
-### 自动填充
-
-```java
-@Component
-public class MyMetaObjectHandler implements MetaObjectHandler {
-
-    @Override
-    public void insertFill(MetaObject metaObject) {
-        this.strictInsertFill(metaObject, "createTime", LocalDateTime.class, LocalDateTime.now());
-        this.strictUpdateFill(metaObject, "updateTime", LocalDateTime.class, LocalDateTime.now());
-    }
-
-    @Override
-    public void updateFill(MetaObject metaObject) {
-        this.strictUpdateFill(metaObject, "updateTime", LocalDateTime.class, LocalDateTime.now());
-    }
-}
-```
-
-### 枚举处理
-
-MyBatis 原生支持枚举类型映射。
-
-```java
-public enum Status {
-    ACTIVE, INACTIVE, DELETED
-}
-```
-
-## 注解 vs XML
-
-| 场景 | 推荐 | 说明 |
-|------|------|------|
-| 简单 CRUD | 注解 | 代码简洁 |
-| 复杂 SQL | XML | 可读性好，支持动态 SQL |
-| 多表关联 | XML | resultMap 更灵活 |
-| 动态 SQL | XML | if/choose/foreach 更强大 |
-
-## 常见问题
-
-### N+1 问题
-
-解决方案：使用嵌套 join 或分步查询，避免懒加载导致的 N+1。
-
-### 批量操作性能
-
-```java
-@Mapper
-public interface UserMapper {
-
-    @Insert({
-        "<script>",
-        "INSERT INTO users(user_name, email) VALUES",
-        "<foreach collection='users' item='u' separator=','>",
-        "(#{u.userName}, #{u.email})",
-        "</foreach>",
-        "</script>"
-    })
-    void batchInsert(@Param("users") List<User> users);
-}
-```
+PageHelper 是通过拦截 Executor.query 方法，在 SQL 执行前重写为分页 SQL（如 MySQL 的 LIMIT）。
 
 ## 参考样例
 
 ```yaml
-# 配置
 mybatis:
   mapper-locations: classpath:mapper/*.xml
   type-aliases-package: com.example.entity
@@ -329,106 +100,57 @@ mybatis:
 ```
 
 ```java
-// Mapper 接口
 @Mapper
 public interface UserMapper {
     @Select("SELECT * FROM users WHERE id = #{id}")
     User findById(Long id);
-
-    @Insert("INSERT INTO users(user_name, email) VALUES(#{userName}, #{email})")
+    @Insert("INSERT INTO users(name, email) VALUES(#{name}, #{email})")
     @Options(useGeneratedKeys = true, keyProperty = "id")
     int insert(User user);
 }
 ```
 
 ```xml
-<!-- XML Mapper -->
 <mapper namespace="com.example.mapper.UserMapper">
     <resultMap id="BaseResultMap" type="com.example.entity.User">
         <id column="id" property="id"/>
         <result column="user_name" property="userName"/>
-        <result column="email" property="email"/>
     </resultMap>
-
     <select id="findById" resultMap="BaseResultMap">
         SELECT * FROM users WHERE id = #{id}
     </select>
-
-    <insert id="insert" useGeneratedKeys="true" keyProperty="id">
-        INSERT INTO users(user_name, email) VALUES(#{userName}, #{email})
-    </insert>
 </mapper>
 ```
 
 ```xml
-<!-- 动态 SQL - if -->
 <select id="search" resultMap="BaseResultMap">
     SELECT * FROM users
     <where>
-        <if test="userName != null">
-            AND user_name LIKE CONCAT('%', #{userName}, '%')
-        </if>
-        <if test="email != null">
-            AND email = #{email}
-        </if>
+        <if test="name != null">AND name LIKE #{name}</if>
+        <if test="email != null">AND email = #{email}</if>
     </where>
 </select>
 ```
 
 ```xml
-<!-- 动态 SQL - foreach -->
 <select id="findByIds" resultMap="BaseResultMap">
-    SELECT * FROM users
-    WHERE id IN
-    <foreach collection="ids" item="id" open="(" separator="," close=")">
-        #{id}
-    </foreach>
+    SELECT * FROM users WHERE id IN
+    <foreach collection="ids" item="id" open="(" separator="," close=")">#{id}</foreach>
 </select>
-
-<insert id="batchInsert">
-    INSERT INTO users(user_name, email) VALUES
-    <foreach collection="users" item="user" separator=",">
-        (#{user.userName}, #{user.email})
-    </foreach>
-</insert>
-```
-
-```xml
-<!-- 一对一 association -->
-<resultMap id="OrderDetailMap" type="com.example.entity.Order">
-    <association property="user" javaType="com.example.entity.User">
-        <id column="user_id" property="id"/>
-        <result column="user_name" property="userName"/>
-    </association>
-</resultMap>
-```
-
-```xml
-<!-- 一对多 collection -->
-<resultMap id="UserWithOrdersMap" type="com.example.entity.User">
-    <collection property="orders" ofType="com.example.entity.Order">
-        <id column="order_id" property="orderId"/>
-        <result column="total_amount" property="totalAmount"/>
-    </collection>
-</resultMap>
 ```
 
 ```java
-// PageHelper 分页
 public PageInfo<User> findPage(int pageNum, int pageSize) {
     PageHelper.startPage(pageNum, pageSize);
-    List<User> users = userMapper.findAll();
-    return new PageInfo<>(users);
+    return new PageInfo<>(userMapper.findAll());
 }
 ```
 
 ```java
-// 自动填充
 @Component
 public class MyMetaObjectHandler implements MetaObjectHandler {
-    @Override
     public void insertFill(MetaObject metaObject) {
-        this.strictInsertFill(metaObject, "createTime", LocalDateTime.class, LocalDateTime.now());
+        strictInsertFill(metaObject, "createTime", LocalDateTime.class, LocalDateTime.now());
     }
 }
 ```

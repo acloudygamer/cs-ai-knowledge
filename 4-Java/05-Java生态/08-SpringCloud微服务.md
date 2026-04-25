@@ -1,398 +1,148 @@
 # Spring Cloud 微服务
 
-## 概述
+## 本质断言
 
-Spring Cloud 是微服务架构的工具集，封装了分布式系统所需的各种组件。
-
-```
-微服务架构
-├── 服务注册与发现（Eureka / Nacos）
-├── 服务通信（OpenFeign / RestTemplate）
-├── 负载均衡（Ribbon）
-├── 熔断器（Hystrix / Resilience4j）
-├── 网关（Gateway）
-├── 配置中心（Config Server / Nacos）
-└── 分布式链路追踪
-```
+Spring Cloud 的本质是一套分布式系统解决方案，通过声明式服务发现实现服务地址的动态管理，通过声明式 HTTP 客户端（OpenFeign）实现服务间调用的简化，通过熔断器实现故障隔离和降级，通过 API 网关实现统一入口和动态路由。
 
 ## 服务注册与发现
 
-### Nacos（推荐）
+### 服务注册的本质
 
-```yaml
-spring:
-  cloud:
-    nacos:
-      discovery:
-        server-addr: localhost:8848
-        namespace: dev
-        group: DEFAULT_GROUP
-```
+<pre>
+服务注册与发现流程：
+服务启动 → 注册自己的 IP:Port 到注册中心（Nacos/Eureka）
+    ↓
+服务消费者从注册中心获取服务提供者地址列表
+    ↓
+消费者本地缓存地址列表，注册中心变更时推送通知
+    ↓
+消费者根据负载均衡策略选择目标服务实例
+</pre>
 
-```java
-@SpringBootApplication
-@EnableDiscoveryClient
-public class ServiceApplication {
-    public static void main(String[] args) {
-        SpringApplication.run(ServiceApplication.class, args);
-    }
-}
-```
+### Nacos vs Eureka
+
+<pre>
+注册中心选型：
+Eureka（已停止维护）：AP 模型，只保证可用性
+Nacos：同时支持 AP 和 CP，可作为配置中心
+</pre>
 
 ## 服务通信
 
-### RestTemplate
+### OpenFeign 的本质
 
-```java
-@Configuration
-public class RestTemplateConfig {
+OpenFeign 通过动态代理（Proxy）将接口方法调用转换为 HTTP 请求，开发者只需声明接口而无需实现，运行时由 Feign 生成代理类完成 HTTP 调用。
 
-    @Bean
-    @LoadBalanced
-    public RestTemplate restTemplate() {
-        return new RestTemplate();
-    }
-}
+<pre>
+OpenFeign 执行流程：
+接口声明 → @FeignClient(name="svc")
+    ↓
+启动时生成 JDK 动态代理类
+    ↓
+方法调用 → 拦截器 → 构建 HTTP 请求 → 发送
+    ↓
+响应 → 解码 → 返回值
+</pre>
 
-@Service
-public class UserService {
+### 负载均衡
 
-    @Autowired
-    private RestTemplate restTemplate;
+<pre>
+负载均衡策略：
+Round Robin：轮询（默认）
+Random：随机
+Weighted Response Time：根据响应时间加权
+Best Available：根据并发连接数选择
+</pre>
 
-    public User getUserById(Long id) {
-        return restTemplate.getForObject(
-            "http://user-service/users/" + id,
-            User.class
-        );
-    }
-}
-```
-
-### OpenFeign（推荐）
-
-OpenFeign 是声明式 HTTP 客户端，简化服务间调用。
-
-```xml
-<dependency>
-    <groupId>org.springframework.cloud</groupId>
-    <artifactId>spring-cloud-starter-openfeign</artifactId>
-</dependency>
-```
-
-```java
-@SpringBootApplication
-@EnableFeignClients
-public class OrderApplication {
-    public static void main(String[] args) {
-        SpringApplication.run(OrderApplication.class, args);
-    }
-}
-
-// 声明式接口
-@FeignClient(name = "user-service", path = "/users")
-public interface UserClient {
-
-    @GetMapping("/{id}")
-    User getUserById(@PathVariable("id") Long id);
-
-    @PostMapping
-    User createUser(@RequestBody UserRequest request);
-}
-```
-
-```java
-// 使用
-@Service
-public class OrderService {
-
-    @Autowired
-    private UserClient userClient;
-
-    public Order createOrder(Long userId) {
-        User user = userClient.getUserById(userId);
-        // 创建订单...
-    }
-}
-```
-
-### OpenFeign 配置
-
-```yaml
-spring:
-  cloud:
-    openfeign:
-      client:
-        config:
-          user-service:
-            connect-timeout: 5000
-            read-timeout: 5000
-      circuitbreaker:
-        enabled: true
-```
-
-## 负载均衡
-
-### Spring Cloud LoadBalancer（新版）
-
-Ribbon 已停止维护，Spring Cloud LoadBalancer 是新版替代方案。
-
-```yaml
-spring:
-  cloud:
-    loadbalancer:
-      ribbon:
-        enabled: false
-```
+Ribbon 已停止维护，Spring Cloud LoadBalancer 是其替代方案。
 
 ## 熔断器
 
-### Resilience4j（推荐）
+### Resilience4j 熔断状态机
 
-Resilience4j 是轻量级熔断器库，支持超时、重试、限流、舱壁模式。
+<pre>
+熔断器状态转换：
+CLOSED（正常）→ 失败率超过阈值 → OPEN（熔断）
+OPEN（熔断）→ 经过冷却时间 → HALF_OPEN（试探）
+HALF_OPEN（试探）→ 成功 → CLOSED
+HALF_OPEN（试探）→ 失败 → OPEN
+</pre>
 
-```xml
-<dependency>
-    <groupId>org.springframework.cloud</groupId>
-    <artifactId>spring-cloud-starter-circuitbreaker-resilience4j</artifactId>
-</dependency>
-```
+### 熔断 vs 超时 vs 重试
 
-```yaml
-resilience4j:
-  circuitbreaker:
-    instances:
-      userService:
-        sliding-window-size: 10
-        failure-rate-threshold: 50
-        wait-duration-in-open-state: 60s
-```
-
-```java
-@Service
-public class UserService {
-
-    @Autowired
-    private CircuitBreakerFactory circuitBreakerFactory;
-
-    public User getUserById(Long id) {
-        CircuitBreaker circuitBreaker = circuitBreakerFactory.create("userService");
-
-        return circuitBreaker.run(
-            () -> userClient.getUserById(id),
-            throwable -> fallback(throwable)
-        );
-    }
-
-    private User fallback(Throwable throwable) {
-        return new DefaultUser();
-    }
-}
-```
-
-### 超时和重试
-
-```yaml
-resilience4j:
-  timelimiter:
-    instances:
-      userService:
-        timeout-duration: 3s
-
-  retry:
-    instances:
-      userService:
-        max-attempts: 3
-        wait-duration: 500ms
-```
+<pre>
+容错策略对比：
+超时：等待多久放弃（防止无限等待）
+重试：失败后重新尝试（提高成功率，但可能放大故障）
+熔断：快速失败，拒绝新请求（防止雪崩，保护下游）
+</pre>
 
 ## API 网关
 
-### Spring Cloud Gateway
+### Gateway 的本质
 
-Gateway 是基于 Spring WebFlux 的响应式网关。
+Gateway 基于 Spring WebFlux 的响应式编程模型，通过路由（Route）+ 断言（Predicate）+ 过滤器（Filter）实现请求的转发、过滤和修改。
 
-```xml
-<dependency>
-    <groupId>org.springframework.cloud</groupId>
-    <artifactId>spring-cloud-starter-gateway</artifactId>
-</dependency>
-```
-
-```yaml
-spring:
-  cloud:
-    gateway:
-      routes:
-        - id: user-service
-          uri: lb://user-service
-          predicates:
-            - Path=/users/**
-          filters:
-            - StripPrefix=1
-
-        - id: order-service
-          uri: lb://order-service
-          predicates:
-            - Path=/orders/**
-          filters:
-            - StripPrefix=1
-```
-
-### 全局过滤器
-
-```java
-@Component
-public class AuthFilter implements GlobalFilter {
-
-    @Override
-    public Mono<Void> filter(ServerWebExchange exchange,
-                             GatewayFilterChain chain) {
-        String token = exchange.getRequest().getHeaders()
-            .getFirst("Authorization");
-
-        if (StringUtils.isBlank(token)) {
-            exchange.getResponse().setStatusCode(
-                HttpStatus.UNAUTHORIZED);
-            return exchange.getResponse().setComplete();
-        }
-
-        return chain.filter(exchange);
-    }
-}
-```
+<pre>
+Gateway 请求处理流程：
+请求 → Route Predicate → 匹配路由规则
+    ↓
+匹配成功 → Filter（前置处理）→ 代理转发
+    ↓
+Filter（后置处理）→ 响应
+</pre>
 
 ## 配置中心
 
-### Nacos 配置中心（推荐）
+### 配置动态刷新机制
 
-```yaml
-spring:
-  cloud:
-    nacos:
-      discovery:
-        server-addr: localhost:8848
-      config:
-        server-addr: localhost:8848
-        file-extension: yaml
-        namespace: dev
-        refresh-enabled: true
-```
-
-### 动态刷新配置
-
-```java
-@RestController
-@RefreshScope
-public class UserController {
-
-    @Value("${app.feature-flag:false}")
-    private boolean featureFlag;
-}
-```
+<pre>
+配置变更推送流程：
+Nacos 配置变更 → 发送 UDP 通知到所有服务
+    ↓
+服务收到通知 → 重新从 Nacos 获取最新配置
+    ↓
+@RefreshScope 触发 Bean 重新创建
+    ↓
+新 Bean 注入到依赖方
+</pre>
 
 ## 分布式链路追踪
 
-### Sleuth + Zipkin
+### Trace / Span 模型
 
-```xml
-<dependency>
-    <groupId>org.springframework.cloud</groupId>
-    <artifactId>spring-cloud-starter-sleuth</artifactId>
-</dependency>
-
-<dependency>
-    <groupId>org.springframework.cloud</groupId>
-    <artifactId>spring-cloud-starter-zipkin</artifactId>
-</dependency>
-```
-
-```yaml
-spring:
-  zipkin:
-    base-url: http://localhost:9411
-  sleuth:
-    sampling:
-      probability: 0.1
-```
-
-### Micrometer（指标）
-
-```xml
-<dependency>
-    <groupId>org.springframework.boot</groupId>
-    <artifactId>spring-boot-starter-actuator</artifactId>
-</dependency>
-
-<dependency>
-    <groupId>io.micrometer</groupId>
-    <artifactId>micrometer-registry-prometheus</artifactId>
-</dependency>
-```
-
-## 微服务最佳实践
-
-### 服务拆分原则
-
-单一职责、高内聚低耦合、业务边界清晰、独立部署。
-
-### 服务间通信
-
-同步：HTTP（OpenFeign）/ gRPC；异步：Kafka / RabbitMQ。
-
-### 健康检查
-
-```yaml
-management:
-  endpoints:
-    web:
-      exposure:
-        include: health,info,metrics
-  endpoint:
-    health:
-      show-details: when-authorized
-```
+<pre>
+分布式追踪结构：
+Trace = 请求全流程（唯一 TraceId）
+Span = 单个服务/操作（唯一 SpanId，携带 ParentSpanId）
+    ↓
+Span A（Gateway）→ Span B（User Service）→ Span C（DB）
+  TraceId: T1          TraceId: T1            TraceId: T1
+  SpanId: S1           SpanId: S2             SpanId: S3
+  ParentId: null       ParentId: S1           ParentId: S2
+</pre>
 
 ## 参考样例
 
 ```yaml
-# Nacos 配置
 spring:
   cloud:
     nacos:
       discovery:
         server-addr: localhost:8848
-        namespace: dev
 ```
 
 ```java
-// OpenFeign 声明式接口
 @FeignClient(name = "user-service", path = "/users")
 public interface UserClient {
     @GetMapping("/{id}")
     User getUserById(@PathVariable("id") Long id);
-
     @PostMapping
     User createUser(@RequestBody UserRequest request);
 }
 ```
 
-```java
-// 使用 Feign Client
-@Service
-public class OrderService {
-    @Autowired
-    private UserClient userClient;
-
-    public Order createOrder(Long userId) {
-        User user = userClient.getUserById(userId);
-        return createOrderWithUser(user);
-    }
-}
-```
-
 ```yaml
-# Gateway 路由
 spring:
   cloud:
     gateway:
@@ -405,29 +155,7 @@ spring:
             - StripPrefix=1
 ```
 
-```java
-// 全局过滤器
-@Component
-public class AuthFilter implements GlobalFilter {
-    @Override
-    public Mono<Void> filter(ServerWebExchange exchange,
-                             GatewayFilterChain chain) {
-        String token = exchange.getRequest().getHeaders()
-            .getFirst("Authorization");
-
-        if (StringUtils.isBlank(token)) {
-            exchange.getResponse().setStatusCode(
-                HttpStatus.UNAUTHORIZED);
-            return exchange.getResponse().setComplete();
-        }
-
-        return chain.filter(exchange);
-    }
-}
-```
-
 ```yaml
-# Resilience4j 熔断配置
 resilience4j:
   circuitbreaker:
     instances:
@@ -438,46 +166,16 @@ resilience4j:
 ```
 
 ```java
-// 熔断器使用
-@Service
-public class UserService {
-    @Autowired
-    private CircuitBreakerFactory circuitBreakerFactory;
-
-    public User getUserById(Long id) {
-        CircuitBreaker circuitBreaker = circuitBreakerFactory.create("userService");
-        return circuitBreaker.run(
-            () -> userClient.getUserById(id),
-            throwable -> fallback(throwable)
-        );
-    }
-}
+CircuitBreaker circuitBreaker = circuitBreakerFactory.create("userService");
+return circuitBreaker.run(() -> userClient.getUserById(id),
+    throwable -> fallback());
 ```
 
 ```yaml
-# Sleuth + Zipkin 配置
 spring:
   zipkin:
     base-url: http://localhost:9411
   sleuth:
     sampling:
       probability: 0.1
-```
-
-```yaml
-# Docker Compose 微服务
-services:
-  gateway:
-    build: ./gateway
-    ports:
-      - "8080:8080"
-  user-service:
-    build: ./user-service
-    depends_on:
-      postgres:
-        condition: service_healthy
-  postgres:
-    image: postgres:15-alpine
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
 ```

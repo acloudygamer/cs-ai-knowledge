@@ -1,415 +1,92 @@
 # Redis
 
-## Redis 概述
+## 本质断言
 
-Redis 是高性能的内存数据存储，支持字符串、哈希、列表、集合、有序集合等数据结构。
+Redis 是高性能的内存键值存储，其本质是提供 O(1) 复杂度的数据结构操作，将磁盘数据库的访问延迟从毫秒级降低到微秒级，通过单线程事件循环模型避免锁竞争，通过异步持久化（AOF/RDB）实现数据安全。
 
-### 数据结构
+## 核心数据结构
 
-| 类型 | 用途 |
-|------|------|
-| String | 缓存、计数器、分布式锁 |
-| Hash | 对象存储 |
-| List | 队列、消息流 |
-| Set | 去重、标签 |
-| Sorted Set | 排行榜、优先级队列 |
-| Bitmap | 用户在线状态、签到 |
-| HyperLogLog | 统计去重 |
-| Geo | 地理位置 |
+### 数据结构选择依据
 
-## Spring Data Redis
+| 操作场景 | 推荐数据结构 | 原因 |
+|----------|-------------|------|
+| 唯一性检查 | Set | 自动去重，O(1) 判断存在 |
+| 排行榜/优先级 | Sorted Set | 精确排序，O(log N) 插入 |
+| 消息队列/列表 | List | LPUSH/RPOP 实现队列 |
+| 计数器 | String | INCR 原子递增 |
+| 用户在线/签到 | Bitmap | 按位存储，空间效率极高 |
 
-### 配置
+## 缓存问题
 
-```yaml
-spring:
-  redis:
-    host: localhost
-    port: 6379
-    password: password
-    lettuce:
-      pool:
-        max-active: 10
-        max-idle: 5
-        min-idle: 1
-```
+### 缓存三问
 
-### RedisTemplate
+<pre>
+缓存穿透（查询不存在的数据）：
+原因：查询 DB 也不存在的数据，无法缓存
+解决：缓存空值（"NULL"）并设置短过期时间
 
-RedisTemplate 提供操作 Redis 的模板方法。
+缓存击穿（热点 key 过期瞬间穿库）：
+原因：单个热点 key 过期后，大量并发请求同时穿透到 DB
+解决：分布式锁（SETNX）+ 双检（先查缓存再加载）
 
-```java
-@Autowired
-private RedisTemplate<String, Object> redisTemplate;
-
-// String 操作
-redisTemplate.opsForValue().set("key", "value");
-String value = (String) redisTemplate.opsForValue().get("key");
-
-// Hash 操作
-redisTemplate.opsForHash().put("user:1", "name", "Alice");
-Object name = redisTemplate.opsForHash().get("user:1", "name");
-
-// List 操作
-redisTemplate.opsForList().leftPush("queue", "task");
-redisTemplate.opsForList().rightPop("queue");
-
-// Set 操作
-redisTemplate.opsForSet().add("tags", "java", "spring");
-
-// ZSet 操作
-redisTemplate.opsForZSet().add("leaderboard", "Alice", 100);
-```
-
-### 序列化配置
-
-```java
-@Configuration
-public class RedisConfig {
-
-    @Bean
-    public RedisTemplate<String, Object> redisTemplate(
-            RedisConnectionFactory factory) {
-
-        RedisTemplate<String, Object> template = new RedisTemplate<>();
-        template.setConnectionFactory(factory);
-
-        template.setKeySerializer(new StringRedisSerializer());
-        template.setValueSerializer(new GenericJackson2JsonRedisSerializer());
-        template.setHashKeySerializer(new StringRedisSerializer());
-        template.setHashValueSerializer(new GenericJackson2JsonRedisSerializer());
-
-        template.afterPropertiesSet();
-        return template;
-    }
-}
-```
-
-## 缓存
-
-### @Cacheable
-
-```java
-@Service
-@CacheConfig(cacheNames = "users")
-public class UserService {
-
-    @Cacheable(key = "#id")
-    public User findById(Long id) {
-        return userRepository.findById(id);
-    }
-}
-```
-
-### @CacheEvict
-
-```java
-@CacheEvict(key = "#id")
-public void deleteById(Long id) {
-    userRepository.deleteById(id);
-}
-
-@CacheEvict(allEntries = true)
-public void clearCache() { }
-```
-
-### @CachePut
-
-```java
-@CachePut(key = "#result.id")
-public User updateUser(User user) {
-    return userRepository.save(user);
-}
-```
-
-### Redis 缓存配置
-
-```java
-@Configuration
-@EnableCaching
-public class CacheConfig {
-
-    @Bean
-    public RedisCacheManager cacheManager(RedisConnectionFactory factory) {
-        RedisCacheConfiguration config = RedisCacheConfiguration.defaultCacheConfig()
-            .entryTtl(Duration.ofMinutes(30))
-            .serializeKeysWith(
-                RedisSerializationContext.SerializationPair
-                    .fromSerializer(new StringRedisSerializer())
-            )
-            .serializeValuesWith(
-                RedisSerializationContext.SerializationPair
-                    .fromSerializer(new GenericJackson2JsonRedisSerializer())
-            );
-
-        return RedisCacheManager.builder(factory)
-            .cacheDefaults(config)
-            .build();
-    }
-}
-```
+缓存雪崩（大量 key 同时过期）：
+原因：大量 key 过期时间相同，瞬间失去缓存保护
+解决：过期时间加随机偏移量（TTL + rand）
+</pre>
 
 ## 分布式锁
 
-### Redis 分布式锁
+### SETNX + EXPIRE 的原子性问题
 
-```java
-@Service
-public class DistributedLockService {
+SET key value NX PX milliseconds 是 SET 的原子操作变种，解决了 SETNX + EXPIRE 分两步执行可能导致的锁永久存在问题（SETNX 成功后 EXPIRE 前崩溃）。
 
-    @Autowired
-    private RedisTemplate<String, Object> redisTemplate;
-
-    public boolean lock(String key, String value, long expireSeconds) {
-        Boolean result = redisTemplate.opsForValue()
-            .setIfAbsent(key, value, Duration.ofSeconds(expireSeconds));
-        return Boolean.TRUE.equals(result);
-    }
-
-    public void unlock(String key, String value) {
-        String current = (String) redisTemplate.opsForValue().get(key);
-        if (value.equals(current)) {
-            redisTemplate.delete(key);
-        }
-    }
-}
-```
-
-### Redisson
-
-Redisson 提供更完善的分布式锁实现。
-
-```java
-@Autowired
-private RedissonClient redissonClient;
-
-public void doWithLock(String lockKey, Runnable task) {
-    RLock lock = redissonClient.getLock(lockKey);
-    try {
-        lock.lock();
-        task.run();
-    } finally {
-        lock.unlock();
-    }
-}
-```
+<pre>
+分布式锁释放的安全问题：
+错误方式：直接 DEL key（可能删除他人持有的锁）
+正确方式：使用 Lua 脚本，保证"只有持有者才能删除"
+</pre>
 
 ## 消息队列
 
-### Redis Stream
+### Redis Stream 的优势
 
-```java
-@Service
-public class RedisStreamService {
+Redis Stream 是 List/Pub/Sub 的替代方案，提供持久化、消息 ID、消费者组（类似 Kafka Consumer Group）、Ack 确认等特性。
 
-    @Autowired
-    private RedisTemplate<String, Object> redisTemplate;
+<pre>
+Redis Stream vs List vs Pub/Sub：
+List：非持久化，无 Ack，无消费者组
+Pub/Sub：无持久化，无 Ack，广播模式
+Stream：持久化 + Ack + 消费者组 + 消息 ID
+</pre>
 
-    public void sendMessage(String stream, String key, String value) {
-        redisTemplate.opsForStream().add(
-            new Record<>(stream, Map.of(key, value))
-        );
-    }
+## 限流
 
-    public List<MapRecord<String, Object, Object>> readMessages(
-            String stream, int count) {
-        return redisTemplate.opsForStream().read(
-            StreamReadOptions.empty().count(count),
-            StreamOffset.create(stream, ReadOffset.lastConsumed())
-        );
-    }
-}
-```
+### 计数器限流 vs 滑动窗口限流
 
-## 计数器
+<pre>
+计数器（固定窗口）：
+T1 内只允许 N 次请求，超出则拒绝
+问题：窗口边界可能出现 2N 次请求
 
-### 限流
+滑动窗口（Sorted Set）：
+使用 ZSET 按时间戳 scored 记录请求
+ZREMRANGEBYSCORE 删除窗口外请求
+ZCOUNT 统计窗口内请求数
+</pre>
 
-```java
-public boolean isAllowed(String userId, int maxRequests, int windowSeconds) {
-    String key = "rate:" + userId;
-    Long current = redisTemplate.opsForValue().increment(key);
+## 计数器与基数统计
 
-    if (current == 1) {
-        redisTemplate.expire(key, Duration.ofSeconds(windowSeconds));
-    }
+### HyperLogLog 的概率本质
 
-    return current <= maxRequests;
-}
-```
-
-### 滑动窗口
-
-```java
-public boolean slidingWindowLimit(String userId, int limit, int windowSeconds) {
-    String key = "sliding:" + userId;
-    long now = System.currentTimeMillis();
-    long windowStart = now - windowSeconds * 1000L;
-
-    redisTemplate.opsForZSet().removeRangeByScore(key, 0, windowStart);
-    Long count = redisTemplate.opsForZSet().zCard(key);
-
-    if (count < limit) {
-        redisTemplate.opsForZSet().add(key, String.valueOf(now), now);
-        redisTemplate.expire(key, Duration.ofSeconds(windowSeconds));
-        return true;
-    }
-
-    return false;
-}
-```
-
-## Bitmap
-
-### 用户在线状态
-
-```java
-public void setUserOnline(long userId) {
-    redisTemplate.opsForValue().setBit("online:users", userId, true);
-}
-
-public boolean isUserOnline(long userId) {
-    return Boolean.TRUE.equals(
-        redisTemplate.opsForValue().getBit("online:users", userId)
-    );
-}
-```
-
-### 签到
-
-```java
-public boolean checkIn(long userId, LocalDate date) {
-    String key = "checkin:" + date.format(DateTimeFormatter.ofPattern("yyyyMM"));
-    long offset = date.getDayOfMonth() - 1;
-
-    Boolean result = redisTemplate.opsForValue()
-        .setBit(key, offset, true);
-
-    return !Boolean.TRUE.equals(result);
-}
-```
-
-## Session 共享
-
-### Spring Session + Redis
-
-```xml
-<dependency>
-    <groupId>org.springframework.session</groupId>
-    <artifactId>spring-session-data-redis</artifactId>
-</dependency>
-```
-
-```java
-@SpringBootApplication
-@EnableRedisHttpSession
-public class Application {
-    public static void main(String[] args) {
-        SpringApplication.run(Application.class, args);
-    }
-}
-```
-
-## Pipeline
-
-### 批量操作
-
-```java
-public void batchOperations(List<String> keys) {
-    redisTemplate.executePipelined((RedisCallback<Object>) connection -> {
-        for (String key : keys) {
-            connection.stringCommands().set(
-                key.getBytes(),
-                "value".getBytes()
-            );
-        }
-        return null;
-    });
-}
-```
-
-## 最佳实践
-
-### Key 命名规范
-
-```
-user:{userId}:profile
-product:{productId}:details
-cache:user:{userId}
-lock:order:{orderId}
-```
-
-### 缓存穿透
-
-缓存空值防止穿透。
-
-```java
-public User findById(Long id) {
-    String key = "user:" + id;
-    User user = (User) redisTemplate.opsForValue().get(key);
-
-    if (user == null) {
-        user = userRepository.findById(id);
-
-        if (user != null) {
-            redisTemplate.opsForValue().set(key, user, Duration.ofMinutes(30));
-        } else {
-            // 缓存空值，防止穿透
-            redisTemplate.opsForValue().set(key, "", Duration.ofMinutes(5));
-        }
-    }
-
-    return user;
-}
-```
-
-### 缓存击穿
-
-使用分布式锁。
-
-```java
-public User findByIdWithLock(Long id) {
-    String key = "user:" + id;
-    User user = (User) redisTemplate.opsForValue().get(key);
-
-    if (user == null) {
-        String lockKey = "lock:" + key;
-        if (lock(key, lockKey, 30)) {
-            try {
-                user = userRepository.findById(id);
-                redisTemplate.opsForValue().set(key, user, Duration.ofMinutes(30));
-            } finally {
-                unlock(lockKey);
-            }
-        } else {
-            Thread.sleep(100);
-            return findByIdWithLock(id);
-        }
-    }
-
-    return user;
-}
-```
-
-### 缓存雪崩
-
-随机过期时间防止雪崩。
-
-```java
-int randomSeconds = ThreadLocalRandom.current().nextInt(300) + 600;
-redisTemplate.opsForValue().set(key, user,
-    Duration.ofSeconds(randomSeconds));
-```
+HyperLogLog 是概率算法，标准误差约 0.81%，内存固定 12KB（无论数据量大小）。适合 UV 统计、注册用户数等允许误差的场景。
 
 ## 参考样例
 
 ```yaml
-# 配置
 spring:
   redis:
     host: localhost
     port: 6379
-    password: password
     lettuce:
       pool:
         max-active: 10
@@ -418,98 +95,55 @@ spring:
 ```
 
 ```java
-// String 操作
 redisTemplate.opsForValue().set("key", "value");
 String value = (String) redisTemplate.opsForValue().get("key");
-redisTemplate.opsForValue().increment("counter");
 ```
 
 ```java
-// Hash 操作
 redisTemplate.opsForHash().put("user:1", "name", "Alice");
-redisTemplate.opsForHash().put("user:1", "age", "30");
 Object name = redisTemplate.opsForHash().get("user:1", "name");
-Map<Object, Object> user = redisTemplate.opsForHash().entries("user:1");
 ```
 
 ```java
-// ZSet 操作
 redisTemplate.opsForZSet().add("leaderboard", "Alice", 100);
-redisTemplate.opsForZSet().add("leaderboard", "Bob", 90);
 Set<Object> top3 = redisTemplate.opsForZSet().reverseRange("leaderboard", 0, 2);
 ```
 
 ```java
-// @Cacheable 缓存
 @Service
 @CacheConfig(cacheNames = "users")
 public class UserService {
     @Cacheable(key = "#id")
-    public User findById(Long id) {
-        return userRepository.findById(id);
-    }
-
+    public User findById(Long id) { }
     @CacheEvict(key = "#id")
     public void deleteById(Long id) { }
-
-    @CachePut(key = "#result.id")
-    public User updateUser(User user) {
-        return userRepository.save(user);
-    }
 }
 ```
 
 ```java
-// 分布式锁
-public boolean lock(String key, String value, long expireSeconds) {
-    Boolean result = redisTemplate.opsForValue()
-        .setIfAbsent(key, value, Duration.ofSeconds(expireSeconds));
-    return Boolean.TRUE.equals(result);
-}
+Boolean result = redisTemplate.opsForValue()
+    .setIfAbsent(key, value, Duration.ofSeconds(30));
 ```
 
 ```java
-// Redisson 锁
-public void doWithLock(String lockKey, Runnable task) {
-    RLock lock = redissonClient.getLock(lockKey);
-    try {
-        lock.lock();
-        task.run();
-    } finally {
-        lock.unlock();
-    }
-}
+RLock lock = redissonClient.getLock(lockKey);
+lock.lock();
+try { task.run(); } finally { lock.unlock(); }
 ```
 
 ```java
-// 限流
-public boolean isAllowed(String userId, int maxRequests, int windowSeconds) {
+public boolean isAllowed(String userId, int limit, int window) {
     String key = "rate:" + userId;
-    Long current = redisTemplate.opsForValue().increment(key);
-    if (current == 1) {
-        redisTemplate.expire(key, Duration.ofSeconds(windowSeconds));
-    }
-    return current <= maxRequests;
+    Long cnt = redisTemplate.opsForValue().increment(key);
+    if (cnt == 1) redisTemplate.expire(key, Duration.ofSeconds(window));
+    return cnt <= limit;
 }
 ```
 
 ```java
-// Bitmap 签到
 public boolean checkIn(long userId, LocalDate date) {
     String key = "checkin:" + date.format(DateTimeFormatter.ofPattern("yyyyMM"));
-    long offset = date.getDayOfMonth() - 1;
-    Boolean result = redisTemplate.opsForValue().setBit(key, offset, true);
+    Boolean result = redisTemplate.opsForValue().setBit(key, date.getDayOfMonth() - 1, true);
     return !Boolean.TRUE.equals(result);
-}
-```
-
-```java
-// Spring Session
-@SpringBootApplication
-@EnableRedisHttpSession
-public class Application {
-    public static void main(String[] args) {
-        SpringApplication.run(Application.class, args);
-    }
 }
 ```

@@ -1,417 +1,132 @@
 # Gradle
 
-## 概述
+> **本质断言**：Gradle 构建逻辑由有向无环图（DAG）驱动，每个 Task 节点代表一个原子构建操作，边代表任务依赖关系，执行引擎按拓扑排序决定任务并行度和执行顺序。
 
-Gradle 是现代化的构建工具，使用 Groovy 或 Kotlin DSL 定义构建逻辑。
+## 构建 DAG
 
-### vs Maven
+<pre>
+应用构建任务图:
+
+:compileJava ──► :processResources ──► :classes
+      │                                    │
+      │         ┌─────────────────────────┘
+      │         ▼
+:compileTestJUnit ──► :test ──► :build
+                          │
+                          ▼
+                   :bootJar (Spring Boot)
+</pre>
+
+**增量构建原理**：每个 Task 记录 `lastBuildSuccessTimestamp` 和输入指纹（input file hash）、输出指纹（output file hash）。构建时比较当前指纹与记录指纹，仅在指纹变化时重新执行任务。这使 Gradle 在大多数增量修改后跳过 90%+ 的任务。
+
+## Gradle vs Maven 核心差异
 
 | 特性 | Gradle | Maven |
 |------|--------|-------|
-| 语言 | Groovy/Kotlin DSL | XML |
-| 构建速度 | 更快（增量构建） | 较慢 |
-| 依赖管理 | 传递依赖智能解析 | 依赖冲突手动解决 |
-| 灵活性 | 高 | 中 |
-| 生态 | Spring Boot 优先支持 | Apache 生态优先 |
+| 构建语言 | Groovy/Kotlin DSL | XML |
+| 依赖解析 | DAG + 传递依赖智能解析 | 最短路径 + 声明顺序 |
+| 增量构建 | 基于任务指纹 | 基于时间戳 |
+| 并行执行 | 任务级并行 | Reactor 模式 |
+| 配置方式 | 声明式 + 代码式 | 纯声明式 |
 
-## 项目结构
+**为什么 Gradle 更快**：Maven 的 Reactor 只决定模块构建顺序，每个模块内部仍是顺序执行。Gradle 的任务级并行（`--parallel`）允许 DAG 中无依赖的任务同时执行，现代多核 CPU 上显著提速。
 
-```
-project/
-├── build.gradle           # 构建脚本（Groovy DSL）
-├── build.gradle.kts       # 构建脚本（Kotlin DSL）
-├── settings.gradle        # 项目设置
-├── settings.gradle.kts
-├── gradle.properties      # Gradle 属性
-├── app/
-│   ├── build.gradle
-│   └── src/
-│       ├── main/
-│       │   ├── java/
-│       │   └── resources/
-│       └── test/
-│           ├── java/
-│           └── resources/
-├── src/                   # 源码目录（单项目时）
-└── lib/                   # 库目录
-```
+## 依赖配置
 
-## 基础构建脚本
+<pre>
+implementation vs api vs compileOnly:
 
-### settings.gradle
+implementation: 编译时可用，传递依赖不暴露给消费者
+               A → B(implementation) → C  → C 对 A 不可见
+
+api (≈ compile): 编译时可用，传递依赖暴露给消费者
+               A → B(api) → C     → C 对 A 可见
+
+compileOnly: 仅编译时，不打包、不运行
+</pre>
+
+`api` 配置解决了"依赖泄漏"问题：库作者希望某些传递依赖对使用者可见（用于进一步扩展），但 `implementation` 会阻断传递性。
+
+## Gradle Wrapper
+
+`gradlew` 脚本在用户首次执行时下载指定版本的 Gradle，然后所有团队成员使用相同的 Gradle 版本，消除"在我机器上能构建"的兼容性问题。
+
+## 参考样例
 
 ```groovy
-// settings.gradle
+// settings.gradle（≤20行）
 rootProject.name = 'my-app'
-
-// 包含子项目
 include 'app', 'library'
 ```
 
-### build.gradle（Groovy DSL）
-
 ```groovy
+// build.gradle (Groovy DSL)
 plugins {
     id 'java'
     id 'application'
-    id 'java-library'
 }
-
-// 项目属性
-group 'com.example'
-version '1.0.0'
-
-// 仓库配置
-repositories {
-    mavenCentral()
-    google()
-    maven { url 'https://jitpack.io' }
-}
-
-// 依赖配置
+group = 'com.example'
+version = '1.0.0'
+repositories { mavenCentral() }
 dependencies {
-    // 编译时依赖
     implementation 'com.google.guava:guava:32.1.3-jre'
-
-    // 测试依赖
     testImplementation 'org.junit.jupiter:junit-jupiter:5.10.1'
-    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
-
-    // API（编译和运行时可用，但不会传递）
-    api 'org.apache.commons:commons-lang3:3.14.0'
-
-    // 仅编译时实现
-    compileOnly 'org.projectlombok:lombok:1.18.30'
-    annotationProcessor 'org.projectlombok:lombok:1.18.30'
 }
-
-// Java 编译配置
 java {
     sourceCompatibility = JavaVersion.VERSION_25
     targetCompatibility = JavaVersion.VERSION_25
-
-    // 源码编码
-    withJavadocJar()
 }
-
-// 任务配置
-application {
-    mainClass = 'com.example.App'
-}
-
-// 测试配置
-test {
-    useJUnitPlatform()
-    testLogging {
-        events 'passed', 'skipped', 'failed'
-    }
-}
+application { mainClass = 'com.example.App' }
+test { useJUnitPlatform() }
 ```
 
-### build.gradle.kts（Kotlin DSL）
-
 ```kotlin
-// build.gradle.kts
-plugins {
-    java
-    application
-}
-
+// build.gradle.kts (Kotlin DSL)
+plugins { java; application }
 group = "com.example"
 version = "1.0.0"
-
-repositories {
-    mavenCentral()
-    google()
-}
-
+repositories { mavenCentral() }
 dependencies {
     implementation("com.google.guava:guava:32.1.3-jre")
     testImplementation("org.junit.jupiter:junit-jupiter:5.10.1")
 }
-
-java {
-    sourceCompatibility = JavaVersion.VERSION_25
-    targetCompatibility = JavaVersion.VERSION_25
-}
-
-application {
-    mainClass.set("com.example.App")
-}
+java { sourceCompatibility = JavaVersion.VERSION_25 }
+application { mainClass.set("com.example.App") }
 ```
 
-## 依赖管理
-
-### 依赖配置
-
 ```groovy
-dependencies {
-    // 编译时依赖（传递依赖不会暴露给消费者）
-    implementation 'com.google.guava:guava:32.1.3-jre'
-
-    // API 依赖（传递依赖会暴露给消费者，等同于 compile）
-    api 'org.apache.commons:commons-lang3:3.14.0'
-
-    // 仅编译时
-    compileOnly 'org.projectlombok:lombok:1.18.30'
-
-    // 运行时依赖
-    runtimeOnly 'com.fasterxml.jackson.core:jackson-databind:2.16.1'
-
-    // 测试依赖
-    testImplementation 'org.junit.jupiter:junit-jupiter:5.10.1'
-    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
-}
-```
-
-### 依赖冲突解决
-
-```groovy
-// 排除传递依赖
-implementation('com.example:library:1.0') {
-    exclude group: 'org.slf4j', module: 'slf4j-api'
-}
-
-// 强制使用特定版本（解决冲突）
+// 依赖冲突解决
 configurations.all {
-    resolutionStrategy {
-        force 'org.slf4j:slf4j-api:2.0.9'
-    }
-}
-
-// 依赖版本变量
-ext {
-    guavaVersion = '32.1.3-jre'
-}
-dependencies {
-    implementation "com.google.guava:guava:$guavaVersion"
+    resolutionStrategy { force 'org.slf4j:slf4j-api:2.0.9' }
 }
 ```
 
-## 多项目构建
-
-### settings.gradle
-
 ```groovy
-rootProject.name = 'multi-project'
-
-include 'app', 'library', 'web-service'
-
-// 项目别名
-project(':app').name = 'application'
-```
-
-### 根项目 build.gradle
-
-```groovy
-subprojects {
-    // 所有子项目共享的配置
-    plugins.apply('java')
-
-    repositories {
-        mavenCentral()
-    }
-
-    dependencies {
-        testImplementation 'org.junit.jupiter:junit-jupiter:5.10.1'
-    }
-
-    test {
-        useJUnitPlatform()
-    }
-}
-
-// 子项目特定配置
-project(':app') {
-    dependencies {
-        implementation project(':library')
-    }
-}
-
-project(':web-service') {
-    dependencies {
-        implementation project(':library')
-        implementation 'org.springframework.boot:spring-boot-starter-web:3.4.0'
-    }
-}
-```
-
-## 自定义任务
-
-```groovy
-// 创建任务
+// 自定义任务
 tasks.register('hello') {
-    doLast {
-        println 'Hello, Gradle!'
-    }
-}
-
-// 任务依赖
-tasks.register('buildAll') {
-    dependsOn tasks.named('clean'), tasks.named('build')
-}
-
-// 任务分组
-tasks.register('myTask') {
-    group = 'Custom'
-    description = 'A custom task'
-
-    doLast {
-        println 'Custom task executed'
-    }
-}
-
-// 增量任务
-tasks.register('processFiles', Copy) {
-    from 'source'
-    into 'target'
-
-    // 增量配置
-    filesMatching('*.txt') {
-        expand(version: '1.0')
-    }
+    doLast { println 'Hello, Gradle!' }
 }
 ```
-
-## Gradle Wrapper
-
-### 生成 Wrapper
-
-```bash
-# 生成 Gradle Wrapper
-gradle wrapper --gradle-version=8.5
-
-# 验证 Wrapper
-./gradlew -v
-```
-
-### gradle/wrapper/gradle-wrapper.properties
-
-```properties
-distributionBase=GRADLE_USER_HOME
-distributionPath=wrapper/dists
-distributionUrl=https\://services.gradle.org/distributions/gradle-8.5-bin.zip
-networkTimeout=10000
-validateDistributionUrl=true
-zipStoreBase=GRADLE_USER_HOME
-zipStorePath=wrapper/dists
-```
-
-## 常用命令
-
-```bash
-# 构建
-gradle build              # 编译测试
-gradle build -x test     # 跳过测试构建
-gradle clean build       # 清理并重新构建
-
-# 运行
-gradle run               # 运行 application
-gradle bootRun           # 运行 Spring Boot 应用
-
-# 测试
-gradle test              # 运行测试
-gradle test --info       # 详细测试输出
-gradle test --tests '*ServiceTest'  # 运行特定测试
-
-# 依赖
-gradle dependencies      # 查看依赖树
-gradle dependencies --configuration runtimeClasspath  # 查看特定配置
-gradle buildEnvironment   # 查看构建环境
-
-# 其他
-gradle projects          # 查看项目结构
-gradle tasks            # 查看可用任务
-gradle properties       # 查看项目属性
-gradle wrapper --gradle-version=8.5  # 升级 Wrapper
-```
-
-## Spring Boot 集成
 
 ```groovy
+// Spring Boot
 plugins {
     id 'java'
     id 'org.springframework.boot' version '3.4.0'
     id 'io.spring.dependency-management' version '1.1.4'
 }
-
 dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-web'
-    implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
-    runtimeOnly 'com.h2database:h2'
-    testImplementation 'org.springframework.boot:spring-boot-starter-test'
 }
 ```
 
-## 发布配置
-
-```groovy
-plugins {
-    id 'java-library'
-    id 'maven-publish'
-}
-
-publishing {
-    publications {
-        mavenJava(MavenPublication) {
-            from components.java
-
-            pom {
-                name = 'My Library'
-                description = 'A sample library'
-                url = 'https://github.com/example/library'
-
-                licenses {
-                    license {
-                        name = 'MIT'
-                        url = 'https://opensource.org/licenses/MIT'
-                    }
-                }
-
-                developers {
-                    developer {
-                        id = 'developer'
-                        name = 'Developer Name'
-                    }
-                }
-
-                scm {
-                    connection = 'scm:git:https://github.com/example/library.git'
-                    developerConnection = 'scm:git:https://github.com/example/library.git'
-                }
-            }
-        }
-    }
-
-    repositories {
-        maven {
-            url = version.endsWith('SNAPSHOT')
-                ? 'https://oss.sonatype.org/content/repositories/snapshots/'
-                : 'https://oss.sonatype.org/service/local/staging/deploy/maven2/'
-
-            credentials {
-                username = System.getenv('MAVEN_USERNAME')
-                password = System.getenv('MAVEN_PASSWORD')
-            }
-        }
-    }
-}
+```bash
+# 常用命令
+gradle build          # 编译测试
+gradle test           # 运行测试
+gradle bootRun        # 运行 Spring Boot
+gradle dependencies   # 查看依赖树
 ```
-
-## 常见问题
-
-### 依赖下载慢
-
-```groovy
-repositories {
-    maven {
-        url 'https://maven.aliyun.com/repository/public'
-        url 'https://maven.aliyun.com/repository/spring'
-    }
-}
-```
-
-### 内存不足
 
 ```properties
 # gradle.properties
@@ -419,14 +134,4 @@ org.gradle.jvmargs=-Xmx2g -XX:+HeapDumpOnOutOfMemoryError
 org.gradle.daemon=true
 org.gradle.parallel=true
 org.gradle.caching=true
-```
-
-### 构建缓存
-
-```bash
-# 清理缓存
-gradle clean --refresh-dependencies
-
-# 离线模式（使用本地缓存）
-gradle build --offline
 ```

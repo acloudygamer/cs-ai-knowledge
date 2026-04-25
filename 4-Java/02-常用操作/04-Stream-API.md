@@ -1,118 +1,64 @@
 # Stream API
 
-## 概述
+> **本质断言**：Stream 的中间操作不执行任何计算，只构建一个包含源引用和所有操作函数的懒计算图（Pipeline），终端操作触发从源头到终点的单次遍历。
 
-Stream API（Java 8+）提供函数式风格处理集合数据，支持惰性求值和并行处理。
+## 惰性求值原理
 
-核心概念：
-- **源（Source）**：集合、数组、I/O 等
-- **中间操作（Intermediate Operations）**：filter、map、sorted 等，返回新的 Stream
-- **终端操作（Terminal Operations）**：collect、forEach、reduce 等，触发计算
+<pre>
+Stream 管道构建（不执行）:
+source.filter(...).map(...).sorted().collect(...)
 
-## 创建 Stream
+终端操作触发后执行顺序：
+1. 源拉取第一个元素
+2. 依次通过 filter → map → sorted（sorted 需全部元素，触发全量拉取）
+3. collect 消费
+4. 重复直到源耗尽
+</pre>
 
-Stream 可从集合、数组、Stream.of 创建，也可创建无限 Stream。IntStream/LongStream 可避免装箱。
+`sorted()` 是惰性但非短路的原因：它必须看到所有元素才能确定最大/最小值，无法在第一个元素满足时提前返回。因此 `sorted()` 会强制其前面的所有操作处理完全部元素。
 
-## 中间操作
+**为什么这样设计**：函数式语言的惰性求值允许构建无限流（`Stream.iterate()`），并在满足短路条件时提前终止，无需一次性加载全部数据到内存。
 
-### filter - 过滤
+## 并行 Stream 机制
 
-### map - 转换
+`parallelStream()` 将管道分解为多个子任务，使用 `ForkJoinPool.common()` 执行。任务粒度由 `Spliterator` 控制，默认对 `ArrayList` 按数组长度一半分割，对 `HashSet` 按哈希桶分割。
 
-### distinct / limit / skip
+<pre>
+数据源: [e0, e1, e2, e3, e4, e5, e6, e7]
+              ↓ split
+      [e0,e1,e2,e3]  [e4,e5,e6,e7]
+          ↓ split         ↓ split
+      [e0,e1] [e2,e3]  [e4,e5] [e6,e7]
+          ↓              ↓
+      compute...    compute...
+          ↓              ↓
+      [r0,r1]       [r2,r3]
+              ↓ join
+      [r0,r1,r2,r3]
+</pre>
 
-### sorted - 排序
+## Stream Gatherers（Java 22+）
 
-### peek - 调试
-
-## 终端操作
-
-### collect - 收集
-
-### forEach / forEachOrdered
-
-### reduce - 归约
-
-### findFirst / findAny
-
-### anyMatch / allMatch / noneMatch
-
-## 并行 Stream
-
-并行 Stream 自动使用 ForkJoinPool，可通过系统属性指定并行度。
-
-## 短路操作
-
-中间操作的短路：filter、distinct、limit/skip、takeWhile/dropWhile。
-终端操作的短路：findFirst/findAny、anyMatch/allMatch/noneMatch。
-
-## 惰性求值
-
-Stream 的中间操作是惰性的，只有遇到终端操作才会执行。
-
-## Stream Gatherers (<latest> 版本新增)
-
-Java 22 引入 `Stream.gather()` 方法，支持自定义中间操作器。
+`gather()` 接收一个 `Gatherer`，定义 `integrator`（如何将元素并入状态）、`combiner`（如何并行合并状态）和 `finisher`（如何输出最终结果）。这使得自定义中间操作无需修改 Stream 核心库。
 
 ## 参考样例
 
 ```java
-// 创建 Stream
-List<String> list = Arrays.asList("a", "b", "c");
-Stream<String> stream = list.stream();
-
+// 创建（≤20行）
+Stream<String> s = List.of("a","b").stream();
 IntStream range = IntStream.range(1, 10);
-Stream<Integer> infinite = Stream.iterate(0, n -> n + 2);
 ```
 
 ```java
 // 链式调用
-List<Integer> result = numbers.stream()
-    .filter(n -> n > 3)
-    .sorted()
-    .collect(Collectors.toList());
+List<Integer> r = numbers.stream()
+    .filter(n -> n > 3).sorted().collect(Collectors.toList());
 ```
 
 ```java
-// filter / map
-List<String> filtered = names.stream()
-    .filter(name -> name.startsWith("A"))
-    .collect(Collectors.toList());
-
-List<String> upper = words.stream()
-    .map(String::toUpperCase)
-    .collect(Collectors.toList());
-
 // 扁平化
 List<String> flat = nested.stream()
-    .flatMap(List::stream)
-    .collect(Collectors.toList());
-```
-
-```java
-// distinct / limit / skip
-List<Integer> distinct = numbers.stream().distinct().collect(Collectors.toList());
-List<Integer> limited = numbers.stream().limit(3).collect(Collectors.toList());
-List<Integer> skipped = numbers.stream().skip(2).collect(Collectors.toList());
-```
-
-```java
-// sorted
-List<String> sorted = names.stream().sorted().collect(Collectors.toList());
-List<String> byLength = names.stream()
-    .sorted(Comparator.comparingInt(String::length))
-    .collect(Collectors.toList());
-```
-
-```java
-// collect 收集
-List<String> list = names.stream().collect(Collectors.toList());
-Set<String> set = names.stream().collect(Collectors.toSet());
-Map<String, Integer> map = names.stream()
-    .collect(Collectors.toMap(name -> name, String::length));
-Map<Integer, List<String>> byLength = names.stream()
-    .collect(Collectors.groupingBy(String::length));
-String joined = names.stream().collect(Collectors.joining(", ", "[", "]"));
+    .flatMap(List::stream).collect(Collectors.toList());
 ```
 
 ```java
@@ -122,55 +68,22 @@ Optional<Integer> max = numbers.stream().reduce(Integer::max);
 ```
 
 ```java
-// findFirst / findAny
-Optional<String> first = names.stream()
-    .filter(name -> name.length() > 3)
-    .findFirst();
-```
-
-```java
 // 并行 Stream
-long count = numbers.parallelStream()
-    .filter(n -> n % 2 == 0)
-    .count();
+long cnt = numbers.parallelStream().filter(n -> n % 2 == 0).count();
 ```
 
 ```java
-// takeWhile / dropWhile
-List<Integer> taken = numbers.stream()
-    .takeWhile(n -> n < 4)
-    .collect(Collectors.toList());
-```
-
-```java
-// Stream Gatherers (Java 22+)
+// Gatherer（Java 22+）
 Gatherer<List<Integer>, ?, Integer> flattener = Gatherer.of(
     (state, element, downstream) -> {
-        for (var item : element) {
-            if (!downstream.push(item)) {
-                return false;
-            }
-        }
+        for (var item : element)
+            if (!downstream.push(item)) return false;
         return true;
-    }
-);
-
-List<Integer> flat = nested.stream()
-    .gather(flattener)
-    .toList();
+    });
+List<Integer> flat = nested.stream().gather(flattener).toList();
 ```
 
 ```java
-// 最佳实践 - 避免修改外部变量
-int sum = numbers.stream().reduce(0, Integer::sum);
-
-// 优先使用基础类型 Stream
-int sum = numbers.stream()
-    .mapToInt(Integer::intValue)
-    .sum();
-
-// 正确处理 Optional
-first.ifPresent(name -> System.out.println("Found: " + name));
-first.orElse("Default");
-first.orElseThrow(() -> new RuntimeException("Not found"));
+// 基础类型避免装箱
+int sum = numbers.stream().mapToInt(Integer::intValue).sum();
 ```
