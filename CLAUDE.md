@@ -1,57 +1,48 @@
-# CS/AI 知识库
+# 团队协作规范
 
-## 项目结构
+## 团队架构
 
-- `versions.json` - 版本参考标准
-- `README.md` - 目录概览
-- `0-计算机基础/` ~ `6-Go/` - 各知识领域
+| 团队 | Agent | 职责 |
+|------|-------|------|
+| Team A（写作） | concept-writer × N | 并行撰写子目录文档 |
+| Team B（审改） | reviewer + modifier | 审查 + 重写，循环直到通过 |
+| Team C（合并） | topology-architect | 整合目录内所有文档 |
 
-## 审查标准
+## 工作流程
 
-以 `versions.json` 中的版本信息为基准，审查文档中的：
-- 错误（API 误用、命令错误等）
-- 过时内容
-- 不准确描述
-- 无用内容
-- 格式问题
+每个外层目录（0→1→2...）按以下顺序执行：
 
----
+```
+1. Team A（写）
+   └─ 子目录并行：每个子目录一个 concept-writer
+   └─ 全部写完 → Team A leader 通知 Team B leader
 
-## 概念文档宪法
+2. Team B（审改）
+   └─ reviewer 审查 → 输出问题清单
+   └─ modifier 重写
+   └─ reviewer 再审（循环直到无问题）
+   └─ 通过 → Team B leader 通知 Team C leader
 
-每个概念文档必须严格遵循以下结构：
-
-```markdown
-# [概念名称]
-
-## 定义
-
-一句话断言本质。不是描述，是断言。
-
-## 数学模型
-
-若涉及计算/复杂度/概率，必须给出 LaTeX 公式。公式本身即为解释。
-
-## 数据流
-
-ASCII 图或分步列表，标记数据从入口到出口的每一次形态变换和所有权转移。
-
-> **ASCII 图**：用 `<pre>` 标签包裹，防止空格被 Markdown 渲染器忽略导致对齐错乱。
-
-> **对比参照**：若存在易混淆概念（如协程/线程/进程），在此处用对比表格强制对齐：内存模型、调度权、数据交换代价三列。
-
-## 机制
-
-高密度文字，解释“为什么这样设计”“约束条件是什么”“违反约束会怎样”。不描述 API，不描述用法。
-
-## 参考存根
-
-仅当概念有明确的可执行证明价值时出现。代码不超过 20 行，不含错误处理、不含日志、不含注释。
+3. Team C（合并）
+   └─ topology-architect 整合目录内所有文档
+   └─ 完成 → 通知进入下一个目录
 ```
 
-**执行原则**：
-- `定义` 是一句话本质断言，`机制` 讲为什么
-- `数学模型` 强制化：涉及计算/复杂度必须给 LaTeX
-- `对比参照` 强制对齐：协程/线程/进程等易混淆概念必须三列对比
-- `参考存根` 触发条件：仅有明确的可执行证明价值时才出现
-- `机制` 禁止描述 API 和用法，防止写成使用手册
+## 跨团队沟通
+
+- **Team A leader** → 完成时通知 **Team B leader**
+- **Team B leader** → 审查通过后通知 **Team C leader**
+- **Team C leader** → 合并完成后通知进入下一个目录
+- 各团队内部由 leader 分配任务给成员
+
+## 目录顺序
+
+外层目录（0→1→2→3→4→5→6）顺序执行，
+每个目录内部子目录并行处理。
+
+## Agent 定义索引
+
+- **concept-writer**：`.claude/agents/concept-writer.md`
+- **reviewer**：`.claude/agents/reviewer.md`
+- **modifier**：`.claude/agents/modifier.md`
+- **topology-architect**：`.claude/agents/topology-architect.md`
