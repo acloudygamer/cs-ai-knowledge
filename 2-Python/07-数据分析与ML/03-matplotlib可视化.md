@@ -14,38 +14,69 @@ matplotlib 是 Python 最流行的可视化库，核心概念：`Figure`（画�
 pip install matplotlib
 ```
 
+## Artist 层次
+
 两种风格：面向对象（`fig, ax = plt.subplots()`）和 pyplot（`plt.plot()`）。推荐面向对象风格。
+
+### 本质断言
+
+**matplotlib 的 Artist 层次是树形结构：Figure 是根容器，Axes 是绘图区域容器，Axis 是坐标轴数据对象，Artist 是所有可见元素的基类。**
+
+### 机制解释
+
+Figure 是最顶层容器，包含所有 Axes 和背景。一个 Figure 可有多个 Axes（子图）。每个 Axes 有两个 Axis 对象（x/y 轴）管理刻度和数据范围。pyplot 维护一个隐式的全局 Figure 和当前 Axes，所有 `plt.plot()` 调用实际上是对当前 axes 的代理。面向对象风格显式管理这个层次，避免隐式状态，理解 `fig, ax = plt.subplots()` 返回的是同一层次树的不同入口。
+
+```
+Artist 树形层次：
+  Figure
+  ├── Canvas（底层渲染，不属于 Artist）
+  ├── suptitle / title（Text Artist）
+  ├── Axes
+  │   ├── patch（背景 Rectangle）
+  │   ├── Axis（x）
+  │   │   ├── Label（Text）
+  │   │   ├── Tick（Major/Minor）
+  │   │   └── Line2D（网格线）
+  │   ├── Axis（y）
+  │   ├── Line2D / Scatter / Bar / ...（数据 Artist）
+  │   └── Legend（Proxy Artist）
+  └── savefig / show（Canvas 操作）
+
+  pyplot 隐式全局：
+    plt.plot() → gca() → gcf() → ax.plot()
+    全局栈管理当前 Figure/Axes
+```
 
 ### 参考样例
 
 ```python
 import matplotlib.pyplot as plt
-import numpy as np
 
-# 方式1：面向对象风格（推荐）
 fig, ax = plt.subplots()
-ax.plot([1, 2, 3, 4], [1, 4, 2, 3])
-plt.show()
-
-# 方式2：pyplot 风格
-plt.plot([1, 2, 3, 4], [1, 4, 2, 3])
-plt.show()
-
-# 多子图
-fig, axes = plt.subplots(2, 2, figsize=(10, 8))
-axes[0, 0].plot([1, 2, 3], [1, 2, 3])
-axes[0, 1].scatter([1, 2, 3], [3, 2, 1])
-axes[1, 0].bar(["A", "B", "C"], [3, 2, 1])
-axes[1, 1].hist([1, 2, 2, 3, 3, 3, 4, 4, 5])
-plt.tight_layout()
+ax.plot([1, 2, 3], [1, 4, 2])
 plt.show()
 ```
 
-## 常用图表
-
-### 折线图
+## 折线图
 
 `ax.plot(x, y)` 绑定折线图，可设置样式、标签、网格。
+
+### 本质断言
+
+**Line2D Artist 将 (x,y) 数据点序列用线段连接，zorder 控制叠盖顺序，color/linestyle/lw 控制外观，label 控制图例条目。**
+
+### 机制解释
+
+`plot` 返回 Line2D 对象列表，修改对象属性（`line.set_color()`）会实时更新已渲染的图。`ax.grid()` 绘制的网格线是独立的 Line2D Artist，有独立 zorder 可置于数据线上方或下方。刻度标签通过 `set_xticklabels` 设置为字符串列表，支持 LaTeX 格式（`r"$\pi$"`）。
+
+```
+plot 渲染顺序：
+  1. axes patch（背景）绘制
+  2. grid（zorder 小）绘制
+  3. 数据线（Line2D）按 zorder 顺序绘制
+  4. legend 绘制
+  5. 坐标轴须髑（spines）绘制
+```
 
 ### 参考样例
 
@@ -55,542 +86,369 @@ import numpy as np
 
 x = np.linspace(0, 2 * np.pi, 100)
 y = np.sin(x)
-
-fig, ax = plt.subplots(figsize=(10, 6))
-
-# 基本折线图
+fig, ax = plt.subplots()
 ax.plot(x, y, label="sin(x)")
-
-# 多条线
-ax.plot(x, np.cos(x), label="cos(x)", linestyle="--", color="red", linewidth=2)
-
-# 散点图叠加
-ax.scatter(x[::10], np.sin(x[::10]), color="blue", s=50, zorder=5, label="points")
-
-# 设置标题和标签
-ax.set_title("Trigonometric Functions", fontsize=16, fontweight="bold")
-ax.set_xlabel("X axis", fontsize=12)
-ax.set_ylabel("Y axis", fontsize=12)
-
-# 设置图例
-ax.legend(loc="upper right")
-
-# 设置网格
-ax.grid(True, linestyle="--", alpha=0.7)
-
-# 设置坐标轴范围
-ax.set_xlim(0, 2 * np.pi)
-ax.set_ylim(-1.5, 1.5)
-
-# 设置刻度
-ax.set_xticks([0, np.pi/2, np.pi, 3*np.pi/2, 2*np.pi])
-ax.set_xticklabels(["0", "π/2", "π", "3π/2", "2π"])
-ax.set_yticks([-1, -0.5, 0, 0.5, 1])
-
+ax.legend()
 plt.show()
 ```
 
-### 散点图
+## 散点图
 
 `ax.scatter(x, y)` 绑定散点图，支持颜色、大小映射。
 
+### 本质断言
+
+**scatter 是 PathCollection Artist，数据点变为 Path 对象（矢量格式），c 参数控制颜色映射（colormap），s 参数控制点大小，colorbar 将 colormap 映射到可见色标。**
+
+### 机制解释
+
+`scatter` 为每个数据点生成一个 Path（矢量矩形或圆），collection 用相同方式渲染所以比多次 `plot` 调用高效。`c` 可以是单一颜色（所有点同色）、一维数组（colormap 映射）或 RGBA 数组。`colorbar` 创建新的 Axes，渲染 ScalarMappable 的 colormap，将颜色值与刻度对齐。
+
+```
+scatter PathCollection 结构：
+  PathCollection
+  ├── paths = [Path(p0), Path(p1), ...]
+  ├── offsets = [(x0,y0), (x1,y1), ...]
+  ├── array = color_values  ← colormap 查表
+  └── cmap = viridis / plasma / ...
+
+colorbar 关联：
+  scatter.set_array(color_values)
+  fig.colorbar(scatter, ax=ax)
+       ↓
+  ScalarMappable(cmap, norm) → colorbar axes 渲染
+```
+
 ### 参考样例
 
 ```python
 import matplotlib.pyplot as plt
 import numpy as np
 
-# 随机数据
-np.random.seed(42)
-n = 100
-x = np.random.randn(n)
-y = np.random.randn(n)
-colors = np.random.rand(n)
-sizes = 100 * np.random.rand(n)
-
-fig, ax = plt.subplots(figsize=(10, 8))
-
-# 基本散点图
-scatter = ax.scatter(x, y, c=colors, s=sizes, alpha=0.6, cmap="viridis")
-
-# 添加颜色条
-cbar = plt.colorbar(scatter)
-cbar.set_label("Value", fontsize=12)
-
-ax.set_xlabel("X", fontsize=12)
-ax.set_ylabel("Y", fontsize=12)
-ax.set_title("Scatter Plot", fontsize=16)
-
-plt.show()
-
-# 气泡图示例
-categories = ["A", "B", "C", "D", "E"]
-values = [25, 40, 30, 55, 50]
-sizes = [100, 200, 150, 300, 250]
-
-fig, ax = plt.subplots(figsize=(10, 6))
-scatter = ax.scatter(categories, values, s=sizes, alpha=0.5)
-for i, (cat, val) in enumerate(zip(categories, values)):
-    ax.annotate(f"{val}", (cat, val), ha="center", va="bottom")
+x = np.random.randn(100)
+y = np.random.randn(100)
+fig, ax = plt.subplots()
+scatter = ax.scatter(x, y, c=np.random.rand(100), s=50, cmap="viridis")
+plt.colorbar(scatter)
 plt.show()
 ```
 
-### 柱状图
+## 柱状图
 
 `ax.bar` 绑定柱状图，支持分组、堆叠、水平柱状图。
 
+### 本质断言
+
+**BarContainer 是 Rectangle Artist 的容器，每根柱子是一个 xy 定位的矩形（xy 为左下角），height 控制高度，bottom 控制 y 起点，堆叠柱通过叠加 bottom 值实现。**
+
+### 机制解释
+
+`bar` 返回 BarContainer（类似列表的容器），包含所有 Rectangle。`bar_label` 在每个矩形顶端添加文本标签。堆叠柱的原理是每列下一组柱的 `bottom` 参数设为上一组的 `bottom + height`。分组柱需计算每组内柱子宽度和位置偏移。水平柱（`barh`）本质是交换 x/y 角色。
+
+```
+bar 定位参数：
+  bar(x, height, width=0.8, bottom=None)
+  xy = (x - width/2, bottom)
+  矩形：width × height
+
+堆叠原理：
+  layer1 = bar(x, [1,2,3], bottom=[0,0,0])  # 底层
+  layer2 = bar(x, [4,5,6], bottom=layer1[0].get_height()) # 上层
+```
+
 ### 参考样例
 
 ```python
 import matplotlib.pyplot as plt
-import numpy as np
 
-# 简单柱状图
-categories = ["Python", "Java", "C++", "JavaScript", "Go"]
-popularity = [30, 25, 15, 35, 12]
-
-fig, ax = plt.subplots(figsize=(10, 6))
-bars = ax.bar(categories, popularity, color=["#3776ab", "#b07219", "#f34b7d", "#f7df1e", "#00add8"])
-
-# 添加数值标签
-for bar, val in zip(bars, popularity):
-    ax.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 0.5,
-            f"{val}%", ha="center", va="bottom", fontsize=11)
-
-ax.set_xlabel("Language", fontsize=12)
-ax.set_ylabel("Popularity (%)", fontsize=12)
-ax.set_title("Programming Language Popularity", fontsize=16, fontweight="bold")
-ax.set_ylim(0, 45)
-plt.show()
-
-# 分组柱状图
-categories = ["Group A", "Group B", "Group C"]
-men_means = [20, 35, 30]
-women_means = [25, 32, 35]
-
-x = np.arange(len(categories))
-width = 0.35
-
-fig, ax = plt.subplots(figsize=(10, 6))
-bars1 = ax.bar(x - width/2, men_means, width, label="Men", color="steelblue")
-bars2 = ax.bar(x + width/2, women_means, width, label="Women", color="coral")
-
-ax.set_xlabel("Group", fontsize=12)
-ax.set_ylabel("Score", fontsize=12)
-ax.set_title("Scores by Group and Gender", fontsize=16)
-ax.set_xticks(x)
-ax.set_xticklabels(categories)
-ax.legend()
-ax.bar_label(bars1, padding=3)
-ax.bar_label(bars2, padding=3)
-plt.show()
-
-# 水平柱状图
-fig, ax = plt.subplots(figsize=(10, 6))
-ax.barh(categories, popularity, color=["#3776ab", "#b07219", "#f34b7d", "#f7df1e", "#00add8"])
-ax.set_xlabel("Popularity (%)", fontsize=12)
-ax.set_title("Programming Language Popularity (Horizontal)", fontsize=16)
-plt.gca().invert_yaxis()  # 最大的在顶部
-plt.show()
-
-# 堆叠柱状图
-categories = ["Q1", "Q2", "Q3", "Q4"]
-product_a = [10, 15, 12, 18]
-product_b = [8, 10, 14, 12]
-product_c = [5, 6, 8, 10]
-
-fig, ax = plt.subplots(figsize=(10, 6))
-ax.bar(categories, product_a, label="Product A", color="steelblue")
-ax.bar(categories, product_b, bottom=product_a, label="Product B", color="coral")
-ax.bar(categories, product_c, bottom=[a+b for a,b in zip(product_a, product_b)],
-       label="Product C", color="seagreen")
-
-ax.set_xlabel("Quarter", fontsize=12)
-ax.set_ylabel("Sales", fontsize=12)
-ax.set_title("Quarterly Sales by Product", fontsize=16)
-ax.legend()
+x = ["A", "B", "C"]
+y = [3, 5, 2]
+fig, ax = plt.subplots()
+ax.bar(x, y)
 plt.show()
 ```
 
-### 饼图
+## 饼图
 
 `ax.pie` 绑定饼图，支持突出显示、环形图。
 
+### 本质断言
+
+**pie 是 Wedge Artist 的集合（扇形），外半径控制饼大小，内半径控制是否为环形，wedgeprops 控制扇形形状（可用椭圆替代圆弧）。**
+
+### 机制解释
+
+`pie` 返回 (wedges, texts, autotexts) 三元组：wedges 是 Wedge 对象列表（每个扇形），texts 是标签文本对象，autotexts 是百分比文本对象。环形图通过 `wedgeprops=dict(width=0.7)` 实现（width 是内半径相对外半径的比例）。`explode` 参数通过径向偏移 Wedge 实现"突出"效果。
+
+```
+pie 布局：
+         0°
+         ↑
+    外半径 r
+    ──────
+   / wedge0 \   ← 第一个扇形（startangle 偏移）
+  |  wedge1  |
+   \ wedge2 /
+    ──────
+   内半径 r*width（若 width<1 则为环形）
+
+环形图 wedgeprops：
+  wedgeprops={"width": 0.7}
+  → 内半径 = 0.7 * 外半径（留白作环形）
+```
+
 ### 参考样例
 
 ```python
 import matplotlib.pyplot as plt
-import numpy as np
 
-# 基本饼图
-labels = ["Python", "Java", "C++", "JavaScript", "Go"]
-sizes = [30, 25, 15, 35, 12]
-explode = (0, 0, 0, 0.1, 0)  # 突出显示 JavaScript
-
-fig, ax = plt.subplots(figsize=(10, 8))
-wedges, texts, autotexts = ax.pie(
-    sizes,
-    explode=explode,
-    labels=labels,
-    autopct="%1.1f%%",
-    shadow=True,
-    startangle=90,
-    colors=["#3776ab", "#b07219", "#f34b7d", "#f7df1e", "#00add8"]
-)
-
-# 设置标签样式
-for text in texts:
-    text.set_fontsize(12)
-for autotext in autotexts:
-    autotext.set_color("white")
-    autotext.set_fontweight("bold")
-    autotext.set_fontsize(11)
-
-ax.set_title("Programming Language Market Share", fontsize=16, fontweight="bold")
-plt.show()
-
-# 环形图
-fig, ax = plt.subplots(figsize=(10, 8))
-wedges, texts, autotexts = ax.pie(
-    sizes,
-    labels=labels,
-    autopct="%1.1f%%",
-    startangle=90,
-    pctdistance=0.85,
-    colors=["#3776ab", "#b07219", "#f34b7d", "#f7df1e", "#00add8"]
-)
-
-# 创建环形
-centre_circle = plt.Circle((0, 0), 0.70, fc="white")
-ax.add_patch(centre_circle)
-
-ax.set_title("Programming Language Market Share (Donut)", fontsize=16, fontweight="bold")
+labels = ["A", "B", "C"]
+sizes = [30, 50, 20]
+fig, ax = plt.subplots()
+ax.pie(sizes, labels=labels, autopct="%1.1f%%")
 plt.show()
 ```
 
-### 直方图和密度图
+## 直方图
 
 `ax.hist` 绑定直方图，`scipy.stats.gaussian_kde` 进行核密度估计。
 
+### 本质断言
+
+**hist 将数据值域划分为 bin（离散区间），统计每 bin 内数据点数量，返回 (counts, bin_edges, patches) 三元组；Patches 是 Rectangle 列表，每 bin 一个。**
+
+### 机制解释
+
+`hist` 默认 10 个等宽 bin，bin 数过少会掩盖分布细节，过多会引入噪声。`density=True` 将 counts 归一化为概率密度（积分=1）。KDE 用高斯核函数对数据进行核密度估计，带宽（bandwidth）控制平滑程度：带宽太小过拟合（锯齿），太大过度平滑。`stacked=True` 将多组数据堆叠显示。
+
+```
+hist bin 划分：
+  data = [0.1, 0.5, 1.2, 1.8, 2.1, 2.9]
+  bins=3 → 区间 [0,1), [1,2), [2,3)
+  counts = [2, 2, 2]
+
+KDE 原理（高斯核）：
+  f(x) = (1/(nh)) * Σ K((x-xi)/h)
+  K = 标准高斯密度
+  h = bandwidth（核宽度）
+```
+
 ### 参考样例
 
 ```python
 import matplotlib.pyplot as plt
 import numpy as np
 
-# 生成正态分布数据
-np.random.seed(42)
-data1 = np.random.normal(0, 1, 1000)
-data2 = np.random.normal(3, 1, 1000)
-data3 = np.random.exponential(2, 1000)
-
-fig, axes = plt.subplots(2, 2, figsize=(14, 10))
-
-# 基本直方图
-axes[0, 0].hist(data1, bins=30, color="steelblue", alpha=0.7, edgecolor="black")
-axes[0, 0].set_xlabel("Value", fontsize=12)
-axes[0, 0].set_ylabel("Frequency", fontsize=12)
-axes[0, 0].set_title("Histogram (Normal Distribution)", fontsize=14)
-
-# 多组直方图
-axes[0, 1].hist(data1, bins=30, alpha=0.5, label="Data 1", color="steelblue")
-axes[0, 1].hist(data2, bins=30, alpha=0.5, label="Data 2", color="coral")
-axes[0, 1].set_xlabel("Value", fontsize=12)
-axes[0, 1].set_ylabel("Frequency", fontsize=12)
-axes[0, 1].set_title("Overlaid Histograms", fontsize=14)
-axes[0, 1].legend()
-
-# 堆叠直方图
-axes[1, 0].hist([data1, data2, data3], bins=30, label=["Normal 1", "Normal 2", "Exponential"],
-                color=["steelblue", "coral", "seagreen"], stacked=True)
-axes[1, 0].set_xlabel("Value", fontsize=12)
-axes[1, 0].set_ylabel("Cumulative Frequency", fontsize=12)
-axes[1, 0].set_title("Stacked Histogram", fontsize=14)
-axes[1, 0].legend()
-
-# KDE 密度图
-from scipy import stats
-x = np.linspace(-5, 8, 200)
-kde1 = stats.gaussian_kde(data1)
-kde2 = stats.gaussian_kde(data2)
-
-axes[1, 1].plot(x, kde1(x), label="Data 1", color="steelblue", linewidth=2)
-axes[1, 1].plot(x, kde2(x), label="Data 2", color="coral", linewidth=2)
-axes[1, 1].fill_between(x, kde1(x), alpha=0.3, color="steelblue")
-axes[1, 1].fill_between(x, kde2(x), alpha=0.3, color="coral")
-axes[1, 1].set_xlabel("Value", fontsize=12)
-axes[1, 1].set_ylabel("Density", fontsize=12)
-axes[1, 1].set_title("Kernel Density Estimation", fontsize=14)
-axes[1, 1].legend()
-
-plt.tight_layout()
+data = np.random.normal(0, 1, 1000)
+fig, ax = plt.subplots()
+ax.hist(data, bins=30, density=True)
 plt.show()
 ```
 
-### 箱线图
+## 箱线图
 
 `ax.boxplot` 绑定箱线图，展示数据分布和异常值。`ax.violinplot` 绑定小提琴图。
 
+### 本质断言
+
+**boxplot 返回 dict of artists：box 是四分位范围（Q3-Q1），whisker 是 1.5*IQR 范围须线，fliers 是异常值点，caps 是须线端点；violinplot 用核密度估计替代四分位矩形展示分布形状。**
+
+### 机制解释
+
+IQR = Q3 - Q1，whisker 延伸至 1.5*IQR 范围内的最远数据点，超出则为异常值（flier）。`showfliers=True` 绘制异常值点。violinplot 用 `stats.gaussian_kde` 估计分布密度，纵轴为密度（归一化），横轴为分类位置，两侧对称显示。
+
+```
+boxplot 组成：
+  caps:     whisker 端横线
+  whiskers: 须线（延伸至 non-outlier 极值）
+  fliers:   异常值点（CircleMarker）
+  means:    均值点（可选，showmeans）
+  medians:  中位线
+  boxes:    Q1-Q3 矩形箱体
+```
+
 ### 参考样例
 
 ```python
 import matplotlib.pyplot as plt
 import numpy as np
 
-# 准备数据
-np.random.seed(42)
-data = {
-    "Group A": np.random.normal(50, 10, 100),
-    "Group B": np.random.normal(55, 15, 100),
-    "Group C": np.random.normal(45, 8, 100),
-    "Group D": np.random.normal(60, 12, 100),
-}
-
-fig, axes = plt.subplots(1, 2, figsize=(14, 6))
-
-# 基本箱线图
-bp1 = axes[0].boxplot(data.values(), labels=data.keys(), patch_artist=True)
-colors = ["steelblue", "coral", "seagreen", "gold"]
-for patch, color in zip(bp1["boxes"], colors):
-    patch.set_facecolor(color)
-    patch.set_alpha(0.7)
-axes[0].set_xlabel("Group", fontsize=12)
-axes[0].set_ylabel("Value", fontsize=12)
-axes[0].set_title("Box Plot", fontsize=14)
-
-# 带异常值的箱线图
-bp2 = axes[1].boxplot(data.values(), labels=data.keys(), patch_artist=True,
-                      showfliers=True, flierprops={"marker": "o", "markerfacecolor": "red"})
-for patch, color in zip(bp2["boxes"], colors):
-    patch.set_facecolor(color)
-    patch.set_alpha(0.7)
-axes[1].set_xlabel("Group", fontsize=12)
-axes[1].set_ylabel("Value", fontsize=12)
-axes[1].set_title("Box Plot with Outliers", fontsize=14)
-
-plt.tight_layout()
-plt.show()
-
-# 小提琴图
-fig, ax = plt.subplots(figsize=(10, 6))
-parts = ax.violinplot(data.values(), positions=range(1, 5), showmeans=True, showmedians=True)
-for i, pc in enumerate(parts["bodies"]):
-    pc.set_facecolor(colors[i])
-    pc.set_alpha(0.7)
-ax.set_xticks(range(1, 5))
-ax.set_xticklabels(data.keys())
-ax.set_xlabel("Group", fontsize=12)
-ax.set_ylabel("Value", fontsize=12)
-ax.set_title("Violin Plot", fontsize=14)
+data = [np.random.normal(0, 1, 100), np.random.normal(1, 1, 100)]
+fig, ax = plt.subplots()
+ax.boxplot(data)
 plt.show()
 ```
 
-### 热力图
+## 热力图
 
 `ax.imshow` 绑定热力图，展示二维数据矩阵。
 
+### 本质断言
+
+**imshow 将 2D 数组映射为颜色，通过 colormap 和 norm 控制颜色方案，aspect 控制像素长宽比，origin 选择数据坐标系原点位置。**
+
+### 机制解释
+
+`imshow` 将数组值通过 `Normalize`（默认线性缩放到 [0,1]）后查 colormap 得到 RGBA。`interpolation` 参数控制像素间插值方式（nearest/bilinear/antialiased 等）。热力图的 x/y 刻度标签通过 `set_xticklabels` / `set_yticklabels` 设置。`aspect="auto"` 使像素成为真方形。
+
+```
+imshow 数据流：
+  array (M,N) → Normalize(vmin,vmax) → [0,1] → colormap → RGBA
+                  ↑
+            若未指定 vmin/vmax：用 array min/max
+
+常见 colormap：
+  数值连续：viridis, plasma, coolwarm
+  正负对立：RdBu_r, seismic
+  离散类别：Set1, tab10
+```
+
 ### 参考样例
 
 ```python
 import matplotlib.pyplot as plt
 import numpy as np
 
-# 相关性热力图
-np.random.seed(42)
 data = np.random.rand(10, 10)
-columns = [f"Feature_{i}" for i in range(10)]
-
-fig, ax = plt.subplots(figsize=(12, 10))
-im = ax.imshow(data, cmap="coolwarm", aspect="auto")
-
-# 添加颜色条
-cbar = plt.colorbar(im)
-cbar.set_label("Correlation", fontsize=12)
-
-# 设置刻度
-ax.set_xticks(np.arange(len(columns)))
-ax.set_yticks(np.arange(len(columns)))
-ax.set_xticklabels(columns, rotation=45, ha="right")
-ax.set_yticklabels(columns)
-
-# 在每个格子中显示数值
-for i in range(len(columns)):
-    for j in range(len(columns)):
-        text = ax.text(j, i, f"{data[i, j]:.2f}",
-                      ha="center", va="center", color="black", fontsize=8)
-
-ax.set_title("Correlation Heatmap", fontsize=16)
-plt.tight_layout()
-plt.show()
-
-# 地理热力图示例
-import pandas as pd
-
-# 模拟时间序列热力图
-days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
-hours = list(range(24))
-data = np.random.rand(7, 24) * 100
-
-fig, ax = plt.subplots(figsize=(16, 6))
-im = ax.imshow(data, cmap="YlOrRd", aspect="auto")
-
-ax.set_xticks(np.arange(24))
-ax.set_yticks(np.arange(7))
-ax.set_xticklabels(hours)
-ax.set_yticklabels(days)
-
-cbar = plt.colorbar(im)
-cbar.set_label("Activity Level", fontsize=12)
-
-ax.set_xlabel("Hour of Day", fontsize=12)
-ax.set_ylabel("Day of Week", fontsize=12)
-ax.set_title("Activity Heatmap", fontsize=16)
-
-plt.tight_layout()
+fig, ax = plt.subplots()
+im = ax.imshow(data, cmap="viridis")
+plt.colorbar(im)
 plt.show()
 ```
 
-### 子图布局
+## 子图布局
 
 `GridSpec` 或 `subplot_mosaic` 创建复杂子图布局。
 
+### 本质断言
+
+**GridSpec 定义网格拓扑（元格数量和间距），子图占据一个或多个连续元格；subplot_mosaic 用字符串图描述布局，更直观。**
+
+### 机制解释
+
+`GridSpec(3, 3)` 创建 3×3 网格，每格是相对坐标空间。元格合并通过 `gs[0, :]`（第一行所有列）或 `gs[1:, 2]`（第二三行第三列）实现。`subplot_mosaic` 解析字符串行，每字符代表一个子图标识，相同字符占相同位置。
+
+```
+GridSpec 元格合并：
+  gs = GridSpec(3, 3, hspace=0.3, wspace=0.3)
+  ax1 = fig.add_subplot(gs[0, :])   # 占据 (0,0)(0,1)(0,2)
+  ax2 = fig.add_subplot(gs[1:, 2])  # 占据 (1,2)(2,2)
+
+subplot_mosaic 字符串：
+  """
+  AB
+  CC
+  """
+  → A 占 (0,0), B 占 (0,1), C 占 (1,0)(1,1)
+```
+
 ### 参考样例
 
 ```python
 import matplotlib.pyplot as plt
 import numpy as np
 
-# GridSpec 子图布局
-fig = plt.figure(figsize=(14, 10))
-from matplotlib.gridspec import GridSpec
-
-gs = GridSpec(3, 3, figure=fig, hspace=0.3, wspace=0.3)
-
-# 不同大小的子图
-ax1 = fig.add_subplot(gs[0, :])  # 第一行，跨所有列
-ax2 = fig.add_subplot(gs[1, 0])  # 第二行，第一列
-ax3 = fig.add_subplot(gs[1, 1])  # 第二行，第二列
-ax4 = fig.add_subplot(gs[1:, 2])  # 第二三行，第三列
-ax5 = fig.add_subplot(gs[2, 0:2])  # 第三行，前两列
-
-x = np.linspace(0, 2 * np.pi, 100)
-
-ax1.plot(x, np.sin(x), "b-", linewidth=2)
-ax1.set_title("Full Width Plot", fontsize=14)
-ax1.grid(True, alpha=0.3)
-
-ax2.scatter(range(10), np.random.rand(10), c="red", s=50)
-ax2.set_title("Scatter", fontsize=14)
-
-ax3.bar(["A", "B", "C"], [3, 5, 2], color="steelblue")
-ax3.set_title("Bar", fontsize=14)
-
-ax4.pie([30, 25, 20, 15, 10], labels=["A", "B", "C", "D", "E"],
-        autopct="%1.1f%%", colors=plt.cm.Set3.colors)
-ax4.set_title("Pie", fontsize=14)
-
-ax5.hist(np.random.randn(1000), bins=30, color="seagreen", alpha=0.7, edgecolor="black")
-ax5.set_title("Histogram", fontsize=14)
-ax5.set_xlabel("Value", fontsize=12)
-ax5.set_ylabel("Frequency", fontsize=12)
-
-plt.suptitle("Complex Subplot Layout", fontsize=18, fontweight="bold", y=1.02)
-plt.show()
-
-# 使用 subplot_mosaic
 fig, axes = plt.subplot_mosaic("""
-    AAA
-    BCC
-    BCC
-""", figsize=(12, 8))
-
-axes["A"].set_title("Plot A")
-axes["B"].set_title("Plot B")
-axes["C"].set_title("Plot C")
-
-for ax in axes.values():
-    ax.plot(np.random.randn(100))
-    ax.grid(True, alpha=0.3)
-
-plt.tight_layout()
+    AA
+    BC
+""")
+axes["A"].plot(np.random.randn(100))
+axes["B"].scatter([1,2], [1,2])
 plt.show()
 ```
 
-### 样式和主题
+## 样式和主题
 
 `plt.style.use` 应用内置主题，`plt.rcParams` 自定义样式。
 
+### 本质断言
+
+**rcParams 是全局配置字典，style 是预定义的 rcParams 快照集合，切换 style 只覆盖特定键（context manager 隔离修改），不影响其他键。**
+
+### 机制解释
+
+`plt.style.use("ggplot")` 将 matplotlib 的默认外观改为 R ggplot2 风格（灰色背景、白色网格线）。`rcParams` 包含所有 rc 设置，修改 `rcParams["lines.linewidth"]` 影响之后所有图表。context manager `plt.style.context()` 在退出后恢复原状，适合临时主题切换。
+
+```
+rcParams 查找优先级（从低到高）：
+  1. matplotlibrc 文件（安装目录）
+  2. 用户 matplotlibrc（~/.config/matplotlib）
+  3. 当前 session 的 rcParams 修改
+  4. style.use() 覆盖
+  5. axes.properties() 局部设置
+```
+
 ### 参考样例
 
 ```python
 import matplotlib.pyplot as plt
-import numpy as np
 
-# 查看可用样式
-print(plt.style.available)
-# ['Solarize_Light2', '_classic_test_patch', 'bmh', 'classic', 'dark_background',
-#  'fast', 'fivethirtyeight', 'ggplot', 'grayscale', 'seaborn', ...]
-
-# 使用样式
-plt.style.use("seaborn-whitegrid")
-
-# 或者临时设置
 with plt.style.context("ggplot"):
-    fig, ax = plt.subplots(figsize=(10, 6))
-    ax.plot([1, 2, 3], [1, 4, 2])
-    ax.set_title("Using ggplot Style")
+    fig, ax = plt.subplots()
+    ax.plot([1, 2, 3])
     plt.show()
-
-# 自定义样式
-plt.rcParams.update({
-    "figure.figsize": (10, 6),
-    "font.size": 12,
-    "font.family": "sans-serif",
-    "axes.grid": True,
-    "axes.spines.top": False,
-    "axes.spines.right": False,
-    "lines.linewidth": 2,
-    "axes.labelsize": 12,
-    "axes.titlesize": 16,
-    "legend.fontsize": 10,
-})
-
-# 内置颜色
-fig, ax = plt.subplots(figsize=(10, 6))
-x = np.arange(10)
-for i, color in enumerate(plt.cm.tab10.colors):
-    ax.plot(x, np.random.rand(10) + i, color=color, label=f"Series {i+1}")
-ax.legend()
-ax.set_title("Color Palette: tab10")
-plt.show()
 ```
 
-### 保存图片
+## 保存图片
 
 `fig.savefig` 保存图片，支持 PNG、PDF、SVG、JPEG 格式。
 
+### 本质断言
+
+**savefig 调用 Canvas 的 backend-specific 渲染器：PNG 输出 RGB 像素，PDF/SVG 输出矢量指令（文字可能仍为路径），bbox_inches="tight" 裁剪多余白边。**
+
+### 机制解释
+
+矢量格式（PDF/SVG/EPS）存储绘图指令而非像素，缩放不失真，适合论文；标量格式（PNG/JPEG）存储像素矩阵。`bbox_inches="tight"` 自动计算包含所有 artist 的最小包围盒。`facecolor` 控制背景色（默认透明）。PDF 后端支持镂空字体（用字体而非路径渲染文字），避免字体嵌入问题。
+
+```
+格式选择指南：
+  PNG  → 报告、PPT、网页（位图，可压缩）
+  PDF  → 论文（矢量，字体可嵌入）
+  SVG  → 网页（矢量，可交互编辑）
+  EPS  → LaTeX（矢量，科研标准）
+
+bbox_inches="tight" 流程：
+  1. renderer 获取所有 artist 包围盒
+  2. 计算联合包围盒（含标签）
+  3. 裁剪 canvas 到包围盒
+  4. 保存（可能裁掉部分图例）
+```
+
 ### 参考样例
 
 ```python
 import matplotlib.pyplot as plt
-import numpy as np
 
-fig, ax = plt.subplots(figsize=(10, 6))
-ax.plot([1, 2, 3], [1, 4, 2])
-
-# 保存为不同格式
-fig.savefig("plot.png", dpi=300, bbox_inches="tight", facecolor="white")
-fig.savefig("plot.pdf", bbox_inches="tight")  # 矢量图，适合论文
-fig.savefig("plot.svg", bbox_inches="tight")  # SVG 矢量图
-fig.savefig("plot.jpg", dpi=150, quality=95)  # JPEG
-
-# 关闭显示，直接保存
+fig, ax = plt.subplots()
+ax.plot([1, 2, 3])
+fig.savefig("plot.png", dpi=300)
+fig.savefig("plot.pdf")
 plt.close(fig)
 ```
 
-### 交互式图表
+## 交互式图表
 
 `ax.annotate` 添加标注，`ax.text` 添加文本框。
+
+### 本质断言
+
+**annotate 在 xy 位置绘制文本和可选箭头（arrowprops），连接 xy 和 xytext；text 在绝对坐标绘制文本框，bbox 控制背景样式。**
+
+### 机制解释
+
+`annotate` 的 `arrowprops` 支持多种箭头样式（width/color/arrowstyle），`connectionstyle` 控制连接线形状（arc3/antenna/angle）。`text` 支持 `bbox` 参数（boxstyle 决定形状，facecolor 决定背景色）。annotation 适合指向数据特征（峰值、拐点），text 适合说明区域（注释框、公式）。
+
+```
+annotate 参数语义：
+  xy       = 箭头指向的数据坐标
+  xytext   = 文本框位置
+  text     = 文本内容
+  arrowprops = 箭头样式字典
+
+text bbox boxstyle：
+  round, circle, sawtooth, roundtooth, darrow, ...
+```
 
 ### 参考样例
 
@@ -598,31 +456,10 @@ plt.close(fig)
 import matplotlib.pyplot as plt
 import numpy as np
 
-# 使用 annotate 添加交互式标注
-fig, ax = plt.subplots(figsize=(10, 6))
 x = np.linspace(0, 2 * np.pi, 100)
+fig, ax = plt.subplots()
 ax.plot(x, np.sin(x))
-
-# 添加带箭头的标注
-ax.annotate(
-    "Peak",
-    xy=(np.pi/2, 1),
-    xytext=(np.pi/2 + 0.5, 1.2),
-    fontsize=12,
-    arrowprops=dict(arrowstyle="->", color="red", lw=2),
-    color="red"
-)
-
-# 添加文本框
-props = dict(boxstyle="round", facecolor="wheat", alpha=0.8)
-ax.text(4, 0, "Important Point", fontsize=11, verticalalignment="top", bbox=props)
-
-ax.set_title("Interactive Annotations")
-plt.show()
-
-# 缩放和平移
-fig, ax = plt.subplots(figsize=(10, 6))
-ax.plot(np.random.randn(1000).cumsum())
-ax.set_title("Interactive Plot - Use toolbar to zoom/pan")
+ax.annotate("peak", xy=(np.pi/2, 1), xytext=(np.pi/2+0.5, 1.2),
+            arrowprops=dict(arrowstyle="->"))
 plt.show()
 ```

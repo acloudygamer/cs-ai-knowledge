@@ -14,81 +14,100 @@ NumPy 是 Python 科学计算基础库，提供高性能 `ndarray` 多维数组�
 pip install numpy
 ```
 
+## 数据结构
+
 `np.array` 从列表创建，`np.zeros/ones/full` 创建特殊数组，`np.arange/linspace` 创建范围数组。
+
+### 本质断言
+
+**ndarray 是连续内存块的视图，形状（shape）和步长（strides）决定数据如何被解释为多维数组，连续内存布局是 SIMD 并行化的硬件基础。**
+
+### 机制解释
+
+ndarray 的底层是一维 C 连续（或 Fortran 连续）内存块，`shape` 元组定义维度，`strides` 元组定义每维移动时在内存中的字节偏移。这使得 NumPy 可以在原始内存上套用不同视角——同一个 24 字节缓冲区可以被解释为 (2,3) 的 2D 数组或 (6,) 的 1D 数组。`reshape(-1)` 的 `-1` 表示"自动推断该维度大小"。
+
+```
+ndarray 内存模型（以 (2,3) 数组为例）：
+  逻辑索引: arr[0,0] arr[0,1] arr[0,2]
+            arr[1,0] arr[1,1] arr[1,2]
+
+  内存布局: [d00][d01][d02][d10][d11][d12]  ← 连续一维字节序列
+  strides:  (3*8, 1*8) = (24, 8) 字节  ← 每行跳24字节，每列跳8字节
+
+  reshape(-1): 自动计算另一维度 = 6/行数
+  view vs copy: view 共享内存，copy 分配新内存
+```
 
 ### 参考样例
 
 ```python
 import numpy as np
 
-# 从列表创建
 arr = np.array([1, 2, 3, 4, 5])
-print(arr)
-
-# 二维数组
-arr_2d = np.array([
-    [1, 2, 3],
-    [4, 5, 6],
-    [7, 8, 9]
-])
-print(arr_2d)
-
-# 常用创建函数
-zeros = np.zeros((3, 4))        # 全零数组
-ones = np.ones((2, 3))          # 全一数组
-full = np.full((2, 2), 99)      # 填充指定值
-eye = np.eye(3)                  # 单位矩阵
-identity = np.identity(3)       # 同 eye
-
-# 范围数组
-range_arr = np.arange(0, 10, 2)        # [0, 2, 4, 6, 8]
-linspace_arr = np.linspace(0, 1, 5)   # [0, 0.25, 0.5, 0.75, 1]
-
-# 随机数组
-rand = np.random.rand(3, 2)           # [0, 1) 均匀分布
-randn = np.random.randn(3, 2)          # 标准正态分布
-randint = np.random.randint(0, 10, (3, 3))  # 整数随机
-uniform = np.random.uniform(0, 1, (3, 3))  # 指定范围均匀分布
-
-# 特定分布
-normal = np.random.normal(loc=0, scale=1, size=(100,))  # 正态分布
-poisson = np.random.poisson(lam=5, size=100)           # 泊松分布
-binomial = np.random.binomial(n=10, p=0.5, size=100)   # 二项分布
-
-# 结构化数组
-dt = np.dtype([("name", "U10"), ("age", "i4"), ("weight", "f4")])
-people = np.array([("Alice", 25, 55.5), ("Bob", 30, 70.0)], dtype=dt)
+arr2d = np.array([[1, 2], [3, 4]])
+zeros = np.zeros((3, 4))
+ones = np.ones((2, 3))
+eye = np.eye(3)
 ```
+
+## 形状与属性
 
 `arr.shape` 查看形状，`arr.dtype` 查看类型，`arr.reshape` 改变形状。
 
+### 本质断言
+
+**shape 定义了逻辑维度，strides 定义了物理内存访问模式，两者解耦使同一数据可被不同视角解释而不复制内存。**
+
+### 机制解释
+
+`flatten()` 返回复制的一维数组，`ravel()` 返回视图（尽可能避免复制）。转置 `arr.T` 返回视图（共享数据，只交换 shape 和 strides）。`view()` 是低层接口，直接创建共享内存的新 ndarray。连续性（C order vs Fortran order）影响与 C/Fortran 库互调的效率。
+
+```
+reshape 视图链：
+  arr (6,) → reshape(2,3) → view
+              ↓
+           逻辑上 (2,3)，物理上同一内存
+
+  arr (6,) → flatten() → copy → 新内存块
+  arr (6,) → ravel() → view（若连续）→ 共享内存
+```
+
 ### 参考样例
 
 ```python
 import numpy as np
 
-arr = np.array([
-    [1, 2, 3],
-    [4, 5, 6]
-])
-
-print(arr.ndim)       # 维度数量: 2
-print(arr.shape)      # 形状: (2, 3)
-print(arr.size)       # 元素总数: 6
-print(arr.dtype)      # 数据类型: int64
-print(arr.itemsize)   # 每个元素字节大小: 8
-print(arr.nbytes)     # 总字节大小: 48
-print(arr.strides)    # 步长: (24, 8)
-
-# 改变形状
-arr_1d = arr.reshape(-1)      # 展平为一维
-arr_3d = arr.reshape(2, 1, 3) # 改变为 3D
-arr_transposed = arr.T        # 转置
-arr_flat = arr.flatten()      # 复制并展平
-arr_ravel = arr.ravel()       # 返回展平视图（可能不复制）
+arr = np.array([[1, 2, 3], [4, 5, 6]])
+arr.shape
+arr.dtype
+arr.reshape(-1)
+arr.T
 ```
 
+## 索引与切片
+
 `arr[i]` 基本索引，`arr[start:stop:step]` 切片，`arr[condition]` 布尔索引，`arr[[i,j]]` 花式索引。
+
+### 本质断言
+
+**NumPy 索引系统按"位置 vs 标签"、"标量 vs 数组"、"数据 vs 掩码"三条轴正交分解，布尔掩码本质是压缩稀疏格式的选择器。**
+
+### 机制解释
+
+切片返回视图（共享内存），花式索引（整数数组）返回副本。布尔索引 `arr[mask]` 中 mask 必须是与 arr 长度相同的布尔数组，True 位置被选出。`np.where(mask, x, y)` 是向量化条件表达式的原生形式。布尔索引的物理实现是遍历 mask 并收集对应位置的元素。
+
+```
+索引类型对比：
+  arr[0]         → 标量，维度 -1
+  arr[0:2]       → 视图，维度不变
+  arr[[0,2]]     → 副本，维度不变
+  arr[mask]      → 副本，长度 = mask 中 True 数
+  np.where(mask, x, y) → 向量化 if-else
+
+掩码压缩原理（mask = [T,F,F,T]）：
+  逻辑: 选择 arr[0], arr[3]
+  物理: 遍历 mask，按 True 位置索引
+```
 
 ### 参考样例
 
@@ -96,43 +115,37 @@ arr_ravel = arr.ravel()       # 返回展平视图（可能不复制）
 import numpy as np
 
 arr = np.arange(12).reshape(3, 4)
-print(arr)
-# [[ 0  1  2  3]
-#  [ 4  5  6  7]
-#  [ 8  9 10 11]]
-
-# 基本索引
-print(arr[0])        # 第一行: [0, 1, 2, 3]
-print(arr[-1])       # 最后一行: [8, 9, 10, 11]
-print(arr[0, 0])     # 第一个元素: 0
-print(arr[1][2])     # arr[1, 2] 的另一种写法
-
-# 切片
-print(arr[0:2])      # 前两行
-print(arr[:, 0])     # 第一列
-print(arr[0:2, 1:3]) # 子矩阵
-
-# 步长切片
-print(arr[::2])      # 隔行取: 第0,2行
-print(arr[::-1])     # 反向: 所有行逆序
-
-# 布尔索引
-bool_idx = arr > 5
-print(arr[bool_idx])       # [6, 7, 8, 9, 10, 11]
-print(arr[arr > 5])         # 条件索引
-print(arr[(arr > 2) & (arr < 8)])  # 多条件
-
-# 高级索引（花式索引）
-print(arr[[0, 2]])          # 选择指定行
-print(arr[:, [0, 2]])       # 选择指定列
-print(arr[[0, 1], [2, 3]])  # 选择 (0,2) 和 (1,3) 位置的元素
-
-# where 用法
-result = np.where(arr > 5, arr, 0)  # 条件替换
-indices = np.where(arr > 5)         # 返回满足条件的索引
+arr[0]
+arr[0:2]
+arr[arr > 5]
+np.where(arr > 5, arr, 0)
 ```
 
+## 向量运算
+
 NumPy 支持逐元素算术运算、比较运算、聚合函数（`np.sum`、`np.mean` 等）。
+
+### 本质断言
+
+**向量化运算将 Python 循环移入 C/SIMD 层，消除解释器开销和 GIL 锁竞争，代价是失去细粒度控制和潜在内存膨胀。**
+
+### 机制解释
+
+NumPy 的通用函数（ufunc）使用 C 代码直接遍历内存，绕过了 Python 的 GIL（全局解释器锁），允许多线程并行。聚合函数（如 `np.sum`）在多维数组上默认 flatten 后求和，指定 `axis` 参数可沿指定维度聚合，减少内存拷贝。累加 `cumsum` 返回与输入同形状的数组，每位置放前 n 项和。
+
+```
+向量化 vs Python 循环：
+  # Python（慢）：每次迭代有 GIL 获取/释放
+  result = []
+  for x in arr: result.append(x + 1)
+
+  # NumPy（快）：单次 C 调用，SIMD 并行
+  result = arr + 1
+
+axis 聚合语义：
+  arr (3,4) + axis=0 → (4,)  → 每列压成 1 值
+  arr (3,4) + axis=1 → (3,)  → 每行压成 1 值
+```
 
 ### 参考样例
 
@@ -141,83 +154,70 @@ import numpy as np
 
 a = np.array([1, 2, 3])
 b = np.array([4, 5, 6])
-
-# 算术运算
-print(a + b)     # [5, 7, 9] - 逐元素加法
-print(a - b)     # [-3, -3, -3] - 逐元素减法
-print(a * b)     # [4, 10, 18] - 逐元素乘法
-print(a / b)     # [0.25, 0.4, 0.5] - 逐元素除法
-print(a // b)    # [0, 0, 0] - 整除
-print(a % b)     # [1, 2, 3] - 取模
-print(a ** b)    # [1, 32, 729] - 幂运算
-
-# 标量运算
-print(a + 10)    # [11, 12, 13]
-print(a * 2)     # [2, 4, 6]
-
-# 比较运算
-print(a == b)    # [False, False, False]
-print(a > b)     # [False, False, False]
-print(a < b)     # [True, True, True]
-
-# 逻辑运算
-print(np.logical_and(a > 0, b > 0))
-print(np.logical_or(a > 2, b > 4))
-print(np.logical_not(a))
-
-# 聚合函数
-arr = np.array([1, 2, 3, 4, 5])
-print(np.sum(arr))      # 15
-print(np.prod(arr))     # 120
-print(np.min(arr))      # 1
-print(np.max(arr))      # 5
-print(np.mean(arr))     # 3.0
-print(np.median(arr))   # 3.0
-print(np.std(arr))      # 标准差
-print(np.var(arr))      # 方差
-print(np.argmin(arr))   # 最小值索引: 0
-print(np.argmax(arr))   # 最大值索引: 4
-
-# 多维聚合
-arr_2d = np.array([[1, 2, 3], [4, 5, 6]])
-print(np.sum(arr_2d, axis=0))   # 列求和: [5, 7, 9]
-print(np.sum(arr_2d, axis=1))   # 行求和: [6, 15]
-print(np.mean(arr_2d, axis=0))  # 列平均
-
-# cumsum 和 cumprod
-print(np.cumsum(arr))    # [1, 3, 6, 10, 15]
-print(np.cumprod(arr))   # [1, 2, 6, 24, 120]
+np.sum(a)
+np.mean(a)
+np.std(a)
+a + b
 ```
 
+## 广播机制
+
 广播允许不同形状数组进行运算，小数组广播到大数组。
+
+### 本质断言
+
+**广播是维度对齐后自动扩展的虚拟复制：沿缺失维度或在长度为 1 的维度上复制数据，使形状兼容后逐元素运算。**
+
+### 机制解释
+
+NumPy 从后向前比较维度（right-aligned），两维度兼容当且仅当：相等、或其中一个为 1。维度为 1 的数组在该维度上"拉伸"（逻辑上复制，物理上不复制）。这使得标量与数组运算、二维矩阵加一维向量、外积计算成为可能，无需显式复制。
+
+```
+广播对齐规则（right-aligned，从后向前）：
+  A (3,4) + B (4,) → B 扩展为 (1,4) → 结果 (3,4)
+  A (3,4) + C (3,1) → C 扩展为 (3,4) → 结果 (3,4)
+
+  (2,3) + (3,) → 从后对齐：
+    前者:  2, 3
+    后者:     3
+    兼容: 2, 3
+    结果: (2,3)
+
+物理实现（虚拟复制）：
+  b (3,) + c (3,1)
+  c 在列维度复制：
+  [[c0,c0,c0],
+   [c1,c1,c1],
+   [c2,c2,c2]]
+  + b:
+  [[b0,b1,b2],
+   [b0,b1,b2],
+   [b0,b1,b2]]
+```
 
 ### 参考样例
 
 ```python
 import numpy as np
 
-# 广播允许不同形状的数组进行运算
-a = np.array([[1, 2, 3], [4, 5, 6]])  # shape: (2, 3)
-b = np.array([10, 20, 30])             # shape: (3,) - 广播到 (2, 3)
-print(a + b)
-# [[11, 22, 33]
-#  [14, 25, 36]]
-
-c = np.array([[10], [20]])  # shape: (2, 1) - 广播到 (2, 3)
-print(a + c)
-# [[11, 12, 13]
-#  [24, 25, 26]]
-
-# 外积（outer product）
-p = np.array([1, 2, 3])
-q = np.array([4, 5, 6])
-print(np.outer(p, q))
-# [[ 4  5  6]
-#  [ 8 10 12]
-#  [12 15 18]]
+a = np.array([[1, 2, 3], [4, 5, 6]])
+b = np.array([10, 20, 30])
+a + b
+c = np.array([[10], [20]])
+a + c
 ```
 
+## 数学函数
+
 NumPy 提供三角函数、指数对数、幂函数、取整函数等丰富数学函数。
+
+### 本质断言
+
+**NumPy 数学函数是 ufunc（通用函数），逐元素应用，物理实现是预编译的 C 代码，支持广播和梯度参数（where/mout）。**
+
+### 机制解释
+
+所有三角函数、指数对数函数都是 ufunc，接受 `where`（条件屏蔽）和 `dtype` 参数。`np.exp` 对大正值会产生溢出（inf），`np.expm1`（log(1+x) 的逆）更适合小数值的精确计算。`np.clip(x, min, max)` 是 `np.minimum(np.maximum(x, min), max)` 的优化版本。
 
 ### 参考样例
 
@@ -225,43 +225,37 @@ NumPy 提供三角函数、指数对数、幂函数、取整函数等丰富数�
 import numpy as np
 
 arr = np.array([0, 1, 2, 3, 4])
-
-# 三角函数
-print(np.sin(arr))    # [0, 0.841..., 0.909..., 0.141..., -0.757...]
-print(np.cos(arr))
-print(np.tan(arr))
-
-# 反三角函数
-print(np.arcsin(np.array([0, 0.5, 1])))
-print(np.arccos(np.array([0, 0.5, 1])))
-print(np.arctan(np.array([0, 0.5, 1])))
-
-# 指数和对数
-print(np.exp(arr))           # e^0, e^1, e^2, ...
-print(np.exp2(arr))           # 2^0, 2^1, 2^2, ...
-print(np.log(arr[1:]))        # 自然对数
-print(np.log2(arr[1:]))       # 以2为底的对数
-print(np.log10(arr[1:]))     # 以10为底的对数
-
-# 幂函数
-print(np.power(arr, 2))       # arr^2
-print(np.sqrt(arr))          # 平方根
-print(np.cbrt(arr))          # 立方根
-
-# 取整函数
-print(np.ceil(arr.astype(float)))    # 向上取整
-print(np.floor(arr.astype(float)))    # 向下取整
-print(np.round(arr.astype(float), 1)) # 四舍五入
-print(np.trunc(arr.astype(float)))    # 截断小数
-
-# 其他数学函数
-print(np.abs(arr))           # 绝对值
-print(np.sign(arr))          # 符号函数
-print(np.modf(arr.astype(float)))  # 返回小数和整数部分
-print(np.clip(arr, 1, 3))    # 限制在 [1, 3] 范围内
+np.sin(arr)
+np.exp(arr)
+np.sqrt(arr)
+np.clip(arr, 1, 3)
 ```
 
+## 线性代数
+
 `np.linalg` 提供矩阵乘法、逆矩阵、特征值、线性方程组求解等线性代数功能。
+
+### 本质断言
+
+**np.linalg 函数对 2D 数组执行矩阵运算，对 1D 执行向量运算，矩阵乘法的 @ 操作符（Python 3.5+）语义清晰应优先使用。**
+
+### 机制解释
+
+`np.dot(A, B)` 对 2D 是矩阵乘法，对混合维度有不同语义（1D×2D = 向量点积），而 `A @ B` 和 `np.matmul(A, B)` 语义统一。解线性方程组 `np.linalg.solve(A, b)` 比求逆再乘（`np.linalg.inv(A) @ b`）数值更稳定。SVD 是最稳健的矩阵分解，适合处理病态矩阵和最小二乘问题。
+
+```
+矩阵乘法 vs 元素乘法：
+  A @ B    → 矩阵乘法（行·列）
+  A * B    → 逐元素乘法
+
+解 Ax = b 的两种方式：
+  x = np.linalg.solve(A, b)  ← 数值稳定（首选）
+  x = np.linalg.inv(A) @ b  ← 慢且有条件数放大
+
+分解选择：
+  A = Q @ R（QR）→ 最小二乘，正交化
+  A = U @ S @ Vt（SVD）→ 秩亏矩阵，最小范数解
+```
 
 ### 参考样例
 
@@ -269,219 +263,125 @@ print(np.clip(arr, 1, 3))    # 限制在 [1, 3] 范围内
 import numpy as np
 
 A = np.array([[1, 2], [3, 4]])
-B = np.array([[5, 6], [7, 8]])
-
-# 矩阵乘法
-print(np.dot(A, B))          # 矩阵乘法
-print(A @ B)                 # Python 3.5+ 操作符
-print(np.matmul(A, B))
-
-# 元素乘法
-print(A * B)
-
-# 转置
-print(A.T)
-print(np.transpose(A))
-
-# 逆矩阵
-A_inv = np.linalg.inv(A)
-print(A_inv)
-print(np.allclose(A @ A_inv, np.eye(2)))  # 验证
-
-# 行列式
-det = np.linalg.det(A)
-print(det)
-
-# 特征值和特征向量
-eigenvalues, eigenvectors = np.linalg.eig(A)
-print(f"Eigenvalues: {eigenvalues}")
-print(f"Eigenvectors: {eigenvectors}")
-
-# 解线性方程组 Ax = b
 b = np.array([1, 2])
-x = np.linalg.solve(A, b)
-print(x)  # A @ x == b
-
-# QR 分解
-Q, R = np.linalg.qr(A)
-print(Q, R)
-
-# SVD 分解
-U, S, Vt = np.linalg.svd(A)
-print(U, S, Vt)
-
-# 范数
-print(np.linalg.norm(A))           # Frobenius 范数
-print(np.linalg.norm(A, ord=1))     # L1 范数
-print(np.linalg.norm(A, ord=np.inf))  # 无穷范数
-
-# 矩阵的秩
-print(np.linalg.matrix_rank(A))
+np.linalg.solve(A, b)
+np.linalg.inv(A)
+np.linalg.eig(A)
 ```
+
+## 随机数
 
 `np.random` 提供多种分布的随机数生成，正态、均匀、泊松、二项分布等。
 
+### 本质断言
+
+**np.random 使用伪随机数生成器（PCG64），固定种子只能保证相同序列，可重复性不等于确定性（线程调度仍会影响）。**
+
+### 机制解释
+
+`np.random.seed()` 设置全局状态，影响后续所有随机调用。推荐使用 `Generator` 对象（NumPy 1.17+）替代全局 `np.random`，避免状态污染。`np.random.choice` 带权重抽样使用 alias 方法，复杂度 O(n) 而非 O(k×n)。
+
+```
+全局随机 vs Generator 对象：
+  # 全局（状态污染）
+  np.random.seed(42)
+  np.random.rand()
+
+  # 推荐（隔离）
+  rng = np.random.default_rng(42)
+  rng.random()
+
+权重抽样算法（alias method）：
+  均匀分布 O(1) 抽样 → alias table → O(1) 加权抽样
+```
+
 ### 参考样例
 
 ```python
 import numpy as np
 
-# 设置随机种子
-np.random.seed(42)
-np.random.rand(3)  # 固定种子后的随机数
-
-# 常用分布
-normal_samples = np.random.normal(size=1000)      # 正态分布
-uniform_samples = np.random.uniform(0, 1, size=1000)  # 均匀分布
-poisson_samples = np.random.poisson(lam=5, size=1000)  # 泊松分布
-exp_samples = np.random.exponential(scale=1.0, size=1000)  # 指数分布
-binomial_samples = np.random.binomial(n=10, p=0.5, size=1000)  # 二项分布
-
-# 随机整数
-randint_samples = np.random.randint(0, 100, size=(10, 10))
-
-# 随机选择
-choices = np.random.choice([1, 2, 3, 4, 5], size=10, p=[0.1, 0.2, 0.3, 0.3, 0.1])
-# 带权重的随机选择
-
-# 洗牌
-arr = np.arange(10)
-np.random.shuffle(arr)  # 原地洗牌
-arr_shuffled = np.random.permutation(arr)  # 返回新数组
-
-# 多维数组洗牌
-arr_2d = np.arange(20).reshape(4, 5)
-np.random.shuffle(arr_2d)  # 只洗牌行
-np.random.shuffle(arr_2d, axis=1)  # 只洗牌列
+rng = np.random.default_rng(42)
+rng.normal(size=10)
+rng.uniform(0, 1, size=(3, 3))
+rng.choice([1, 2, 3], size=5, p=[0.1, 0.2, 0.7])
 ```
+
+## 文件 IO
 
 `np.save/load` 保存 numpy 文件，`np.savetxt/loadtxt` 保存文本文件。
 
+### 本质断言
+
+**.npy 是 NumPy 专用二进制格式，读取飞快但不可人类阅读；.npyz 是压缩容器可存多数组；CSV/JSON 可迁移但有性能代价。**
+
+### 机制解释
+
+`np.save` 写入未压缩的 .npy 或 .npz（zip 容器），`np.load` 自动解压读取。.npy 格式包含 dtype 和 shape 元数据头，跨平台兼容。`np.savetxt` 输出的 CSV 是人类可读的文本，每行一个数组元素，读取时需重新解析字符串——大数组慎用。
+
+```
+文件格式选择：
+  .npy    → 快速读写，本机 dtype，无压缩，跨版本兼容
+  .npz    → 多数组压缩，lazy loading（访问才解压）
+  .csv    → 人类可读，其他工具兼容，O(n) 解析开销
+  .npy vs .npz:
+    np.savez("f.npz", a=arr1, b=arr2)  # 多数组
+    data = np.load("f.npz")
+    data["a"]
+```
+
 ### 参考样例
 
 ```python
 import numpy as np
 
-# 保存和加载 numpy 文件
 arr = np.arange(100).reshape(10, 10)
 np.save("arr.npy", arr)
 loaded = np.load("arr.npy")
-
-# 压缩格式
-np.savez("arr_compressed.npz", arr=arr, other=arr * 2)
-data = np.load("arr_compressed.npz")
-print(data["arr"])
-print(data["other"])
-
-# 文本文件
-arr = np.arange(100).reshape(10, 10)
-np.savetxt("arr.txt", arr, delimiter=",", fmt="%.2f")
-loaded = np.loadtxt("arr.txt", delimiter=",")
-
-# CSV 文件（带头部）
-header = "col1,col2,col3,col4,col5,col6,col7,col8,col9,col10"
-np.savetxt("arr.csv", arr, delimiter=",", header=header, comments="")
-loaded = np.loadtxt("arr.csv", delimiter=",")
-
-# 二进制格式（更快更大）
-arr = np.arange(1000000)
-np.save("arr.npy", arr)
-np.savez_compressed("arr_compressed.npz", arr=arr)
+np.savez("arr.npz", arr=arr)
 ```
+
+## 结构化数组
 
 结构化数组通过 `dtype` 定义多字段结构，模拟数据库表。
 
-### 参考样例
+### 本质断言
 
-```python
-import numpy as np
+**结构化数组用混合 dtype 定义"行结构"，字段名作为列索引，实现类数据库的列式存储，单字段操作返回所有行该字段的值。**
 
-# 定义结构化数据类型
-dt = np.dtype([
-    ("name", "U20"),
-    ("age", "i4"),
-    ("weight", "f4"),
-    ("active", "b")
-])
+### 机制解释
 
-# 创建结构化数组
-people = np.array([
-    ("Alice", 25, 55.5, True),
-    ("Bob", 30, 70.0, False),
-    ("Charlie", 35, 65.0, True)
-], dtype=dt)
+`dtype` 定义每行的字节布局（类似 C struct），字段名是不可变的字符串哈希键。内存布局是行连续（每行 N 字节），适合与 C/Fortran 互调。排序使用 `np.sort(..., order=["field1", "field2"])` 按字典序多键排序。
 
-# 访问字段
-print(people["name"])       # 所有名字
-print(people["age"][0])      # 第一个人的年龄
-print(people[people["active"]]["name"])  # 所有活跃的人
-
-# 字段排序
-sorted_indices = np.argsort(people["age"])
-print(people[sorted_indices])
-
-# 多字段排序
-dt_multi = np.dtype([
-    ("department", "U10"),
-    ("name", "U20"),
-    ("salary", "f4")
-])
-employees = np.array([
-    ("IT", "Alice", 5000),
-    ("HR", "Bob", 4500),
-    ("IT", "Charlie", 6000)
-], dtype=dt_multi)
-
-# 按部门排序，再按姓名排序
-sorted_employees = np.sort(employees, order=["department", "name"])
 ```
+结构化数组内存布局：
+  dtype [("name", "U10"), ("age", "i4")]
+  每行大小 = 10*4 + 4 = 44 字节（U10=40 字节 unicode）
 
-高级用法包括向量化函数、多项式拟合、近似相等判断、内存布局优化。
+  内存: [row0_name][row0_age][row1_name][row1_age]...
+  索引: arr["name"] → 所有行的 name 字段
+        arr["name"][0] → 第 0 行的 name
+```
 
 ### 参考样例
 
 ```python
 import numpy as np
 
-# 向量化函数
-def calculate(x, y):
-    return np.sqrt(x**2 + y**2)
-
-x = np.array([3, 4, 5])
-y = np.array([4, 3, 12])
-print(calculate(x, y))
-
-# np.vectorize 将普通函数向量化
-@np.vectorize
-def sigmoid(x):
-    return 1 / (1 + np.exp(-x))
-
-print(sigmoid(np.array([-1, 0, 1])))
-
-# 数组元编程
-arr = np.array([1, 2, 3, 4, 5])
-polynomial = np.poly1d([1, -5, 5, 0])  # x^3 - 5x^2 + 5x
-print(polynomial(arr))
-
-# 多项式拟合
-x = np.array([0, 1, 2, 3, 4, 5])
-y = np.array([0, 1, 4, 9, 16, 25])  # y = x^2
-coefficients = np.polyfit(x, y, 2)  # 2次多项式拟合
-print(coefficients)
-
-# np.searchsorted
-arr = np.array([1, 3, 5, 7, 9])
-print(np.searchsorted(arr, 4))  # 2 - 4 应该插入的位置
-
-# np.isclose 判断近似相等
-a = 0.1 + 0.2
-b = 0.3
-print(np.isclose(a, b))  # True
-print(np.allclose([1.0, 2.0], [1.0, 2.0]))  # True
-
-# 内存布局
-arr = np.arange(100).reshape(10, 10)
-print(arr.flags)  # 查看内存布局信息
-arr_c = np.ascontiguousarray(arr)  # C 连续
-arr_f = np.asfortranarray(arr)  # Fortran 连续
+dt = np.dtype([("name", "U10"), ("age", "i4")])
+people = np.array([("Alice", 25), ("Bob", 30)], dtype=dt)
+people["name"]
 ```
+
+### 数学公式
+
+标准差定义：
+
+$$\sigma = \sqrt{\frac{1}{n}\sum_{i=1}^{n}(x_i - \bar{x})^2}$$
+
+均值定义：
+
+$$\bar{x} = \frac{1}{n}\sum_{i=1}^{n} x_i$$
+
+矩阵乘法（C = A @ B）：
+
+$$C_{ij} = \sum_{k} A_{ik} B_{kj}$$

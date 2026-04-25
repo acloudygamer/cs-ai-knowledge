@@ -1,686 +1,166 @@
 # Flask 基础
 
-Flask 是轻量级 Python Web 框架，核心简单但扩展丰富。不同于 Django 的 "batteries included"，Flask 允许自由选择组件。
+Flask 是核心极简但扩展生态丰富的 Python WSGI Web 框架，通过松耦合设计让开发者按需选择组件，避免"batteries included"带来的框架约束。
 
 ## 核心特性
 
 ## 环境准备
 
-`pip install flask` 安装。
-
-### 参考样例
-
 ```bash
 pip install flask
 ```
 
-`Flask(__name__)` 创建应用，`@app.route()` 定义路由。
+## 请求上下文
 
-### 参考样例
+<pre>
+请求进入
+    │
+    ▼
+WSGI Server (Gunicorn/Werkzeug)
+    │
+    ▼
+Flask 应用调度
+    │
+    ▼
+请求上下文对象
+    │
+    ├─── request: 请求数据
+    │
+    ├─── session: 用户会话
+    │
+    └─── g: 请求级全局对象
+    │
+    ▼
+before_request 钩子
+    │
+    ▼
+路由处理函数
+    │
+    ▼
+after_request 钩子
+    │
+    ▼
+响应返回
+</pre>
 
-```python
-from flask import Flask, render_template, request, jsonify, redirect, url_for, flash, session
-from werkzeug.exceptions import abort
-import functools
+### 机制：上下文局部变量
 
-app = Flask(__name__)
-app.secret_key = "your-secret-key-change-in-production"
+Flask 通过 `werkzeug.local.LocalStack` 实现请求上下文。`request`、`session`、`g` 是线程/协程安全的上下文局部变量——相同线程/协程内访问同一变量，不同请求互不干扰。这比显式传递参数更便捷，但隐藏了数据来源，理解上下文生命周明很重要。
 
-
-@app.route("/")
-def index():
-    """首页"""
-    return "<h1>Hello, Flask!</h1>"
-
-
-@app.route("/user/<username>")
-def user_profile(username):
-    """动态路由"""
-    return f"<h1>Welcome, {username}!</h1>"
-
-
-@app.route("/hello/")
-@app.route("/hello/<name>")
-def hello(name=None):
-    """多路由示例"""
-    return render_template("hello.html", name=name)
-
-
-if __name__ == "__main__":
-    app.run(debug=True, port=5000)
-```
-
-Flask 请求钩子（`before_request`、`after_request`）和路由处理函数处理请求。`request` 对象提供请求数据访问。
-
-### 参考样例
-
-```python
-from flask import Flask, request, jsonify, abort
-from functools import wraps
-import time
-
-app = Flask(__name__)
-app.config["JSON_SORT_KEYS"] = False
-
-
-# 请求钩子
-@app.before_request
-def before_request():
-    """请求前处理"""
-    request.start_time = time.time()
-    print(f"Before request: {request.path}")
-
-
-@app.after_request
-def after_request(response):
-    """请求后处理"""
-    if hasattr(request, "start_time"):
-        elapsed = time.time() - request.start_time
-        response.headers["X-Request-Time"] = str(elapsed)
-    return response
-
-
-@app.teardown_request
-def teardown_request(exception=None):
-    """请求结束后处理"""
-    pass
-
-
-# 路由示例
-@app.route("/api/items", methods=["GET", "POST"])
-def items():
-    """物品列表"""
-    if request.method == "POST":
-        data = request.get_json()
-        if not data or "name" not in data:
-            abort(400, description="Missing required field: name")
-        return jsonify({"id": 1, "name": data["name"]}), 201
-    return jsonify([
-        {"id": 1, "name": "Item 1"},
-        {"id": 2, "name": "Item 2"},
-    ])
-
-
-@app.route("/api/items/<int:item_id>", methods=["GET", "PUT", "DELETE"])
-def item_detail(item_id):
-    """单个物品"""
-    item = {"id": item_id, "name": f"Item {item_id}"}
-
-    if request.method == "GET":
-        return jsonify(item)
-
-    if request.method == "PUT":
-        data = request.get_json()
-        item.update(data)
-        return jsonify(item)
-
-    if request.method == "DELETE":
-        return "", 204
-
-
-# 查询参数
-@app.route("/search")
-def search():
-    query = request.args.get("q", "")
-    page = request.args.get("page", 1, type=int)
-    per_page = request.args.get("per_page", 10, type=int)
-    return jsonify({
-        "query": query,
-        "page": page,
-        "per_page": per_page,
-        "results": []
-    })
-
-
-# 表单数据
-@app.route("/submit", methods=["POST"])
-def submit():
-    name = request.form.get("name")
-    email = request.form.get("email")
-    return jsonify({"name": name, "email": email})
-
-
-# 文件上传
-from werkzeug.utils import secure_filename
-import os
-
-UPLOAD_FOLDER = "uploads"
-app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
-app.config["MAX_CONTENT_LENGTH"] = 16 * 1024 * 1024  # 16MB
-
-ALLOWED_EXTENSIONS = {"txt", "pdf", "png", "jpg", "jpeg", "gif"}
-
-
-def allowed_file(filename):
-    return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
-
-
-@app.route("/upload", methods=["GET", "POST"])
-def upload():
-    if request.method == "POST":
-        if "file" not in request.files:
-            return jsonify({"error": "No file part"}), 400
-        file = request.files["file"]
-        if file.filename == "":
-            return jsonify({"error": "No selected file"}), 400
-        if file and allowed_file(file.filename):
-            filename = secure_filename(file.filename)
-            os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-            file.save(os.path.join(UPLOAD_FOLDER, filename))
-            return jsonify({"filename": filename}), 201
-    return """
-    <form method="post" enctype="multipart/form-data">
-        <input type="file" name="file">
-        <input type="submit" value="Upload">
-    </form>
-    """
-
-
-# 请求头
-@app.route("/headers")
-def headers():
-    user_agent = request.headers.get("User-Agent")
-    auth_token = request.headers.get("Authorization")
-    return jsonify({
-        "user_agent": user_agent,
-        "auth_token": auth_token
-    })
-```
-
-Jinja2 模板引擎通过 `render_template()` 渲染 HTML，支持模板继承、循环、条件。
-
-### 参考样例
-
-```html
-<!-- templates/base.html -->
-<!DOCTYPE html>
-<html>
-<head>
-    <title>{% block title %}My App{% endblock %}</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-</head>
-<body>
-    <nav>
-        <a href="{{ url_for('index') }}">Home</a>
-        <a href="{{ url_for('items') }}">Items</a>
-        {% if current_user.is_authenticated %}
-            <a href="{{ url_for('logout') }}">Logout</a>
-        {% else %}
-            <a href="{{ url_for('login') }}">Login</a>
-        {% endif %}
-    </nav>
-
-    {% with messages = get_flashed_messages(with_categories=true) %}
-        {% if messages %}
-            {% for category, message in messages %}
-                <div class="alert alert-{{ category }}">{{ message }}</div>
-            {% endfor %}
-        {% endif %}
-    {% endwith %}
-
-    <main>
-        {% block content %}{% endblock %}
-    </main>
-</body>
-</html>
-```
-
-```html
-<!-- templates/items.html -->
-{% extends "base.html" %}
-
-{% block title %}Items - My App{% endblock %}
-
-{% block content %}
-<h1>Items</h1>
-
-<form method="get">
-    <input type="text" name="q" placeholder="Search..." value="{{ request.args.q }}">
-    <button type="submit">Search</button>
-</form>
-
-<ul>
-{% for item in items %}
-    <li>
-        <a href="{{ url_for('item_detail', item_id=item.id) }}">
-            {{ item.name }}
-        </a>
-        - ${{ item.price }}
-    </li>
-{% else %}
-    <li>No items found</li>
-{% endfor %}
-</ul>
-
-{% if pagination.has_prev %}
-    <a href="{{ url_for('items', page=pagination.prev_num) }}">Previous</a>
-{% endif %}
-
-Page {{ pagination.page }} of {{ pagination.pages }}
-
-{% if pagination.has_next %}
-    <a href="{{ url_for('items', page=pagination.next_num) }}">Next</a>
-{% endif %}
-{% endblock %}
-```
-
-```python
-# 模板渲染
-from flask import render_template
-
-@app.route("/items/")
-def items():
-    items = [
-        {"id": 1, "name": "Apple", "price": 1.99},
-        {"id": 2, "name": "Banana", "price": 0.99},
-    ]
-    return render_template(
-        "items.html",
-        items=items,
-        page=1,
-        pagination=Pagination(page=1, per_page=10)
-    )
-
-
-# 自定义模板过滤器
-@app.template_filter("currency")
-def currency_filter(value):
-    return f"${value:.2f}"
-
-
-@app.template_filter("truncate_words")
-def truncate_words_filter(value, num=50):
-    words = value.split()
-    if len(words) > num:
-        return " ".join(words[:num]) + "..."
-    return value
-```
-
-Flask-SQLAlchemy 通过 `db.Model` 定义模型，提供 CRUD 操作。
-
-### 参考样例
+## 路由
 
 ```python
 from flask import Flask, request, jsonify
-from flask_sqlalchemy import SQLAlchemy
-from flask_migrate import Migrate
-from datetime import datetime
 
 app = Flask(__name__)
-app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///app.db"
-app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
-
-db = SQLAlchemy(app)
-migrate = Migrate(app, db)
 
 
-# 模型定义
-class User(db.Model):
-    __tablename__ = "users"
-
-    id = db.Column(db.Integer, primary_key=True)
-    username = db.Column(db.String(80), unique=True, nullable=False)
-    email = db.Column(db.String(120), unique=True, nullable=False)
-    password_hash = db.Column(db.String(200), nullable=False)
-    is_active = db.Column(db.Boolean, default=True)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-
-    posts = db.relationship("Post", backref="author", lazy="dynamic")
-
-    def to_dict(self):
-        return {
-            "id": self.id,
-            "username": self.username,
-            "email": self.email,
-            "is_active": self.is_active,
-            "created_at": self.created_at.isoformat()
-        }
+@app.route("/items/<int:item_id>", methods=["GET", "POST"])
+def item_detail(item_id):
+    if request.method == "POST":
+        return jsonify({"id": item_id}), 201
+    return jsonify({"id": item_id})
 
 
-class Post(db.Model):
-    __tablename__ = "posts"
-
-    id = db.Column(db.Integer, primary_key=True)
-    title = db.Column(db.String(200), nullable=False)
-    content = db.Column(db.Text, nullable=False)
-    published = db.Column(db.Boolean, default=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-
-    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
-
-    def to_dict(self):
-        return {
-            "id": self.id,
-            "title": self.title,
-            "content": self.content,
-            "published": self.published,
-            "author": self.author.username,
-            "created_at": self.created_at.isoformat()
-        }
-
-
-# 数据库操作
-@app.cli.command("init-db")
-def init_db():
-    """初始化数据库"""
-    db.create_all()
-    print("Database initialized!")
-
-
-@app.route("/api/users", methods=["GET"])
-def get_users():
-    users = User.query.filter_by(is_active=True).all()
-    return jsonify([u.to_dict() for u in users])
-
-
-@app.route("/api/users/<int:user_id>", methods=["GET"])
-def get_user(user_id):
-    user = User.query.get_or_404(user_id)
-    return jsonify(user.to_dict())
-
-
-@app.route("/api/users", methods=["POST"])
-def create_user():
-    data = request.get_json()
-    if User.query.filter_by(username=data["username"]).first():
-        return jsonify({"error": "Username already exists"}), 400
-    if User.query.filter_by(email=data["email"]).first():
-        return jsonify({"error": "Email already exists"}), 400
-
-    user = User(username=data["username"], email=data["email"])
-    db.session.add(user)
-    db.session.commit()
-    return jsonify(user.to_dict()), 201
-
-
-@app.route("/api/users/<int:user_id>", methods=["PUT"])
-def update_user(user_id):
-    user = User.query.get_or_404(user_id)
-    data = request.get_json()
-
-    if "username" in data:
-        user.username = data["username"]
-    if "email" in data:
-        user.email = data["email"]
-    if "is_active" in data:
-        user.is_active = data["is_active"]
-
-    db.session.commit()
-    return jsonify(user.to_dict())
-
-
-@app.route("/api/users/<int:user_id>", methods=["DELETE"])
-def delete_user(user_id):
-    user = User.query.get_or_404(user_id)
-    db.session.delete(user)
-    db.session.commit()
-    return "", 204
-
-
-# 查询示例
-@app.route("/api/posts")
-def get_posts():
-    page = request.args.get("page", 1, type=int)
-    per_page = request.args.get("per_page", 10, type=int)
-    published_only = request.args.get("published", "true").lower() == "true"
-
-    query = Post.query
-    if published_only:
-        query = query.filter_by(published=True)
-
-    posts = query.order_by(Post.created_at.desc()).paginate(
-        page=page, per_page=per_page, error_out=False
-    )
-
-    return jsonify({
-        "items": [p.to_dict() for p in posts.items],
-        "total": posts.total,
-        "page": posts.page,
-        "pages": posts.pages,
-        "has_next": posts.has_next,
-        "has_prev": posts.has_prev
-    })
+@app.route("/search")
+def search():
+    query = request.args.get("q", "")
+    return jsonify({"query": query})
 ```
 
-Flask 认证基于 `session`，使用 `werkzeug.security` 哈希密码。
+### 机制：路由匹配优先级
 
-### 参考样例
+Flask 按定义顺序匹配路由，具体路径优先于动态路径（`/items` 优先于 `/items/<id>`）。 Blueprint 内的路由按注册顺序匹配，设计 API 时应注意路由声明顺序。
+
+## 模板引擎
 
 ```python
-from flask import Flask, request, jsonify, session, g
-from flask_httpauth import HTTPBasicAuth
-from werkzeug.security import generate_password_hash, check_password_hash
-from functools import wraps
-
-app = Flask(__name__)
-app.secret_key = "change-this-secret-key"
-auth = HTTPBasicAuth()
-
-# 模拟用户数据
-users = {
-    "admin": generate_password_hash("admin123"),
-    "user": generate_password_hash("user123"),
-}
+from flask import render_template
 
 
-@auth.verify_password
-def verify_password(username, password):
-    if username in users and check_password_hash(users.get(username), password):
-        return username
-    return None
+@app.route("/items/")
+def items():
+    return render_template("items.html", items=[], page=1)
+```
+
+### 机制：Jinja2 继承的设计意图
+
+模板继承通过 `{% block %}` 实现布局复用——基模板定义结构，子模板填充内容。这将页面骨架与具体内容分离，修改全站布局只需改基模板，符合 DRY 原则。
+
+## 数据库
+
+```python
+from flask_sqlalchemy import SQLAlchemy
+
+db = SQLAlchemy(app)
 
 
-# Session-based auth
+class User(db.Model):
+    __tablename__ = "users"
+    id = db.Column(db.Integer, primary_key=True)
+    username = db.Column(db.String(80), unique=True)
+```
+
+### 机制：Flask-SQLAlchemy 的生命周期绑定
+
+`db` 对象与应用上下文绑定，会话在请求结束时自动提交或回滚。这种设计确保每个请求有独立的数据库连接和事务，避免跨请求的状态污染。
+
+## 认证
+
+```python
+from flask import session
+from werkzeug.security import generate_password_hash
+
+
 @app.route("/login", methods=["POST"])
 def login():
     data = request.get_json()
-    username = data.get("username")
-    password = data.get("password")
-
-    if username in users and check_password_hash(users[username], password):
-        session["user_id"] = username
-        session["logged_in"] = True
-        return jsonify({"message": "Login successful"})
-
-    return jsonify({"error": "Invalid credentials"}), 401
-
-
-@app.route("/logout", methods=["POST"])
-def logout():
-    session.clear()
-    return jsonify({"message": "Logged out"})
-
-
-def login_required(f):
-    """登录_required装饰器"""
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        if not session.get("logged_in"):
-            return jsonify({"error": "Login required"}), 401
-        return f(*args, **kwargs)
-    return decorated_function
-
-
-@app.route("/profile")
-@login_required
-def profile():
-    return jsonify({"user": session["user_id"]})
-
-
-# HTTP Basic Auth
-@app.route("/protected")
-@auth.login_required
-def protected():
-    return jsonify({"message": f"Hello, {auth.current_user()}!"})
+    if data["username"] == "admin":
+        session["user_id"] = "admin"
+        return jsonify({"message": "ok"})
+    return jsonify({"error": "fail"}), 401
 ```
 
-`@app.errorhandler` 装饰器注册错误处理器，返回 JSON 或模板。
+### 机制：Session 存储在客户端
 
-### 参考样例
+Flask 的 session 是签名 Cookie——数据存在客户端，仅签名验证完整性。敏感数据不应存入 session（用户可见），仅存 user_id 等引用符，实际数据存服务端或数据库。
+
+## 错误处理
 
 ```python
-from flask import Flask, jsonify, render_template, request
-from werkzeug.exceptions import NotFound, InternalServerError
-
-app = Flask(__name__)
+from werkzeug.exceptions import NotFound
 
 
 @app.errorhandler(404)
 def not_found(error):
-    if request.accept_mimetypes["application/json"]:
-        return jsonify({"error": "Not found"}), 404
-    return render_template("404.html"), 404
-
-
-@app.errorhandler(500)
-def internal_error(error):
-    db.session.rollback()
-    if request.accept_mimetypes["application/json"]:
-        return jsonify({"error": "Internal server error"}), 500
-    return render_template("500.html"), 500
-
-
-@app.errorhandler(400)
-def bad_request(error):
-    return jsonify({"error": str(error.description)}), 400
+    return jsonify({"error": "Not found"}), 404
 
 
 @app.route("/force-404")
 def force_404():
-    raise NotFound("This resource doesn't exist")
-
-
-@app.route("/force-500")
-def force_500():
-    raise InternalServerError("Something went wrong")
+    raise NotFound("Resource missing")
 ```
 
-Flask-RESTful 提供 `Resource` 和 `marshal_with` 简化 REST API 开发。
+### 机制：错误处理器与路由的解耦
 
-### 参考样例
+错误处理器捕获应用级异常而非特定路由的返回值。`abort()` 抛出异常，由错误处理器统一处理——适合处理 404、500 等非业务逻辑错误，业务逻辑错误仍应在路由内处理。
 
-```python
-from flask import Flask, request, jsonify, Blueprint
-from flask_restful import Api, Resource, fields, marshal_with, reqparse
-
-app = Flask(__name__)
-api_bp = Blueprint("api", __name__, url_prefix="/api/v1")
-api = Api(api_bp)
-
-# 响应字段定义
-item_fields = {
-    "id": fields.Integer,
-    "name": fields.String,
-    "price": fields.Float,
-    "in_stock": fields.Boolean,
-    "created_at": fields.DateTime(dt_format="iso8601"),
-}
-
-# 请求解析器
-item_parser = reqparse.RequestParser()
-item_parser.add_argument("name", type=str, required=True, help="Name is required")
-item_parser.add_argument("price", type=float, required=True, help="Price is required")
-item_parser.add_argument("in_stock", type=bool, default=True)
-
-
-class ItemResource(Resource):
-    """单个物品资源"""
-
-    @marshal_with(item_fields)
-    def get(self, item_id):
-        item = get_item_or_404(item_id)
-        return item
-
-    @marshal_with(item_fields)
-    def put(self, item_id):
-        args = item_parser.parse_args()
-        item = get_item_or_404(item_id)
-        item.update(args)
-        return item
-
-    def delete(self, item_id):
-        get_item_or_404(item_id)
-        delete_item(item_id)
-        return "", 204
-
-
-class ItemListResource(Resource):
-    """物品列表资源"""
-
-    @marshal_with(item_fields)
-    def get(self):
-        items = get_all_items()
-        return items
-
-    @marshal_with(item_fields)
-    def post(self):
-        args = item_parser.parse_args()
-        item = create_item(args)
-        return item, 201
-
-
-api.add_resource(ItemListResource, "/items")
-api.add_resource(ItemResource, "/items/<int:item_id>")
-app.register_blueprint(api_bp)
-```
-
-蓝图（Blueprint）将应用拆分为模块化组件，便于大型应用组织。
-
-### 参考样例
+## 蓝图
 
 ```python
-# app/__init__.py
-from flask import Flask
-from flask_sqlalchemy import SQLAlchemy
-from flask_migrate import Migrate
-from flask_jwt_extended import JWTManager
-
-db = SQLAlchemy()
-migrate = Migrate()
-jwt = JWTManager()
-
-
-def create_app(config_name="default"):
-    app = Flask(__name__)
-
-    if config_name == "development":
-        app.config.from_object("config.DevelopmentConfig")
-    elif config_name == "production":
-        app.config.from_object("config.ProductionConfig")
-    else:
-        app.config.from_object("config.TestingConfig")
-
-    db.init_app(app)
-    migrate.init_app(app, db)
-    jwt.init_app(app)
-
-    from app.api import api_bp
-    app.register_blueprint(api_bp)
-
-    from app.web import web_bp
-    app.register_blueprint(web_bp)
-
-    return app
-```
-
-```python
-# app/api/__init__.py
 from flask import Blueprint
 
-api_bp = Blueprint("api", __name__)
-
-from app.api import routes
-```
-
-```python
-# app/api/routes.py
-from flask import jsonify
-from app.api import api_bp
+api_bp = Blueprint("api", __name__, url_prefix="/api")
 
 
 @api_bp.route("/health")
 def health():
-    return jsonify({"status": "healthy"})
+    return {"status": "ok"}
+
+
+app.register_blueprint(api_bp)
 ```
+
+### 机制：蓝图的命名空间隔离
+
+Blueprint 创建独立的 URL 命名空间和视图集合。通过 `url_prefix` 批量添加路径前缀，`endpoint` 默认以蓝图名为前缀避免冲突。这支持将大型应用拆分为多个模块，各模块独立开发测试。

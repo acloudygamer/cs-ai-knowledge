@@ -1,24 +1,31 @@
 # CLI 应用开发
 
-## argparse（标准库）
+CLI 应用开发是构建通过命令行界面与用户交互的程序，通过参数解析实现命令到函数的映射。
 
-### 基础用法
+## 核心机制
 
-### 参考样例
+`argparse` 是 Python 标准库，通过 `ArgumentParser` 注册参数，`parse_args()` 将命令行字符串转换为 Namespace 对象。位置参数必须按顺序提供，可选参数 `-v/--verbose` 可省略。`click` 通过装饰器 `@click.command()` 将函数转为 CLI 命令，参数自动从函数签名提取。`typer` 基于 `click` 构建，提供类型提示自动生成 CLI 界面。子命令通过 `add_subparsers()` 实现类似 git 的多命令结构。
 
-```python
-import argparse
+## 定义断言
 
-parser = argparse.ArgumentParser(description="数据处理工具")
-parser.add_argument("input_file", help="输入文件路径")
-parser.add_argument("output_file", help="输出文件路径")
-parser.add_argument("-v", "--verbose", action="store_true", help="详细输出")
-parser.add_argument("-n", "--num", type=int, default=10, help="处理数量")
+> CLI 应用是通过命令行参数传递指令的程序，CLI 开发本质是将命令行参数解析为函数调用，其核心挑战是参数验证、类型转换和帮助信息生成。
 
-args = parser.parse_args()
-```
+## 数据流
 
-### 子命令
+<pre>
+命令行字符串
+    |
+    v
+参数解析器
+    |
+    v
+Namespace 对象
+    |
+    v
+函数调用
+</pre>
+
+## argparse 基础
 
 ### 参考样例
 
@@ -26,17 +33,12 @@ args = parser.parse_args()
 import argparse
 
 parser = argparse.ArgumentParser()
-subparsers = parser.add_subparsers(dest="command", help="子命令")
-
-install_parser = subparsers.add_parser("install", help="安装包")
-install_parser.add_argument("package", help="包名")
-
+parser.add_argument("input_file")
+parser.add_argument("-v", "--verbose", action="store_true")
 args = parser.parse_args()
 ```
 
-## Click（第三方库）
-
-### 安装与基础用法
+## Click
 
 ### 参考样例
 
@@ -44,37 +46,12 @@ args = parser.parse_args()
 import click
 
 @click.command()
-@click.argument("input_file", type=click.Path(exists=True))
-@click.argument("output_file", type=click.Path())
-@click.option("-v", "--verbose", is_flag=True, help="详细输出")
-def process(input_file, output_file, verbose):
-    """数据处理工具"""
+@click.argument("input_file")
+def process(input_file):
     click.echo(f"处理文件: {input_file}")
 ```
 
-### 用户交互
-
-### 参考样例
-
-```python
-import click
-
-# 确认提示
-@click.command()
-@click.option("--force", is_flag=True)
-def delete_all(force):
-    if not force and not click.confirm("确认删除所有数据?"):
-        click.echo("操作取消")
-        return
-    click.echo("删除完成")
-
-# 进度条
-with click.progressbar(range(100)) as bar:
-    for item in bar:
-        pass
-```
-
-## Typer（现代化选择）
+## Typer
 
 ### 参考样例
 
@@ -84,18 +61,13 @@ import typer
 app = typer.Typer()
 
 @app.command()
-def create(name: str, email: str, age: int = 0):
-    """创建新用户"""
+def create(name: str, email: str):
     typer.echo(f"创建用户: {name}")
-
-if __name__ == "__main__":
-    app()
 ```
 
 ## 常见问题
 
 | 问题 | 解决方案 |
 |------|----------|
-| 中文帮助乱码 | 使用 `PYTHONIOENCODING=utf-8` 运行 |
-| 参数解析失败 | 使用 `python script.py --help` 查看用法 |
-| 自动化测试 | 使用 `runner = click.testing.CliRunner()` |
+| 中文帮助乱码 | `PYTHONIOENCODING=utf-8` |
+| 自动化测试 | `click.testing.CliRunner()` |

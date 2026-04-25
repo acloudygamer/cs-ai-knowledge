@@ -1,271 +1,135 @@
 # Fixture
 
-pytest fixture 通过 `@pytest.fixture` 装饰器提供测试所需的预处理和后处理逻辑，通过 `yield` 实现清理。
+A fixture is a factory for test dependencies, instantiated per the declared lifecycle scope and automatically cleaned up after use. The `yield` keyword separates resource acquisition (before yield) from resource release (after yield).
 
-## 基本 fixture
+## 生命周期与作用域
 
-### 参考样例
+<pre>
+session scope
+    |
+    +-- module scope
+          |
+          +-- class scope
+                |
+                +-- function scope (default)
+                      |
+                      v
+                  test execution
+</pre>
 
-```python
-import pytest
+Each scope is a container: fixtures at a given scope are created once when entering that scope and destroyed when exiting. A `function` scope fixture is created before each test and destroyed after each test. A `module` scope fixture is created once for all tests in the module.
 
-@pytest.fixture
-def empty_list():
-    return []
+Why scope matters:
+- Expensive resource creation (DB connection, HTTP client) benefits from module or session scope
+- Test isolation is maintained because cleanup happens after each scope boundary
+- Incorrect scope (leaking state across tests) causes test order dependency
 
-@pytest.fixture
-def sample_data():
-    return {"name": "Alice", "age": 30, "city": "NYC"}
+## yield 清理语义
 
-def test_empty_list(empty_list):
-    assert empty_list == []
-    empty_list.append(1)  # 不会影响其他测试
-
-def test_sample_data(sample_data):
-    assert sample_data["name"] == "Alice"
+```
+fixture enters --> yield value --> test runs --> yield resumed --> cleanup runs
 ```
 
-Fixture 可以依赖其他 fixture，通过函数参数声明依赖关系。
+`yield` suspends the fixture function, returns the value to the requesting test, and resumes after the test completes. Code after `yield` always executes, even if the test fails, because the fixture teardown runs in a `finally`-like block managed by pytest.
 
-### 参考样例
+This differs from `return`:
+- `return` does not run cleanup code after test
+- `yield` guarantees cleanup via pytest's fixture teardown machinery
+
+## 依赖注入与 DAG
+
+Fixtures declare dependencies as function parameters. pytest resolves the dependency graph (DAG) topologically and injects the resolved values.
+
+```
+database fixture
+    |
+    v
+user_service(database) --> receives resolved database
+```
+
+Why function parameters over class attributes:
+- Explicit declaration: dependency is visible in function signature
+- No shared mutable state; each test receives its own resolved dependency chain
+- pytest detects circular dependencies and raises during collection
+
+## conftest 共享机制
+
+`conftest.py` is a plugin module auto-loaded by pytest when crawling the directory tree. Fixtures defined in `conftest.py` are available to all tests in that directory and subdirectories.
+
+<pre>
+tests/
+  conftest.py  --> defines shared fixtures
+  unit/
+    test_x.py  --> uses fixtures from conftest.py
+  integration/
+    test_y.py  --> uses fixtures from conftest.py
+</pre>
+
+This avoids import-time fixture pollution in test files while keeping shared fixtures discoverable by pytest's collection mechanism.
+
+## 内置 fixtures
+
+| fixture | purpose |
+|---------|---------|
+| `tmp_path` | temporary directory isolated per test |
+| `monkeypatch` | temporarily replace attributes/environment |
+| `capfd` | capture stdout/stderr output |
+| `caplog` | capture log messages |
+
+`tmp_path` is preferred over `tmpdir` (deprecated) because it provides a `pathlib.Path` object with cleaner semantics.
+
+## 参考样例
 
 ```python
 @pytest.fixture
 def database():
-    db = Database.connect("test.db")
-    yield db  # 测试使用 db
-    db.close()  # 测试后清理
-    Database.drop("test.db")
+    db = Database.connect()
+    yield db
+    db.close()
 
 def test_insert(database):
     database.insert({"name": "Bob"})
     assert database.count() == 1
 ```
 
-`scope` 参数控制 fixture 生命周期：`function`（默认，每个测试）、`class`（每个类）、`module`（每个模块）、`session`（整个会话）。
-
-### 参考样例
-
 ```python
-@pytest.fixture
-def user_repository():
-    return FakeUserRepository()
-
-@pytest.fixture
-def user_service(user_repository):  # 依赖另一个 fixture
-    return UserService(user_repository)
-
-def test_create_user(user_service):
-    user = user_service.create("alice@example.com")
-    assert user.email == "alice@example.com"
-```
-
-## scope（作用域）
-
-```python
-# function：每个测试函数执行一次（默认）
-@pytest.fixture(scope="function")
-def func_fixture():
-    print("\nfunction scope")
-    return "function"
-
-# class：每个测试类执行一次
-@pytest.fixture(scope="class")
-def class_fixture():
-    print("\nclass scope")
-    return "class"
-
-# module：每个模块执行一次
 @pytest.fixture(scope="module")
-def module_fixture():
-    print("\nmodule scope")
-    return "module"
+def db_connection():
+    return Database.connect()
 
-# session：整个测试会话执行一次
-@pytest.fixture(scope="session")
-def session_fixture():
-    print("\nsession scope")
-    return "session"
+@pytest.fixture
+def db(db_connection):
+    return db_connection.cursor()
 ```
 
-`autouse=True` 自动应用于所有测试，无需显式声明使用。
-
-### 参考样例
-
 ```python
-# autouse 自动应用于所有测试
-@pytest.fixture(autouse=True)
-def setup_logging():
-    logging.basicConfig(level=logging.INFO)
-
-# 只自动应用于类内测试
-class TestDatabase:
-    @pytest.fixture(autouse=True)
-    def setup_db(self):
-        self.db = Database.connect("test.db")
-        yield
-        self.db.close()
-```
-
-Fixture 可以参数化，通过 `request.param` 访问不同参数值。
-
-### 参考样例
-
-```python
-@pytest.fixture(params=[1, 2, 3])
-def number(request):
+@pytest.fixture(params=["alice", "bob"])
+def username(request):
     return request.param
-
-def test_square(number):
-    assert number ** 2 > 0
-
-
-@pytest.fixture(params=[
-    ("alice@example.com", "Alice"),
-    ("bob@example.com", "Bob"),
-])
-def user_data(request):
-    return {"email": request.param[0], "name": request.param[1]}
 ```
 
-建议使用描述性名称，避免技术术语。
-
-### 参考样例
-
 ```python
-# 建议使用描述性名称
-@pytest.fixture
-def verified_user_token():
-    return create_verified_user().token
-
-# 避免使用 mock 或 stub 等技术术语
+def test_write(tmp_path):
+    f = tmp_path / "test.txt"
+    f.write_text("data")
+    assert f.read_text() == "data"
 ```
 
-`conftest.py` 在测试目录中定义共享 fixture，pytest 自动发现并加载。
-
-### 参考样例
-
 ```python
-# conftest.py - 共享 fixture
-# tests/conftest.py
-
-import pytest
-
-@pytest.fixture
-def app():
-    from app import create_app
-    app = create_app(testing=True)
-    return app
-
-@pytest.fixture
-def client(app):
-    return app.test_client()
-
-@pytest.fixture
-def db(app):
-    from app.extensions import db
-    with app.app_context():
-        db.create_all()
-        yield db
-        db.drop_all()
-```
-
-`tmp_path` 是 pytest 内置 fixture，提供临时目录用于测试文件操作。
-
-### 参考样例
-
-```python
-def test_write_to_file(tmp_path):
-    file_path = tmp_path / "test.txt"
-    file_path.write_text("Hello, World!")
-
-    assert file_path.read_text() == "Hello, World!"
-    assert file_path.exists()
-
-def test_csv_processing(tmp_path):
-    csv_file = tmp_path / "data.csv"
-    csv_file.write_text("name,age\nAlice,30\nBob,25")
-
-    result = process_csv(str(csv_file))
-    assert len(result) == 2
-```
-
-Fixture 工厂返回创建对象的函数，支持在测试中创建多个对象实例。
-
-### 参考样例
-
-```python
-# 工厂 fixture 返回创建对象的函数
 @pytest.fixture
 def make_user():
-    created_users = []
-
-    def _create_user(name, email):
-        user = User(name=name, email=email)
-        created_users.append(user)
+    created = []
+    def _create(name):
+        user = User(name=name)
+        created.append(user)
         return user
-
-    yield _create_user
-
-    # 清理
-    for user in created_users:
-        user.delete()
-
-def test_multiple_users(make_user):
-    user1 = make_user("Alice", "alice@example.com")
-    user2 = make_user("Bob", "bob@example.com")
-
-    assert user1.name == "Alice"
-    assert user2.name == "Bob"
+    yield _create
+    for u in created:
+        u.delete()
 ```
 
-pytest 提供常用内置 fixture：`capfd` 捕获输出、`monkeypatch` 动态替换、`tmp_path` 临时目录、`caplog` 捕获日志。
-
-### 参考样例
-
 ```python
-def test_capfd(capfd):
-    """捕获 stdout/stderr"""
-    print("Hello")
-    captured = capfd.readouterr()
-    assert "Hello" in captured.out
-
-def test_monkeypatch(monkeypatch):
-    """动态替换属性"""
-    monkeypatch.setattr("os.getcwd", lambda: "/tmp")
-    import os
-    assert os.getcwd() == "/tmp"
-
-def test_cache(tmp_path):
-    """测试缓存目录"""
-    cache_dir = tmp_path / "cache"
-    cache_dir.mkdir()
-    # 使用缓存目录
-
 def test_env(monkeypatch):
-    """设置环境变量"""
-    monkeypatch.setenv("API_KEY", "test-key")
-    assert os.environ["API_KEY"] == "test-key"
-```
-
-Fixture 失败时，依赖它的测试会被跳过。使用 `pytest.skip` 跳过测试。
-
-### 参考样例
-
-```python
-@pytest.fixture
-def risky_resource():
-    resource = acquire_resource()
-    if resource is None:
-        pytest.skip("Resource not available")
-    yield resource
-    resource.release()
-
-@pytest.fixture
-def required_fixture():
-    raise RuntimeError("Setup failed")
-
-# 依赖失败 fixture 的测试会被跳过
-def test_depends_on_failed(required_fixture):
-    pass
+    monkeypatch.setenv("API_KEY", "test")
+    assert os.environ["API_KEY"] == "test"
 ```

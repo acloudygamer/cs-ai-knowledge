@@ -1,149 +1,66 @@
 # f-string 格式化深入
 
-f-string（格式化字符串字面量）是 Python 3.6+ 引入的字符串格式化机制，以 `f` 或 `F` 开头，支持在字符串中嵌入表达式。
+f-string 是 Python 3.6+ 引入的格式化字符串字面量，通过在字符串前加 `f` 前缀，在字符串内部嵌入表达式进行动态插值。
+
+## 核心机制
+
+f-string 在运行时对花括号内的表达式求值并转换为字符串插入，占位符 `{expr}` 中的表达式可以是变量、方法调用、算术运算。格式化规格符通过 `:` 分隔，如 `{value:>10}` 表示右对齐宽度 10。转义 `{{` 和 `}}` 输出字面大括号。调试格式 `{x=}` 在 Python 3.8+ 支持，自动输出变量名和值。datetime 对象可直接格式化，百分比格式 `:.2%` 将小数乘以 100 并加 `%` 后缀。
+
+## 定义断言
+
+> f-string 是运行时求值的格式化字符串，其本质是在字符串字面量中嵌入表达式并在输出时进行格式化转换。
+
+## 数据流
+
+<pre>
+f"value={x:>5}"  -->  解析花括号内表达式和格式规格符
+                        -->  求值 x
+                        -->  应用格式规格符
+                        -->  拼接输出字符串
+</pre>
 
 ## 基础用法
-
-### 基本插值
 
 ### 参考样例
 
 ```python
 name = "Alice"
-age = 30
-
-# 基本变量插值
-print(f"My name is {name} and I am {age} years old")
-
-# 表达式求值
-print(f"In 5 years, I will be {age + 5} years old")
-
-# 调用方法
-print(f"Uppercase: {name.upper()}")
-```
-
-### 引号和转义
-
-### 参考样例
-
-```python
-# 转义大括号
-print(f"{{ literal braces }}")
-
-# 动态大括号
-key = "name"
-print(f"{{{key}}}")
+print(f"Hello, {name}!")
+print(f"{age + 5} years later")
 ```
 
 ## 格式化规格符
 
-### 宽度和对齐
-
 ### 参考样例
 
 ```python
-name = "Alice"
-value = 42
-
-# 右对齐
-print(f"{name:>10}")
-
-# 左对齐
-print(f"{name:<10}")
-
-# 居中对齐
-print(f"{name:^10}")
-
-# 填充字符
-print(f"{name:*>10}")
-```
-
-### 数字格式化
-
-### 参考样例
-
-```python
-# 整数格式
-print(f"{42:05d}")   # "00042"
-print(f"{42:+d}")    # "+42"
-
-# 二进制、八进制、十六进制
-print(f"{42:b}")     # "101010"
-print(f"{42:#x}")    # "0x2a"
-
-# 浮点数
-import math
-pi = math.pi
-print(f"{pi:.2f}")    # "3.14"
-print(f"{pi:.2%}")    # "314.16%"
-
-# 千位分隔符
-big_number = 1234567890
-print(f"{big_number:,}")
+print(f"{42:05d}")
+print(f"{3.14159:.2f}")
+print(f"{1234567890:,}")
 ```
 
 ## 调试格式
-
-### = 自描述说明符（Python 3.8+）
 
 ### 参考样例
 
 ```python
 x = 42
-name = "Alice"
-
-# 调试格式
-print(f"{x=}")           # "x=42"
-print(f"{name=}")        # "name='Alice'"
+print(f"{x=}")
 ```
 
-## 日期时间格式化
+## 日期时间
 
 ### 参考样例
 
 ```python
 from datetime import datetime
-
 now = datetime.now()
-
-# 直接格式化
-print(f"{now:%Y-%m-%d %H:%M:%S}")
-print(f"{now:%B %d, %Y}")
+print(f"{now:%Y-%m-%d}")
 ```
 
-## 百分比和科学计数法
+## 常见问题
 
-### 参考样例
-
-```python
-ratio = 0.856
-large = 1234567890
-
-# 百分比格式
-print(f"{ratio:.1%}")
-
-# 科学计数法
-print(f"{large:.2e}")
-```
-
-## 表格输出
-
-### 参考样例
-
-```python
-data = [
-    {"name": "Alice", "age": 30},
-    {"name": "Bob", "age": 25},
-]
-
-# 计算列宽
-name_width = max(len(str(row["name"])) for row in data) + 2
-
-# 打印表头
-print(f"{'Name':<{name_width}}{'Age':<5}")
-print("-" * (name_width + 5))
-
-# 打印数据行
-for row in data:
-    print(f"{row['name']:<{name_width}}{row['age']}")
-```
+| 问题 | 解决方案 |
+|------|----------|
+| 输出大括号 | 使用 `{{` 和 `}}` |
+| 嵌套表达式 | 使用元组 `{(a, b)}` |
