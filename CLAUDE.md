@@ -4,9 +4,9 @@
 
 | 团队 | Agent | 职责 |
 |------|-------|------|
-| Team A（写作） | concept-writer × N | 并行撰写子目录文档 |
-| Team B（审改） | reviewer + modifier | 审查 + 重写，循环直到通过 |
-| Team C（合并） | topology-architect | 整合目录内所有文档 |
+| Team A（写作） | concept-writer × N + leader | 子目录并行撰写，leader 追踪进度并汇总 |
+| Team B（审改） | (reviewer + modifier) × N | 子目录并行审改，循环直到通过 |
+| Team C（合并） | topology-architect × N + leader | 子目录并行合并，leader 汇总外层 README |
 
 ## 工作流程
 
@@ -15,17 +15,15 @@
 ```
 1. Team A（写）
    └─ 子目录并行：每个子目录一个 concept-writer
-   └─ 全部写完 → Team A leader 通知 Team B leader
+   └─ leader 追踪进度，全部完成后通知 Team B leader
 
 2. Team B（审改）
-   └─ reviewer 审查 → 输出问题清单
-   └─ modifier 重写
-   └─ reviewer 再审（循环直到无问题）
-   └─ 通过 → Team B leader 通知 Team C leader
+   └─ 子目录并行：每组 reviewer + modifier 独立审改
+   └─ 全部通过 → Team B leader 通知 Team C leader
 
 3. Team C（合并）
-   └─ topology-architect 整合目录内所有文档
-   └─ 完成 → 通知进入下一个目录
+   └─ 子目录并行：每个子目录一个 topology-architect 独立合并
+   └─ leader 汇总外层 README，完成后通知进入下一个目录
 ```
 
 ## 跨团队沟通
