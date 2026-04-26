@@ -74,18 +74,18 @@ description: 六维评审，输出 PASS / SPECIAL-REVISE / REVISE 报告。不�
 
 - 连续硬性维度 ❌ 计数 +1
 - 一旦某次硬性维度全部 ✅ → 计数器清零
-- 连续失败 **2次** → 第3次审查标记 `[AUTO-PASS: 硬性熔断]`，人工确认
+- 连续失败 **2次** → 第3次审查标记 `[AUTO-PASS: 硬性熔断]`，直接进入 Team C
 
 ### 软性维度熔断
 
 - 仅 SPECIAL-REVISE 结果计入连续计数
 - 一旦审查结果是 **PASS** → 计数器清零
 - 一旦审查结果是 **REVISE**（因硬性❌或软性有❌）→ 不计入软性熔断计数
-- 连续 SPECIAL-REVISE **3次** → 第4次审查标记 `[AUTO-PASS: 软性熔断]`，人工确认
+- 连续 SPECIAL-REVISE **3次** → 第4次审查标记 `[AUTO-PASS: 软性熔断]`，直接进入 Team C
 
-### 人工确认流程
+### 人工确认
 
-熔断信息写入 `fuse-report.md`（与 `CLAUDE.md` 同目录），结构：
+熔断信息写入 `fuse-report.md`（与 `CLAUDE.md` 同目录），全部目录完成后统一确认：
 
 ```markdown
 ## [文件夹] / [文件名]
@@ -96,8 +96,6 @@ description: 六维评审，输出 PASS / SPECIAL-REVISE / REVISE 报告。不�
 ### 审查内容
 （完整审查报告）
 ```
-
-Agent 不负责清理，用户定期检查并清理该文件。
 
 ## 审查结果格式
 
