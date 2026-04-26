@@ -4,7 +4,7 @@
 
 ## 概念文档格式
 
-详见 [概念文档宪法](../../prompts/constitution-template.md)。
+详见 [概念文档宪法](../../prompts/constitution.md)。
 
 ## 核心特点
 
