@@ -92,43 +92,45 @@ Stream2: ──REQ2──▶              同一QUIC连接
 
 ## 机制
 
-**为什么HTTP是无状态的**：服务器不保存客户端状态，每个请求独立处理。这简化了服务器设计，但需要Cookie/Token等机制来维护会话。
+**为什么HTTP是无状态的**：服务器不保存客户端状态，每个请求独立处理。这简化了服务器设计——无状态意味着服务器可以任意水平扩展，不需要在不同请求之间同步状态。代价是会话管理被推给客户端（Cookie）或应用层（JWT）。
 
 **约束**：
-- HTTP是文本协议，头部为ASCII编码
-- 请求必须有Host头（HTTP/1.1强制）
-- GET/HEAD请求不能有body
-- 响应body必须匹配Content-Length或使用chunked transfer-encoding
+- HTTP是文本协议，头部为ASCII编码（不含中文等非ASCII字符）
+- 请求必须有Host头（HTTP/1.1强制，用于虚拟主机区分）
+- GET/HEAD请求不能有body（HTTP/1.1规范定义）
+- 响应body必须匹配Content-Length或使用chunked transfer-encoding（接收方需要知道消息边界）
 
-**状态码分类与语义**：
+**状态码分类的语义层级**：
 
-| 类别 | 范围 | 语义 | 典型场景 |
-|------|------|------|----------|
-| 1xx | 100-199 | 信息 | 100 Continue |
-| 2xx | 200-299 | 成功 | 200 OK, 201 Created |
-| 3xx | 300-399 | 重定向 | 301/302 跳转, 304 缓存 |
-| 4xx | 400-499 | 客户端错误 | 404 未找到, 403 无权限 |
-| 5xx | 500-599 | 服务器错误 | 500 内部错, 502 网关错误 |
+| 类别 | 范围 | 本质语义 | 设计意图 |
+|------|------|----------|----------|
+| 1xx | 100-199 | 过渡状态 | 通知客户端服务器正在处理 |
+| 2xx | 200-299 | 成功完成 | 确认请求已被正确处理 |
+| 3xx | 300-399 | 重定向 | 资源位于别处，客户端需再次请求 |
+| 4xx | 400-499 | 客户端错误 | 请求本身有问题，客户端需修正 |
+| 5xx | 500-599 | 服务器错误 | 服务器未能正确处理合法请求 |
 
-**缓存机制**：HTTP缓存通过Cache-Control和ETag/Last-Modified实现。强缓存（max-age/Expires）不发送请求，协商缓存（If-None-Match/If-Modified-Since）发送条件请求。
+**队头阻塞的物理根源**：HTTP/1.1的持久连接中，请求必须串行处理——这是因为TCP是字节流协议，同一连接上的多个请求复用同一个字节流，接收方无法区分属于不同请求的字节。只有等待一个请求的完整响应返回，才能开始处理下一个请求。
 
-**队头阻塞**：HTTP/1.1的持久连接中，请求必须串行处理，一个请求耗时会影响后续请求。HTTP/2通过多路复用解决TCP层的队头阻塞，但HTTP/3通过QUIC在用户态解决流级别阻塞。
+**HTTP/2解决的是什么问题**：HTTP/2通过多路复用让多个请求同时在飞行中。但它仍然受TCP层队头阻塞影响——如果TCP丢包，HTTP/2的所有流都会卡住，因为TCP按序交付。
+
+**HTTP/3如何解决队头阻塞**：HTTP/3基于QUIC协议，QUIC在用户态实现自己的可靠传输和拥塞控制。每个QUIC流独立有序，丢包只影响该流，不影响其他流。这是用户态协议栈的优势——可以独立演进而不受TCP约束。
+
+**缓存机制的双层设计**：
+- 强缓存（max-age/Expires）：客户端不发送请求，直接使用本地缓存。服务器通过Cache-Control: max-age=N告知客户端缓存新鲜度。
+- 协商缓存（If-None-Match/If-Modified-Since）：客户端发送条件请求，服务器判断是否返回304（使用缓存）或200（返回新内容）。
 
 **违规后果**：
-- 不设置Host头：HTTP/1.1服务器无法确定虚拟主机
-- 不设置Content-Length且不使用chunked：接收方无法确定消息边界
-- 缓存不设置Cache-Control：代理可能不缓存或缓存过久
+- 不设置Host头：HTTP/1.1服务器无法确定虚拟主机，目标服务器可能错误
+- 不设置Content-Length且不使用chunked：接收方无法确定消息边界，会一直等待直到连接关闭或超时
+- 缓存不设置Cache-Control：代理可能不缓存（浪费带宽）或缓存过久（用户看到过期内容）
+- GET请求带body：可能被中间代理拒绝或截断，不符合HTTP语义
 
 ## 参考存根
 
 ```python
 import http.client
 conn = http.client.HTTPSConnection("example.com")
-conn.request("GET", "/", headers={"Host": "example.com"})
+conn.request("GET", "/")
 resp = conn.getresponse()
-print(resp.status, resp.read())
-```
-
-```bash
-curl -v https://example.com/api -X POST -H "Content-Type: application/json" -d '{"key":"value"}'
 ```
