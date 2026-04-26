@@ -85,9 +85,25 @@ description: 六维评审，输出 PASS / SPECIAL-REVISE / REVISE 报告。不�
 
 ### 人工确认流程
 
-- 硬性熔断文件夹 / 软性熔断文件夹 分开存放熔断文件
-- 用户检查熔断文件后，手动将 `AUTO-PASS` 改为 `PASS` 或继续 REVISE
-- 两层循环：优先检查熔断文件夹，再进行正常审查
+熔断状态存储在 `.claude/tasks/fuse-state.json`，结构为 7 个外层目录 × 2 种熔断类型：
+
+```json
+{
+  "0": { "hard": 0, "soft": 0 },
+  "1": { "hard": 0, "soft": 0 },
+  ...
+  "6": { "hard": 0, "soft": 0 }
+}
+```
+
+**硬性维度熔断**：连续失败次数，达到 2 次则触发 `[AUTO-PASS: 硬性熔断]`，报告注入 JSON
+**软性维度熔断**：连续 SPECIAL-REVISE 次数，达到 3 次则触发 `[AUTO-PASS: 软性熔断]`，报告注入 JSON
+
+Agent 不负责检查熔断状态，只负责在审查报告中注入：
+- 当前文件的熔断触发结果
+- 当前目录的熔断计数更新值
+
+人工确认由用户自行检查 `.claude/tasks/fuse-state.json`，确认后手动将 `AUTO-PASS` 改为 `PASS` 或继续 REVISE。
 
 ## 审查结果格式
 
