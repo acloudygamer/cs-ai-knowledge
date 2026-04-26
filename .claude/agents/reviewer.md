@@ -85,25 +85,19 @@ description: 六维评审，输出 PASS / SPECIAL-REVISE / REVISE 报告。不�
 
 ### 人工确认流程
 
-熔断状态存储在 `.claude/tasks/fuse-state.json`，结构为 7 个外层目录 × 2 种熔断类型：
+熔断信息写入 `fuse-report.md`（与 `CLAUDE.md` 同目录），结构：
 
-```json
-{
-  "0": { "hard": 0, "soft": 0 },
-  "1": { "hard": 0, "soft": 0 },
-  ...
-  "6": { "hard": 0, "soft": 0 }
-}
+```markdown
+## [文件夹] / [文件名]
+
+### 熔断类型
+[AUTO-PASS: 硬性熔断] / [AUTO-PASS: 软性熔断]
+
+### 审查内容
+（完整审查报告）
 ```
 
-**硬性维度熔断**：连续失败次数，达到 2 次则触发 `[AUTO-PASS: 硬性熔断]`，报告注入 JSON
-**软性维度熔断**：连续 SPECIAL-REVISE 次数，达到 3 次则触发 `[AUTO-PASS: 软性熔断]`，报告注入 JSON
-
-Agent 不负责检查熔断状态，只负责在审查报告中注入：
-- 当前文件的熔断触发结果
-- 当前目录的熔断计数更新值
-
-人工确认由用户自行检查 `.claude/tasks/fuse-state.json`，确认后手动将 `AUTO-PASS` 改为 `PASS` 或继续 REVISE。
+Agent 不负责清理，用户定期检查并清理该文件。
 
 ## 审查结果格式
 
@@ -138,6 +132,12 @@ Agent 不负责检查熔断状态，只负责在审查报告中注入：
 - 结果：PASS / SPECIAL-REVISE / REVISE
 - 说明：<具体建议或打回理由>
 - 熔断状态：<首次 SPECIAL-REVISE 计数 / AUTO-PASS 标记>
+- 操作指令：
+  - **PASS** → "无需操作，可直接交付。"
+  - **REVISE** → "请务必修改后重新提交。"
+  - **SPECIAL-REVISE** → 按分数梯度建议：
+    - **4 分（最低档）**：建议极强，接近强制REVISE。建议修改后重新提交。如不修改直接提交，将消耗 1 次软性熔断计数（当前 X/3）。
+    - **5-6 分（中间档）**：建议修改后重新提交。如不修改直接提交，将消耗 1 次软性熔断计数（当前 X/3），连续 3 次软性熔断后触发 [AUTO-PASS: 软性熔断]。
 ```
 
 ## 禁止行为
