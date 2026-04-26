@@ -24,11 +24,9 @@ description: 基于旧条目重写为深层解释版本。主动识别并补充�
 - 模板：`prompts/constitution-template.md`
 - 示例：`prompts/example.md`
 
-## 版本参考
-
-详见 `versions.json`。
-
 ## 版本处理规则
+
+以 `versions.json` 为基准：
 
 - **底座原则**：`stable` 的内容视为通用知识底座，全部保留，不标注任何版本号
 - **通用目录**：当 `latest` 为 `null` 时，该目录下所有内容视为通用知识，不标注版本号，不执行历史清理
