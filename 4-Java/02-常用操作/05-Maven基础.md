@@ -1,123 +1,192 @@
 # Maven 基础
 
-> **本质断言**：Maven 通过约定优于配置（Convention over Configuration）和依赖传递图解析，将项目构建定义为一个有向无环图（DAG）的拓扑排序过程。
+## 定义
 
-## 依赖解析算法
+Maven 是基于项目对象模型（POM）的构建自动化工具，核心是将项目构建定义为有向无环图（DAG）的拓扑排序过程。POM 声明依赖、插件、属性，Maven 通过依赖传递解析和生命周期阶段绑定，将声明转化为可执行的构建任务序列。
+
+## 数学模型
+
+### 依赖解析的最短路径算法
+
+Maven 使用最近声明优先（Nearest Definition）策略解析版本冲突。设依赖图 $G = (V, E)$，$V$ 为 artifact，$E$ 为依赖关系边。
+
+对于 artifact $a$，其版本 $\text{ver}(a)$ 按以下规则确定：
+
+$$\text{ver}(a) = \begin{cases}
+\text{from\_dependencyManagement}(a) & \text{if defined} \\
+\text{nearest}(a) & \text{else}
+\end{cases}$$
+
+其中 $\text{nearest}(a)$ 返回从根节点（当前项目）到 $a$ 的**最短路径**上的最后一个声明版本。若存在等长路径，选择声明顺序靠前的。
+
+**形式化**：设 $P = \{p_1, p_2, ..., p_k\}$ 为所有从根到 $a$ 的路径，$|p_i|$ 为路径长度，$v_i$ 为 $p_i$ 末端的版本。则：
+
+$$\text{nearest}(a) = v_j \text{ where } j = \arg\min_i |p_i|$$
+
+### DAG 拓扑排序的构建顺序
+
+Maven 生命周期阶段（validate → compile → test → package → install → deploy）构成线性序。插件 goal 绑定到阶段，构建时按阶段顺序执行。
+
+多模块项目的模块构建顺序由 reactor 决定：
+
+$$O = \text{topological\_sort}(M, D)$$
+
+其中 $M$ 为模块集合，$D$ 为模块间依赖关系（`<module>` 声明）。若存在环形依赖，reactor 失败并报错。
+
+### 依赖传递的图收缩
+
+传递依赖构成完全依赖图 $G_T$。排除（`exclusion`）操作将图中某些边移除：
+
+$$G_T' = (V, E_T \setminus \{ (u, v) \mid u \in \text{exclusions} \})$$
+
+收缩后重新计算 $\text{nearest}$，可能导致原本被排除的 artifact 重新被解析（若存在其他路径）。
+
+## 数据流
 
 <pre>
-依赖图构建：
-A → B:1.0
-A → C:2.0
-B → D:1.5
-C → D:2.0  (冲突)
+Maven 构建数据流：
 
-Maven 最短路径原则：
-A → B → D:1.5  (路径长度2)
-A → C → D:2.0  (路径长度2) → 声明顺序/Circular选择
+    pom.xml 解析
+         │
+         ▼
+    ┌────────────────────────────────────┐
+    │  Project / Reactor                  │
+    │  - 当前项目                         │
+    │  - 模块列表（若有）                   │
+    │  - dependencyManagement            │
+    └────────────────────────────────────┘
+         │
+         ▼
+    依赖解析（Dependency Resolution）
+         │
+         ▼
+    ┌────────────────────────────────────┐
+    │  Artifact 节点                      │
+    │  [group:artifact:version]          │
+    └────────────────────────────────────┘
+         │
+         ├──────────────────┬──────────────┐
+         ▼                  ▼              ▼
+    本地仓库缓存      远程仓库下载    依赖传递
+    (~/.m2/repository)  (Maven Central)  (transitive)
 
-冲突解决：选择路径最短的版本；若等长，选择声明靠前的
+         │
+         ▼
+    Reactor 拓扑排序
+         │
+         ▼
+    生命周期执行
+    ┌────────────────────────────────────┐
+    │  validate → compile → test          │
+    │  → package → verify → install      │
+    │  → deploy                          │
+    └────────────────────────────────────┘
+         │
+         ▼
+    构建产物（target/）
 </pre>
 
-`dependencyManagement` 节点的作用是将版本号提升到父 POM，作为所有子模块引用的版本约束来源，避免版本信息散落在各子模块。
+**资源流转**：
+- `pom.xml` → 内存中的 Project 对象
+- 依赖坐标 → 本地仓库路径（`groupId/artifactId/version/artifactId-version.jar`）
+- 插件 goal → 绑定到生命周期的具体执行类
 
-## 项目结构约定
+## 机制
 
-<pre>
-my-project/
-├── pom.xml
-├── src/main/java/        ← 编译输出到 target/classes
-├── src/main/resources/   ← 资源文件复制到 target/classes
-├── src/test/java/        ← 测试编译输出到 target/test-classes
-└── target/               ← 所有构建产物
-</pre>
+### dependencyManagement 的作用域提升
 
-约定优于配置意味着：如果遵循标准目录结构，`pom.xml` 可以极简；如果自定义源码目录（如将 Java 源码放在 `src/java`），则需显式配置 `<sourceDirectory>`。
-
-## 构建生命周期
-
-<pre>
-validate → compile → test → package → verify → install → deploy
-  │         │        │       │         │        │        │
-  │         │        │       │         │        │        └── 推送到远程仓库
-  │         │        │       │         │        └── 安装到本地 .m2
-  │         │        │       │         └── 运行集成测试
-  │         │        │       └── jar/war/zip
-  │         │        └── 运行单元测试（surefire）
-  │         └── 编译 src/main/java
-  └── 验证项目结构正确
-</pre>
-
-每个阶段（phase）绑定一个或多个插件目标（goal）。`mvn package` 实际执行 `process-classes → jar:jar` 等。
-
-## 依赖范围（scope）
-
-| scope | 编译可见 | 打包包含 | 测试可见 | 典型用途 |
-|-------|---------|---------|---------|---------|
-| `compile` | ✓ | ✓ | ✓ | 默认，主代码依赖 |
-| `provided` | ✓ | ✗ | ✓ | JDK/容器提供的 API |
-| `runtime` | ✗ | ✓ | ✓ | 实现类，如 JDBC 驱动 |
-| `test` | ✗ | ✗ | ✓ | 仅测试代码依赖 |
-
-## 参考样例
+`<dependencyManagement>` 的作用是将版本号从子模块提升到父 POM：
 
 ```xml
-<!-- 最小 pom.xml（≤20行）-->
+<!-- 父 POM -->
+<dependencyManagement>
+    <dependencies>
+        <dependency>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-core</artifactId>
+            <version>6.1.0</version>
+        </dependency>
+    </dependencies>
+</dependencyManagement>
+
+<!-- 子模块 POM（无需声明 version） -->
+<dependencies>
+    <dependency>
+        <groupId>org.springframework</groupId>
+        <artifactId>spring-core</artifactId>
+        <!-- 版本从 dependencyManagement 继承 -->
+    </dependency>
+</dependencies>
+```
+
+**约束**：只有直接匹配的 `groupId:artifactId` 才从 `dependencyManagement` 继承版本，传递依赖不自动应用。
+
+### scope 的传递闭包
+
+依赖 scope 在传递时按以下规则变换：
+
+| 依赖的 scope | 传递到依赖于该项目的 scope |
+|--------------|---------------------------|
+| `compile` | `compile` |
+| `provided` | `provided`（仅限直接依赖） |
+| `runtime` | `runtime` |
+| `test` | 不传递 |
+
+**关键约束**：`provided` 和 `test` 不传递。这意味着若 `A → B → C`，且 `B` 的 `spring-core` 为 `provided`，则 `A` 不会获得 `spring-core`（除非 `A` 直接声明）。
+
+### 插件 goal 的阶段绑定语义
+
+`mvn <phase>` 执行该阶段及之前的所有阶段。每个阶段绑定零个或多个插件 goal：
+
+```
+compile 阶段默认绑定:
+  └── maven-compiler-plugin:compile → 编译 src/main/java
+
+test 阶段默认绑定:
+  └── maven-compiler-plugin:testCompile → 编译 src/test/java
+  └── maven-surefire-plugin:test → 运行测试
+```
+
+自定义绑定通过 `<executions><execution>` 声明：
+
+```xml
+<plugin>
+    <executions>
+        <execution>
+            <id>my-goal</id>
+            <phase>package</phase>
+            <goals><goal>myGoal</goal></goals>
+        </execution>
+    </executions>
+</plugin>
+```
+
+## 参考存根
+
+```xml
+<!-- 多模块 reactor（≤20行）-->
 <project>
     <modelVersion>4.0.0</modelVersion>
     <groupId>com.example</groupId>
-    <artifactId>my-app</artifactId>
-    <version>1.0.0</version>
-    <dependencies>
-        <dependency>
-            <groupId>org.junit.jupiter</groupId>
-            <artifactId>junit-jupiter</artifactId>
-            <version>5.10.0</version>
-            <scope>test</scope>
-        </dependency>
-    </dependencies>
-</project>
-```
-
-```xml
-<!-- 依赖排除（解决冲突）-->
-<dependency>
-    <groupId>com.example</groupId>
-    <artifactId>some-lib</artifactId>
-    <version>1.0.0</version>
-    <exclusions>
-        <exclusion>
-            <groupId>org.unwanted</groupId>
-            <artifactId>unwanted-artifact</artifactId>
-        </exclusion>
-    </exclusions>
-</dependency>
-```
-
-```xml
-<!-- Spring Boot 父 POM -->
-<parent>
-    <groupId>org.springframework.boot</groupId>
-    <artifactId>spring-boot-starter-parent</artifactId>
-    <version>3.4.0</version>
-</parent>
-```
-
-```xml
-<!-- 多模块父 POM -->
-<project>
-    <groupId>com.example</groupId>
-    <artifactId>parent-project</artifactId>
-    <version>1.0.0</version>
+    <artifactId>parent</artifactId>
+    <version>1.0</version>
     <packaging>pom</packaging>
     <modules>
-        <module>module-a</module>
-        <module>module-b</module>
+        <module>api</module>
+        <module>impl</module>
     </modules>
 </project>
 ```
 
+```bash
+# 依赖树分析（定位冲突）
+mvn dependency:tree -Dverbose \
+    -Dincludes=com.example:problematic-artifact
+# 输出显示哪些路径引入该 artifact
+```
+
 ```xml
-<!-- 阿里云镜像 -->
+<!-- 阿里云镜像配置（settings.xml）-->
 <mirrors>
     <mirror>
         <id>aliyun</id>
@@ -125,12 +194,4 @@ validate → compile → test → package → verify → install → deploy
         <mirrorOf>central</mirrorOf>
     </mirror>
 </mirrors>
-```
-
-```bash
-# 常用命令
-mvn compile        # 编译
-mvn test            # 运行测试
-mvn package         # 打包
-mvn dependency:tree  # 查看依赖树
 ```

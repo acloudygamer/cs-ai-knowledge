@@ -1,161 +1,181 @@
 # Kafka
 
-## 本质断言
+## 定义
 
-Kafka 是分布式流处理平台，其本质是通过顺序写磁盘实现高吞吐，通过分区（Partition）实现水平扩展，通过消费者组（Consumer Group）实现负载均衡和消息冗余消费，通过持久化日志（Log）实现消息回溯。
+Kafka 是分布式流处理平台，其本质是 **持久化日志（Immutable Log）**——消息只能追加（append），不能修改或删除。Kafka 通过 **顺序写磁盘** 实现高吞吐（远超随机写），通过 **分区（Partition）** 实现水平扩展，通过 **消费者组（Consumer Group）** 实现负载均衡和消息冗余消费。
 
-## 核心概念
+## 数学模型
 
-### Topic 与 Partition
+### 磁盘顺序写的性能建模
 
-<pre>
-Kafka 存储结构：
-Topic: orders（3 个 Partition）
-    ↓
-Partition 0: [msg0, msg1, msg3, msg5] → Broker 1
-Partition 1: [msg0, msg2, msg4]       → Broker 2
-Partition 2: [msg0, msg1, msg4, msg6] → Broker 3
+传统磁盘随机写吞吐量：$\sim 0.5\text{-}2\text{ MB/s}$（受寻道时间限制）
+Kafka 顺序写吞吐量：$\sim 500\text{-}600\text{ MB/s}$（受磁盘带宽限制）
 
-消息路由：Producer 根据 key 哈希 → Partition 编号
-消费分配：Consumer Group 内每个 Partition 只能被一个 Consumer 消费
-</pre>
+设寻道时间 $T_{\text{seek}} = 10ms$，旋转延迟 $T_{\text{rot}} = 5ms$，传输时间 $T_{\text{trans}}$ 可忽略：
+- 随机写：每条消息需要 $T_{\text{seek}} + T_{\text{rot}}$ → 1500 消息/秒
+- 顺序写：初始一次寻道后，传输时间 $T_{\text{trans}} \approx 0$ → 近乎无限吞吐量
 
-### Offset 的本质
+Kafka 利用 OS 的 **页缓存（Page Cache）**：写入数据先到页缓存，后台异步刷盘。消费时也先读页缓存，未命中才读磁盘。这实现了"写即返回"的低延迟。
 
-Offset 是消息在 Partition 内的唯一递增序号。Consumer 通过提交 Offset 告诉 Broker "我已经消费到哪条了"，实现消息仅处理一次的语义（at-least-once + 幂等）。
+### 分区再均衡的图论分析
 
-## 生产者
+设 Consumer Group 有 $C$ 个消费者，Topic 有 $P$ 个分区。分配关系是 **二分图匹配**：
 
-### 发送确认（ACKS）机制
+```
+分区集合 Partitions = {P1, P2, ..., Pp}
+消费者集合 Consumers = {C1, C2, ..., Cc}
 
-<pre>
-ACKS 配置与持久性：
-acks=0：发出去即成功，丢消息风险最高
-acks=1：Leader 写入成功即返回，可能丢消息（Follower 未同步）
-acks=all：ISR 全部写入成功才返回，最强持久性
-</pre>
-
-### 分区策略
-
-Producer 根据 key 计算哈希后决定写入哪个 Partition。默认哈希是 key.hashCode() % partitionCount。自定义分区器可实现基于业务规则的分区（如按地区、用户 ID）。
-
-## 消费者
-
-### 消费者组机制
-
-<pre>
-消费者组消费模型：
-Consumer Group A：[P0, P1]（2 个 Consumer）
-Consumer Group B：[P0, P1, P2]（3 个 Consumer）
-    ↓
-每个 Partition 只能被同组内一个 Consumer 消费
-不同组之间相互独立，都可以消费全量消息
-</pre>
-
-### 提交模式
-
-<pre>
-提交方式对比：
-自动提交（enable.auto.commit=true）：
-    每隔 auto.commit.interval.ms 提交一次
-    可能重复消费（提交后崩溃）
-
-手动提交：
-    ack.acknowledge() 同步提交
-    失败可重试，确保 exactly-once（结合事务）
-</pre>
-
-## 错误处理
-
-### 重试机制
-
-<pre>
-Kafka 重试拓扑：
-消息发送失败 → 重试（retries 配置次数）
-    ↓
-超过重试次数 → 进入重试队列或死信队列（DLT）
-    ↓
-死信队列保留无法处理的消息供人工干预
-</pre>
-
-## 事务
-
-### 事务的原子性保证
-
-Kafka 事务通过 PID（Producer ID）和序列号（Sequence Number）实现 exactly-once 语义：同一 PID 的消息序列号必须连续，Broker 拒绝接受序列号跳跃的消息。
-
-## Spring Cloud Stream
-
-### 绑定器抽象
-
-<pre>
-Spring Cloud Stream 架构：
-Source → Channel → Binder → Kafka
-         ↓
-      Processor
-         ↓
-      Sink
-
-Binder：对接具体消息中间件（Kafka / RabbitMQ）
-Channel：应用与 Binder 之间的队列抽象
-Source/Sink：预定义的输入/输出端点
-</pre>
-
-## 参考样例
-
-```yaml
-spring:
-  kafka:
-    bootstrap-servers: localhost:9092
-    consumer:
-      group-id: my-group
-      auto-offset-reset: earliest
-    producer:
-      acks: all
-      retries: 3
+分配约束：
+1. 每个分区只能分配给一个消费者
+2. 每个消费者至少分配 0 个分区
+3. 分区尽量均匀分布（负载均衡）
 ```
 
+当消费者数量变化（加入/离开）时，触发 **再均衡（Rebalance）**：
+- 所有消费者暂停消费（Stop The World）
+- 重新计算分配方案
+- 各消费者领取新分配的分区
+- 恢复消费
+
+**再均衡代价**：期间所有消费暂停，影响吞吐量。再均衡频繁会导致性能震荡。
+
+### 消息投递语义的形式化
+
+Kafka 支持三种消息投递语义，通过 Producer 和 Consumer 配置组合实现：
+
+| 语义 | Producer | Consumer | 消息丢失 | 重复消费 |
+|------|---------|---------|---------|---------|
+| at-most-once | acks=0 | 自动提交 | 可能 | 不可能 |
+| at-least-once | acks=all | 手动提交 | 不可能 | 可能 |
+| exactly-once | 事务 | 事务 | 不可能 | 不可能 |
+
+**exactly-once 实现**（Kafka Streams）：
+```
+事务内：
+  1. Producer 向 Kafka 写入
+  2. Consumer 从 Kafka 读取
+  3. 业务处理
+  4. 业务结果写回 Kafka
+  5. 提交事务（offset + output 原子提交）
+```
+
+## 数据流
+
+<pre>
+Kafka Producer → Broker → Consumer 数据流
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Producer                              Broker
+   │                                    │
+   │ ── Metadata Request ──────────────▶│ 获取 topic partition leader
+   │◀── Metadata Response ──────────────│
+   │                                    │
+   │ ── Produce Request (批量) ────────▶│
+   │      └─ acks 配置决定写入策略        │
+   │                                    │
+   │◀── Produce Response ───────────────│ (leader 写入 → 复制到 ISR)
+   │      └─ baseOffset 分配             │
+   │                                    │
+   │         Consumer Group A
+   │              │
+   │              ▼
+   │ ◀── Fetch Request (从 offset 开始) ─│
+   │     └─ consumer.poll()             │
+   │                                  Broker
+   │◀── Fetch Response ────────────────│
+   │     └─ 消息批次                     │
+   │              │
+   │              ▼
+   │         业务处理                     │
+   │              │
+   │              ▼
+   │ ◀── Commit Offset (异步) ─────────│
+   │     └─ 记录已消费到的位置             │
+</pre>
+
+## 机制
+
+### ISR（In-Sync Replicas）的共识机制
+
+Kafka 的高可用建立在 **ISR 列表** 之上：
+- **AR（Assigned Replicas）**：分区所有副本
+- **ISR（In-Sync Replicas）**：与 leader 保持同步的副本（lag < replica.lag.time.max.ms）
+
+Leader election 只从 ISR 中选取。若所有 follower 落后太多（超出阈值），该分区不可用——这是 **CAP 定理** 中 Kafka 选择 **C**（一致性）而非 **A**（可用性）的一致性保证。
+
+**写入一致性决策**：
+- `acks=0`：发即忘，可能丢消息（leader 写入后崩溃）
+- `acks=1`：leader 写入后返回，若 leader 崩溃且未复制到 ISR，消息丢失
+- `acks=all`（或 -1）：leader + ISR 全部写入后返回，最强一致性
+
+### 零拷贝（Zero-Copy）技术
+
+传统 I/O 需要 4 次数据拷贝：
+```
+磁盘 → 内核缓冲区 → 用户缓冲区 → socket 缓冲区 → 网卡
+```
+
+Kafka 使用 **sendfile()** 系统调用实现零拷贝：
+```
+磁盘 → 内核缓冲区（Page Cache）→ 网卡
+```
+
+数据直接从 Page Cache 传到 socket 缓冲区，无需经过用户态。Linux 的 `transferTo()` 方法实现此优化，可将吞吐提升 2-3 倍。
+
+### 分区策略与消息顺序保证
+
+Kafka 只保证 **单个分区内消息有序**，跨分区无顺序保证。
+
+分区决策：
 ```java
-@Service
-public class KafkaProducerService {
-    private final KafkaTemplate<String, String> kafkaTemplate;
-    public void send(String topic, String key, String value) {
-        kafkaTemplate.send(topic, key, value);
+// 默认：按 key 的 hash 分配
+partition = Utils.abs(key.hashCode()) % partitions.size();
+
+// 自定义分区器可实现业务规则
+public class RegionPartitioner implements Partitioner {
+    public int partition(String topic, Object key, byte[] keyBytes,
+                         Object value, byte[] valueBytes,
+                         Cluster cluster) {
+        String region = extractRegion(key);
+        List<PartitionInfo> partitions = cluster.partitionsForTopic(topic);
+        // 按区域哈希到特定分区集合
+        return ...;
     }
 }
 ```
 
-```java
-@KafkaListener(topics = "my-topic", groupId = "my-group")
-public void listen(String message) { }
-```
+**顺序保证的场景**：若需要全局顺序，只能用单分区 Topic——但这会成为性能瓶颈。
+
+## 参考存根
 
 ```java
-@KafkaListener(topics = "my-topic")
-public void listen(ConsumerRecord<String, String> record, Acknowledgment ack) {
-    process(record.value());
-    ack.acknowledge();
+// 展示 Kafka 事务的 exactly-once 语义（简化版）
+@Configuration
+public class KafkaTransactionConfig {
+    @Bean
+    public KafkaTemplate<String, String> kafkaTemplate(
+            ProducerFactory<String, String> pf) {
+        // 开启事务
+        pf.setTransactionIdPrefix("tx-");
+        return new KafkaTemplate<>(pf);
+    }
 }
-```
 
-```java
-@Bean
-public ErrorHandler errorHandler(KafkaTemplate<String, String> template) {
-    DeadLetterPublishingRecoverer recoverer = new DeadLetterPublishingRecoverer(template,
-        (record, ex) -> new TopicPartition("my-topic.DLT", record.partition()));
-    return new DefaultErrorHandler(recoverer, new FixedBackOff(1000L, 3));
+@Service
+public class OrderService {
+    private final KafkaTemplate<String, String> kafkaTemplate;
+
+    @Transactional
+    public void processOrder(Order order) {
+        // 1. 处理订单（写本地 DB）
+        orderRepository.save(order);
+
+        // 2. 发送消息到 Kafka（与本地 DB 操作原子）
+        kafkaTemplate.send("order-topic", order.getId().toString(),
+            objectMapper.writeValueAsString(order));
+
+        // 3. 业务操作 + Kafka 发送在事务提交时一起提交
+        // 若业务回滚，Kafka 消息也不会发送
+    }
 }
-```
-
-```java
-@Transactional
-public void sendInTransaction(String topic, String key, String value) {
-    kafkaTemplate.send(topic, key, value);
-}
-```
-
-```java
-props.put(ProducerConfig.BATCH_SIZE_CONFIG, 32768);
-props.put(ProducerConfig.LINGER_MS_CONFIG, 10);
-props.put(ConsumerConfig.MAX_POLL_RECORDS_CONFIG, 500);
 ```

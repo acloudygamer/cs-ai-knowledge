@@ -1,183 +1,185 @@
 # Elasticsearch 与 MongoDB
 
-## 本质断言
+## 定义
 
-Elasticsearch 的本质是倒排索引（Inverted Index）搜索引擎，将文本字段拆分为词项（Term）后建立词项到文档的映射，实现 O(1) 的全文检索；MongoDB 的本质是文档数据库，将 JSON 文档作为存储单元，通过 MMAP 内存映射文件实现磁盘读写的高性能。两者分别代表了检索型存储和文档型存储的两个极端。
+**Elasticsearch** 是基于 **倒排索引（Inverted Index）** 的全文搜索引擎，本质是将文本切分为词项（Term），建立词项到文档的映射，实现 $O(1)$ 词项查找。**MongoDB** 是 **文档数据库**，本质是将 JSON 文档作为存储单元，通过 MMAP 内存映射文件实现磁盘读写的高性能。两者代表了检索型存储与文档型存储的两个极端。
 
-## Elasticsearch
+## 数学模型
 
-### 倒排索引原理
+### 倒排索引的查找复杂度
 
-<pre>
-正排索引：Document → Terms（文档包含哪些词）
-倒排索引：Term → Documents（词出现在哪些文档）
+**正排索引**：Document → Terms（文档包含哪些词）
+- 查找包含词 "Spring" 的文档：需要扫描所有文档
 
-示例：
-文档1："Spring Boot 深度用法"
-文档2："Spring Security 入门"
+**倒排索引**：Term → Documents（词出现在哪些文档）
+- 查找包含词 "Spring" 的文档：直接查倒排表，$O(1)$
 
-正排：{doc1: [Spring, Boot, 深度, 用法], doc2: [Spring, Security, 入门]}
-倒排：{Spring: [doc1, doc2], Boot: [doc1], 深度: [doc1], 用法: [doc1], Security: [doc2], 入门: [doc2]}
+倒排索引的存储结构：
+```
+倒排表（Posting List）：
+Spring → [doc1, doc3, doc5, doc7, ...]  (每个 doc 以 docID 形式存储)
+Boot   → [doc1, doc9, ...]
+```
 
-查询 "Spring" → 直接返回 [doc1, doc2]
-</pre>
+词项越多，倒排表越长。内存受限场景下可压缩：
+- **FOR（Frame of Reference）**：压缩 docID 差值
+- **Roaring Bitmap**：按块压缩 docID
 
-### 分片与副本机制
+### Elasticsearch 分片分配的负载均衡
 
-<pre>
-Elasticsearch 数据分布：
-Index → Shard 0 / Shard 1 / Shard 2（默认 5 个分片）
-    ↓
-每个 Shard 有一个主分片（Primary）和 N 个副本（Replica）
-    ↓
-写入：必须写入主分片 → 异步复制到副本
-读取：主分片或副本都行（负载均衡）
-</pre>
+ES 集群的 **分片分配（Shard Allocation）** 遵循 **磁盘使用率 + 分片数均衡** 策略：
 
-### 查询类型选择
+设节点 $N_i$ 的分片数为 $s_i$，磁盘使用率为 $d_i$，目标函数：
+$$\min \sum_i |s_i - \bar{s}| + \lambda \cdot |d_i - \bar{d}|$$
 
-<pre>
-ES 查询类型选择：
-Term Query：精确值查询（分词后匹配）
-Match Query：全文检索（先分词再匹配）
-Range Query：数值/日期范围
-Bool Query：组合多个查询条件
-</pre>
+其中 $\bar{s}$ 为平均分片数，$\bar{d}$ 为平均磁盘使用率，$\lambda$ 为权重因子。
 
-## MongoDB
+ES 默认优先均衡分片数，新索引优先分配到分片数最少的节点。
 
-### 文档模型设计
+### MongoDB 聚合管道的延迟求值
 
-<pre>
-内嵌 vs 引用：
-内嵌（Embedded）：相关数据放同一文档（1:1 / 1:N 强关联）
-    优点：一次查询获取全部数据
-    缺点：数据重复、更新复杂、文档过大
+MongoDB 聚合管道是 **延迟求值（Lazy Evaluation）**：
+```
+db.orders.aggregate([
+    { $match: { status: "completed" } },  // Stage 1
+    { $group: { _id: "$customer", total: { $sum: "$amount" } } }, // Stage 2
+    { $sort: { total: -1 } }               // Stage 3
+])
+```
 
-引用（Reference）：通过 _id 关联不同集合
-    优点：数据正规化、单文档小
-    缺点：需要多次查询或聚合管道
-</pre>
+管道不会一次性加载所有数据到内存，而是 **流式处理**：每个 document 依次通过所有 stage，按需产出结果。这允许处理远大于内存的数据集。
 
-### 聚合管道原理
+## 数据流
 
 <pre>
-MongoDB 聚合管道执行：
-[{$match: ...}, {$group: ...}, {$sort: ...}]
-    ↓
-每个阶段称为 Stage，按顺序处理文档流
-$match：过滤（尽量靠前，减少后续处理数据量）
-$group：分组统计
-$sort：排序
-$project：投影/字段重命名
-$lookup：关联查询（类似 JOIN）
+Elasticsearch 写入流程
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+┌──────────────────────────────────────────────────────────────┐
+│  Client                                                      │
+│   │                                                          │
+│   ▼                                                          │
+│  Coordinating Node（接收请求的节点）                          │
+│   │                                                          │
+│   ├─▶ 写入请求转发到 Primary Shard                            │
+│   │                                                          │
+│   │   Primary Shard ──▶ 写入内存 Buffer                       │
+│   │                        │                                 │
+│   │                        ▼                                 │
+│   │                   写入 Translog（持久化）                 │
+│   │                        │                                 │
+│   │                        ▼                                 │
+│   │                   refresh() → Segment                    │
+│   │                        │                                 │
+│   │                        ▼                                 │
+│   │                   可被搜索                                          │
+│   │                                                          │
+│   │   异步：Segment 合并 → 写入磁盘（fsync）                   │
+│   │                                                          │
+│   └──▶ 副本同步（Replicas）                                  │
+└──────────────────────────────────────────────────────────────┘
+
+MongoDB 写入流程
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+┌──────────────────────────────────────────────────────────────┐
+│  Client                                                      │
+│   │                                                          │
+│   ▼                                                          │
+│  mongos（路由节点，分片集群）                                 │
+│   │                                                          │
+│   ▼                                                          │
+│  Primary Replica Set                                         │
+│   │                                                          │
+│   ├─▶ 写入内存（WiredTiger Cache）                           │
+│   │                                                          │
+│   ├─▶ 写入 Journal（日志）                                    │
+│   │                                                          │
+│   └─▶ 返回 ACK（可配置 writeConcern）                         │
+│                                                              │
+│  异步：Checkpoint → 内存数据刷写到磁盘                        │
+└──────────────────────────────────────────────────────────────┘
 </pre>
 
-### 事务机制
+## 机制
 
-<pre>
-MongoDB 事务：
-单文档原子性：MongoDB 对单文档操作保证原子性
-多文档事务：需要副本集部署（Replica Set）
-    ↓
-事务通过 WiredTiger 存储引擎的快照隔离实现
-readConcern / writeConcern 控制事务隔离级别
-</pre>
+### Elasticsearch 的分片与副本一致性
 
-## 两者对比
+ES 的 **写一致性** 通过 **quorum** 机制保证：
+```yaml
+wait_for_active_shards: 1  # 默认，等待 1 个 shard 就绪
+# 可选：all（全部），quorum（多数）
+```
+
+写操作必须在 `wait_for_active_shards` 数量的 shard（包括 primary）写入成功后才返回。这确保了数据不丢失。
+
+**副本同步机制**：ES 使用 **基于版本的复制（Version-based replication）**：
+- Primary 写入后分配全局递增 version
+- Replica 按 version 增量同步
+- 若 replica 落后太多，Primary 发送全量 Lucene segment
+
+### MongoDB 的写Concern 与 ReadConcern
+
+**Write Concern** 控制写入确认级别：
+```javascript
+{ w: 0 }   // 不等待任何确认（最快，最不安全）
+{ w: 1 }   // 等待 Primary 确认（默认）
+{ w: "majority" } // 等待多数节点确认（最强一致性）
+```
+
+**Read Concern** 控制读取一致性级别：
+```javascript
+{ readConcern: "local" }        // 读取本地最新数据
+{ readConcern: "available" }    // 分片集群：读取任意分片数据
+{ readConcern: "majority" }     // 读取被多数节点确认的数据
+{ readConcern: "snapshot" }      // 事务内读取快照
+```
+
+**组合效果**：`{ w: "majority", readConcern: "majority" }` 提供 **线性一致性（Linearizable）** 保证。
+
+### 两者事务能力对比
 
 | 维度 | Elasticsearch | MongoDB |
 |------|--------------|---------|
-| 核心能力 | 全文检索、聚合分析 | 文档存储、灵活查询 |
-| 数据模型 | Index / Document / Mapping | Collection / Document / Schema |
-| 查询语言 | RESTful JSON Query DSL | MongoDB Query Language |
-| 事务 | 无（最终一致） | 支持多文档事务（副本集） |
-| 扩展方式 | 分片自动数据均衡 | 分片手动指定分片键 |
+| 单文档原子性 | ✅ Lucene 层面保证 | ✅ WiredTiger 层面保证 |
+| 多文档事务 | ❌ 无（5.x+ 有，但有限制） | ✅ Replica Set 快照隔离 |
+| 事务隔离级别 | 无 | 快照隔离（Snapshot） |
 
-## 参考样例
+ES 通过外部事务管理器（如 Spring）实现跨系统事务，但这依赖外部补偿机制，非 ACID 事务。
 
-```yaml
-spring:
-  elasticsearch:
-    uris: http://localhost:9200
-```
+## 参考存根
 
 ```java
-@Document(indexName = "products")
-public class Product {
-    @Id private String id;
-    @Field(type = FieldType.Text) private String name;
-    @Field(type = FieldType.Keyword) private String category;
-    @Field(type = FieldType.Double) private Double price;
-}
-```
+// 展示 Elasticsearch 批量写入
+@Service
+public class ElasticsearchService {
+    private final ElasticsearchOperations esOps;
 
-```java
-public interface ProductRepository extends ElasticsearchRepository<Product, String> {
-    List<Product> findByName(String name);
-    List<Product> findByPriceBetween(Double min, Double max);
-}
-```
-
-```java
-Query query = new NativeQuery.Builder()
-    .withQuery(q -> q.match(m -> m.field("name").query(keyword)))
-    .build();
-SearchHits<Product> hits = elasticsearchOperations.search(query, Product.class);
-```
-
-```yaml
-spring:
-  data:
-    mongodb:
-      uri: mongodb://localhost:27017/mydb
-      auto-index-creation: true
-```
-
-```java
-@Document(collection = "users")
-public class User {
-    @Id private String id;
-    @Field("email") private String email;
-    @Field("profile") private UserProfile profile;
+    public void bulkIndex(List<Product> products) {
+        BulkOperations bulkOps = esOps.bulkOps(BulkOptions.defaultOptions(), Product.class);
+        products.forEach(bulkOps::save);
+        BulkResult result = bulkOps.index();
+        if (result.hasErrors()) {
+            result.getErrors().forEach(e ->
+                System.err.println("Failed: " + e.getItem().getId()));
+        }
+    }
 }
 
-@Embedded
-public class UserProfile {
-    @Field("first_name") private String firstName;
-    @Field("last_name") private String lastName;
+// 展示 MongoDB 聚合管道
+public List<CityStats> getTopCities() {
+    Aggregation agg = Aggregation.newAggregation(
+        // Stage 1: 过滤已完成订单
+        Aggregation.match(Criteria.where("status").is("COMPLETED")),
+        // Stage 2: 按城市分组统计
+        Aggregation.group("shippingAddress.city")
+            .count().as("orderCount")
+            .sum("totalAmount").as("revenue"),
+        // Stage 3: 按收入排序取前 10
+        Aggregation.sort(Sort.Direction.DESC, "revenue"),
+        Aggregation.limit(10)
+    );
+    return mongoTemplate.aggregate(agg, "orders", CityStats.class)
+        .getMappedResults();
 }
-```
-
-```java
-public interface UserRepository extends MongoRepository<User, String> {
-    Optional<User> findByEmail(String email);
-    List<User> findByStatus(UserStatus status);
-}
-```
-
-```java
-Query query = new Query();
-query.addCriteria(Criteria.where("status").is(status));
-query.with(Sort.by(Sort.Direction.DESC, "createdAt"));
-query.limit(pageSize);
-return mongoTemplate.find(query, User.class);
-```
-
-```java
-Aggregation aggregation = Aggregation.newAggregation(
-    Aggregation.unwind("addresses"),
-    Aggregation.group("addresses.city").count().as("userCount"),
-    Aggregation.sort(Sort.Direction.DESC, "userCount")
-);
-```
-
-```java
-mongoTemplate.execute(TransactionCallback.doInTransaction(() -> {
-    Order saved = mongoTemplate.save(order);
-    mongoTemplate.updateFirst(
-        Query.query(Criteria.where("_id").is(order.getUserId())),
-        new Update().inc("orderCount", 1), User.class);
-    return saved;
-}));
 ```

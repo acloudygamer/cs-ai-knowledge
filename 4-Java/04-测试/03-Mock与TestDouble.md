@@ -1,105 +1,221 @@
 # Mock 与 Test Double
 
-## Test Double 概述
+## 定义
 
-**Test Double 是用伪对象替代真实依赖以隔离被测对象的模式。**
+Test Double是用伪对象替代真实依赖以隔离被测单元（SUT，System Under Test）的模式。其本质是**依赖反转**——被测单元依赖抽象接口，测试时注入Mock实现，控制实验环境。
 
-### 五种类型
+---
 
-| 类型 | 用途 | 机制 |
-|------|------|------|
-| Dummy | 填充参数列表 | 从不调用 |
-| Fake | 简化实现 | 有实际逻辑但不完整（内存数据库） |
-| Stub | 预设回答 | 返回预设值，不验证调用 |
-| Spy | 部分模拟 | 记录调用 + 真实执行 |
-| Mock | 行为验证 | 预设期望 + 验证交互 |
+## 五种类型
+
+| 类型 | 调用真实实现 | 返回值 | 典型应用 |
+|------|-------------|--------|----------|
+| **Dummy** | 否 | 从不调用 | 填充参数列表 |
+| **Fake** | 部分 | 简化实现 | 内存数据库 |
+| **Stub** | 否 | 预设固定值 | 返回测试数据 |
+| **Spy** | 是 | 真实或预设 | 记录调用 |
+| **Mock** | 否 | 预设期望 | 验证交互 |
+
+Fake与Stub的关键区别：Fake有业务逻辑（简化版），Stub只有预设返回值。
+
+---
 
 ## Mockito 核心概念
 
-**Mockito 通过动态代理实现 Mock 对象，拦截方法调用并返回预设值。**
+### 动态代理机制
 
-### @ExtendWith(MockitoExtension.class)
+Mockito通过**字节码生成（CGLIB/ByteBuddy）**创建Mock对象的子类，拦截所有方法调用：
 
-启用 Mockito 注解支持，将字段初始化为 Mock 对象。
+$$
+\text{MockObject} = \text{ subclass of T } \implies \text{ 所有方法被拦截 }
+$$
 
-### @Mock、@Spy、@InjectMocks
+拦截方法：
+1. 调用`when()`时记录方法签名+参数+预设返回值
+2. 调用真实方法时，若有预设值则返回，否则返回**默认值**（null/0/false/空集合）
 
-- **@Mock**：创建完全模拟对象，所有方法返回默认值或预设值
-- **@Spy**：创建部分模拟对象，默认调用真实方法，可选择性预设
-- **@InjectMocks**：自动将 @Mock 字段注入被测对象的构造器
+```java
+List<String> mock = mock(List.class);
+mock.get(0);  // 返回 null（尚未设置预设）
+```
 
-## Mock 对象创建
+### 默认行为
 
-### 三种方式
+| 返回类型 | 默认值 |
+|----------|--------|
+| 对象/String | null |
+| int/long/double | 0/0L/0.0 |
+| boolean | false |
+| Collection | 空集合（Collections.emptyList()） |
+| Optional | Optional.empty() |
 
-1. **@Mock + MockitoExtension**（推荐）：声明式，生命周期由 JUnit 管理
-2. **Mockito.mock()**：编程式，适用于动态类
-3. **MockitoAnnotations.openMocks()**：兼容旧代码，需手动清理
+---
+
+## @Mock、@Spy、@InjectMocks
+
+### @Mock
+
+创建完全受控的Mock对象，方法调用返回默认值或预设值：
+
+```java
+@Mock
+private UserRepository userRepository;
+```
+
+### @Spy
+
+创建部分受控的Spy对象，默认调用真实方法，可选择性预设：
+
+```java
+@Spy
+private UserService userService;  // 真实方法被调用
+
+// 预设特定方法
+doReturn(fakeUser).when(userService).findById(1L);
+```
+
+### @InjectMocks
+
+自动将@Mock字段注入被测对象的**构造器**或**setter**：
+
+```java
+@InjectMocks
+private UserController controller;  // userRepository 被注入到 controller 构造器
+```
+
+注入顺序：构造器注入 → setter注入 → 字段注入（反射）。
+
+---
 
 ## Stub 预设返回值
 
-**when().thenReturn() 为方法调用预设返回值。**
+### when().thenReturn()
 
-多次调用可通过链式调用返回不同值，最后一次值会持续返回。
+```java
+when(userRepository.findById(1L)).thenReturn(Optional.of(user));
+when(userRepository.findById(2L)).thenReturn(Optional.empty());
+```
+
+### 链式返回值
+
+```java
+when(mockedList.get(0)).thenReturn("first")
+    .thenReturn("second");  // 第一次返回"first"，第二次返回"second"
+```
 
 ### 抛出异常
 
-thenThrow() 预设方法抛出异常，用于验证异常处理路径。
+```java
+when(dao.findById(anyLong())).thenThrow(new DataAccessException("DB error"));
+```
 
 ### Answer 自定义行为
 
-thenAnswer() 通过 Invocation 对象访问调用参数，动态计算返回值。
+```java
+when(mockedMap.get(any())).thenAnswer(invocation -> {
+    String key = invocation.getArgument(0);
+    return "value_for_" + key;
+});
+```
+
+---
 
 ## 参数匹配
 
-**参数匹配器使 Stub 和 verify 脱离具体值，聚焦于行为模式。**
+### 精确匹配 vs 通配匹配
 
-### anyXxx 任意参数
+| 方式 | 行为 | 约束 |
+|------|------|------|
+| 精确值 | `when(repo.findById(1L))` | 参数必须equals |
+| 通配符 | `when(repo.findById(anyLong()))` | 匹配类型范围内的任意值 |
 
-匹配任意值的匹配器，避免 Stub 过于具体。
+### 常用匹配器
+
+| 匹配器 | 匹配范围 |
+|--------|----------|
+| `any()` | 任意非null值 |
+| `anyLong()` / `anyInt()` | 任意原生类型 |
+| `anyString()` | 任意String |
+| `anyList()` / `anySet()` | 任意集合 |
+| `isNull()` | 仅null |
+| `argThat(predicate)` | 自定义断言 |
 
 ### argThat 自定义匹配
 
-通过 Lambda 自定义匹配逻辑，适用于复杂约束（正则、范围、格式）。
+```java
+argThat(list -> list.size() > 2)
+argThat(name -> name.matches("[A-Z].*"))  // 首字母大写
+```
+
+---
 
 ## 验证调用
 
-**verify() 验证方法是否按预期被调用，而不仅验证返回值。**
+### 验证调用次数
 
-### 调用次数
+```java
+verify(mock, times(3)).add("element");     // 精确3次
+verify(mock, atLeast(2)).add("element");   // 至少2次
+verify(mock, atMost(5)).add("element");    // 至多5次
+verify(mock, never()).clear();             // 从未调用
+```
 
-- **times(n)**：精确调用 n 次
-- **atLeast(n)**：至少调用 n 次
-- **atMost(n)**：至多调用 n 次
-- **never()**：从未调用
+### 验证调用顺序
 
-### 调用顺序
+`InOrder`验证**偏序关系**——仅验证指定的调用序列，不限制其他调用：
 
-**InOrder 验证调用顺序，确保时序正确的关键验证。**
+```java
+InOrder inOrder = inOrder(collaborator1, collaborator2);
+inOrder.verify(collaborator1).methodA();
+inOrder.verify(collaborator2).methodB();
+```
 
-### 验证没有发生交互
+### verifyNoMoreInteractions()
 
-**verifyNoMoreInteractions() 作为最终门禁，确保无意外调用。**
+作为最终门禁，确保测试后无意外调用：
 
-## Spy 部分模拟
+```java
+verify(mock).expectedMethod();
+verifyNoMoreInteractions(mock);  // 若有其他调用则失败
+```
 
-**@Spy 创建部分模拟对象，保留真实实现，按需覆写。**
+---
 
-doReturn().when() 优于 when().thenReturn()，因为 Spy 默认调用真实方法。
+## Spy 使用约束
 
-### @Spy vs @Mock
+### doReturn().when() vs when().thenReturn()
 
-- **@Mock**：完全控制，方法必须预设
-- **@Spy**：部分保留，真实方法按需调用
+Spy的`when().thenReturn()`会触发真实方法调用（然后被预设值覆盖），若方法有副作用则产生问题：
 
-## @InjectMocks 自动注入
+```java
+// 危险：若 sendEmail() 有真实副作用
+when(emailService.sendEmail(any())).thenReturn(true);
 
-**@InjectMocks 自动将 @Mock 字段注入被测对象的构造器或 setter。**
+// 安全：直接预设，不调用真实方法
+doReturn(true).when(emailService).sendEmail(any());
+```
 
-构造器注入优先，其次是 setter 注入，最后是字段注入。
+---
 
 ## Mock 静态方法
 
-**mockStatic() 在作用域内模拟静态方法，超出作用域自动恢复。**
+Mockito 3.4+支持`mockStatic()`模拟静态方法：
 
-try-with-resources 确保作用域边界清晰，避免泄漏。
+```java
+try (MockedStatic<UUID> uuidMock = mockStatic(UUID.class)) {
+    uuidMock.when(UUID::randomUUID).thenReturn(UUID.fromString("00000000-0000-0000-0000-000000000000"));
+    String id = generateId();  // 使用预设的UUID
+}  // 超出作用域自动恢复
+```
+
+---
+
+## Mockito 验证语义
+
+Mockito的`verify()`验证的是**行为契约**而非**状态**：
+
+$$
+\text{verify}(mock, times(n)).method(args) \iff \text{在测试期间，mock.method(args) 被精确调用了n次}
+$$
+
+这与断言（验证返回值/状态）形成互补——**断言验证结果，验证调用验证过程**。

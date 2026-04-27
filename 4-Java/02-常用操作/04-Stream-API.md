@@ -1,89 +1,185 @@
 # Stream API
 
-> **本质断言**：Stream 的中间操作不执行任何计算，只构建一个包含源引用和所有操作函数的懒计算图（Pipeline），终端操作触发从源头到终点的单次遍历。
+## 定义
 
-## 惰性求值原理
+Stream 是对数据源的元素序列的惰性视图。中间操作仅构建包含源引用和操作函数的管道描述，终端操作触发从源到终点的单次遍历并产生结果。Stream 的本质是将数据转换声明为函数组合，由运行时按需执行。
+
+## 数学模型
+
+### 惰性求值的均摊复杂度
+
+设管道包含 $k$ 个中间操作，源有 $n$ 个元素。每个中间操作的语义决定其是否短路：
+
+| 操作类型 | 是否短路 | 对上游的影响 |
+|----------|----------|--------------|
+| `filter` | 否 | 需评估所有元素（除非短路操作在前） |
+| `map` | 否 | 需评估所有元素 |
+| `takeWhile` | 是 | 满足条件后停止拉取 |
+| `limit(n)` | 是 | 输出 $n$ 个后停止拉取 |
+| `sorted()` | 否 | 必须全量消费上游 |
+
+设管道中非短路操作数为 $k_{non-short}$，终端操作前最后一个短路操作位置为 $p$（若无穷流则 $p = \infty$）。时间复杂度：
+
+$$T_{pipeline}(n) = O\left(\min\left(n \cdot k_{non-short}, \sum_{i=1}^{p} \text{cost}_i(n)\right)\right)$$
+
+对于非短路管道，复杂度为 $O(n \cdot k)$。对于含 `limit(n)` 的管道，均摊复杂度为 $O(n \cdot k_{before\_limit})$。
+
+### 并行 Stream 的任务分解
+
+`parallelStream()` 使用 Fork/Join 框架，将源数据分割为多个子任务：
+
+设分割函数 `Spliterator.trySplit()` 将大小为 $n$ 的源分割为 $[n/2, n/2]$（或按启发式规则）。最大并行度 $P$ 受 `ForkJoinPool.common()`  parallelism 控制（默认 `Runtime.availableProcessors()`）。
+
+总任务数 $T$ 满足：
+$$T = O(\frac{n}{\text{minChunkSize}})$$
+
+当每个子任务的处理代价超过分割/合并开销时，并行化收益最大化。
+
+### sorted() 的外部排序约束
+
+`sorted()` 对于 `ArrayList` 等随机访问源，使用成熟的 TimSort（$O(n \log n)$）。但对于无限流或有序保证的源，排序必须全量消费上游元素。
+
+**关键约束**：若上游是无限 Stream，`sorted()` 导致死循环——因为 TimSort 需要知道所有元素才能确定位置关系。
+
+## 数据流
 
 <pre>
-Stream 管道构建（不执行）:
-source.filter(...).map(...).sorted().collect(...)
+Stream 管道数据流（串行）：
 
-终端操作触发后执行顺序：
-1. 源拉取第一个元素
-2. 依次通过 filter → map → sorted（sorted 需全部元素，触发全量拉取）
-3. collect 消费
-4. 重复直到源耗尽
+数据源 [e₀, e₁, e₂, e₃, e₄, ...]
+    │
+    ▼ source()
+    Stream<T> (持有 Spliterator + 管道操作引用)
+    │
+    ▼ filter(Predicate<T> p)
+    ReferencePipeline (持有 filter 函数，链接上游)
+    │
+    ▼ map(Function<T, R> f)
+    ReferencePipeline (持有 map 函数，链接上游)
+    │
+    ▼ sorted()
+    ReferencePipeline (持有比较器，链接上游)
+    │
+    ▼ collect(Collector<T, A, R> c)
+    TerminalOp (触发执行)
+    │
+    ▼ 触发执行
+    ──────────────────────────────
+    Spliterator.advance() → filter.test() → map.apply() → ... → accumulate
+    ──────────────────────────────
+
+并行 Stream 数据流：
+
+数据源分割：
+[e₀, e₁, e₂, e₃, e₄, e₅, e₆, e₇]
+        │
+        ▼ trySplit()
+    [e₀,e₁,e₂,e₃]  [e₄,e₅,e₆,e₃]
+        │                  │
+        ▼ trySplit()      ▼ trySplit()
+    [e₀,e₁] [e₂,e₃]  [e₄,e₅] [e₆,e₇]
+        │                  │
+        ▼ 处理           ▼ 处理
+    [r₀,r₁]           [r₂,r₃]
+        │                  │
+        └────── join() ───┘
+               │
+               ▼
+        [r₀,r₁,r₂,r₃]
 </pre>
 
-`sorted()` 是惰性但非短路的原因：它必须看到所有元素才能确定最大/最小值，无法在第一个元素满足时提前返回。因此 `sorted()` 会强制其前面的所有操作处理完全部元素。
+**数据形态变换**：
+- 源 → `Spliterator<T>`：一次性消耗，不可回退
+- 中间操作 → 新的 `ReferencePipeline`，持有函数闭包
+- 终端操作 → 触发实际遍历，产生具体结果（List/Map/primitive）
 
-**为什么这样设计**：函数式语言的惰性求值允许构建无限流（`Stream.iterate()`），并在满足短路条件时提前终止，无需一次性加载全部数据到内存。
+## 机制
 
-## 并行 Stream 机制
+### 惰性求值的短路语义
 
-`parallelStream()` 将管道分解为多个子任务，使用 `ForkJoinPool.common()` 执行。任务粒度由 `Spliterator` 控制，默认对 `ArrayList` 按数组长度一半分割，对 `HashSet` 按哈希桶分割。
-
-<pre>
-数据源: [e0, e1, e2, e3, e4, e5, e6, e7]
-              ↓ split
-      [e0,e1,e2,e3]  [e4,e5,e6,e7]
-          ↓ split         ↓ split
-      [e0,e1] [e2,e3]  [e4,e5] [e6,e7]
-          ↓              ↓
-      compute...    compute...
-          ↓              ↓
-      [r0,r1]       [r2,r3]
-              ↓ join
-      [r0,r1,r2,r3]
-</pre>
-
-## Stream Gatherers（Java 22+）
-
-`gather()` 接收一个 `Gatherer`，定义 `integrator`（如何将元素并入状态）、`combiner`（如何并行合并状态）和 `finisher`（如何输出最终结果）。这使得自定义中间操作无需修改 Stream 核心库。
-
-## 参考样例
+`Optional<T>.stream()` 与 `Stream<T>.filter().findFirst()` 的组合展示了短路与惰性的交互：
 
 ```java
-// 创建（≤20行）
-Stream<String> s = List.of("a","b").stream();
-IntStream range = IntStream.range(1, 10);
+Stream.of(1,2,3,4,5)
+    .filter(x -> x > 2)     // 不执行
+    .findFirst()            // 触发执行，找到3后停止filter
+```
+
+执行过程：
+1. `findFirst` 调用 `wrapped.forEachRemaining()`
+2. 每次拉取元素 → `filter.test()` → 若 true → 返回该元素
+3. `filter` 在找到第一个匹配后停止被调用
+
+**短路条件**：操作需实现 `ShortCircuit` 语义（`takeWhile`、`limit`、`findFirst`、`anyMatch` 等）。
+
+### Gatherer 的状态机模型（Java 22+）
+
+`Gatherer` 定义为四元组 $(S, I, C, F)$：
+
+- **$S$**：状态类型（内部状态）
+- **I (integrator)**：$S \times input \to (S, output\_or\_skip)$
+- **C (combiner)**：$S \times S \to S$（并行合并）
+- **F (finisher)**：$S \to output$（最终转换）
+
+```java
+Gatherer.of(
+    () -> new ArrayList<String>(),                    // initializer
+    (state, element, downstream) -> { ... },         // integrator
+    (left, right) -> { left.addAll(right); left; }, // combiner
+    list -> list.toString()                          // finisher
+)
+```
+
+这将自定义中间操作形式化为状态转换自动机，允许框架管理并行化和短路。
+
+### Stream 的引用透明性约束
+
+Stream 操作必须是**无副作用**的函数：
+
+- 不修改共享变量
+- 不执行 I/O
+- 不抛出受检异常
+
+违反此约束可能导致：
+- 串行 Stream：结果不确定（filter 顺序依赖）
+- 并行 Stream：数据竞争（`ConcurrentModificationException`）
+
+**根本原因**：并行 Stream 的 `forEach` 使用 `ForkJoinTask`，多个线程同时消费源，若操作有副作用则需要外部同步。
+
+## 参考存根
+
+```java
+// 短路操作（≤20行）
+var result = Stream.iterate(1, n -> n + 1)
+    .filter(n -> n % 2 == 0)
+    .map(n -> n * n)
+    .takeWhile(n -> n < 100)
+    .toList();
+// 输出: [4, 16, 36, 64]
 ```
 
 ```java
-// 链式调用
-List<Integer> r = numbers.stream()
-    .filter(n -> n > 3).sorted().collect(Collectors.toList());
-```
-
-```java
-// 扁平化
-List<String> flat = nested.stream()
-    .flatMap(List::stream).collect(Collectors.toList());
-```
-
-```java
-// reduce
-int sum = numbers.stream().reduce(0, Integer::sum);
-Optional<Integer> max = numbers.stream().reduce(Integer::max);
-```
-
-```java
-// 并行 Stream
-long cnt = numbers.parallelStream().filter(n -> n % 2 == 0).count();
-```
-
-```java
-// Gatherer（Java 22+）
-Gatherer<List<Integer>, ?, Integer> flattener = Gatherer.of(
+// Gatherer 实现（Java 22+, ≤25行）
+Gatherer<Integer, List<Integer>, Integer> batcher = Gatherer.ofSequential(
+    ArrayList::new,
     (state, element, downstream) -> {
-        for (var item : element)
-            if (!downstream.push(item)) return false;
+        state.add(element);
+        if (state.size() == 3) {
+            state.forEach(downstream::push);
+            state.clear();
+        }
         return true;
-    });
-List<Integer> flat = nested.stream().gather(flattener).toList();
+    },
+    (left, right) -> { left.addAll(right); left; },
+    list -> list.listIterator()
+);
 ```
 
 ```java
-// 基础类型避免装箱
-int sum = numbers.stream().mapToInt(Integer::intValue).sum();
+// 并行 Stream 分割策略
+var list = new ArrayList<>(List.of(1,2,3,4,5,6,7,8));
+var spliterator = list.spliterator();
+System.out.println("Character estimate: " + spliterator.estimateSize());
+spliterator.trySplit();  // [1,2,3,4] vs [5,6,7,8]
+spliterator.trySplit();  // 继续分割
 ```

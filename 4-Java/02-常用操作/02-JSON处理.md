@@ -1,99 +1,136 @@
 # JSON处理
 
-> **本质断言**：Jackson 和 Gson 的核心差异在于，前者通过 `ObjectMapper` 的多态路由实现高性能树遍历，后者通过运行时类型擦除和泛型桥接实现简洁 API。
+## 定义
 
-## Jackson 核心机制
+Jackson 和 Gson 的核心差异在于序列化器的构建策略：Jackson 通过 `ObjectMapper` 在启动时静态构建序列化器图，实现编译期多态路由；Gson 通过运行时反射拦截和 `TypeAdapter` 链动态调度，实现 API 简洁性。两者的本质都是将 JSON 文本的词法/语法结构映射为 Java 对象的图结构。
 
-`ObjectMapper` 内部维护一个 `SerializerProvider` 和 `DeserializationContext`，序列化时从类注解（`@JsonSerialize`）或 Bean 属性（`@JsonIgnore`）构建序列化器图，反序列化时构建 `JsonNode` 树后按路径导航。
+## 数学模型
+
+### 序列化复杂度
+
+设待序列化对象图 $G = (V, E)$，其中 $V$ 为节点集合（对象字段），$E$ 为引用边集合（对象引用）。序列化时间复杂度：
+
+$$T_{serialize}(G) = O(|V| + |E|)$$
+
+每个节点需经过：类型判断 → 序列化器选择 → 值写入。边遍历受对象图深度影响，但无环形引用时为树遍历 $O(|V| + |E|)$。
+
+### 树构建 vs 流式解析
+
+Gson 的 `JsonParser` 构建完整 `JsonElement` 树，内存占用：
+
+$$M_{tree} = O(|V| \cdot s)$$
+
+其中 $s$ 为单个节点平均字节开销（约 40-80 字节，含类型标记和父子指针）。
+
+Jackson 的 `XmlFactory` 流式解析器仅维护当前路径栈，内存占用：
+
+$$M_{stream} = O(d \cdot s)$$
+
+其中 $d$ 为最大嵌套深度，通常 $d \ll |V|$。
+
+### 循环引用压缩率
+
+Jackson 的 `@JsonIdentityInfo` 为每个对象分配唯一标识符 $\text{oid}$。设对象图中唯一对象数为 $|U|$，出现次数为 $f_i$，总引用数为 $R = \sum_{i=1}^{|U|} f_i$。压缩后输出边数：
+
+$$R' = |U| + (R - |U|) = R$$
+
+压缩收益在 $f_i > 1$ 时显著：当同一对象被引用多次（如父引用子、孙引用爷形成环），边数不变但对象内容只输出一次。
+
+## 数据流
 
 <pre>
-JSON文本 → Lexer（词法分析）→ Parser（语法分析）→ JsonNode树
-                                                 │
-                                    ObjectMapper.readValue()
-                                                 │
-                              ┌──────────────────┼──────────────────┐
-                              ▼                  ▼                  ▼
-                        简单类型          Object（属性映射）        Array（List映射）
+Jackson 序列化数据流：
+┌─────────────┐    ┌──────────────┐    ┌─────────────────┐    ┌──────────────┐
+│ Java Object │───▶│ ObjectMapper │───▶│ SerializerProvider│───▶│ UTF8JsonGenerator│
+└─────────────┘    └──────────────┘    └─────────────────┘    └──────┬───────┘
+                                                                     │
+                                                             ┌───────▼────────┐
+                                                             │  输出 byte[]    │
+                                                             └────────────────┘
+
+Jackson 反序列化数据流：
+┌─────────────┐    ┌──────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│  byte[]/String│───▶│  UTF8StreamParser│───▶│  JsonNode Tree  │───▶│  Java Object    │
+└─────────────┘    └──────────────┘    └─────────────────┘    └─────────────────┘
+                           │                    │
+                           ▼                    ▼
+                    Lexer → Tokenizer    ObjectMapper.readValue()
+                    (字节→Token序列)       (树→对象映射)
+
+Gson 反序列化数据流：
+┌─────────────┐    ┌──────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│  String     │───▶│  JsonReader  │───▶│  TypeAdapter链   │───▶│  Java Object    │
+└─────────────┘    └──────────────┘    └─────────────────┘    └─────────────────┘
+                           │                    │
+                           ▼                    ▼
+                    Token序列逐步消费      反射字段写入
 </pre>
 
-## Gson 核心机制
+**所有权变换**：
+- Jackson：序列化时 Java 对象 → Token序列 → UTF-8字节，所有权从 JVM 堆内存转移到堆外字节缓冲区
+- Gson：反序列化时 String → Token（栈上int标记）→ 字段直接写入对象，所有权变换少一次中间复制
 
-Gson 使用反射直接访问字段（不考虑 getter/setter），通过 `TypeAdapter` 链处理每种类型。泛型信息通过 `TypeToken` 捕获：`new TypeToken<List<User>>(){}.getType()` 创建匿名内部类，Gson 从中提取真实泛型类型。
+## 机制
 
-```java
-// TypeToken 原理
-TypeToken<List<User>> token = new TypeToken<List<User>>(){};
-Type type = token.getType();  // 反射获取匿名类父类的泛型参数
+### Jackson 的多态路由机制
+
+`ObjectMapper` 在首次遇到类型 $T$ 时，通过 `SerializerProvider` 查找或构建 `JsonSerializer<T>`。查找路径：
+
+1. 检查 `@JsonSerialize(as = T.class)` 注解
+2. 检查 `SerializerProvider` 缓存
+3. 通过 `BeanDescription`  introspect 属性，查找 `@JsonValue`、`@JsonRawValue`
+4. 降级为黑盒反射 `BeanSerializer`
+
+**关键约束**：这个构建过程在首次调用时发生，后续调用复用缓存的序列化器实例。因此 Jackson 适合大量同类对象的重复序列化，初始化成本被均摊。
+
+### Gson 的 TypeAdapter 链式调用
+
+`Gson` 维护一个 `TypeAdapterFactory` 链，对每个类型逐个尝试适配：
+
+```
+RuntimeClass → [Factory₁: T₁?] → [Factory₂: T₂?] → ... → [ReflectionFactory: fallback]
 ```
 
-## 循环引用处理
+每 `read()`/`write()` 操作从链首到链尾线性扫描，最坏时间复杂度 $O(n)$，其中 $n$ 为注册的 `TypeAdapterFactory` 数量（通常 < 20）。
 
-Jackson 处理对象图循环使用标识解析（`@JsonIdentityInfo`）或双引用注解（`@JsonManagedReference`/`@JsonBackReference`）。前者给对象分配唯一 ID，序列化后再次出现时输出 ID 而非完整对象；后者将双向引用拆分为"拥有方"和"引用方"。
+**`TypeToken` 捕获泛型的原理**：通过匿名内部类继承 `TypeToken<T>` 的超类，JVM 在类加载时将泛型参数签名注入到 `TypeToken` 的 `Type` 字段。这利用了"泛型擦除后保留签名在 Class 对象"这一 JVM 特性。
 
-```java
-@JsonIdentityInfo(generator = PropertyGenerator.class, property = "id")
-public class Department { private Long id; private List<Employee> employees; }
-```
+### 循环引用处理的数学本质
 
-## 性能对比
+循环引用构成对象图中的环。序列化器必须处理两种环：
 
-| 特性 | Jackson | Gson |
-|------|---------|------|
-| 序列化速度 | 快（约2-3x） | 慢 |
-| 内存占用 | 低（流式） | 高（全量树） |
-| 注解丰富度 | 丰富 | 一般 |
+1. **直接自环**：A.id = A
+2. **间接环**：A.b = B, B.a = A
 
-Jackson 快的原因：内部使用 `UTF8JsonGenerator` 直接输出 UTF-8 字节，不经过 `String` 中间层；Gson 普遍使用 `StringBuilder` 拼接后转字节。
+Jackson 的 `@JsonIdentityInfo` 将对象图的有向边转化为**生成树 + 回边标记**：每个节点首次出现时输出完整内容并记录 oid；后续出现只输出 `"$ref": "oid"`。
 
-## 参考样例
+**违反约束的后果**：若循环引用未标注且序列化器未检测，将导致 StackOverflowError（递归无限深入）。
+
+## 参考存根
 
 ```java
-// Jackson 序列化/反序列化（≤20行）
-ObjectMapper mapper = new ObjectMapper();
-User u = mapper.readValue(json, User.class);
-String s = mapper.writeValueAsString(u);
-```
-
-```java
-// JsonNode 树操作
-JsonNode root = mapper.readTree(json);
-String city = root.at("/address/city").asText();
-```
-
-```java
-// Gson 泛型
-Type listType = new TypeToken<List<User>>(){}.getType();
-List<User> list = gson.fromJson(json, listType);
-```
-
-```java
-// 自定义序列化器
-public class MoneySerializer extends JsonSerializer<Money> {
-    public void serialize(Money v, JsonGenerator g, SerializerProvider p)
-            throws IOException {
-        g.writeString(v.getAmount() + " " + v.getCurrency());
-    }
+// Jackson 流式 API（≤25行）
+var mapper = new ObjectMapper();
+try (var jr = mapper.createParser(new FileInputStream("data.json"))) {
+    var node = mapper.readTree(jr);
+    var city = node.at("/address/city").asText();
+    var users = node.withArray("users");
+    users.forEach(u -> System.out.println(u.at("/name").asText()));
 }
 ```
 
 ```java
-// 多态类型处理
-@JsonTypeInfo(use = Id.NAME, property = "type")
-@JsonSubTypes({ @SubTypes.Type(value = Dog.class, name = "dog") })
-public interface Animal { }
-```
-
-```java
-// 流式 API
-JsonReader r = new JsonReader(new FileReader("data.json"));
-r.beginArray();
-while (r.hasNext()) { r.beginObject(); r.endObject(); }
-r.endArray();
-```
-
-```java
-// Jackson 模块注册
-ObjectMapper mapper = new ObjectMapper();
-mapper.registerModule(new JavaTimeModule());
-mapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
+// Gson TypeAdapter 自定义（≤25行）
+record Money(BigDecimal amount, String currency) {}
+var gson = new GsonBuilder()
+    .registerTypeAdapter(Money.class, new TypeAdapter<>() {
+        @Override public void write(JsonWriter w, Money m) throws IOException {
+            w.value(m.amount() + " " + m.currency());
+        }
+        @Override public Money read(JsonReader r) throws IOException {
+            var parts = r.nextString().split(" ");
+            return new Money(new BigDecimal(parts[0]), parts[1]);
+        }
+    })
+    .create();
 ```

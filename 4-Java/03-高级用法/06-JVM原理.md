@@ -1,169 +1,198 @@
 # JVM原理
 
-> JVM是Java程序的运行环境，其本质是"基于栈的指令集解释器+分层编译执行引擎"——字节码被加载后经过验证、解释或编译为机器码执行，内存由GC自动管理，线程由JVM调度。
+## 定义
 
-## 字节码基础
+JVM是Java程序的运行环境，其本质是**基于栈的指令集解释器 + 分层编译执行引擎**——字节码被加载后经过验证、解释或编译为机器码执行，内存由GC自动管理，线程由JVM调度。
 
-**字节码是JVM的指令集，每条指令一个字节（操作码）+ 0-N个操作数。基于栈而非寄存器——所有操作数先入栈，计算后再出栈。**
+**字节码（Bytecode）** 是JVM的指令集，每条指令占一个字节（操作码）+ 0-N个操作数。所有操作数先入栈，计算后再出栈——这是一种**零地址架构（Zero-Address Architecture）**，适合基于栈的虚拟机。
+
+**类加载（Class Loading）** 的本质是将 `.class` 文件的字节流转换为JVM内部的Class对象——这个过程不仅是读取数据，还要验证合法性、分配内存、建立符号引用与直接引用的映射。
+
+## 数学模型
+
+### 栈帧内存布局
+
+每个栈帧的大小在编译时确定：
+
+$$
+\text{栈帧} = \text{局部变量表} + \text{操作数栈} + \text{动态链接} + \text{返回地址}
+$$
+
+- 局部变量表槽数：参数数量 + 局部变量数量（long/double占2槽）
+- 操作数栈最大深度：编译时确定（字节码验证阶段检查）
+
+### JIT编译的热点检测
+
+基于**采样**而非精确计数：
+
+$$
+\text{编译触发} \iff \text{方法调用计数} > C_{\text{threshold}} \lor \text{循环回边计数} > C_{\text{threshold}}
+$$
+
+Server模式阈值：$10{,}000$ 次调用
+Client模式阈值：$1{,}500$ 次调用
+
+### 分层编译的加速比
+
+$$
+S_{\text{tiered}} = \frac{T_{\text{interpreted}}}{T_{\text{compiled}}}
+$$
+
+分层编译通过 C1（快速编译 + 轻量profiling）和 C2（慢速编译 + 激进优化）平衡编译时间和执行效率。
+
+## 数据流
+
+### 字节码执行数据流
 
 <pre>
-iload_0    ──> 从局部变量槽0加载int到栈顶
-iconst_1    ──> 将int 1推入栈顶
-iadd       ──> 弹出两个int相加，结果推入栈顶
-istore_1   ──> 弹出栈顶int存入局部变量槽1
-ireturn    ──> 返回int值
+字节码指令流
+    │
+    ├─ iconst_5 ──> 将5压入操作数栈顶
+    │                 [操作数栈: [5]]
+    │
+    ├─ istore_1 ──> 弹出5存入局部变量槽1
+    │                 [操作数栈: []]
+    │
+    ├─ iload_1 ──> 从局部变量槽1加载到栈顶
+    │               [操作数栈: [5]]
+    │
+    └─ ireturn ──> 返回栈顶值
 </pre>
-
-| 指令 | 含义 |
-|------|------|
-| iconst_0 | 将int 0推入栈顶 |
-| iload_0 | 从局部变量表加载int到栈顶 |
-| istore_1 | 从栈顶弹出int到局部变量槽1 |
-| invokevirtual | 调用虚方法 |
-| invokestatic | 调用静态方法 |
-| ireturn | 返回int |
-
-## 类加载机制
-
-**类加载的本质是将.class文件的字节流转换为JVM内部的Class对象——这个过程不仅是读取数据，还要验证合法性、分配内存、建立符号引用与直接引用的映射。**
 
 ### 类加载生命周期
 
-```
-加载 → 验证 → 准备 → 解析 → 初始化 → 使用 → 卸载
-  │        │        │       │
-  │        │        └── 符号解析为直接引用 ──┘
-  │        └── 字节码验证
-  └── 从.class读取字节流
-```
+<pre>
+加载 (Loading)
+    │
+    ├── 通过类全限定名读取 .class 字节流
+    ├── 创建 Class 对象
+    └── 分配内存，建立静态数据结构
 
-### 三种类加载器
+    ▼
+验证 (Verification)
+    │
+    ├── 魔数验证 (0xCAFEBABE)
+    ├── 字节码语义验证
+    ├── 符号引用验证
+    └── 引用的类/字段/方法是否存在
 
-- **Bootstrap ClassLoader**：C++实现，加载JAVA_HOME/lib下核心类库
-- **Platform ClassLoader**（JDK 9+）：原Extension ClassLoader，加载扩展类
-- **Application ClassLoader**：加载用户classpath上的类
+    ▼
+准备 (Preparation)
+    │
+    └── 为静态字段分配内存，初始化为默认值
+
+    ▼
+解析 (Resolution)
+    │
+    ├── 符号引用 → 直接引用
+    ├── 类/接口解析
+    ├── 字段解析
+    └── 方法解析
+
+    ▼
+初始化 (Initialization)
+    │
+    └── 执行 <clinit>（静态赋值语句、静态块）
+
+    ▼
+使用 (Using)
+
+    ▼
+卸载 (Unloading)
+    └── ClassLoader 被 GC 且 类无实例引用
+</pre>
 
 ### 双亲委派模型
 
-**双亲委派的核心目的是安全——防止用户自定义的类冒充核心类（如自定义java.lang.String），也防止同一个类被多次加载。**
-
-```java
-protected Class<?> loadClass(String name, boolean resolve) {
-    Class<?> c = findLoadedClass(name);
-    if (c == null) {
-        if (parent != null) {
-            c = parent.loadClass(name, false);
-        } else {
-            c = findBootstrapClassOrNull(name);
-        }
-    }
-    return c;
-}
-```
-
-## JVM内存结构
-
 <pre>
-堆 (Heap)                    方法区 (Method Area)
-├─ 对象实例                   ├─ 类信息
-├─ 数组                      ├─ 运行时常量池
-└─ 字符串常量池              └─ 静态变量
-栈 (Stack)                   程序计数器 (PC)
-├─ 栈帧 x N                  └─ 当前线程字节码行号
-└─ 每个线程独有               无GC
-本地方法栈
-└─ native方法调用
+ApplicationClassLoader
+    │
+    ├── findLoadedClass() ──> 缓存命中则返回
+    │
+    └── findClass() ──> 委托 parent
+                              │
+                              ▼
+                        PlatformClassLoader
+                              │
+                              └── findClass() ──> 委托 parent
+                                                    │
+                                                    ▼
+                                              BootstrapClassLoader
+                                                    │
+                                                    └── findClass() ──> 加载核心类库
 </pre>
 
-### 栈帧结构
+**核心目的**：安全（防止用户自定义类冒充核心类）+ 避免重复加载。
 
-每个方法调用创建一个栈帧：
-- **局部变量表**：参数 + 局部变量
-- **操作数栈**：表达式求值的临时空间
-- **动态链接**：符号引用 → 直接引用
-- **返回地址**：方法返回位置
+## 机制
 
-## 垃圾回收（GC）
+### 为何JVM选择基于栈的架构？
 
-### 引用判断
+1. **移植性**：基于栈的指令集不依赖具体寄存器，虚拟机实现更简单
+2. **指令紧凑**：零地址指令只有操作码，字节更少
+3. **安全性**：所有操作数显式入栈，不存在寄存器误用
 
-**引用计数法因循环引用问题已废弃。可达性分析从GC Roots向下搜索——GC Roots包括：栈帧本地变量表引用的对象、方法区静态属性引用的对象、方法区常量引用的对象、JNI引用。**
+**代价**：相比基于寄存器的架构（如Dalvik），相同计算需要更多指令（因为栈既是操作数来源也是目标）。
 
-### GC算法
+### 类加载器的双亲委派安全性
+
+"双亲"指的是父类加载器，而非继承关系：
 
 $$
-\text{G1回收时间} \approx \frac{\text{存活对象大小}}{\text{回收速度}} + \text{并行协调开销}
+\text{safe} \iff \text{类加载请求总是向上传递到BootstrapClassLoader}
 $$
 
-- **标记-清除**：两阶段，产生内存碎片
-- **复制**：无碎片，但浪费一半空间，适合存活少的新生代
-- **标记-整理**：无碎片，整理有STW停顿，适合老年代
+这确保：
+- `java.lang.String` 永远由 BootstrapClassLoader 加载
+- 自定义的 `java.lang.HackedString` 不会被加载（委派给父后找不到，不会自己加载）
+- 保证了核心API的不可篡改性
 
-### 分代收集
+### JIT编译的内联优化
 
-大多数对象朝生夕灭（90%以上），分代收集将堆分为Young（Eden+Survivor）和Old区，不同区采用不同算法。
+内联（Inlining）是JIT最重要的优化——消除方法调用开销：
 
-### 收集器对比
+$$
+\text{内联收益} = \underbrace{\text{调用开销}}_{\approx 10\text{ns}} - \underbrace{\text{代码膨胀代价}}_{\text{缓存污染}}
+$$
 
-| 收集器 | 线程 | 算法 | 适用场景 |
-|--------|------|------|---------|
-| Serial | 单线程 | 复制 | 小型应用 |
-| Parallel | 多线程 | 复制 | 吞吐量优先 |
-| CMS | 并发 | 标记-清除 | 低停顿（已移除） |
-| G1 | 并发 | 标记-整理+复制 | 大型应用（JDK 9+默认）|
-| ZGC | 并发 | 标记-整理 | 大内存低停顿 |
-| Shenandoah | 并发 | 标记-整理 | 低延迟 |
+JIT会根据以下因素决定是否内联：
+- 方法大小（太大的方法不被内联）
+- 调用频率（热点方法优先）
+- 虚调用去虚化（单态调用可内联）
 
-## JIT编译
+### 栈帧与局部变量表
 
-**JIT（Just-In-Time）编译将热点字节码在运行时编译为本地机器码——解释执行启动快但运行慢，JIT编译后运行快但编译有开销。分层编译用C1（快速但浅优化）和C2（慢但深优化）平衡编译时间和执行效率。**
-
-### 分层编译层级
-
-| 层级 | 名称 | 行为 |
-|------|------|------|
-| 0 | 解释执行 | 字节码逐行解释 |
-| 1 | 简单C1编译 | 快速编译，无profiling |
-| 2 | 受限C1编译 | 收集较少profiling |
-| 3 | 完全C1编译 | 收集完整profiling |
-| 4 | C2编译 | 激进优化 |
-
-### 热点代码检测
-
-基于方法调用计数器和循环回边计数器，超过阈值触发JIT编译。
-
-## 常用命令
-
-```bash
-javac HelloWorld.java
-javap -c HelloWorld.class
-javap -v HelloWorld.class
-```
-
-```bash
--Xms512m -Xmx512m -XX:+UseG1GC -XX:MaxGCPauseMillis=200
--Xlog:gc*:file=gc.log
--XX:+HeapDumpOnOutOfMemoryError
-```
-
-```bash
-jstat -gcutil <pid> 1000
-jmap -dump:format=b,file=heap.hprof <pid>
-```
-
-## 类加载器示例
+局部变量表槽的分配规则：
+- 槽 0：this（实例方法）或方法的第一个参数（静态方法）
+- 槽 1-N：剩余参数（按声明顺序）
+- 槽 N+1 及以后：局部变量（按声明顺序）
 
 ```java
-ClassLoader bootstrapLoader = String.class.getClassLoader();
-ClassLoader platformLoader = ClassLoader.getPlatformClassLoader();
-ClassLoader appLoader = ClassLoaderDemo.class.getClassLoader();
-```
-
-```java
-public class CustomClassLoader extends ClassLoader {
-    @Override
-    protected Class<?> findClass(String name) throws ClassNotFoundException {
-        return defineClass(name, bytes, 0, bytes.length);
-    }
+// 槽分配示例
+void method(int a, long b, Object c) {
+    // a -> slot 0 (或1，取决于是否是实例方法)
+    // b -> slot 2 (long占2槽)
+    // c -> slot 4
+    String s = "hello"; // slot 5
 }
+```
+
+## 参考存根
+
+```java
+// javap 输出的字节码分析（≤30行）
+// 源码：
+// int add(int a, int b) { return a + b; }
+
+// 字节码（javap -c 输出）:
+// int add(int a, int b);
+//   0: iload_1       // 将参数a压栈
+//   1: iload_2       // 将参数b压栈
+//   2: iadd          // 弹出两int相加，结果压栈
+//   3: ireturn       // 返回栈顶int
+
+// 栈帧状态变化：
+// PC=0: [操作数栈: [a], 局部变量: [this, a, b]]
+// PC=1: [操作数栈: [a, b], 局部变量: [this, a, b]]
+// PC=2: [操作数栈: [a+b], 局部变量: [this, a, b]]
 ```

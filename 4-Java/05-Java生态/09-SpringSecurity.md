@@ -1,188 +1,191 @@
 # Spring Security
 
-## 本质断言
+## 定义
 
-Spring Security 的本质是通过 Filter 链（Filter Chain）拦截所有请求，在请求到达 Controller 之前完成认证（Authentication，确认用户是谁）和授权（Authorization，确认用户能做什么），通过 SecurityContext 将在请求线程中共享已认证用户信息。
+Spring Security 的本质是 **过滤器链（Filter Chain）**——所有请求在到达 DispatcherServlet 前必须经过一系列安全过滤器，在请求到达 Controller 之前完成身份认证（Authentication，确认用户是谁）和授权（Authorization，确认用户能做什么）。
 
-## 认证机制
+## 数学模型
 
-### 认证流程
+### BCrypt 的计算复杂度
 
-<pre>
-认证流程：
-请求 → UsernamePasswordAuthenticationFilter 提取凭证
-    ↓
-AuthenticationManager.authenticate(认证令牌)
-    ↓
-AuthenticationProvider 实现类认证（查 DB/LDAP/JWT）
-    ↓
-认证成功 → SecurityContextHolder.getContext().setAuthentication()
-    ↓
-Authentication 包含：Principal、Credentials、Authorities
-</pre>
+BCrypt 是专为密码哈希设计的自适应函数，基于 **Blowfish** 加密算法，加入了 **cost factor** 控制计算时间：
 
-### BCrypt 密码存储原理
+$$T = O(2^{\text{costFactor}}) = O(2^{10}) \approx 1000 \text{ 次 Blowfish 加密}$$
 
-BCrypt 通过 Cost Factor（默认10）控制计算复杂度，每次计算随机生成盐值，输出格式为 `$2a$10$salt[22 chars]hash[31 chars]`。相同明文每次加密结果不同，但 matches() 总能正确验证。
+设 cost factor = 10，每次哈希耗时约 10-20ms（取决于硬件），则：
+- 单次验证：10-20ms
+- 暴力破解（假设攻击者 1000 H/s）：约 $2^{10}/1000 \approx 1$ 秒破解一个密码
 
-## JWT 认证
+**自适应含义**：随着硬件提升，可增加 cost factor 保持破解难度。
 
-### JWT 的本质
+### RBAC 的权限图论建模
 
-<pre>
-JWT 结构：Header.Payload.Signature
-    ↓
-Header：算法类型（HS256/RS256）
-Payload：Claims（用户信息、过期时间、签发时间）
-Signature：HMAC(Header.Payload, Secret) 或 RSA(Header.Payload, PrivateKey)
-    ↓
-服务器不存储 Token，客户端每次携带，服务器验证签名即可
-</pre>
+RBAC（基于角色的访问控制）可建模为 **二分图**：
 
-### 无状态认证的优势
+```
+User 集合 U ──── 分配关系 ──── Role 集合 R
+                                       │
+                                       │ 权限关系
+                                       ▼
+                                   Permission 集合 P
+```
+
+授权判断转化为图的可达性问题：
+$$\text{hasPermission}(u, p) = \exists r \in R: (u,r) \in \text{assignments} \land (r,p) \in \text{permissions}$$
+
+RBAC 相比 ACL 的优势：**层次化授权**，权限变更只需修改角色，而非每个用户。
+
+## 数据流
 
 <pre>
-Session vs JWT：
-Session：服务器存储会话数据，分布式环境需要 Session 共享
-JWT：服务器不存储，Token 本身包含用户信息，天然适合分布式
+Spring Security 过滤器链
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+┌──────────────────────────────────────────────────────────────┐
+│  Security Filter Chain（顺序执行）                             │
+├──────────────────────────────────────────────────────────────┤
+│  1. ChannelProcessingFilter     ← HTTP/HTTPS 协议切换         │
+│  2. SecurityContextPersistenceFilter ← 从 Session 加载        │
+│             │                 SecurityContext                 │
+│  3. LogoutFilter              ← 处理注销请求                  │
+│  4. UsernamePasswordAuthenticationFilter ← 认证入口           │
+│             │                                               │
+│             ▼                                               │
+│      ┌─────────────────┐                                   │
+│      │ Authentication   │ ← 认证管理器                        │
+│      │ Manager         │   委托给多个                        │
+│      └────────┬────────┘   AuthenticationProvider            │
+│               │                                              │
+│               ▼                                              │
+│      ┌─────────────────┐                                   │
+│      │ DaoAuthentication- ← 查询 UserDetailsService         │
+│      │ Provider        │   验证密码                         │
+│      └────────┬────────┘                                   │
+│               │                                              │
+│               ▼                                              │
+│      ┌─────────────────┐                                   │
+│      │ SecurityContext │ ← 认证成功，存入                    │
+│      │ Holder          │   SecurityContextHolder             │
+│      └─────────────────┘                                   │
+│                                                              │
+│  5. ExceptionTranslationFilter  ← 处理 AccessDeniedException  │
+│  6. FilterSecurityInterceptor  ← 最终授权检查                 │
+│                                                              │
+└──────────────────────────────────────────────────────────────┘
 </pre>
 
-## 授权机制
+## 机制
 
-### 权限检查决策链
+### 认证的委托链
 
-<pre>
-授权检查决策：
-hasRole("ADMIN") → 检查 Authorities 中是否包含 "ROLE_ADMIN"
-hasAuthority("READ") → 检查 Authorities 中是否包含 "READ"
-@PreAuthorize("hasRole('ADMIN')") → SpEL 表达式评估
-    ↓
-方法级注解在 AOP 层面拦截方法调用
-URL 级配置在 Filter 层面拦截请求
-</pre>
-
-### RBAC 模型
-
-<pre>
-RBAC（基于角色的访问控制）：
-User → Role → Permission
-用户分配角色，角色分配权限
-    ↓
-好处：权限变更只需修改角色，无需逐个修改用户
-</pre>
-
-## OAuth 2.0
-
-### 四种授权模式
-
-<pre>
-OAuth 2.0 授权模式：
-1. Authorization Code：给 Server-side App 使用（含 code 换 token）
-2. PKCE + Authorization Code：给 SPA / Mobile 使用
-3. Client Credentials：给 Service-to-Service 使用
-4. Refresh Token：用于刷新 Access Token
-</pre>
-
-### 资源服务器验证 JWT
-
-<pre>
-JWT 验证流程：
-1. 客户端携带 Bearer Token 请求
-2. 资源服务器从 issuer-uri 获取 JWKS（公钥）
-3. 使用公钥验证 Token 签名
-4. 验证 claims（iss/exp/aud 等）
-5. 提取 authorities（从 roles claim 映射）
-</pre>
-
-## CSRF 防护
-
-### CSRF 攻击原理
-
-<pre>
-CSRF 攻击流程：
-1. 用户登录银行网站，获取 Session Cookie
-2. 用户被诱导访问恶意网站
-3. 恶意网站 JS 发起转账请求（自动携带 Cookie）
-4. 银行服务器验证 Cookie 有效，执行转账
-    ↓
-防御：要求请求携带 CSRF Token（第三方网站无法获取）
-</pre>
-
-### 有状态 vs 无状态
-
-<pre>
-CSRF 策略选择：
-有状态（Session）：浏览器访问 → 启用 CSRF Token
-无状态（JWT）：非浏览器客户端 → 可禁用 CSRF
-    ↓
-Cookie + CSRF Token：Session 模式的标准防护
-Bearer Token：JWT 模式天然防护（不自动携带 Cookie）
-</pre>
-
-## 参考样例
+`AuthenticationManager` 是认证的**入口**，实际认证委托给 `AuthenticationProvider`：
 
 ```java
-@Bean
-public PasswordEncoder passwordEncoder() {
-    return new BCryptPasswordEncoder();
+public interface AuthenticationProvider {
+    // 支持的认证类型
+    boolean supports(Class<?> authentication);
+
+    // 执行认证
+    Authentication authenticate(Authentication authentication);
 }
 ```
 
+常见实现：
+- `DaoAuthenticationProvider`：通过 `UserDetailsService` 加载用户，验证密码
+- `JwtAuthenticationProvider`：验证 JWT 签名
+- `LdapAuthenticationProvider`：通过 LDAP 验证
+
+### JWT 的无状态认证数学
+
+JWT 本质是 **签名声明（Signed Claims）**：
+
+```
+JWT = Base64(Header) . Base64(Payload) . Signature
+
+Header: {"alg": "HS256", "typ": "JWT"}
+Payload: {"sub": "userId", "exp": 1699999999, "iss": "auth-server"}
+Signature: HMAC-SHA256(Header.Payload, secret)
+```
+
+**验证逻辑**：接收 JWT → 解析 Header 和 Payload → 用公钥/密钥重新签名 → 比对签名
+
+无状态认证的数学价值：
+- 验证复杂度：$O(1)$（只需签名验证，无需查库）
+- 空间复杂度：分布式的，无需 Session 存储
+
+### CSRF 防护的数学原理
+
+CSRF 攻击成功的条件：
+1. 用户登录目标站点，Session Cookie 被浏览器保存
+2. 用户被诱导访问恶意站点
+3. 恶意站点发起请求，**浏览器自动携带 Cookie**
+4. 目标站点验证 Cookie 有效，执行攻击
+
+**CSRF Token 防御**：要求请求携带服务器下发的随机 Token：
+```
+攻击者站点 → 发起 POST /transfer?to=hacker&amount=1000
+                                   ↑
+                            浏览器不携带 CSRF Token
+                                   ↓
+                         请求被目标站点拒绝（403）
+```
+
+**Cookie + Token 模式**：Token 放在自定义头（如 `X-CSRF-Token`），而非 Cookie——Cookie 仍自动发送，但攻击者无法设置自定义头。
+
+### OAuth 2.0 的授权码流程
+
+```
+┌─────────┐                    ┌─────────────┐              ┌─────────┐
+│  User   │                    │ Auth Server │              │ Client  │
+└────┬────┘                    └──────┬──────┘              └────┬────┘
+     │                                │                           │
+     │ ─── 访问受保护资源 ──────────▶│                           │
+     │◀─── 重定向到登录 ─────────────│                           │
+     │                                │                           │
+     │ ──── 登录成功 ───────────────▶│                           │
+     │                                │                           │
+     │◀─── 重定向到 Client + code ──│                           │
+     │                                │                           │
+     │ ──── code + client_secret ───▶│                           │
+     │                                │                           │
+     │◀─── access_token ─────────────│                           │
+     │                                │                           │
+     │ ─── access_token ─────────────▶│ (验证 token)               │
+     │◀─── 受保护资源 ───────────────│                           │
+```
+
+**PKCE（Proof Key for Code Exchange）**：为防止 code 被截获，客户端先生成 `code_verifier`，发送其 hash `code_challenge`，后续用 `code_verifier` 证明自己。
+
+## 参考存根
+
 ```java
-@Service
-public class CustomUserDetailsService implements UserDetailsService {
-    public UserDetails loadUserByUsername(String username) {
-        User user = userRepository.findByUsername(username).orElseThrow();
-        return User.builder()
-            .username(user.getUsername())
-            .password(user.getPassword())
-            .roles("USER")
-            .build();
+// 展示 JWT 认证过滤器的实现
+public class JwtAuthenticationFilter extends OncePerRequestFilter {
+    private final JwtService jwtService;
+
+    @Override
+    protected void doFilterInternal(HttpServletRequest request,
+                                     HttpServletResponse response,
+                                     FilterChain chain)
+            throws ServletException, IOException {
+        String authHeader = request.getHeader("Authorization");
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            chain.doFilter(request, response);
+            return;
+        }
+        String token = authHeader.substring(7);
+        try {
+            UserDetails user = jwtService.validateToken(token);
+            UsernamePasswordAuthenticationToken auth =
+                new UsernamePasswordAuthenticationToken(
+                    user, null, user.getAuthorities());
+            auth.setDetails(
+                new WebAuthenticationDetailsSource().buildDetails(request));
+            SecurityContextHolder.getContext().setAuthentication(auth);
+        } catch (JwtException e) {
+            // Token 无效，继续链（后续 Filter 会拒绝）
+        }
+        chain.doFilter(request, response);
     }
 }
-```
-
-```java
-@Bean
-public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
-    http
-        .csrf(csrf -> csrf.disable())
-        .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-        .authorizeHttpRequests(auth -> auth
-            .requestMatchers("/api/auth/**").permitAll()
-            .anyRequest().authenticated()
-        )
-        .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
-    return http.build();
-}
-```
-
-```java
-@Bean
-public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
-    http
-        .authorizeHttpRequests(auth -> auth
-            .requestMatchers("/admin/**").hasRole("ADMIN")
-            .requestMatchers("/user/**").hasAnyRole("USER", "ADMIN")
-            .anyRequest().authenticated()
-        );
-    return http.build();
-}
-```
-
-```java
-@Secured("ROLE_ADMIN")
-public void deleteUser(Long id) { }
-
-@PreAuthorize("hasRole('ADMIN') or #userId == authentication.principal.id")
-public User updateUser(Long userId, UserUpdateRequest request) { }
-```
-
-```yaml
-spring:
-  security:
-    oauth2:
-      resourceserver:
-        jwt:
-          issuer-uri: https://auth.example.com
 ```

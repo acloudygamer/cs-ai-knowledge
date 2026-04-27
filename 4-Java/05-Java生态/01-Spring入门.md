@@ -1,172 +1,142 @@
 # Spring 入门
 
-## 本质断言
+## 定义
 
-Spring 是 Java 企业级开发的核心框架，其本质是通过 IoC 容器实现对象生命周期的反转，通过 AOP 实现横切关注点的分离。
+Spring Framework 的本质是一个**控制反转（IoC）容器**，通过依赖注入（DI）实现对象生命周期的管理，将对象间依赖关系的构建责任从应用代码转移给容器。框架同时通过 AOP（面向切面编程）将横切关注点（事务、安全、日志）与业务逻辑解耦。
 
-## 核心概念
+## 数学模型
 
-### IoC 与 DI
+### 依赖注入的图论建模
 
-IoC（控制反转）将对象创建权移交容器；DI（依赖注入）是 IoC 的实现手段，通过构造函数、Setter 或字段将依赖注入对象。
+将应用视为有向图 $G = (V, E)$，其中顶点集 $V$ 表示 Bean，边 $(a, b) \in E$ 表示 Bean $a$ 依赖 Bean $b$。IoC 容器的核心职责是 **拓扑排序**：确保所有依赖在被注入前已完成初始化。
 
-<pre>
-对象创建流程对比：
-传统方式：应用代码 → new UserService() → 组件自行管理依赖
-IoC方式：应用代码 → 容器 → 容器通过反射注入依赖 → 组件只关注业务
-</pre>
+设 $\text{in-degree}(v)$ 表示节点 $v$ 的入度（依赖数量），则有效注入的必要条件是：
+$$\forall (a, b) \in E: \text{init-order}(b) < \text{init-order}(a)$$
 
-### AOP
+若图中存在环（循环依赖），拓扑排序不存在，容器启动失败。Spring 通过构造式注入的"短生命周期优先"规则部分化解循环依赖，但构造函数循环依赖仍然无法解决。
 
-AOP 将事务、安全、日志等横切关注点与业务逻辑分离，通过切面（Aspect）定义切入点（Pointcut）和通知（Advice）。
+### Bean 作用域的资源约束
 
-<pre>
-AOP 执行流程：
-方法调用 → 代理对象 → [前置通知] → 目标方法 → [后置通知] → 返回
-                        ↑                ↓
-                    [异常通知] ←←←←←←←←←
-</pre>
+| 作用域 | 实例数量上界 | 线程安全约束 |
+|--------|-------------|-------------|
+| singleton | 1 | 需要外部同步 |
+| prototype | $\infty$ | 每次新建，无共享状态 |
+| request | $\infty$（按HTTP请求） | 线程局部，非线程安全 |
+| session | $\infty$（按HTTP会话） | 会话局部，非线程安全 |
 
-### Bean 作用域
-
-| 作用域 | 生命周期 | 线程安全 |
-|--------|-----------|----------|
-| singleton | 容器唯一实例 | 非线程安全 |
-| prototype | 每次获取新建 | 非线程安全 |
-| request | HTTP 请求唯一 | 线程安全 |
-| session | HTTP Session 唯一 | 线程安全 |
-
-## Spring Boot 自动配置
-
-### 本质机制
-
-@SpringBootApplication 组合了 @EnableAutoConfiguration，容器启动时通过 AutoConfigurationImportSelector 扫描 META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports 文件，按 @Conditional 条件注解筛选并加载符合条件的 AutoConfiguration 类。
+## 数据流
 
 <pre>
-Spring Boot 启动流程：
-1. 创建 SpringApplication 实例
-2. 执行 BootstrapContext 引导上下文初始化
-3. 配置 Environment 环境属性
-4. 打印 Banner 横幅
-5. 创建 ApplicationContext 应用上下文
-6. 刷新上下文（加载 Bean 定义、实例化单例）
-7. 执行 ApplicationRunner / CommandLineRunner
+┌─────────────────────────────────────────────────────────────────┐
+│                     Spring IoC 容器初始化                        │
+├─────────────────────────────────────────────────────────────────┤
+│  1. BeanDefinition 注册                                           │
+│     配置 → BeanDefinitionMap (ConcurrentHashMap)                  │
+│            ↓                                                      │
+│  2. 依赖解析 + 拓扑排序                                           │
+│     检查循环依赖 → 计算初始化顺序                                    │
+│            ↓                                                      │
+│  3. Bean 实例化（按拓扑序）                                        │
+│     singleton beans → 在容器刷新时全部实例化                       │
+│     prototype beans → 每次 getBean() 时新建                        │
+│            ↓                                                      │
+│  4. 属性注入（DI）                                                │
+│     Constructor Injection → 在构造时完成                           │
+│     Setter Injection → 实例化后调用 setter 完成                   │
+│            ↓                                                      │
+│  5. 生命周期回调                                                 │
+│     InitializingBean.afterPropertiesSet()                         │
+│     @PostConstruct                                               │
+│     init-method                                                  │
+└─────────────────────────────────────────────────────────────────┘
 </pre>
 
-### 条件装配
+**AOP 代理创建时机**：目标 Bean 实例化后，初始化阶段通过 `BeanPostProcessor` 包装为代理对象。若使用 JDK 动态代理，代理类实现与目标类相同的接口；若使用 CGLIB，代理类继承目标类。
 
-@Conditional 系列注解控制 Bean 的注册条件，实现可选功能的自动装配。
+## 机制
 
-<pre>
-条件判断顺序：
-@ConditionalOnClass      → 检查 classpath 是否存在指定类
-@ConditionalOnBean        → 检查容器中是否已存在指定 Bean
-@ConditionalOnProperty     → 检查配置属性是否满足条件
-@ConditionalOnMissingBean → 检查容器中是否不存在指定 Bean
-</pre>
+### IoC 容器为何需要控制反转
 
-## 依赖注入方式
-
-### 构造函数注入（推荐）
-
-构造函数注入确保依赖在对象创建时完全初始化，保证依赖不可变，利于单元测试。
-
-<pre>
-依赖注入选择决策树：
-                    ┌─ 依赖可变？ ─→ Setter 注入
-依赖是否必须？ ─┤
-                └─ 依赖不可变？ ─→ 构造函数注入
-</pre>
-
-### 字段注入 vs 构造函数注入
-
-字段注入（@Autowired private UserRepository repo）无法保证依赖在构造时初始化，且隐藏了真正的依赖关系。构造函数注入显式声明所有依赖，编译期即可检测缺失。
-
-## 常用 Starter
-
-| Starter | 引入能力 |
-|---------|----------|
-| spring-boot-starter-web | REST Web 开发、Tomcat 嵌入 |
-| spring-boot-starter-data-jpa | JPA 持久化、Hibernate 自动配置 |
-| spring-boot-starter-data-redis | Redis 连接、自动序列化 |
-| spring-boot-starter-security | 安全认证、授权框架 |
-| spring-boot-starter-validation | Bean Validation 参数校验 |
-| spring-boot-starter-actuator | 应用监控端点 |
-
-## 参考样例
-
+传统程序中，对象通过 `new` 直接创建依赖：
 ```java
-@SpringBootApplication
-public class DemoApplication {
-    public static void main(String[] args) {
-        SpringApplication.run(DemoApplication.class, args);
-    }
-}
-```
-
-```java
-@RestController
-@RequestMapping("/api")
-public class HelloController {
-    private final HelloService helloService;
-    public HelloController(HelloService helloService) {
-        this.helloService = helloService;
-    }
-    @GetMapping("/hello")
-    public String hello(@RequestParam(required = false) String name) {
-        return helloService.sayHello(name);
-    }
-}
-```
-
-```java
-@Service
-public class HelloService {
-    public String sayHello(String name) {
-        return (name == null || name.isBlank())
-            ? "Hello, World!" : "Hello, " + name + "!";
-    }
-}
-```
-
-```yaml
-server:
-  port: 8080
-spring:
-  application:
-    name: demo
-logging:
-  level:
-    com.example.demo: DEBUG
-```
-
-```xml
-<parent>
-    <groupId>org.springframework.boot</groupId>
-    <artifactId>spring-boot-starter-parent</artifactId>
-    <version>3.4.0</version>
-</parent>
-```
-
-```java
-@Service
+// 紧耦合：UserService 直接创建自己的依赖
 public class UserService {
-    private final UserRepository userRepository;
-    private final EmailService emailService;
-    public UserService(UserRepository userRepository,
-                       EmailService emailService) {
-        this.userRepository = userRepository;
-        this.emailService = emailService;
-    }
+    private UserRepository repo = new JdbcUserRepository();
 }
 ```
 
+问题在于：`UserRepository` 的具体实现被硬编码在 `UserService` 中。若需要切换到 `JpaUserRepository`，必须修改 `UserService` 源码。这违反了 **依赖倒置原则（DIP）**：高层模块不应依赖低层模块，两者都应依赖抽象。
+
+IoC 容器通过将依赖的实例化责任转移，使 `UserService` 只声明"我需要什么"，而不负责"如何获取"。这将依赖关系从编译时绑定推迟到运行时解析，实现了关注点分离。
+
+### AOP 的本质：方法拦截的职责链
+
+AOP 切面的执行依赖于代理对象的拦截链。当客户端调用被代理方法时：
+
+```
+调用 proxy.someMethod()
+    ↓
+DelegatingMethod切面 → 前置通知 (Before)
+    ↓
+CGLIB/JDK Proxy 拦截 → 调用目标方法
+    ↓
+返回结果途经切面 → 后置通知 (AfterReturning)
+    ↓
+或异常途经切面 → 异常通知 (AfterThrowing)
+    ↓
+最终通知 (AfterFinally)
+```
+
+**约束条件**：
+- 代理方法必须是 `public`，protected/private 方法无法被拦截（除非通过 AspectJ 编译时/加载时织入）
+- 自调用（同一个 Bean 内部方法调用）不经过代理，因此切面无效——这是 Spring AOP 的著名陷阱
+
+**违反约束的后果**：若在同一 Bean 内调用带事务注解的方法，事务不会生效，因为绕过了代理。
+
+### 自动配置的条件判断机制
+
+`@Conditional` 系列注解在 `ConfigurationClassPostProcessor` 中逐个评估，决定 Bean 是否注册：
+
+- `@ConditionalOnClass`：检查 classpath 是否有某类——使可选依赖成为自动配置的前提
+- `@ConditionalOnMissingBean`：确保用户自定义 Bean 优先于自动配置——尊重用户意图
+- `@ConditionalOnProperty`：实现配置开关（如 `spring.rabbitmq.enabled=false` 可禁用某自动配置）
+
+**优先级链**：用户显式注册的 Bean > 用户自定义配置类 > Spring Boot 自动配置。这确保了框架的"零配置"不会覆盖用户意图。
+
+### 构造函数注入为何是最佳实践
+
+| 注入方式 | 不可变性 | 可测试性 | 循环依赖检测 |
+|---------|---------|---------|-------------|
+| 构造函数注入 | ✅ final 可声明 | ✅ mock 传入 | ✅ 启动时失败 |
+| Setter 注入 | ❌ | ✅ | ❌ 运行时失败 |
+| 字段注入 | ❌ | ❌ 需要反射 | ❌ 运行时失败 |
+
+构造函数注入迫使依赖在对象构造时完全初始化。Java 编译器确保了构造函数的完整执行，使得部分初始化的对象无法存在。同时，循环的构造函数依赖在容器启动时立即暴露，而非运行时。
+
+## 参考存根
+
 ```java
-@Configuration
-public class AppConfig {
-    @Bean
-    public RestTemplate restTemplate() {
-        return new RestTemplate();
+// 展示 AOP 代理的实际创建过程（简化版）
+public class AopProxyDemo {
+    public static void main(String[] args) {
+        // 目标对象
+        TargetImpl target = new TargetImpl();
+
+        // JDK 动态代理
+        InvocationHandler handler = (proxy, method, args2) -> {
+            System.out.println("Before: " + method.getName());
+            Object result = method.invoke(target, args2);
+            System.out.println("After: " + method.getName());
+            return result;
+        };
+        Target proxy = (Target) Proxy.newProxyInstance(
+            Target.class.getClassLoader(),
+            new Class[]{Target.class},
+            handler
+        );
+        proxy.execute(); // 输出: Before: execute → Target.execute → After: execute
     }
 }
+interface Target { void execute(); }
+class TargetImpl implements Target { public void execute() {} }
 ```

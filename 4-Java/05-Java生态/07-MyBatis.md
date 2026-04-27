@@ -1,156 +1,148 @@
 # MyBatis
 
-## 本质断言
+## 定义
 
-MyBatis 的本质是 SQL 映射框架，将 SQL 语句从 Java 代码中分离到 XML/注解中，通过 JDBC 的 PreparedStatement 参数绑定和结果集映射实现数据库操作，开发者完全掌控 SQL 执行计划。
+MyBatis 是 **SQL 映射框架**，本质是将 SQL 语句从 Java 代码中分离到 XML/注解中，通过 JDBC 的 `PreparedStatement` 实现参数绑定和结果集映射。与 JPA/Hibernate 的 ORM 不同，MyBatis 将 SQL 控制权完全交给开发者，不自动生成 SQL——这是对 **SQL 确定性** 与 **自动化的权衡**。
 
-## 核心机制
+## 数学模型
 
-### SQL 映射原理
+### N+1 问题的查询复杂度分析
 
-<pre>
-MyBatis 执行流程：
-1. Mapper 接口方法调用
-2. MyBatis 根据方法签名找到对应 SQL（XML id / 注解）
-3. 创建 PreparedStatement
-4. 参数绑定（#{} → setString/setInt）
-5. 执行 SQL
-6. ResultSet 映射回 Java 对象（自动驼峰转换）
-</pre>
+设主表查询返回 $N$ 条记录，每条记录关联 $K$ 个子记录：
 
-### XML vs 注解映射选择
+| 加载方式 | SQL 数量 | 时间复杂度 |
+|---------|---------|----------|
+| 嵌套查询（N+1） | $1 + N$ | $O(N)$ 次 DB 往返 |
+| JOIN FETCH | 1 | $O(1)$ 次 DB 往返，但单次查询数据量大 |
+| @BatchSize(n) | $1 + \lceil N/n \rceil$ | 批量查询减少往返 |
 
-<pre>
-XML vs 注解场景选择：
-XML：复杂 SQL（多表JOIN、动态SQL嵌套）、SQL 较长
-注解：简单 CRUD、SQL 不超过 3-5 行
-</pre>
+**JOIN FETCH 的 trade-off**：单次查询返回数据量约 $N \times K$ 行，数据量过大时可能撑爆网络缓冲区。
 
-## 动态 SQL
+### OGNL 表达式求值器
 
-### OGNL 表达式本质
+OGNL（Object-Graph Navigation Language）用于动态 SQL 的条件判断。设上下文对象为 $ctx$，表达式 $e$ 求值为布尔值：
 
-MyBatis 动态 SQL 使用 OGNL（Object-Graph Navigation Language）表达式语言访问对象属性。if/test 中的表达式最终由 OGNL 求值为 true/false，决定对应 SQL 片段是否包含。
+$$\text{evaluate}(e, ctx) \rightarrow \{\text{true}, \text{false}\}$$
 
-<pre>
-动态 SQL if 原理：
-<if test="name != null">
-  AND name = #{name}
-</if>
-    ↓
-OGNL 求值：name != null → true
-    ↓
-生成 SQL 片段：AND name = ?
-</pre>
+支持的表达式类型：
+- 属性访问：`name != null`
+- 方法调用：`user.getId() > 0`
+- 集合操作：`ids.size() > 0`
+- 静态方法：`@java.lang.Math@max(a, b)`
 
-### where/set 标签的作用
-
-\<where> 标签自动处理 AND/OR 前缀（移除多余关键词）。\<set> 标签在 UPDATE 语句中自动移除末尾逗号，避免"SET col1 = ?, col2 = ?, "的语法错误。
-
-## 关联查询
-
-### N+1 问题的本质
+## 数据流
 
 <pre>
-MyBatis N+1 产生机制（未配置关联加载）：
-1. SELECT * FROM users → N 条 User 记录
-2. 遍历每个 User：
-   SELECT * FROM orders WHERE user_id = ?（循环 N 次）
-总 SQL 数：1 + N（与 JPA Hibernate N+1 相同）
+MyBatis SQL 执行流程
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+┌──────────────────────────────────────────────────────────────┐
+│  SqlSessionFactoryBuilder                                    │
+│      │                                                      │
+│      └─▶ SqlSessionFactory（会话工厂）                       │
+│               │                                              │
+│               └─▶ SqlSession（会话）                         │
+│                        │                                    │
+│                        ▼                                    │
+│              ┌─────────────────────┐                        │
+│              │ Executor            │                        │
+│              │  - SIMPLE          │                        │
+│              │  - REUSE           │  ← 重用 PreparedStatement │
+│              │  - BATCH           │  ← 批量执行              │
+│              └──────────┬──────────┘                        │
+│                         │                                    │
+│          ┌──────────────┼──────────────┐                   │
+│          ▼              ▼              ▼                    │
+│  ┌─────────────┐ ┌─────────────┐ ┌─────────────┐         │
+│  │ Statement   │ │Parameter   │ │ ResultSet   │         │
+│  │ Handler    │ │Handler     │ │Handler      │         │
+│  │ (SQL 构建) │ │(参数绑定)   │ │(结果映射)    │         │
+│  └──────┬──────┘ └──────┬──────┘ └──────┬──────┘         │
+│         │                │                │                  │
+│         ▼                ▼                ▼                  │
+│   PreparedStatement   setXXX()        ResultSet             │
+│         │                │                │                  │
+│         └────────────────┼────────────────┘                  │
+│                          ▼                                   │
+│                    SQL 执行                                   │
+│                          │                                   │
+│                          ▼                                   │
+│                   结果集映射                                   │
+│                   (自动驼峰转换)                               │
+└──────────────────────────────────────────────────────────────┘
 </pre>
 
-### association/collection 的嵌套查询
+## 机制
 
-MyBatis 通过 nested select 属性实现关联对象的懒加载查询：先查主表，返回后按外键值触发第二次查询。JOIN FETCH 则通过一次 SQL 解决 N+1。
+### SQL 映射的类型安全保证
 
-## 缓存
+MyBatis 通过 **运行时反射** 实现 DB 类型与 Java 类型的映射。关键问题：若映射错误（如 `VARCHAR` 映射到 `int`），错误在运行时才暴露。
 
-### 一级缓存 vs 二级缓存
-
-<pre>
-MyBatis 缓存作用域：
-一级缓存（SqlSession）：同一 SqlSession 内共享，close 后清除
-二级缓存（Mapper）：跨 SqlSession 共享，需要 POJO implements Serializable
-</pre>
-
-MyBatis 二级缓存是 Mapper 级别的，缓存的是查询结果而非 Entity 对象，与 Hibernate 的二级缓存设计不同。
-
-## 插件机制
-
-### 插件拦截点
-
-<pre>
-MyBatis 可拦截的四大对象：
-Executor（方法级）：update / query / flushStatements / commit / rollback
-StatementHandler（SQL构建）：prepare / parameterize / batch / query / update
-ParameterHandler（参数处理）：getParameterObject / setParameters
-ResultSetHandler（结果处理）：handleResultSets / handleOutputParameters
-</pre>
-
-PageHelper 是通过拦截 Executor.query 方法，在 SQL 执行前重写为分页 SQL（如 MySQL 的 LIMIT）。
-
-## 参考样例
-
-```yaml
-mybatis:
-  mapper-locations: classpath:mapper/*.xml
-  type-aliases-package: com.example.entity
-  configuration:
-    map-underscore-to-camel-case: true
-```
-
+**类型处理器（TypeHandler）** 负责 `PreparedStatement.setXXX()` 和 `ResultSet.getXXX()` 的双向转换：
 ```java
-@Mapper
-public interface UserMapper {
-    @Select("SELECT * FROM users WHERE id = #{id}")
-    User findById(Long id);
-    @Insert("INSERT INTO users(name, email) VALUES(#{name}, #{email})")
-    @Options(useGeneratedKeys = true, keyProperty = "id")
-    int insert(User user);
+public interface TypeHandler<T> {
+    void setParameter(PreparedStatement ps, int i, T parameter, JdbcType jdbcType);
+    T getResult(ResultSet rs, String columnName);
 }
 ```
 
-```xml
-<mapper namespace="com.example.mapper.UserMapper">
-    <resultMap id="BaseResultMap" type="com.example.entity.User">
-        <id column="id" property="id"/>
-        <result column="user_name" property="userName"/>
-    </resultMap>
-    <select id="findById" resultMap="BaseResultMap">
-        SELECT * FROM users WHERE id = #{id}
-    </select>
-</mapper>
-```
+MyBatis 内置了常见类型的处理器，自定义处理器可处理用户类型。
+
+### 动态 SQL 的 OGNL 约束
+
+`<if test="...">` 中的表达式必须求值为布尔值。若表达式引用 `null` 对象的属性，会抛出 `NullPointerException`：
 
 ```xml
-<select id="search" resultMap="BaseResultMap">
-    SELECT * FROM users
-    <where>
-        <if test="name != null">AND name LIKE #{name}</if>
-        <if test="email != null">AND email = #{email}</if>
-    </where>
-</select>
+<!-- 错误：若 user 为 null，抛出 NPE -->
+<if test="user.name != null">
+
+<!-- 正确：OGNL 支持 null 安全表达式 -->
+<if test="user?.name != null">
 ```
 
-```xml
-<select id="findByIds" resultMap="BaseResultMap">
-    SELECT * FROM users WHERE id IN
-    <foreach collection="ids" item="id" open="(" separator="," close=")">#{id}</foreach>
-</select>
-```
+OGNL 表达式中的 `?.` 是空安全访问操作符。
+
+### 二级缓存的事务隔离语义
+
+MyBatis 二级缓存是 **Mapper 级别**的，与 JPA/Hibernate 的二级缓存不同：
+
+| 缓存级别 | 作用域 | 存储内容 | 失效策略 |
+|---------|-------|---------|---------|
+| 一级缓存 | SqlSession | Entity 实例 | close 后清除 |
+| 二级缓存 | Mapper | 查询结果集 | 任何 DML 操作同一表后清除 |
+
+**约束条件**：二级缓存的 POJO 必须 `implements Serializable`，因为缓存可能存储到磁盘或跨进程使用。
+
+### 插件拦截的代理链
+
+MyBatis 允许拦截四大对象：
+- `Executor`：SQL 执行入口（`update`, `query`, `flushStatements`, `commit`, `rollback`）
+- `StatementHandler`：`PreparedStatement` 的创建和参数绑定（`prepare`, `parameterize`, `batch`）
+- `ParameterHandler`：参数到 `PreparedStatement` 的绑定
+- `ResultSetHandler`：`ResultSet` 到 Java 对象的映射
+
+**拦截器链的数学结构**：形成责任链（Chain of Responsibility）模式：
+$$R = R_1 \circ R_2 \circ R_3 \circ \cdots$$
+
+每个拦截器的 `plugin()` 方法返回包装后的代理对象，按注册顺序形成嵌套代理。
+
+## 参考存根
 
 ```java
-public PageInfo<User> findPage(int pageNum, int pageSize) {
-    PageHelper.startPage(pageNum, pageSize);
-    return new PageInfo<>(userMapper.findAll());
-}
-```
-
-```java
-@Component
-public class MyMetaObjectHandler implements MetaObjectHandler {
-    public void insertFill(MetaObject metaObject) {
-        strictInsertFill(metaObject, "createTime", LocalDateTime.class, LocalDateTime.now());
+// 展示 MyBatis 插件拦截机制
+@Intercepts({
+    @Signature(type = StatementHandler.class, method = "prepare",
+               args = {Connection.class, Integer.class})
+})
+public class SqlLogInterceptor implements Interceptor {
+    @Override
+    public Object intercept(Invocation invocation) throws Throwable {
+        StatementHandler sh = (StatementHandler) invocation.getTarget();
+        String sql = sh.getBoundSql().getSql();
+        long start = System.currentTimeMillis();
+        Object result = invocation.proceed(); // 执行原方法
+        System.out.println("SQL: " + sql + ", time: " + (System.currentTimeMillis() - start) + "ms");
+        return result;
     }
 }
 ```

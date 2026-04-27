@@ -1,129 +1,172 @@
 # HTTP 客户端对比
 
-> **本质断言**：JDK HttpClient、OkHttp、WebClient、RestTemplate 的核心差异在于连接池管理方式（是否内置）、并发模型（线程阻塞 vs 响应式 vs 虚拟线程）以及 HTTP/2 支持的原生程度。
+## 定义
 
-## 架构对比
+JDK HttpClient、OkHttp、WebClient、RestTemplate 的核心差异在于**连接池所有权模型**（内置 vs 手动管理）、**并发范式**（阻塞线程 vs 虚拟线程 vs 事件驱动）和 **HTTP/2 支持程度**。这些因素共同决定了连接复用率、内存占用和吞吐量的上限。
+
+## 数学模型
+
+**连接池利用率**：
+
+设并发请求数为 $R$，连接池大小为 $C$，平均请求处理时间为 $T_{req}$，平均 I/O 阻塞时间为 $T_{io}$，则：
+
+- 阻塞模型（RestTemplate，每请求一线程）：
+  $$\text{吞吐量} = \frac{R}{T_{req}} \cdot \text{线程利用率} \propto R$$
+  线程数随并发线性增长，$R=10000$ 时需要 10000 个线程栈（~10GB 堆外内存）
+
+- 虚拟线程模型（JDK HttpClient + 虚拟线程）：
+  $$\text{吞吐量} = \frac{R}{T_{req}}$$
+  虚拟线程栈按需扩展（约 200B-1KB vs 1MB），$R=10000$ 仅占用 ~10MB 栈空间
+
+- 事件驱动模型（WebClient/Netty）：
+  $$\text{吞吐量} = \frac{C}{T_{io}}$$
+  连接数固定为 $C$，吞吐量与 $R$ 解耦，$C$ 通常为 CPU 核数的 2-4 倍
+
+**连接复用率**：
+
+HTTP/1.1 keep-alive：同一连接可发送多个请求，但必须 **串行等待**（上一个响应完成才能发下一个）。
+
+HTTP/2 多路复用：同一连接可并行发送 $N$ 个请求（$N$ 由流控制窗口决定），连接复用率：
+$$\text{复用率} = \frac{\text{实际连接数}}{\text{理论连接数}} \in (0, 1]$$
+
+OkHttp 默认最大并发流为 100，HTTP/2 server push 使连接复用率进一步提升。
+
+**归约终点**：HTTP 客户端的性能模型可归约为**队列论中的 M/G/k 排队系统**，其中 $k$ 是连接池大小，$T_{req}$ 服从请求分布，瓶颈在 I/O 等待还是 CPU 计算决定了最优并发模型。
+
+## 数据流
 
 <pre>
 JDK HttpClient:
-   HttpClient.newBuilder()
-       ├─ ConnectionPool (手动管理)
-       ├─ HttpClient.Redirect.NORMAL
-       └─ sendAsync() → CompletableFuture
+HttpClient.newBuilder()
+    │
+    ├─ HttpClient.newHttpClient()
+    │       └─ ConnectionPool (手动配置)
+    │
+    └─ sendAsync(req) → CompletableFuture<HttpResponse>
+              │
+              ▼
+         线程池执行器（默认 ForkJoinPool.commonPool()）
 
 OkHttp:
-   OkHttpClient.Builder()
-       ├─ ConnectionPool (内置，5连接/5分钟空闲)
-       ├─ addInterceptor() (应用拦截器)
-       ├─ addNetworkInterceptor() (网络拦截器)
-       └─ enqueue(Callback) → 后台线程池
+OkHttpClient.Builder()
+    │
+    ├─ ConnectionPool (内置 5 connections / 5分钟空闲)
+    ├─ Dispatcher().setMaxRequests(64)  // 最大并发请求
+    └─ enqueue(Callback) → 后台线程池（最大5个）
+              │
+              ▼
+         同步返回 Response 或异步 Callback
 
 WebClient:
-   WebClient.builder()
-       ├─ Reactor Netty (事件驱动)
-       ├─ exchangeToMono() / retrieve()
-       └─ Flux/Mono (响应式流)
+WebClient.builder()
+    │
+    ├─ exchangeToMono() / retrieve()
+    └─ Flux/Mono<ClientResponse>
+              │
+              ▼
+         Reactor Netty EventLoop（固定数量 I/O 线程）
+         事件驱动，非阻塞
 
 RestTemplate:
-   RestTemplate()
-       ├─ SimpleClientHttpRequestFactory
-       └─ 同步阻塞，每请求一线程（已过时）
+RestTemplate()
+    │
+    └─ SimpleClientHttpRequestFactory
+              │
+              ▼
+         每请求获取一个连接，执行，释放
+         无连接池（默认），或手动配置 ConnectionPool
 </pre>
 
-## 连接池管理
+**HTTP/2 协商流程**：
+```
+客户端发送 HTTP/1.1 请求（ALPN 扩展）
+        │
+        ▼
+服务器响应 HTTP/1.1 + ALPN 声明支持 h2
+        │
+        ▼
+TLS 握手时协商使用 HTTP/2
+        │
+        ▼
+后续请求使用 HTTP/2 帧（多路复用）
+```
 
-| 客户端 | 连接池 | 复用策略 |
-|--------|--------|---------|
-| JDK HttpClient | 需手动配置 `ConnectionPool` | 同一 HttpClient 实例复用 |
-| OkHttp | 内置 5 max connections | 自动复用空闲连接 |
-| WebClient | Netty 内置 EventLoopGroup | 事件循环复用 |
-| RestTemplate | SimpleHttpConnectionPool | 每个 RequestFactory 实例 |
+## 机制
 
-## HTTP/2 差异
+**为什么需要连接池**：
 
-- **JDK HttpClient**：默认 HTTP/2，服务器不支持自动降级 HTTP/1.1
-- **OkHttp**：自动协商，支持 HTTP/2 Server Push
-- **WebClient**：通过 Netty 自动协商
-- **RestTemplate**：需配置 `HttpComponentsClientHttpRequestFactory`
+TCP 三次握手 + TLS 握手开销约为 2-4 个 RTT（30-100ms）。连接池通过保持长连接复用，避免重复握手。连接池命中时：
+$$\text{延迟节省} = 2 \times RTT_{\text{handshake}} + TLS_{\text{overhead}}$$
 
-## 虚拟线程适配
+**各客户端的连接池模型**：
 
-<pre>
-传统线程: Thread-Per-Request
-每请求占用 ~1MB 栈空间，阻塞时线程空等
+- **JDK HttpClient**：`ConnectionPool` 需要手动配置，生命周期由应用管理。同一 `HttpClient` 实例的连接被所有请求复用。
+- **OkHttp**：内置连接池，默认 5 个连接、5 分钟空闲清理。通过 `ConnectionPool` 类可配置。
+- **WebClient**：Netty 的 `EventLoopGroup` 维护内部连接池，对应用透明。
+- **RestTemplate**：无内置连接池，`SimpleClientHttpRequestFactory` 每次请求新建连接，高并发下性能差。
 
-虚拟线程: Carrier Thread (平台线程) 承载多个虚拟线程
-         ├─ 虚拟线程 V1 (阻塞在 I/O)
-         ├─ 虚拟线程 V2 (阻塞在 I/O)
-         └─ 虚拟线程 V3 (运行中)
-         
-         V1 阻塞 → Carrier 挂起 V1，继续调度 V2/V3
-         I/O 完成 → V1 加入可运行队列，等待 Carrier 调度
+**虚拟线程的调度机制**：
 
-JDK HttpClient + 虚拟线程 = 轻量级高并发
-每请求不再占用 1MB，10万并发成为可能
-</pre>
+虚拟线程（Java 21+ 正式生产可用）不绑定固定 OS 线程，而是由 **Carrier Thread**（平台线程）承载：
+- 虚拟线程调用阻塞 I/O → Carrier Thread 挂起该虚拟线程，继续调度其他虚拟线程
+- I/O 完成 → 虚拟线程加入可运行队列，等待 Carrier Thread 调度
+- 虚拟线程与 OS 线程的比例可达 1:1 到 1000:1
 
-## 参考样例
+**约束条件**：
+- JDK HttpClient 默认 HTTP/2，若服务器不支持会自动降级（需要配置）
+- OkHttp 的连接池自动清理依赖后台线程，JVM 退出时可能未及时清理
+- WebClient 的 `block()` 方法在响应式链中会阻塞当前线程（反模式）
+- RestTemplate 已在 Spring 6.1 中标记为 `@Deprecated`
+
+**违反约束的后果**：
+- 连接池泄漏（未关闭 Response body）→ 连接的流控窗口耗尽，新请求无法复用该连接
+- `WebClient` 链中调用 `.block()` → 可能死锁（event loop 线程被阻塞等待自己处理的结果）
+- OkHttp 异步 Callback 中抛出未捕获异常 → 请求"静默失败"，无重试无告警
+
+## 参考存根
 
 ```java
-// JDK HttpClient（≤20行）
-HttpClient client = HttpClient.newHttpClient();
+// JDK HttpClient + 虚拟线程（Java 21+）（≤20行）
+HttpClient client = HttpClient.newBuilder()
+    .executor(Executors.newVirtualThreadPerTaskExecutor())
+    .build();
 HttpRequest req = HttpRequest.newBuilder()
     .uri(URI.create("https://api.example.com"))
     .GET().build();
-HttpResponse<String> resp = client.send(req,
-    HttpResponse.BodyHandlers.ofString());
-```
-
-```java
-// HttpClient 异步
 client.sendAsync(req, HttpResponse.BodyHandlers.ofString())
     .thenApply(HttpResponse::body)
     .thenAccept(System.out::println);
 ```
 
 ```java
-// OkHttp 配置
+// OkHttp 连接池配置
 var client = new OkHttpClient.Builder()
-    .connectTimeout(10, TimeUnit.SECONDS)
-    .readTimeout(30, TimeUnit.SECONDS)
-    .connectionPool(new ConnectionPool(5, 5, TimeUnit.MINUTES))
-    .addInterceptor(chain -> {
-        Request req = chain.request().newBuilder()
-            .addHeader("Authorization", "Bearer token").build();
-        return chain.proceed(req);
-    }).build();
+    .connectionPool(new ConnectionPool(
+        5,              // maxIdleConnections
+        5, TimeUnit.MINUTES,
+        100))           // maxRequests (Java 9+)
+    .build();
+try (Response r = client.newCall(request).execute()) {
+    System.out.println(r.body().string());
+}
 ```
 
 ```java
-// WebClient
-Mono<User> user = webClient.get()
-    .uri("/users/{id}", 1).retrieve().bodyToMono(User.class);
-Flux<User> users = webClient.get().uri("/users")
-    .retrieve().bodyToFlux(User.class);
+// WebClient 响应式链
+webClient.get()
+    .uri("/users/{id}", 1)
+    .retrieve()
+    .bodyToMono(User.class)
+    .timeout(Duration.ofSeconds(5))
+    .onErrorResume(e -> Mono.just(User.defaultUser()))
+    .subscribe(user -> System.out.println(user));
 ```
 
 ```java
-// RestTemplate（已过时）
-User user = restTemplate.getForObject("/users/{id}", User.class, 1);
+// RestTemplate 连接池（已过时，仅用于兼容遗留代码）
+PoolingHttpClientConnectionManager cm = new PoolingHttpClientConnectionManager();
+cm.setMaxTotal(100);
+CloseableHttpClient client = HttpClients.custom()
+    .setConnectionManager(cm)
+    .build();
 ```
-
-```java
-// 连接池泄漏防御
-// OkHttp
-try (Response r = client.newCall(request).execute()) { }
-// HttpClient
-try (var resp = client.send(req,
-        HttpResponse.BodyHandlers.ofString())) { }
-```
-
-## 场景选择
-
-| 场景 | 推荐 | 原因 |
-|------|------|------|
-| 简单调用 | HttpClient | JDK 内置，无需依赖 |
-| 复杂网络应用 | OkHttp | 功能全面，成熟稳定 |
-| Spring WebFlux | WebClient | 响应式，天然集成 |
-| 遗留 Spring MVC | RestTemplate | 兼容（已过时）|
-| 高并发短连接 | 虚拟线程 + HttpClient | 轻量级 |

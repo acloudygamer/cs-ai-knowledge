@@ -1,167 +1,181 @@
 # JPA 与 Hibernate
 
-## 本质断言
+## 定义
 
-JPA（Java Persistence API）是 Java 持久化的标准规范，其本质是 ORM（对象关系映射）规范；Hibernate 是该规范的主流实现，通过 Persistence Context 实现同一事务内的对象同一性（identity），通过 dirty checking 自动生成更新 SQL。
+JPA（Java Persistence API）是 Java 持久化的 **标准化 ORM 规范**，定义了实体（Entity）、持久化上下文（Persistence Context）、实体管理器（EntityManager）和查询语言（JPQL）的接口契约。Hibernate 是 JPA 规范的主流实现，通过 **脏检查（dirty checking）** 机制在事务提交时自动生成最小化 SQL，通过 **Persistence Context** 保证同一事务内的对象同一性（identity）。
 
-## 核心概念
+## 数学模型
 
-### Entity 状态机
+### 一级缓存的命中率建模
+
+Persistence Context 本质是 **键值缓存**，键为主键，值为 Entity 实例。设：
+- $h$ = 缓存命中率
+- $N$ = 查询次数
+- $T_{\text{hit}}$ = 缓存命中时的查询时间（常量）
+- $T_{\text{miss}}$ = 缓存未命中时的查询时间（含 DB 查询 + 缓存写入）
+
+总查询时间：
+$$T_{\text{total}} = N \cdot (h \cdot T_{\text{hit}} + (1-h) \cdot T_{\text{miss}})$$
+
+Hibernate 默认在 Session 关闭时清空缓存，故一级缓存的生命周期 = 事务生命周期。
+
+### 乐观锁的冲突检测概率
+
+乐观锁通过版本号字段实现冲突检测。设：
+- $p$ = 某次更新时发生冲突的概率
+- $v$ = 当前版本号
+- $n$ = 并发更新同一行的事务数
+
+T1 和 T2 同时读取 `version=v`，各自修改后尝试更新：
+- T1 先提交：`UPDATE ... SET version=v+1 WHERE id=? AND version=v` → 成功，version=v+1
+- T2 后提交：同条件 → 0 rows affected → 抛 `OptimisticLockException`
+
+冲突概率 $p$ 近似为：
+$$p \approx 1 - \frac{1}{n}$$
+
+当 $n=2$ 时，$p \approx 50\%$；$n=3$ 时，$p \approx 67\%$。
+
+### N+1 问题的 SQL 数量分析
+
+| 加载策略 | SQL 数量 | 网络往返 |
+|---------|---------|---------|
+| EAGER（立即加载） | $1 + \sum_{i=1}^{N} f_i$ | N+1 次 |
+| LAZY（懒加载） | $1 + M$（M=访问关联的请求数） | M 次 |
+| JOIN FETCH | 1 | 1 次 |
+| @BatchSize(n) | $1 + \lceil N/n \rceil$ | 近似 1 次 |
+
+其中 $f_i$ 为第 $i$ 个主对象的关联字段数。
+
+## 数据流
 
 <pre>
-Entity 生命周期状态流转：
-new（新建）→ persist（持久化）→ managed（受管）
-                                    ↓
-                         remove（删除）→ removed（已删除）
-                         ↑                      
-                    flush（刷出）→ 同步到数据库
+EntityManager 操作的数据流
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+persistenceContext (一级缓存)
+    │
+    ├─ findById(id) → 缓存命中？ → 直接返回缓存引用
+    │                 ↓ 缓存未命中
+    │              DB 查询 → 存入 persistenceContext → 返回引用
+    │
+    ├─ persist(entity) → persistenceContext 注册新实体（NEW → MANAGED）
+    │                   → flush 时生成 INSERT
+    │
+    ├─ entity.setXxx() → 实体变为 DIRTY（脏标记）
+    │                   → flush 时生成 UPDATE
+    │
+    ├─ remove(entity) → 实体标记为 DELETED
+    │                  → flush 时生成 DELETE
+    │
+    └─ flush() → 脏检查 → 计算变更集 → 生成 SQL → 执行 → 同步状态
+                  │
+                  └─ 默认 AUTO_flush_mode：
+                     Session 事务提交时自动 flush
 </pre>
 
-### 一级缓存（Persistence Context）
+**快照（Snapshot）机制**：Hibernate 在 Entity 加载时保存一份快照到 Persistence Context。flush 时逐字段对比当前值与快照，生成最小 UPDATE 语句。
 
-Persistence Context 是 Entity 实例的缓存区，同一事务内对同一主键的多次查询返回同一 Java 对象引用（identity）。flush 时将修改合并为最少 SQL 发送到数据库。
+## 机制
 
-<pre>
-一级缓存工作原理：
-findById(1) → 查询 DB → 返回 entity 并存入缓存
-findById(1) → 直接从缓存返回（不查 DB）
-entity.setName("x") → 修改缓存中对象为脏
-flush() → 生成 UPDATE SQL → 同步到 DB
-</pre>
+### Entity 状态机的转换语义
 
-## 关系映射
+```
+     new()            persist()
+   ┌──────┐         ┌──────┐
+   │ NEW  │────────▶│MANAGED│
+   └──────┘         └──────┘
+        │                │
+        │                │ remove()
+        │                ↓
+        │            ┌──────────┐
+        └───────────▶│ REMOVED │
+                     └──────────┘
+                          │
+                     flush()/commit()
+                          ↓
+                   [数据库已同步]
+```
 
-### 关联方向与加载策略
+**Managed 状态的特性**：
+- 脏检查自动跟踪：任何字段变更在 flush 时被检测
+- 同一性保证：`findById(k)` 在同一 Persistence Context 内返回同一 Java 对象引用
+- 集合代理：@OneToMany 等返回 Hibernate 集合代理（PersistentBag 等），延迟加载
 
-@OneToOne / @OneToMany / @ManyToMany 的 fetch 属性控制关联对象的加载时机。EAGER 在查询主对象时立即加载所有关联；LAZY 在访问关联属性时才加载（产生额外 SQL，即 N+1 问题）。
+### 二级缓存的隔离级别语义
 
-<pre>
-加载策略选择依据：
-EAGER：关联数据始终需要、且数据量可预测
-LAZY：关联数据可能不访问、且数据量大
-</pre>
+二级缓存存储的是 Entity 的 **快照（Snapshot）**，而非 Entity 实例本身。这确保了：
+- 缓存命中时返回的是克隆对象，修改不影响缓存源
+- 不同 Session（事务）间通过快照隔离，实现 `READ_COMMITTED` 语义
 
-### 双向关联的维护
+`READ_COMMITTED` 下，若事务 T1 修改了 Entity 但未提交，事务 T2 从二级缓存读到的是 T1 修改前的快照值。
 
-mappedBy 属性声明"我是被维护端"，只有非 owning 侧可以放弃外键维护权。在内存中反向设置关联不会同步到数据库，必须通过 owning 侧操作。
+### JPQL → SQL 的翻译过程
 
-## JPQL 与原生 SQL
-
-### JPQL 的本质
-
-JPQL 是面向对象的查询语言，操作的是 Entity 及其属性，而非数据库表名和列名。Hibernate 在执行前将 JPQL 翻译为对应数据库的 SQL。
-
-<pre>
-JPQL → SQL 翻译流程：
-JPQL: SELECT u FROM User u WHERE u.name = ?1
+```
+JPQL: SELECT u FROM User u JOIN FETCH u.profile WHERE u.age > :age
     ↓
-Hibernate 分析 Entity 映射元数据
+[1] Hibernate 解析 JPQL，识别 Entity 元数据（User.class 的映射信息）
     ↓
-SQL: SELECT id, name, email FROM users WHERE name = ?
-</pre>
+[2] 识别 JOIN FETCH u.profile → 预加载关联（消除 N+1）
+    ↓
+[3] 识别 WHERE u.age > :age → 转换为 WHERE u.age > ?
+    ↓
+[4] 根据 Dialect 生成数据库特定 SQL：
+    MySQL:    SELECT u.*, p.* FROM user u LEFT JOIN profile p ON ...
+    PostgreSQL: 同上（语法略有差异）
+    Oracle:   同上（分页语法不同）
+```
 
-## N+1 问题
+### 关系映射的 owning side 机制
 
-### 产生原因
+JPA 要求双向关联中必须有一方为 **owning side**（外键维护方），另一方为 **inverse side**（反向端）：
 
-<pre>
-N+1 问题产生机制：
-1. 查询 10 个 User（N=10）
-   → 发送 1 条 SELECT 查询用户表
-2. 遍历列表，访问 user.getProfile()
-   → 每个访问触发 1 条 SELECT
-   → 共 10 条 SELECT profile 表
-3. 总计：1 + 10 = 11 条 SQL（1+10 = N+1）
-</pre>
+- **owning side**：通过 `@JoinColumn` 定义外键列，`mappedBy` 不存在
+- **inverse side**：`mappedBy` 指向 owning 侧的字段名，不维护外键
 
-### 解决方案对比
+**关键约束**：只有 owning side 的修改才会同步到数据库。设置 inverse 侧的关联不会触发外键更新：
+```java
+// 这不会同步到数据库！因为 department 是 inverse side
+employee.setDepartment(dept);  // 正确：owning side
+dept.getEmployees().add(employee); // 错误：inverse side，不生效
+```
 
-| 方案 | 原理 | SQL 数量 |
-|------|------|----------|
-| JOIN FETCH | 一次 JOIN 查询所有关联 | 1 |
-| @BatchSize | 改用 IN 查询，批处理关联加载 | 1 + ceil(N/batchSize) |
-| @EntityGraph | 指定预加载关联，底层也是 JOIN | 1 |
-
-## 二级缓存
-
-### EHCache / JCache 本质
-
-二级缓存是 SessionFactory 级别的缓存，可跨事务共享。缓存的是 Entity 的快照（snapshot），而非直接缓存 Entity 实例本身，确保隔离级别。
-
-<pre>
-二级缓存读写流程：
-读取：Session → 一级缓存 → 二级缓存 → DB
-写入：Session → 一级缓存 → flush → 二级缓存更新
-</pre>
-
-## 事务与隔离
-
-### 传播行为决策
-
-<pre>
-事务传播选择决策树：
-            ┌─ 需要独立事务？ → REQUIRES_NEW
-传播行为 ─┤
-            ├─ 支持当前事务？ → REQUIRED（默认）
-            └─ 必须有事务？ → MANDATORY
-</pre>
-
-## 乐观锁 vs 悲观锁
-
-### @Version 乐观锁原理
-
-<pre>
-乐观锁冲突检测流程：
-T1: 读取 entity（version=1）→ 修改 → UPDATE WHERE version=1
-T2: 同时读取同一 entity（version=1）→ 修改 → UPDATE WHERE version=1
-    → T1 成功，version 变为 2
-    → T2 UPDATE 失败（0 rows affected）
-    → 抛出 OptimisticLockException
-</pre>
-
-## 参考样例
+## 参考存根
 
 ```java
+// 展示脏检查和快照机制（简化版）
 @Entity
-@Table(name = "users")
 public class User {
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Id @GeneratedValue
     private Long id;
-    @Column(nullable = false, unique = true)
-    private String username;
+    private String name;
+    @Version
+    private Long version; // 乐观锁版本号
 }
-```
 
-```java
-public interface UserRepository extends JpaRepository<User, Long> {
-    User findByUsername(String username);
-    List<User> findByAgeGreaterThan(int age);
+// 演示 persist vs merge
+@Test
+public void testEntityStates() {
+    User user = new User(); // NEW
+    user.setName("Alice");
+
+    em.getTransaction().begin();
+    em.persist(user); // MANAGED
+    user.setName("Bob"); // 脏检查跟踪此变更
+    em.getTransaction().commit(); // flush → 生成 UPDATE（因 version 未变）
+    // 注意：persist 后 entity 仍是 MANAGED，不需要 merge
 }
-```
 
-```java
-@Query("SELECT u FROM User u JOIN FETCH u.profile WHERE u.id = :id")
-User findByIdWithProfile(@Param("id") Long id);
-```
+// 演示 merge
+@Test
+public void testMerge() {
+    User detached = new User();
+    detached.setId(1L);
+    detached.setName("Charlie");
 
-```java
-@OneToMany(mappedBy = "department", cascade = CascadeType.ALL)
-private List<Employee> employees;
-```
-
-```java
-@Transactional
-public void createUser(String name) { }
-```
-
-```java
-@Version
-private Long version;
-```
-
-```java
-public Page<User> findUsers(int page, int size) {
-    return userRepository.findAll(PageRequest.of(page, size));
+    em.getTransaction().begin();
+    User merged = em.merge(detached); // detached → MANAGED（返回的是 persistenceContext 中的实例）
+    merged.setName("David");
+    em.getTransaction().commit();
 }
 ```

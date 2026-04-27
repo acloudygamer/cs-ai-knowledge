@@ -1,189 +1,196 @@
 # Docker 与 Kubernetes
 
-## 本质断言
+## 定义
 
-容器的本质是进程隔离技术，通过 Linux Namespace 实现资源隔离（PID、网络、文件系统等），通过 cgroup 实现资源限制（CPU、内存），通过 UnionFS 实现分层镜像以节省存储。Kubernetes 的本质是容器编排引擎，通过声明式配置实现多容器 Pod 的自动化调度、扩缩容和自愈。
+**Docker** 是容器化 runtime，其本质是通过 Linux Namespace 实现进程级资源隔离，通过 cgroup 实现资源限制，通过 UnionFS 实现分层镜像。**Kubernetes** 是容器编排引擎，其本质是 **声明式状态机**——用户声明期望状态（YAML），Kubernetes 控制器不断调谐（reconcile）实际状态直到与期望状态一致。
 
-## Docker
+## 数学模型
 
-### 镜像层叠机制
+### cgroup 资源限制的约束模型
 
-<pre>
-Docker 镜像结构：
-Container Layer（可写层）
-    ↑
-Image Layer 3（应用依赖）
-Image Layer 2（运行时环境）
-Image Layer 1（操作系统基础）
-    ↓
-Read-only 共享基础层
-</pre>
+cgroup v2 的资源约束可建模为不等式组：
 
-每个镜像层是只读的，新容器在顶部添加可写层。相同基础层的多个镜像共享底层存储，实现空间节省。
+| 资源类型 | 约束形式 | 说明 |
+|---------|---------|------|
+| CPU | $\text{CPU}_{\text{quota}} / \text{CPU}_{\text{period}} \leq N$ | 容器最多使用 N 个 CPU |
+| 内存 | $\text{memory.max} = X$ | 超过则 OOM Kill |
+| I/O | $\text{IOPS}_{\text{throttle}} \leq Y$ | 限制磁盘吞吐量 |
 
-### 多阶段构建原理
+**CPU 权重模型**：cgroup 按权重分配 CPU 时间片。设容器 A 权重 $w_A$，容器 B 权重 $w_B$，则 CPU 时间片比例为：
+$$\frac{T_A}{T_B} = \frac{w_A}{w_B}$$
 
-多阶段构建利用 Docker 镜像层共享机制：第一阶段构建产物（JAR/WAR）被复制到第二阶段，第二阶段仅包含运行时依赖，显著减小镜像体积。
+权重是相对值，不是绝对值。若只有一个容器，即使权重很低也能使用全部空闲 CPU。
 
-<pre>
-多阶段构建效果：
-传统：构建工具 + 运行时 + 应用 = 800MB+
-多阶段：仅运行时 + 应用 = 200MB+
-</pre>
+### Kubernetes 调度器的装箱算法（Bin Packing）
 
-### Jib 的差异
+Pod 调度 = 将 Pod 放入最优节点，本质是 **多维装箱问题（Multi-dimensional Bin Packing）**：
 
-Jib 直接将 Java 应用打包为 OCI 镜像，无需 Docker daemon，通过 Maven/Gradle 插件直接推送到 registry，实现无特权构建。
+- 资源维度：CPU、内存、GPU、临时存储
+- 约束：节点资源容量、亲和性/反亲和性、污点容忍
 
-## Kubernetes
+装箱目标是 **资源利用率最大化**，通常使用 **First Fit Decreasing (FFD)** 或 **Best Fit** 启发式算法。
 
-### Pod 的本质
+**优先级函数**（simplified）：
+$$Score_i = w_1 \cdot \frac{\text{CPU\_used}}{\text{CPU\_allocatable}} + w_2 \cdot \frac{\text{Mem\_used}}{\text{Mem\_allocatable}}$$
+
+得分最高的节点被选中调度。
+
+## 数据流
 
 <pre>
-Pod 与容器的关系：
-Pod = 共享网络 + 共享 IPC + 共享UTS命名空间的一个或多个容器
-    ↓
-同一 Pod 内的容器：
-- 共享同一个 IP（localhost 互通）
-- 共享同一个 PID 命名空间（可见彼此进程）
-- 共享同一个 UTS（主机名相同）
+Docker 镜像层与容器层
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+┌──────────────────────────────────────────────────────────┐
+│ Container Layer (可写层，thin R/W)                       │
+│  对容器文件系统的修改在此层                                │
+└──────────────────────────────────────────────────────────┘
+         ▲ copy-on-write（写入时才复制）
+         │
+┌──────────────────────────────────────────────────────────┐
+│ Image Layer 3 (Tomcat)                                   │
+│ Image Layer 2 (JRE)                                       │
+│ Image Layer 1 (OS Base: alpine)                           │
+│ Boot Layer (bootfs)                                       │
+└──────────────────────────────────────────────────────────┘
+
+Kubernetes 控制器调谐循环
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+用户声明: spec.replicas = 3
+         │
+         ▼
+┌─────────────────┐
+│  Controller    │ ──▶ 比较期望状态 vs 实际状态
+│  (Control Loop) │
+└────────┬────────┘
+         │ 发现差距
+         ▼
+┌─────────────────┐
+│  ReplicaSet     │ ──▶ 创建/删除 Pod
+│  Controller     │
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────┐
+│  Scheduler     │ ──▶ 为 Pod 选择最优节点
+│                 │
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────┐
+│  Kubelet       │ ──▶ 在节点上创建/停止容器
+│                 │
+└────────┬────────┘
+         │
+         ▼
+      实际状态 → (再次调谐) → 期望状态
 </pre>
 
-Pod 是 Kubernetes 的最小调度单元，而非容器。Pod 内的多个容器共享资源（内存卷、网络），共同调度。
+## 机制
 
-### Deployment 的滚动更新
+### UnionFS 的写时复制（Copy-on-Write）语义
 
-<pre>
-滚动更新流程：
-Deployment（replicas=3）
-    ↓
-ReplicaSet A：3 个旧版 Pod
-    ↓
-开始更新 → ReplicaSet B：1 个新版 Pod
-    ↓
-验证新版 Pod 就绪 → ReplicaSet A 缩容至 2
-    ↓
-循环直到全部替换
-    ↓
-最终：ReplicaSet B：3 个新版 Pod
-</pre>
+镜像层是只读的。当容器向某文件写入时：
+1. 若文件不在容器层（未修改过）→ 从下层镜像层复制到容器层
+2. 在容器层执行写入操作
+3. 读取时：容器层有则读容器层，无则读镜像层（按顺序向下查找）
 
-### Service 的服务发现
+这使得：
+- 多个容器共享相同镜像层，节省磁盘空间
+- 容器启动极快（只需创建薄的 R/W 层）
+- 镜像构建可复用层缓存
 
-<pre>
-Kubernetes 服务寻址流程：
-Pod 访问 Service（clusterIP:port）
-    ↓
-kube-proxy 拦截流量
-    ↓
-负载均衡到后端 Pod（Endpoints）
-    ↓
-环境变量 / DNS 提供 Service 地址
-</pre>
+### Pod 的本质：共享命名空间
 
-Service 通过 Label Selector 动态追踪后端 Pod 列表，Pod 的 IP 变化不影响 Service 地址。
+Pod 内的容器共享：
+- **网络命名空间**：同一 IP、端口空间，`localhost` 互通
+- **IPC 命名空间**：可通过 IPC 通信（System V IPC、POSIX 消息队列）
+- **UTS 命名空间**：同一主机名
+- **PID 命名空间**：容器 1 的进程在容器 2 中可见（Kubernetes 特有的 "shareProcessNamespace"）
 
-### 探针机制
+**存储卷共享**：通过 `emptyDir` 或 `persistentVolumeClaim`，Pod 内多个容器可读写同一卷。
 
-<pre>
-存活探针（livenessProbe）vs 就绪探针（readinessProbe）：
-livenessProbe 失败 → 重启容器（ kubelet 行为）
-readinessProbe 失败 → 从 Service 移除（停止接收流量）
-    ↓
-应用启动慢 → 初始延迟（initialDelaySeconds）防止误杀
-</pre>
+### 探针机制的安全语义
 
-## 资源配置
+| 探针类型 | 失败后果 | 适用场景 |
+|---------|---------|---------|
+| livenessProbe | kubelet 重启容器 | 确认进程僵死（无法自行恢复） |
+| readinessProbe | 从 Service 摘除 | 确认未就绪（启动中/过载/依赖不可用） |
+| startupProbe | 禁用 liveness/readiness 直到成功 | 确认启动完成（用于启动慢的应用） |
 
-### 资源配额模型
+**约束条件**：
+- `failureThreshold × periodSeconds` 应大于应用最大启动时间
+- livenessProbe 不应检查外部依赖（否则依赖故障会触发无限重启）
+- readinessProbe 失败时 Pod IP 从 Endpoints 移除，但容器不重启
 
-<pre>
-Kubernetes 资源配额：
-requests：调度时预留的最小资源（调度依据）
-limits：运行时不允许超过的最大资源（触发 OOM Kill）
-    ↓
-CPU：1 core = 1000m（millicores）
-内存：1Gi = 1024Mi
-</pre>
+### Rolling Update 的数学保证
 
-## 参考样例
+Rolling Update 策略参数：
+```yaml
+spec:
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1    # 最多不可用 Pod 数
+      maxSurge: 1          # 最多超出期望 Pod 数
+```
+
+设 $N$ = 期望副本数，$S$ = maxSurge，$U$ = maxUnavailable：
+
+**最小可用 Pod 数**：$N - U$
+**最大总 Pod 数**：$N + S$
+
+Rolling Update 过程可建模为状态机，确保任意时刻都有至少 $N-U$ 个 Pod 可用——这是 **始终保持服务可用** 的数学保证。
+
+## 参考存根
 
 ```dockerfile
-FROM eclipse-temurin:25-jre-alpine
-COPY target/myapp.jar /app/myapp.jar
-USER 1000
-ENTRYPOINT ["java", "-jar", "/app/myapp.jar"]
+# 多阶段构建示例：减小镜像体积
+# 阶段 1：构建
+FROM maven:3.9-eclipse-temurin AS builder
+WORKDIR /app
+COPY pom.xml .
+RUN mvn dependency:go-offline
+COPY src ./src
+RUN mvn package -DskipTests
+
+# 阶段 2：运行（仅复制产物）
+FROM eclipse-temurin:21-jre-alpine
+WORKDIR /app
+COPY --from=builder /app/target/myapp.jar ./myapp.jar
+# 体积从 ~800MB 降到 ~200MB
+ENTRYPOINT ["java", "-jar", "myapp.jar"]
 ```
 
 ```yaml
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: myapp-deployment
-spec:
-  replicas: 3
-  selector:
-    matchLabels:
-      app: myapp
-  template:
-    metadata:
-      labels:
-        app: myapp
-    spec:
-      containers:
-        - name: myapp
-          image: myuser/myapp:1.0.0
-          ports:
-            - containerPort: 8080
-```
-
-```yaml
+# Kubernetes Pod 探针配置
 apiVersion: v1
-kind: Service
+kind: Pod
 metadata:
-  name: myapp-service
+  name: myapp
 spec:
-  selector:
-    app: myapp
-  ports:
-    - protocol: TCP
-      port: 80
-      targetPort: 8080
-```
-
-```yaml
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: myapp-ingress
-spec:
-  rules:
-    - host: myapp.example.com
-      http:
-        paths:
-          - path: /
-            pathType: Prefix
-            backend:
-              service:
-                name: myapp-service
-                port:
-                  number: 80
-```
-
-```yaml
-management:
-  endpoint:
-    health:
-      probes: true
-```
-
-```yaml
-spec:
-  terminationGracePeriodSeconds: 60
   containers:
-    - name: myapp
-      lifecycle:
-        preStop:
-          exec:
-            command: ["sh", "-c", "sleep 10"]
+  - name: myapp
+    image: myapp:1.0
+    livenessProbe:
+      httpGet:
+        path: /healthz
+        port: 8080
+      initialDelaySeconds: 30      # 启动 30s 后开始探测
+      periodSeconds: 10             # 每 10s 探测一次
+      failureThreshold: 3          # 连续 3 次失败则重启
+    readinessProbe:
+      httpGet:
+        path: /ready
+        port: 8080
+      initialDelaySeconds: 5
+      periodSeconds: 5
+      failureThreshold: 2          # 连续 2 次失败则从 Service 摘除
+    startupProbe:
+      httpGet:
+        path: /started
+        port: 8080
+      failureThreshold: 30         # 30 * 10s = 300s 最大启动时间
+      periodSeconds: 10
 ```

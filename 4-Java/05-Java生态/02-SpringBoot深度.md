@@ -1,179 +1,171 @@
 # Spring Boot 深度用法
 
-## 本质断言
+## 定义
 
-Spring Boot 的本质是通过约定优于配置（Convention over Configuration）减少开发者决策负担，通过自动配置（Auto Configuration）动态适配 classpath 依赖，通过嵌入式容器实现应用的快速启动。
+Spring Boot 的本质是 **约定优于配置** 的自动化框架，通过 `spring-boot-autoconfigure` 模块实现classpath 依赖的自动感知和 Bean 的条件注册，将原本需要手动配置的 Spring 应用转变为"添加依赖即可运行"的零配置体验。
 
-## 自动配置原理
+## 数学模型
 
-### 核心机制
+### 自动配置的贝叶斯条件概率模型
 
-Spring Boot 3.x 通过 AutoConfigurationImportSelector 扫描 classpath 下 META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports 文件，按 @Conditional 条件注解筛选并加载符合条件的 AutoConfiguration 类，实现"添加依赖即生效"的零配置体验。
+将每个 `@Conditional` 注解视为一个条件事件。设 $C_i$ 为"第 $i$ 个条件满足"事件，$B$ 为"某 AutoConfiguration 注册"事件。Spring Boot 计算后验概率：
 
-<pre>
-自动配置加载流程：
-classpath 扫描
-    ↓
-读取 AutoConfiguration.imports 文件
-    ↓
-按 @ConditionalOnClass 过滤（依赖存在才加载）
-    ↓
-按 @ConditionalOnBean 过滤（避免重复注册）
-    ↓
-按 @ConditionalOnProperty 过滤（配置开关控制）
-    ↓
-注册 @Bean 到容器
-</pre>
+$$P(B | C_1, C_2, ..., C_n) = \prod_{i=1}^{n} P(C_i | B)$$
 
-### 条件装配决策链
+实际执行时，Spring 逐条件求值（AND 逻辑），任意一个 `$P(C_i) = 0$` 则 `$P(B) = 0$`，该配置类不注册。
 
-<pre>
-Bean 注册决策树：
-                    ┌─ @ConditionalOnClass 失败？
-                    │       ↓ (不注册)
-                    ├─ @ConditionalOnBean 已有同类型？
-                    │       ↓ (跳过)
-                    ├─ @ConditionalOnMissingBean 不存在？
-                    │       ↓ (注册)
-                    └─ @ConditionalOnProperty 满足？
-                            ↓ (不注册/注册)
-</pre>
+### 事件发布-订阅的有限状态机模型
 
-## 事件机制
+Spring ApplicationEvent 可以建模为 **有限状态自动机（FSA）**：
+- 状态集 $S = \{\text{NEW}, \text{PUBLISHED}, \text{MULTICASTING}, \text{DELIVERED}\}$
+- 事件 $E = \{\text{publish}, \text{multicast}, \text{deliver}\}$
+- 初始状态：NEW
+- 终止状态：DELIVERED
 
-### 发布-订阅模式
+`@TransactionalEventListener` 添加了一个 **guard condition**（事务提交后）：只有当发布线程的事务提交成功，才允许状态转换到 MULTICASTING。
 
-Spring 的事件机制本质是发布-订阅模式：ApplicationEventPublisher 负责发布事件，ApplicationEventMulticaster 负责将事件广播给所有匹配的 @EventListener。
+## 数据流
 
 <pre>
-事件传播流程：
-publisher.publishEvent(event)
-    ↓
-ApplicationEventMulticaster 接收
-    ↓
-匹配 @EventListener 方法
-    ↓
-同步/异步执行监听器
+SpringApplication.run() 执行路径
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+│
+├─[1] Bootstrap Context 初始化
+│   配置源优先级链生效（高→低）：
+│   命令行参数 > ServletConfigParam > ServletContextParam
+│    > application-{profile}.yml > application.yml > 默认值
+│
+├─[2] ApplicationContext 创建
+│   │
+│   └─[3] BeanDefinition 加载阶段
+│       │
+│       ├─ @ComponentScan → 扫描 + 注册
+│       ├─ @Import → 导入配置类
+│       └─ @EnableConfigurationProperties → 绑定配置属性
+│
+├─[4] 容器刷新（AbstractApplicationContext.refresh()）
+│   │
+│   ├─ prepareBeanFactory() — 填充 BeanFactory 预设
+│   ├─ invokeBeanFactoryPostProcessors() — 执行后置处理器
+│   │   └─ ConfigurationClassPostProcessor
+│   │       └─ 解析 @Bean, @ComponentScan, @Import
+│   ├─ registerBeanPostProcessors() — 注册后置处理器
+│   │   └─ 排序 + 注册到 BeanFactory
+│   ├─ initMessageSource() — i18n 消息源
+│   ├─ initApplicationEventMulticaster() — 事件广播器
+│   ├─ onRefresh() — 子类扩展（如 WebFlux 创建 Reacter)
+│   ├─ registerListeners() — 注册静态监听器
+│   ├─ finishBeanFactoryInitialization() — 单例预实例化
+│   │   └─ BeanFactory.preInstantiateSingletons()
+│   └─ finishRefresh() — 发送 ContextRefreshedEvent
+│
+└─[5] ApplicationRunner / CommandLineRunner 执行
+    └─ 按 @Order 排序，同 Order 内随机
 </pre>
 
-### @TransactionalEventListener 的事务绑定
+## 机制
 
-@TransactionalEventListener 确保事件监听器只在事务提交后执行，用于解决"业务操作成功后发送通知"的场景，避免事务回滚导致通知已发送。
+### 条件装配的偏序关系
 
-## 配置管理
+`@Conditional` 注解之间存在隐式偏序：Spring Boot 的 `AutoConfiguration` 实际上按照 `spring.factories` 中定义的顺序执行（显式或隐式）。当同一 Bean 存在多个候选时：
 
-### @ConfigurationProperties 本质
+1. **优先级高者先评估**：若高优先级条件失败，低优先级不会被评估
+2. **OnBeanCondition**：检查容器中是否存在某类型 Bean——用于避免重复注册
+3. **OnClassCondition**：检查 classpath——用于可选依赖的自动配置
 
-@ConfigurationProperties 将外部配置（application.yml / 环境变量）绑定到 POJO 对象，支持 relaxed binding（松散绑定，即 app-name、appName、app-name 均可映射到 appName 字段）。
+**关键约束**：Spring Boot 2.x 的 `@EnableAutoConfiguration` 使用 `AutoConfigurationImportSelector`，读取 `META-INF/spring.factories`；Spring Boot 3.x 改为 `META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports`，结构更清晰。
 
-### 多环境配置机制
+### @ConfigurationProperties 的松散绑定数学本质
 
-Spring Profile 本质是 Environment 的属性源（PropertySource）切分，同一配置项在激活不同 Profile 时读取不同的值。
+Spring Boot 支持三种命名风格自动映射：
+- `app-name` (kebab-case)
+- `app_name` (snake_case)
+- `appName` (camelCase)
 
-<pre>
-配置源优先级（高到低）：
-命令行参数 > @SpringBootApplication 外部配置
-    > application-{profile}.yml
-    > application.yml
-    > 默认值
-</pre>
+设属性名为 $s$，字段名为 $f$，松散绑定关系 $s \approx f$ 由 `RelaxedDataBinder` 定义：
 
-## 启动流程
+| 风格转换 | 规则 |
+|---------|------|
+| kebab → camel | `app-name` → `appName` |
+| snake → camel | `app_name` → `appName` |
+| dot → underscore | `app.name` → `app_name` |
 
-### 容器刷新前阶段
+这本质上是字符串重写（string rewriting）规则，定义了等价类 $[s]$。绑定时在等价类中搜索匹配字段名。
 
-<pre>
-SpringApplication.run() 内部流程：
-1. BootstrapContext 创建 → 引导上下文初始化
-2. Environment 配置 → System Properties / OS Env / application.yml
-3. Banner 打印 → 可通过 banner.txt 自定义
-4. ApplicationContext 创建 → 创建空容器
-5. 上下文刷新 → Bean 加载/实例化/初始化
-6. ApplicationRunner / CommandLineRunner 执行
-</pre>
+### @TransactionalEventListener 的事务边界语义
 
-## 懒加载
+```
+普通事件发布：
+    T1: publishEvent()
+            ↓
+        同步执行所有监听器（在发布者线程）
+            ↓
+        事务提交前监听器已执行完毕
 
-### 懒加载 vs 即时加载
-
-<pre>
-加载策略对比：
-即时加载：启动时实例化所有 Bean → 启动慢但请求快
-懒加载：首次访问时实例化 → 启动快但首次请求慢
-</pre>
-
-@Lazy 注解本质是将 BeanDefinition.setLazyInit(true)，使该 Bean 在首次 getBean() 时才实例化，而非容器刷新时。
-
-## 外部化配置
-
-### @Value 占位符解析顺序
-
-${property:default} 解析顺序：Environment → 系统属性 → 系统环境变量 → 默认值。#{expression} 使用 SpEL 可调用方法、访问系统属性。
-
-## 常用配置端点
-
-### Actuator 端点分类
-
-| 类别 | 端点 | 用途 |
-|------|------|------|
-| 监控 | /health | 存活+就绪状态 |
-| 监控 | /metrics | 各项指标数据 |
-| 运维 | /env | 环境变量查看 |
-| 运维 | /beans | 容器所有 Bean |
-| 运维 | /configprops | 配置属性列表 |
-
-## 参考样例
-
-```java
-@ConfigurationProperties(prefix = "app")
-@Validated
-public class AppProperties {
-    private String name;
-    private int timeout;
-}
+@TransactionalEventListener：
+    T1: publishEvent()
+            ↓
+        事件存入 TransactionSynchronizationManager 队列
+            ↓
+        T1: 业务逻辑执行 → 事务提交
+            ↓
+        T1: 事务提交后，触发 synchronization.afterCommit()
+            ↓
+        异步执行监听器（或按 transactionManager 同步执行）
 ```
 
+**约束条件**：
+- 若事务回滚，事件不发送——这是"业务成功才通知"的语义保证
+- 若事件监听器抛异常，不影响已提交的事务（监听器在事务外执行）
+
+### 懒加载的代价-收益分析
+
+设应用有 $N$ 个 Bean，其中 $k$ 个是启动时不需要的：
+
+**即时加载**：
+- 启动时间代价：$T_{\text{eager}} = \sum_{i=1}^{N} T_{\text{init}}(i)$
+- 首次请求时间：$T_{\text{first}} = O(1)$
+
+**懒加载**：
+- 启动时间代价：$T_{\text{lazy}} = \sum_{i=1}^{N-k} T_{\text{init}}(i)$
+- 首次请求时间：$T_{\text{first}} = \sum_{j \in \text{needed}} T_{\text{init}}(j)$
+
+若懒加载 Bean 在请求时才初始化，且应用启动后立即接收请求，则 $T_{\text{first}}$ 延迟增加。Spring Boot 2.2+ 的 `spring.main.lazy-initialization=true` 全局启用懒加载，适用于启动速度优先的场景。
+
+## 参考存根
+
 ```java
-public class UserRegisteredEvent extends ApplicationEvent {
-    public UserRegisteredEvent(Object source, String userId) {
-        super(source);
+// 展示事件发布的条件执行（简化版）
+@Configuration
+public class EventConfig {
+    @Bean
+    public ApplicationEventMulticaster multicaster(
+            SimpleApplicationEventMulticaster delegate) {
+        // 添加监听器到线程池，实现异步事件
+        delegate.setTaskExecutor(Executors.newCachedThreadPool());
+        return delegate;
     }
 }
-```
 
-```java
+// @TransactionalEventListener 使用示例
+@Service
+public class UserService {
+    private final ApplicationEventPublisher publisher;
+
+    public void createUser(User user) {
+        userRepository.save(user);
+        // 事件监听器将在事务提交后才执行
+        publisher.publishEvent(new UserCreatedEvent(this, user.getId()));
+    }
+}
+
 @Component
-@Order(1)
-public class MyApplicationRunner implements ApplicationRunner {
-    public void run(ApplicationArguments args) { }
+@TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+public class UserCreatedListener {
+    @EventListener
+    public void handle(UserCreatedEvent event) {
+        // 只有事务成功提交后，这里才会执行
+        notificationService.sendWelcome(event.getUserId());
+    }
 }
-```
-
-```java
-@Value("${app.name:default}")
-private String appName;
-```
-
-```java
-@ControllerAdvice
-public class GlobalExceptionHandler {
-    @ExceptionHandler(UserNotFoundException.class)
-    public ErrorResponse handle(UserNotFoundException ex) { }
-}
-```
-
-```java
-@Configuration
-public class CorsConfig implements WebMvcConfigurer {
-    public void addCorsMappings(CorsRegistry registry) { }
-}
-```
-
-```java
-@ConfigurationProperties(prefix = "myapp")
-public class MyProperties { }
-
-@Configuration
-@EnableConfigurationProperties(MyProperties.class)
-public class MyAutoConfiguration { }
 ```

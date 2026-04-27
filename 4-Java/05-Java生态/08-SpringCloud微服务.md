@@ -1,181 +1,180 @@
 # Spring Cloud 微服务
 
-## 本质断言
+## 定义
 
-Spring Cloud 的本质是一套分布式系统解决方案，通过声明式服务发现实现服务地址的动态管理，通过声明式 HTTP 客户端（OpenFeign）实现服务间调用的简化，通过熔断器实现故障隔离和降级，通过 API 网关实现统一入口和动态路由。
+Spring Cloud 是分布式系统解决方案的 **抽象层**，本质是通过声明式服务发现实现服务地址的动态管理，通过声明式 HTTP 客户端（OpenFeign）实现服务间调用的简化，通过断路器（Circuit Breaker）实现故障隔离，通过 API 网关实现统一入口。Spring Cloud 不是具体实现，而是集成规范——具体实现由 Netflix、Alibaba 等提供。
 
-## 服务注册与发现
+## 数学模型
 
-### 服务注册的本质
+### 断路器的有限状态机
 
-<pre>
-服务注册与发现流程：
-服务启动 → 注册自己的 IP:Port 到注册中心（Nacos/Eureka）
-    ↓
-服务消费者从注册中心获取服务提供者地址列表
-    ↓
-消费者本地缓存地址列表，注册中心变更时推送通知
-    ↓
-消费者根据负载均衡策略选择目标服务实例
-</pre>
+Resilience4j 断路器建模为 **有限状态自动机**：
 
-### Nacos vs Eureka
+```
+状态机定义：S = {CLOSED, OPEN, HALF_OPEN}
+事件：E = {failure_count, success_count, timeout}
 
-<pre>
-注册中心选型：
-Eureka（已停止维护）：AP 模型，只保证可用性
-Nacos：同时支持 AP 和 CP，可作为配置中心
-</pre>
-
-## 服务通信
-
-### OpenFeign 的本质
-
-OpenFeign 通过动态代理（Proxy）将接口方法调用转换为 HTTP 请求，开发者只需声明接口而无需实现，运行时由 Feign 生成代理类完成 HTTP 调用。
-
-<pre>
-OpenFeign 执行流程：
-接口声明 → @FeignClient(name="svc")
-    ↓
-启动时生成 JDK 动态代理类
-    ↓
-方法调用 → 拦截器 → 构建 HTTP 请求 → 发送
-    ↓
-响应 → 解码 → 返回值
-</pre>
-
-### 负载均衡
-
-<pre>
-负载均衡策略：
-Round Robin：轮询（默认）
-Random：随机
-Weighted Response Time：根据响应时间加权
-Best Available：根据并发连接数选择
-</pre>
-
-Ribbon 已停止维护，Spring Cloud LoadBalancer 是其替代方案。
-
-## 熔断器
-
-### Resilience4j 熔断状态机
-
-<pre>
-熔断器状态转换：
-CLOSED（正常）→ 失败率超过阈值 → OPEN（熔断）
-OPEN（熔断）→ 经过冷却时间 → HALF_OPEN（试探）
-HALF_OPEN（试探）→ 成功 → CLOSED
-HALF_OPEN（试探）→ 失败 → OPEN
-</pre>
-
-### 熔断 vs 超时 vs 重试
-
-<pre>
-容错策略对比：
-超时：等待多久放弃（防止无限等待）
-重试：失败后重新尝试（提高成功率，但可能放大故障）
-熔断：快速失败，拒绝新请求（防止雪崩，保护下游）
-</pre>
-
-## API 网关
-
-### Gateway 的本质
-
-Gateway 基于 Spring WebFlux 的响应式编程模型，通过路由（Route）+ 断言（Predicate）+ 过滤器（Filter）实现请求的转发、过滤和修改。
-
-<pre>
-Gateway 请求处理流程：
-请求 → Route Predicate → 匹配路由规则
-    ↓
-匹配成功 → Filter（前置处理）→ 代理转发
-    ↓
-Filter（后置处理）→ 响应
-</pre>
-
-## 配置中心
-
-### 配置动态刷新机制
-
-<pre>
-配置变更推送流程：
-Nacos 配置变更 → 发送 UDP 通知到所有服务
-    ↓
-服务收到通知 → 重新从 Nacos 获取最新配置
-    ↓
-@RefreshScope 触发 Bean 重新创建
-    ↓
-新 Bean 注入到依赖方
-</pre>
-
-## 分布式链路追踪
-
-### Trace / Span 模型
-
-<pre>
-分布式追踪结构：
-Trace = 请求全流程（唯一 TraceId）
-Span = 单个服务/操作（唯一 SpanId，携带 ParentSpanId）
-    ↓
-Span A（Gateway）→ Span B（User Service）→ Span C（DB）
-  TraceId: T1          TraceId: T1            TraceId: T1
-  SpanId: S1           SpanId: S2             SpanId: S3
-  ParentId: null       ParentId: S1           ParentId: S2
-</pre>
-
-## 参考样例
-
-```yaml
-spring:
-  cloud:
-    nacos:
-      discovery:
-        server-addr: localhost:8848
+CLOSED（正常）：
+    失败率 > threshold → 触发 transition → OPEN
+    │
+    ▼
+OPEN（熔断）：
+    经过 waitDuration → 触发 transition → HALF_OPEN
+    │
+    ▼
+HALF_OPEN（试探）：
+    成功数 > successThreshold → 触发 transition → CLOSED
+    失败数 > failureThreshold → 触发 transition → OPEN
 ```
 
+**CLOSED 状态的失败率计算**（滑动窗口）：
+$$p_{\text{failure}} = \frac{\text{failures in window}}{\text{requests in window}}$$
+
+设滑动窗口大小为 $W$，失败阈值为 $\theta$：
+- 若 $p_{\text{failure}} > \theta$ → OPEN
+- 若 $p_{\text{failure}} \leq \theta$ → 保持 CLOSED
+
+### 服务注册的 AP vs CP 分析
+
+分布式系统 CAP 定理：
+- **C（Consistency）**：所有节点看到相同数据
+- **A（Availability）**：每次请求都有响应
+- **P（Partition tolerance）**：网络分区时仍能运行
+
+| 注册中心 | 模型 | 说明 |
+|---------|------|------|
+| Eureka | AP | 优先可用，分区时仍可注册/发现，但不保证一致性 |
+| Nacos（默认） | AP | 可切换 CP 模式 |
+| Consul | CP | 优先一致，使用 Raft 协议 |
+
+**选择依据**：服务注册对 **可用性** 要求更高——即使网络波动，也要能注册新服务实例，否则新实例无法被调用。Nacos 默认 AP 是合理选择。
+
+## 数据流
+
+<pre>
+Spring Cloud 服务间调用流程
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+服务消费者                          服务提供者
+     │                                   │
+     │ ──── 服务发现请求 ────────────────▶│ 注册中心（如 Nacos）
+     │◀─── 返回实例列表 ─────────────────│
+     │                                   │
+     │     负载均衡选择一个实例              │
+     │ ◀── 选择 instance-2 ──────────────│
+     │                                   │
+     │ ──── HTTP 请求（带 TraceId） ────▶│
+     │     @FeignClient 拦截器添加 Header  │
+     │◀─── 响应 ────────────────────────│
+     │                                   │
+     │     断路器检查状态                   │
+     │     - CLOSED：直接调用              │
+     │     - OPEN：执行 fallback           │
+     │     - HALF_OPEN：允许试探请求        │
+</pre>
+
+## 机制
+
+### OpenFeign 的动态代理机制
+
+OpenFeign 在启动时通过 **JDK 动态代理** 生成接口实现：
+
+```
+@EnableFeignClients → FeignClientsConfiguration
+        │
+        ▼
+Builder.build() → newInstance()
+        │
+        ▼
+Proxy.newProxyInstance(classLoader, interfaces, InvocationHandler)
+        │
+        ▼
+InvocationHandler.invoke() → MethodHandler.invoke()
+        │
+        ├── MethodHandler.apply() → RequestTemplate 构建 HTTP 请求
+        ├── Client.execute() → 发送 HTTP 请求
+        └── Decoder → 解码响应
+```
+
+**约束条件**：接口方法必须用 `@RequestMapping` 系列注解标注，因为 Feign 需要从注解提取 HTTP 方法、路径、参数。
+
+### 熔断器的隔离策略
+
+断路器打开后，所有请求直接走 **fallback**，不调用下游服务——这是 **快速失败（fail fast）** 策略：
+
+- 保护下游服务：不再接收请求，给下游恢复时间
+- 保护上游：不让上游线程阻塞在不可用的下游
+
+**半开状态**（HALF_OPEN）是试探性恢复：允许少量请求通过，若成功率足够高则恢复正常。
+
+### 配置中心的广播语义
+
+Nacos 配置变更推送使用 **长轮询 + UDP 广播**：
+
+```
+Nacos Server                              Nacos Client（SDK）
+     │                                        │
+     │◀──── 配置变更监听注册 ──────────────────│
+     │                                        │
+     │     变更发生时：                         │
+     │                                        │
+     │ ──── UDP 推送（变更通知） ─────────────▶│
+     │                                        │
+     │     客户端收到通知后：                    │
+     │                                        │
+     │◀──── HTTP GET /v1/cs/configs ────────│ 主动拉取最新配置
+     │───── 返回最新配置 ────────────────────▶│
+     │                                        │
+     │     @RefreshScope 重新创建 Bean         │
+```
+
+**长轮询作为保底**：UDP 不可靠，客户端会定期长轮询检查确保不丢配置。
+
+### 分布式链路追踪的上下文传播
+
+TraceId 在服务间传播通过 **Baggage** 或 **Context**：
+
+```
+请求头中的追踪信息：
+X-B3-TraceId: abc123          ← 全局唯一
+X-B3-SpanId: 456def           ← 当前操作唯一
+X-B3-ParentSpanId: 789ghi     ← 调用方
+X-B3-Sampled: 1                ← 是否采样
+```
+
+Span 形成树结构：根 Span 是入口操作的 TraceId，后续每个子操作继承该 TraceId。
+
+## 参考存根
+
 ```java
-@FeignClient(name = "user-service", path = "/users")
-public interface UserClient {
-    @GetMapping("/{id}")
-    User getUserById(@PathVariable("id") Long id);
-    @PostMapping
-    User createUser(@RequestBody UserRequest request);
+// 展示 Resilience4j 断路器的状态转换
+@Configuration
+public class CircuitBreakerConfig {
+    @Bean
+    public CircuitBreakerRegistry registry() {
+        return CircuitBreakerRegistry.of(
+            CircuitBreakerConfig.custom()
+                .slidingWindowType(CountBasedSlidingWindow.builder()
+                    .slidingWindowSize(10)       // 滑动窗口：10 个请求
+                    .failureRateThreshold(50)    // 失败率阈值：50%
+                    .waitDurationInOpenState(Duration.ofSeconds(60)) // OPEN 持续 60s
+                    .permittedNumberOfCallsInHalfOpenState(3)      // HALF_OPEN 允许 3 个请求
+                    .build()
+            )
+        );
+    }
 }
-```
 
-```yaml
-spring:
-  cloud:
-    gateway:
-      routes:
-        - id: user-service
-          uri: lb://user-service
-          predicates:
-            - Path=/users/**
-          filters:
-            - StripPrefix=1
-```
+@Service
+public class UserService {
+    private final CircuitBreaker circuitBreaker;
 
-```yaml
-resilience4j:
-  circuitbreaker:
-    instances:
-      userService:
-        sliding-window-size: 10
-        failure-rate-threshold: 50
-        wait-duration-in-open-state: 60s
-```
+    public UserService(CircuitBreakerRegistry registry) {
+        this.circuitBreaker = registry.circuitBreaker("userService");
+    }
 
-```java
-CircuitBreaker circuitBreaker = circuitBreakerFactory.create("userService");
-return circuitBreaker.run(() -> userClient.getUserById(id),
-    throwable -> fallback());
-```
-
-```yaml
-spring:
-  zipkin:
-    base-url: http://localhost:9411
-  sleuth:
-    sampling:
-      probability: 0.1
+    public User getUserById(Long id) {
+        return circuitBreaker.executeSupplier(() -> userClient.getUserById(id));
+    }
+}
 ```
