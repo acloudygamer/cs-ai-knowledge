@@ -2,7 +2,7 @@
 
 ## 定义
 
-CLI 应用是从标准输入接收命令行参数字符串，将其解析、验证并映射为函数调用的程序。CLI 解析的本质是一个**字符串到类型的偏函数** $P: \Sigma^* \rightharpoonup D$，其中 $\Sigma^*$ 是字节串集合，$D$ 是目标数据类型集合，$P$ 在非法输入时无定义（导致错误退出而非静默接受错误数据）。
+CLI 应用是从标准输入接收命令行参数字符串，将其解析、验证并映射为函数调用的程序。CLI 解析的本质是一个**字符串到类型的偏函数** $P: \Sigma^* \rightharpoonup D$，其中 $\Sigma^*$ 是字节串集合，$D$ 是目标数据类型集合，$P$ 在非法输入时**无定义**（导致错误退出而非静默接受错误数据）。这个偏函数的定义域并非全 $\Sigma^*$，因此对任何 CLI 解析器，存在合法的 argv 使 $P$ 无定义——这是 CLI 区别于配置文件解析的核心特征。
 
 ## 数学模型
 
@@ -10,9 +10,16 @@ CLI 应用是从标准输入接收命令行参数字符串，将其解析、验�
 
 $$P(\text{argv}) = \begin{cases} (v_1, \dots, v_n) & \text{若每个 } v_i \in T_i \\ \text{error} & \text{否则} \end{cases}$$
 
-验证函数 $V_i$ 作用于每个解析后的值：$V_i(v_i) = \text{True}$ 当且仅当 $v_i$ 满足类型约束。类型转换失败（如 `int("abc")`）是 $V_i$ 为假的特殊情形。
+**FST 归约**：参数解析可形式化为有限状态转换器 $M = (Q, \Sigma, \delta, q_0, F)$：
+- $Q$ 是解析阶段集合（如"位置参数模式"、"可选参数模式"、"子命令解析"）
+- $\Sigma$ 是 token 集合（`"foo"`, `"--bar"`, `"42"` 等）
+- $\delta: Q \times \Sigma \to Q$ 是确定性转移函数，由参数语法定义驱动
+- $q_0$ 是初始状态（位置参数解析）
+- $F \subseteq Q$ 是接受状态集合（解析完成）
 
-**归约终点**：参数解析可归约为**有限状态转换器**——状态为"当前解析阶段"，输入为 token 序列，转移由参数语法定义驱动。
+以 `prog.py input -v` 为例：状态机在位置参数模式下消费 `"input"` → 遇到 `"-"` 前缀触发转移 → 进入可选参数模式 → `"input"` 被解析为可选参数而非位置参数。**这说明 $\delta$ 的设计与参数顺序紧密耦合**，是 argparse "位置参数必须在可选参数前" 这一约束的数学本质。
+
+**归约终点**：$P$ 可进一步归约为硬件层面的原子指令（CAS），但在软件层，CLI 解析的不可约概念是**确定性状态转移 + 类型验证**的组合。
 
 ## 数据流
 
@@ -24,7 +31,7 @@ shell 展开 wildcards / ~ / $VAR          argv 数组（字节串列表）
   (~/.bashrc 等环境)                       │
         │                                    ▼
         │                              参数解析器
-        │                              (argparse/click)
+        │                              (argparse/click/typer)
         │                                    │
         ▼                                    ▼
   环境变量展开后的实际值                  Namespace / Context
@@ -50,71 +57,96 @@ shell 展开 wildcards / ~ / $VAR          argv 数组（字节串列表）
 
 ### argparse 的解析语义
 
-`argparse.ArgumentParser` 维护一个解析状态机：位置参数优先解析，遇到 `-` 前缀时切换到可选参数模式。`parse_args()` 执行的动作是将 token 序列规约为一棵抽象语法树（AST），然后从根节点自上而下构建 Namespace。
+`argparse.ArgumentParser` 维护一个解析状态机：位置参数优先解析，遇到 `-` 前缀时切换到可选参数模式。`parse_args()` 执行的动作是将 token 序列通过确定性状态机按顺序消费，最终构建 Namespace 对象。
+
+**FST 视角下的 argparse**：状态转移 $\delta$ 由参数定义顺序固定。若将 `add_argument("input")` 放在 `add_argument("-v")` 之后，则 `"input"` 进入可选参数模式——这与函数参数顺序在 Python 中的语义完全不同，违反直觉。
 
 关键约束：位置参数的顺序必须唯一确定，因为解析器按顺序消费位置参数 tokens。若位置参数后出现可选参数，则该位置参数解析结束——这导致 `prog.py input -v` 中 `-v` 被解析为可选参数而非文件名（除非使用 `parser.parse_args(["input", "-v"])`）。
 
 ### click 的装饰器语义
 
-click 的 `@click.command()` 将函数包装为 `Command` 对象，但不改变原函数本身——`Command.invoke` 最终调用原始函数。这意味着类型注解在装饰前就被读取，用于自动生成参数类型约束。
+click 的 `@click.command()` 将函数包装为 `Command` 对象，通过 `Command.invoke` 调用链完成解析与执行：
+
+```
+@click.command()              # 装饰器
+def remove(filename, force):  # 原函数（带有类型注解）
+    ...
+
+# 等价于：
+cmd = Command(callback=remove)
+# invoke 调用链：
+#   1. ctx = Context(cmd)      创建上下文，收集所有 params
+#   2. ctx.params = ctx.parse_args()  根据 @click.argument/option 解析 argv
+#   3. ctx.invoke(callback, **ctx.params)  将解析结果作为关键字参数传递
+```
+
+**context 传递机制**：click 通过 `click.Context` 对象在调用链间传递状态。子命令的 `ctx.parent` 指向父级上下文，允许子命令访问全局选项。`ctx.obj` 用于存储任意自定义数据，实现命令间共享状态。
+
+**装饰器语义的数学本质**：`@click.command()` 不改变原函数的类型签名——原函数的类型注解在装饰前就被 `click` 的 `ParamType` 读取用于类型推断。装饰后，`Command.callback` 持有原函数引用，`invoke` 注入解析后的 `ctx.params`。这意味着装饰器是**纯包装，不改变计算语义**。
 
 子命令的数学本质：**不相交联合类型**的参数空间。`prog add` 和 `prog remove` 的参数集合不相交，解析器通过子命令名称选择解析路径。
 
-### click vs argparse 的设计权衡
-
-| 维度 | argparse | click |
-|------|----------|-------|
-| 参数来源 | 函数签名（仅类型提示） | 装饰器显式声明 |
-| 子命令 | `add_subparsers()`（手动） | `@group.command()`（声明式） |
-| 错误处理 | 返回错误码（默认行为） | 调用 `click.echo(..., err=True)` |
-| 帮助生成 | 自动（字段较少） | 自动（更美观，默认） |
-
 ### typer 的类型推断
 
-typer 在 argparse/click 基础上增加了一层基于 `inspect` 的类型推断：读取函数签名中未注解参数的默认值作为常量，构建对应的 click 参数。这将参数规范减少为零——函数签名本身就是 CLI 接口定义。
+typer 在 argparse/click 基础上增加了一层基于 `inspect` 的类型推断：读取函数签名中**未注解参数的默认值**作为常量，构建对应的 click 参数。这将参数规范减少为零——函数签名本身就是 CLI 接口定义。
 
-设计约束：typer 推断仅支持 Python 3.10+ 的内置类型（`str`、`int`、`float`、`bool`）和标准库类型；自定义类型需要 `click.ParamType` 或显式 `click.Argument/Option` 包装。
+**设计范式转变**：argparse 和 click 仍属于**声明式**——程序员显式声明参数名称、类型、默认值。typer 引入的是**推导式**——参数规范从函数签名自动生成，类型即约束。这意味着：
+
+- typer 的 `def create(name: str, age: int = 18)` 实际上等价于 click 的 `add_option('--name', type=str, default=??? )`，但 typer 无需为 `name` 显式指定 `--name`，因为 `name: str` 中的参数名直接作为选项名。
+- typer 的类型推断层本质上是 `inspect.signature` → `click.Option/Argument` 的**编译时元编程**映射。
+
+**约束**：typer 推断仅支持 Python 3.10+ 的内置类型（`str`、`int`、`float`、`bool`）和标准库类型；自定义类型需要 `click.ParamType` 或显式 `click.Argument/Option` 包装。
 
 ### 类型安全的边界
 
 CLI 参数解析的**核心不变量**：所有通过 `parse_args` 得到的值在类型上安全，但**值域合法性**需要额外验证。例如 `port: int` 保证是整数，但不保证在 1-65535 范围内。显式验证是调用方的职责，不是解析器的职责。
 
+### 适用场景
+
+| 场景 | 推荐方案 | 原因 |
+|------|----------|------|
+| 脚本工具，数据处理管道 | argparse | 无依赖，轻量，足够 |
+| 复杂 CLI，子命令，多级帮助 | click | 声明式子命令，自动美观帮助 |
+| 快速原型，数据科学脚本 | typer | 函数签名即 CLI，最小化样板 |
+| 需要类型提示完整的 IDE 支持 | typer | LSP 可直接读取函数签名 |
+| 需要自定义参数解析逻辑 | argparse | 完整控制 `parse_args` 行为 |
+| 需要与现有 click 生态集成 | click | 生态丰富，第三方装饰器兼容 |
+
+### 违反约束
+
+**argparse 位置参数顺序陷阱**：位置参数必须在可选参数之前定义。若顺序颠倒，`prog.py input -v` 中 `"input"` 会被解析为可选参数值。修复：始终先定义位置参数，再定义可选参数。
+
+**typer 推断导致歧义**：当函数有多个 `str` 类型参数时，typer 无法区分哪些应作为位置参数（`Argument`）、哪些应作为选项（`Option`）。此时 typer 的默认行为可能与预期不符。修复：显式使用 `typer.Argument()` 或 `typer.Option()` 注解。
+
+**typer 自定义类型限制**：typer 不支持推断自定义类型（如 `pydantic.BaseModel`），强制使用会抛出 `TypeError`。修复：使用 `click.ParamType` 显式包装或回退到 click。
+
+**argparse/click/typer 均依赖运行时类型检查**：偏函数 $P$ 在非法输入时无定义，但最终表现为程序以错误码退出——这意味着**静默失败是不可能的**，CLI 永远不会在类型错误时继续执行（这与配置文件解析器不同，配置文件解析器通常有默认值填充策略）。
+
 ## 参考存根
 
 ```python
-import argparse
-import click
-import typer
+import argparse, click, typer
 
-# argparse：手动参数定义
-def main():
-    parser = argparse.ArgumentParser(description="文件处理工具")
-    parser.add_argument("input_file", help="输入文件路径")
-    parser.add_argument("-o", "--output", default="a.out", help="输出文件")
-    parser.add_argument("-v", "--verbose", action="store_true")
-    parser.add_argument("--quality", type=int, choices=range(1, 10))
-    args = parser.parse_args()
-    if args.quality is not None and not (1 <= args.quality <= 9):
-        parser.error("--quality must be 1-9")
-    return args
+# argparse: 位置参数必须在可选参数之前
+p = argparse.ArgumentParser()
+p.add_argument("input_file")
+p.add_argument("-v", "--verbose", action="store_true")
+args = p.parse_args()
 
-# click：声明式子命令
+# click: Command.invoke 调用链
 @click.group()
-def cli():
-    pass
-
+def cli(): pass
 @cli.command()
 @click.argument("filename")
 @click.option("--force", is_flag=True)
 def remove(filename, force):
-    if not force:
-        click.confirm(f"Delete {filename}?", abort=True)
     click.echo(f"Removed {filename}")
+```
 
-# typer：类型推断
+```python
+# typer: 类型推断驱动的参数构建
 app = typer.Typer()
-
 @app.command()
-def create(name: str, email: str, age: int = None):
-    typer.echo(f"Creating: {name} <{email}>")
+def create(name: str, age: int = 18):
+    typer.echo(f"{name}, {age}")
 ```
