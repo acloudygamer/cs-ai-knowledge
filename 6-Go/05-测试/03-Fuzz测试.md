@@ -1,35 +1,206 @@
 # Fuzz Testing（模糊测试）
 
-Go 1.18 引入的 fuzz testing 是测试领域的重要里程碑，专门用于发现边界条件和随机输入导致的 bug。
+## 定义
 
-## 概述
+Go 1.18 引入的 fuzz testing 是测试领域的重要里程碑，专门用于发现边界条件和随机输入导致的 bug。其本质是**基于覆盖引导的随机输入生成**——fuzzer 通过追踪代码覆盖路径，选择能触发新执行路径的输入进行变异，从而系统性地探索输入空间。
 
-Fuzz testing 通过生成大量随机、畸形或边界值输入，自动探索程序可能未处理到的代码路径。与传统测试不同，fuzzing 不需要预先知道具体的测试用例，而是让算法自动探索。
+## 数学模型
+
+### 覆盖引导的输入生成
 
 ```
-传统测试:  已知输入 → 验证输出 → 覆盖固定路径
-Fuzz测试:  随机输入 → 探索边界 → 发现隐藏 bug
+fuzzing 的输入空间：所有可能的字节序列
+F: 输入空间 → 代码覆盖空间
+
+覆盖引导原理：
+  1. 从种子语料库开始
+  2. 选择一个输入执行 SUT
+  3. 记录覆盖的代码路径（分支覆盖率）
+  4. 若输入触发了新路径 → 保留，加入语料库
+  5. 变异输入（bit flip, byte swap, arithmetic...）
+  6. 重复 2-5
+
+覆盖空间是有限的（分支数有限），但输入空间是无限的。
+fuzzing 通过系统性探索，在有限时间内最大化覆盖。
 ```
 
-## 基本用法
+### 语料库最小化
 
-### fuzzing 函数签名
+```
+给定一个 crash 输入集合：
+  crashers = {c1, c2, ..., cn}
+
+最小化目标：
+  找到最小的子集 S ⊆ crashers
+  使得 coverage(S) = coverage(crashers)
+
+算法：
+  1. 按触发顺序排序 crashers
+  2. 逐一移除，测试覆盖率是否变化
+  3. 若覆盖率不变，丢弃；若变，保留
+
+最终语料库：能触发所有 crash 的最小输入集
+```
+
+### 逆变不变性（Inverse Invariance）
+
+```
+大多数 fuzzing 测试基于**逆变性**：
+
+对于函数 f：
+  1. Double-Reverse 不变性：
+     Reverse(Reverse(x)) = x（对所有 x）
+
+  2. 解码-重新编码不变性：
+     Decode(Encode(x)) = x
+
+  3. 交换律不变性（特定操作）：
+     a + b = b + a（某些数值运算）
+
+若不变性被违反 → 发现 bug
+```
+
+## 数据流
+
+### fuzzing 执行流
+
+<pre>
+f.Fuzz(func(t *testing.T, orig string) {
+    rev := Reverse(orig)
+    revRev := Reverse(rev)
+    if revRev != orig {
+        t.Errorf("...")
+    }
+})
+
+    │
+    ├── 初始化语料库（f.Add）
+    │
+    ├── 选择输入（从语料库或变异生成）
+    │
+    ├── 字节级变异：
+    │   ├── bit flip（逐位翻转）
+    │   ├── byte swap（相邻字节交换）
+    │   ├── arithmetic（加减常量）
+    │   └── dictionary substitution（已知 tokens）
+    │
+    ├── 执行 fuzz 函数
+    │
+    ├── 记录覆盖率
+    │
+    ├── 若触发新路径 → 保存到语料库
+    │
+    └── 若 crash/t.Errorf → 保存到 crashers 目录
+</pre>
+
+### Go fuzzing 的语料库管理
+
+<pre>
+testdata/fuzz/FuzzReverse/
+    ├── seed0/           # 初始种子
+    │   └── input        # "hello"
+    ├── seed1/
+    │   └── input        # "world"
+    ├── crashers/        # 发现的 crash
+    │   ├── 0a3b4c5d/
+    │   │   ├── input    # crash 输入字节
+    │   │   └── log      # crash 日志
+    │   └── ...
+    └── minimize/
+        └── ...          # 最小化后的 crash
+
+go test -fuzz=FuzzReverse：
+    ├── 首次运行：使用 seed 语料库
+    ├── 运行中发现 crash → 保存到 crashers/
+    └── -fuzzcontinue：继续上次的 fuzzing
+</pre>
+
+### crashers 目录的数据流
+
+<pre>
+Crash 发现
+    │
+    ├── 保存输入到 crashers/<hash>/
+    │       │
+    │       ├── input：原始 crash 输入
+    │       └── log：panic 信息 / 测试失败日志
+    │
+    └── 后续复现
+            │
+            ├── go test -run=FuzzReverse/<crasher_name>
+            │       └── 重新运行该特定输入
+            │
+            └── go test -fuzz=FuzzReverse -fuzz=.
+                    └── 继续 fuzzing（包括已知的 crashers）
+</pre>
+
+## 机制
+
+### 为什么 fuzzing 能发现传统测试发现不了的 bug？
+
+```
+传统测试的问题：
+  - 已知输入 → 验证输出
+  - 输入由人工构造（有限的想象力）
+  - 难以覆盖边界条件
+
+Fuzzing 的优势：
+  - 随机/变异输入 → 自动探索
+  - 能发现：
+    1. 整数溢出（INT_MIN - 1）
+    2. 空指针解引用（空字符串、nil slice）
+    3. 缓冲区溢出（超长输入）
+    4. 格式化字符串漏洞（%s vs %x）
+    5. 编码问题（UTF-8 截断、多字节字符）
+
+本质：穷举输入空间的"角角落落"
+```
+
+### 内存泄漏的防护
+
+```
+Fuzzing 循环中的内存问题：
+
+错误模式：
+  func FuzzBad(f *testing.F) {
+      var largeData [][]byte  // 错误：累积
+
+      f.Fuzz(func(t *testing.T, data []byte) {
+          largeData = append(largeData, data)  // 永不释放
+      })
+  }
+
+正确模式：
+  func FuzzGood(f *testing.F) {
+      f.Fuzz(func(t *testing.T, data []byte) {
+          process(data)  // 每次处理完即释放
+      })
+  }
+
+关键约束：
+  - Fuzz 函数必须是无状态的
+  - 每次调用处理完应释放所有资源
+  - 避免在函数外声明累积性变量
+```
+
+### 并行 fuzzing 的约束
+
+```
+go test -fuzz=FuzzA -fuzz=B 不支持：
+  一次只能 fuzz 一个函数
+
+正确方式：
+  go test -v -fuzz=FuzzReverse -fuzztime=30s -parallel=4
+    │
+    ├── -parallel=4 只影响单元测试并行
+    ├── Fuzz 测试始终单线程
+    └── 多个 fuzzing 需要启动多个进程
+```
+
+## 参考存根
 
 ```go
-// 标准 fuzzing 函数签名 (Go 1.20+)
-func FuzzXxx(f *testing.F)
-```
-
-### 最小示例
-
-```go
-package fuzz
-
-import (
-    "testing"
-)
-
-// 待测试函数
+// 基本 fuzzing
 func Reverse(s string) string {
     runes := []rune(s)
     for i, j := 0, len(runes)-1; i < j; i, j = i+1, j-1 {
@@ -38,171 +209,54 @@ func Reverse(s string) string {
     return string(runes)
 }
 
-// 种子语料库 - 提供初始测试用例
-func TestReverse(t *testing.T) {
-    cases := []struct {
-        input    string
-        expected string
-    }{
-        {"hello", "olleh"},
-        {"world", "dlrow"},
-        {"", ""},
-        {"a", "a"},
-    }
-
-    for _, c := range cases {
-        got := Reverse(c.input)
-        if got != c.expected {
-            t.Errorf("Reverse(%q) = %q; want %q", c.input, got, c.expected)
-        }
-    }
-}
-
-// Fuzz 测试
 func FuzzReverse(f *testing.F) {
-    // 添加种子语料库（可选但推荐）
     f.Add("hello")
     f.Add("world")
     f.Add("")
 
     f.Fuzz(func(t *testing.T, orig string) {
-        // 1. 反转两次应该回到原字符串
         rev := Reverse(orig)
         revRev := Reverse(rev)
         if revRev != orig {
-            t.Errorf("Reverse(Reverse(%q)) = %q; want %q", orig, revRev, orig)
+            t.Errorf("Reverse(Reverse(%q)) = %q", orig, revRev)
         }
+    })
+}
 
-        // 2. 验证字节切片转换后反转与 rune 反转结果一致
-        if len(orig) > 0 {
-            bytes := []byte(orig)
-            // 对字节切片进行反转
-            for i, j := 0, len(bytes)-1; i < j; i, j = i+1, j-1 {
-                bytes[i], bytes[j] = bytes[j], bytes[i]
-            }
-            byteRev := string(bytes)
-            runeRev := Reverse(orig)
-            if byteRev != runeRev {
-                t.Errorf("字节反转与 rune 反转结果不一致: %q vs %q", byteRev, runeRev)
+// 边界条件覆盖
+func FuzzStringToInt(f *testing.F) {
+    f.Add("0")
+    f.Add("9")
+    f.Add("2147483647")   // int32 max
+    f.Add("-2147483648")  // int32 min
+    f.Add("2147483648")   // overflow
+
+    f.Fuzz(func(t *testing.T, s string) {
+        got, err := strconv.Atoi(s)
+        if err == nil {
+            back := strconv.Itoa(got)
+            if back != got {  // 注意：itoa 有符号问题
+                t.Errorf("itoa(atoi(%q)) = %d", s, got)
             }
         }
     })
 }
-```
 
-### 运行 Fuzz 测试
-
-```bash
-# 运行 fuzz 测试（默认 30 秒后停止）
-go test -fuzz=FuzzReverse
-
-# 运行 fuzz 测试 1 分钟
-go test -fuzz=FuzzReverse -fuzztime=1m
-
-# 运行 fuzz 测试直到发现 bug 或时间耗尽
-go test -fuzz=FuzzReverse -fuzztime=30s
-
-# 继续上次的 fuzzing（使用 crashers 目录）
-go test -fuzz=FuzzReverse -fuzzcontinue
-
-# 显示详细 fuzzing 过程
-go test -fuzz=FuzzReverse -v
-```
-
-## 高级用法
-
-### 多参数 Fuzzing
-
-```go
-func FuzzStringReplace(f *testing.F) {
-    // 种子语料库：多个参数
-    f.Add("hello world", "world", "go", 0)
-
-    f.Fuzz(func(t *testing.T, s, old, new string, n int) {
-        // 使用 strings.Replace 测试
-        result := strings.Replace(s, old, new, n)
-
-        // 验证：替换次数为负数时应该替换所有
-        if n < 0 {
-            expected := strings.ReplaceAll(s, old, new)
-            if result != expected {
-                t.Errorf("Replace(%q, %q, %q, %d) = %q; want %q",
-                    s, old, new, n, result, expected)
-            }
-        }
-
-        // 验证：old 为空字符串时，n 应该减 1
-        if old == "" && n > 0 {
-            // strings.Replace("", "", "x", n) = strings.Repeat("x", n+1) - len(s)
-            // 这个边界条件容易被忽略
-        }
-    })
-}
-```
-
-### 自定义 corpus 生成器
-
-```go
-func FuzzURLParse(f *testing.F) {
-    // 添加各种 URL 格式作为种子
-    f.Add("https://example.com/path?query=value")
-    f.Add("http://localhost:8080")
-    f.Add("ftp://files.server.com")
-    f.Add("///unusual///path///")
-    f.Add("scheme://host/path#fragment")
-
-    f.Fuzz(func(t *testing.T, rawURL string) {
-        parsed, err := url.Parse(rawURL)
-        if err != nil {
-            // 无效 URL 不应该导致 panic
-            return
-        }
-
-        // 验证：解析后重新组装应该等价
-        reconstructed := parsed.String()
-        reparsed, err := url.Parse(reconstructed)
-        if err != nil {
-            t.Errorf("re-parse of %q failed: %v", reconstructed, err)
-            return
-        }
-
-        // 验证关键字段
-        if reparsed.Scheme != parsed.Scheme {
-            t.Errorf("scheme mismatch: %q vs %q", reparsed.Scheme, parsed.Scheme)
-        }
-    })
-}
-```
-
-### 结构化 Fuzzing（Go 1.20+）
-
-```go
-// 使用编码器生成复杂结构
+// JSON fuzzing
 func FuzzJSONDecode(f *testing.F) {
-    // 种子：有效的 JSON 数据
-    f.Add([]byte(`{"name":"test","age":42}`))
+    f.Add([]byte(`{"name":"test"}`))
     f.Add([]byte(`[1,2,3]`))
     f.Add([]byte(`"string"`))
-    f.Add([]byte(`123`))
-    f.Add([]byte(`true`))
-    f.Add([]byte(`null`))
 
     f.Fuzz(func(t *testing.T, data []byte) {
-        // 测试 JSON 解析
         var v any
-        err := json.Unmarshal(data, &v)
-        if err != nil {
-            return // 无效 JSON 是预期的
+        if err := json.Unmarshal(data, &v); err != nil {
+            return
         }
-
-        // 测试重新编码
         encoded, err := json.Marshal(v)
         if err != nil {
             t.Errorf("re-encode failed: %v", err)
-            return
         }
-
-        // 验证可以再次解析
         var v2 any
         if err := json.Unmarshal(encoded, &v2); err != nil {
             t.Errorf("re-decode failed: %v", err)
@@ -211,320 +265,9 @@ func FuzzJSONDecode(f *testing.F) {
 }
 ```
 
-### 关联参数约束
-
-```go
-func FuzzMathPow(f *testing.F) {
-    // base 和 exp 单独 fuzz，但验证关系
-    f.Add(2.0, 10.0)
-    f.Add(10.0, 2.0)
-    f.Add(0.0, 0.0) // 0^0 边界
-
-    f.Fuzz(func(t *testing.T, base, exp float64) {
-        result := math.Pow(base, exp)
-
-        // 验证基本数学性质
-        if !math.IsNaN(result) && !math.IsInf(result, 0) {
-            // base^0 = 1 (除了 0^0)
-            if exp == 0 && base != 0 {
-                if result != 1 {
-                    t.Errorf("Pow(%v, 0) = %v; want 1", base, result)
-                }
-            }
-
-            // 1^exp = 1
-            if base == 1 && result != 1 {
-                t.Errorf("Pow(1, %v) = %v; want 1", exp, result)
-            }
-
-            // 0^exp = 0 (exp > 0)
-            if base == 0 && exp > 0 && result != 0 {
-                t.Errorf("Pow(0, %v) = %v; want 0", exp, result)
-            }
-        }
-
-        // 检测 NaN 传播
-        if math.IsNaN(base) || math.IsNaN(exp) {
-            if !math.IsNaN(result) {
-                t.Errorf("Pow(%v, %v) = %v; want NaN", base, exp, result)
-            }
-        }
-    })
-}
-```
-
-## 实际应用场景
-
-### HTTP Handler Fuzzing
-
-```go
-func FuzzHTTPHandler(f *testing.F) {
-    handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-        body, err := io.ReadAll(r.Body)
-        if err != nil {
-            http.Error(w, err.Error(), 400)
-            return
-        }
-
-        // 解析为 JSON
-        var data map[string]any
-        if err := json.Unmarshal(body, &data); err != nil {
-            http.Error(w, err.Error(), 400)
-            return
-        }
-
-        // 简单处理：提取 name 字段
-        if name, ok := data["name"].(string); ok {
-            w.Write([]byte("Hello, " + name))
-        } else {
-            w.Write([]byte("Hello, World"))
-        }
-    })
-
-    f.Fuzz(func(t *testing.T, method string, path string, body []byte) {
-        // 验证 method 有效性
-        if method != http.MethodGet && method != http.MethodPost &&
-           method != http.MethodPut && method != http.MethodDelete {
-            return // 跳过无效 method
-        }
-
-        req := httptest.NewRequest(method, path, bytes.NewReader(body))
-        rr := httptest.NewRecorder()
-
-        // 不应该 panic
-        func() {
-            defer func() {
-                if r := recover(); r != nil {
-                    t.Errorf("handler panicked: %v", r)
-                }
-            }()
-            handler.ServeHTTP(rr, req)
-        }()
-    })
-}
-```
-
-### 正则表达式 Fuzzing
-
-```go
-func FuzzRegexp(f *testing.F) {
-    // 测试各种正则模式
-    patterns := []string{
-        `^\d+$`,           // 纯数字
-        `^[a-zA-Z]+$`,     // 纯字母
-        `^.{3,10}$`,       // 3-10 个任意字符
-        `^(foo|bar)$`,     // foo 或 bar
-        `\[\d+\]`,         // [数字]
-    }
-
-    for _, pattern := range patterns {
-        re, err := regexp.Compile(pattern)
-        if err != nil {
-            continue
-        }
-
-        f.Add(pattern, "abc123")
-        f.Add(pattern, "foo")
-        f.Add(pattern, "")
-    }
-
-    f.Fuzz(func(t *testing.T, patternStr string, input string) {
-        re, err := regexp.Compile(patternStr)
-        if err != nil {
-            return // 跳过无效正则
-        }
-
-        // 测试各种方法不应该 panic
-        re.MatchString(input)
-        re.FindString(input)
-        re.FindAllString(input, -1)
-        re.ReplaceAllString(input, "替换")
-
-        // Split 也不应该有问题
-        re.Split(input, -1)
-    })
-}
-```
-
-### 命令行参数解析 Fuzzing
-
-```go
-func FuzzFlagParse(f *testing.F) {
-    f.Add([]string{"-n", "10", "-o", "output.txt"})
-    f.Add([]string{"--name=John", "--count=5"})
-    f.Add([]string{})
-
-    f.Fuzz(func(t *testing.T, args []string) {
-        // 每个测试需要独立的 flag 集合
-        fs := flag.NewFlagSet("test", flag.ContinueOnError)
-
-        n := fs.Int("n", 0, "number")
-        s := fs.String("s", "", "string")
-        b := fs.Bool("b", false, "bool")
-
-        // 解析不应该 panic
-        err := fs.Parse(args)
-        if err != nil {
-            return
-        }
-
-        // 验证标志位已正确设置
-        _ = *n // 使用这些值避免编译器优化
-        _ = *s
-        _ = *b
-    })
-}
-```
-
-## 语料库管理
-
-### 种子语料库结构
-
-```bash
-testdata/
-└── fuzz/
-    └── FuzzReverse/
-        ├── seed1           # 手动创建的测试用例
-        │   └── input       # bytes of "hello"
-        └── FuzzJSONDecode/
-            └── seed1
-                └── input   # bytes of valid JSON
-```
-
-### 添加语料库文件
-
-```bash
-# 直接运行 fuzz 测试，会自动生成语料库
-go test -fuzz=FuzzReverse
-
-# 查看生成的语料库
-ls -la /tmp/.../fuzz/FuzzReverse/
-
-# 使用现有的 crashers 进行测试
-go test -fuzz=FuzzReverse -fuzz=.
-```
-
-### 语料库压缩
-
-```bash
-# 运行足够长时间后，语料库可能很大
-# 可以导出最小化语料库
-go test -fuzz=FuzzReverse -fuzzminimize
-
-# 查看当前语料库大小
-du -sh testdata/fuzz/FuzzReverse/
-```
-
-## 常见问题与解决方案
-
-### Fuzzing 内存泄漏
-
-```go
-// 问题：大对象在 fuzzing 循环中累积
-func FuzzBad(f *testing.F) {
-    var largeData [][]byte // 错误：累积内存
-
-    f.Fuzz(func(t *testing.T, data []byte) {
-        largeData = append(largeData, data) // 永远不清理
-        // ...
-    })
-}
-
-// 解决方案：使用有界缓存或每次创建新对象
-func FuzzGood(f *testing.F) {
-    f.Fuzz(func(t *testing.T, data []byte) {
-        // 每次都是新对象，处理完即释放
-        process(data)
-    })
-}
-```
-
-### 超时设置
-
-```go
-// 长时间运行的 fuzzing
-func FuzzLongRunning(f *testing.F) {
-    f.Fuzz(func(t *testing.T, data []byte) {
-        // 设置内部超时
-        ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
-        defer cancel()
-
-        select {
-        case <-ctx.Done():
-            t.Skip("processing too slow")
-        default:
-            processWithContext(ctx, data)
-        }
-    })
-}
-```
-
-### 并行 Fuzzing
-
-```go
-// 运行多个 fuzzing 函数
-// go test -fuzz=FuzzA -fuzz=B  # 不支持，只能一次一个
-
-// 使用 -cpu 参数（仅对单元测试有效）
-go test -v -fuzz=FuzzReverse -fuzztime=30s -cpu=4
-```
-
 ## 最佳实践
 
-### 1. 从单元测试迁移到 Fuzzing
-
-```go
-// 单元测试
-func TestStringToInt(t *testing.T) {
-    tests := []struct {
-        input    string
-        expected int
-        err      bool
-    }{
-        {"123", 123, false},
-        {"-456", -456, false},
-        {"abc", 0, true},
-    }
-
-    for _, tt := range tests {
-        t.Run(tt.input, func(t *testing.T) {
-            got, err := strconv.Atoi(tt.input)
-            if tt.err && err == nil {
-                t.Error("expected error")
-            }
-            if !tt.err && got != tt.expected {
-                t.Errorf("got %d, want %d", got, tt.expected)
-            }
-        })
-    }
-}
-
-// Fuzz 测试
-func FuzzStringToInt(f *testing.F) {
-    // 添加已知边界用例
-    f.Add("0")
-    f.Add("9")
-    f.Add("999999999")
-    f.Add("-999999999")
-    f.Add("2147483647")   // int32 max
-    f.Add("-2147483648")  // int32 min
-    f.Add("2147483648")   // overflow
-    f.Add("-2147483649")  // underflow
-
-    f.Fuzz(func(t *testing.T, s string) {
-        // 测试转换
-        got, err := strconv.Atoi(s)
-
-        // 验证逆转换（如果成功）
-        if err == nil {
-            back := strconv.Itoa(got)
-            // 注意：itoa 可能有符号问题
-        }
-    })
-}
-```
-
-### 2. 识别应该 panicking 的情况
+### 识别应该 panicking 的情况
 
 ```go
 func FuzzSafeParser(f *testing.F) {
@@ -532,29 +275,26 @@ func FuzzSafeParser(f *testing.F) {
     f.Add("")
 
     f.Fuzz(func(t *testing.T, input string) {
-        // 使用 recover 捕获意外 panic
         defer func() {
             if r := recover(); r != nil {
                 t.Errorf("parser panicked on %q: %v", input, r)
             }
         }()
-
         result := Parse(input)
-        _ = result // 使用结果
+        _ = result
     })
 }
 ```
 
-### 3. 结合 Property-Based Testing
+### 结合 Property-Based Testing
 
 ```go
 func FuzzReverser(f *testing.F) {
     // 属性 1：双重反转等于自身
     f.Fuzz(func(t *testing.T, s string) {
         if len(s) > 1000 {
-            t.Skip("too long for property test")
+            t.Skip("too long")
         }
-
         r1 := Reverse(s)
         r2 := Reverse(r1)
         if r2 != s {
@@ -568,120 +308,56 @@ func FuzzReverser(f *testing.F) {
             t.Errorf("Reverse changed length of %q", s)
         }
     })
-
-    // 属性 3：反转不影响字母大小写（如果是纯 ASCII）
-    f.Fuzz(func(t *testing.T, s string) {
-        if isASCII(s) {
-            lower := strings.ToLower(s)
-            upper := strings.ToUpper(s)
-
-            revLower := Reverse(lower)
-            revUpper := Reverse(upper)
-
-            if revLower != revUpper {
-                t.Errorf("Case not preserved in reverse of %q", s)
-            }
-        }
-    })
-}
-
-func isASCII(s string) bool {
-    for _, r := range s {
-        if r > 127 {
-            return false
-        }
-    }
-    return true
 }
 ```
+
+## 常见问题与解决方案
+
+| 问题 | 原因 | 解决方案 |
+|------|------|----------|
+| 内存泄漏 | 累积性变量在 fuzz 函数外 | 每次 fuzz 函数内处理完即释放 |
+| 超时 | 处理太慢 | 设置内部 ctx 超时，t.Skip |
+| 假阳性 | 边界条件误报 | 调整属性验证逻辑 |
+| 语料库爆炸 | 保留太多输入 | go test -fuzzminimize |
 
 ## 性能优化
 
-### 并行 Fuzzing
-
-```bash
-# 使用多个 CPU核心加速 fuzzing
-go test -fuzz=FuzzReverse -fuzztime=1m -parallel=4
 ```
+并行 fuzzing：
+  # 使用多核加速
+  go test -fuzz=FuzzReverse -fuzztime=1m -parallel=4
 
-### 持续 Fuzzing
+  注意：-parallel 只影响单元测试，Fuzz 测试单线程
 
-```bash
-# 使用 nohup 或后台运行
-nohup go test -fuzz=FuzzReverse -fuzztime=24h > fuzz.log 2>&1 &
+持续 fuzzing：
+  nohup go test -fuzz=FuzzReverse -fuzztime=24h > fuzz.log 2>&1 &
 
-# 使用 atomicsofuzz 等专业工具进行持续 fuzzing
-```
-
-### 覆盖率引导
-
-```bash
-# 启用覆盖率引导（默认开启）
-go test -fuzz=FuzzReverse -fuzzcoverage
-
-# 查看覆盖率报告
-go tool cover -html=fuzzcov.out
-```
-
-## 调试 Crashers
-
-### 分析 Crash 输入
-
-```bash
-# 查看 crashers 目录
-ls testdata/fuzz/FuzzReverse/crashers/
-
-# 查看 crash 日志
-cat testdata/fuzz/FuzzReverse/crashers/xxx.log
-
-# 复现 crash
-go test -run=FuzzReverse/xxx
-```
-
-### 最小化 Crash Input
-
-```bash
-# 使用 go-fuzz 进行输入最小化
-go-fuzz-minimize testdata/fuzz/FuzzReverse/crashers/xxx
+覆盖率引导：
+  go test -fuzz=FuzzReverse -fuzzcoverage
+  go tool cover -html=fuzzcov.out
 ```
 
 ## 与 CI/CD 集成
 
 ```yaml
-# GitHub Actions 示例
-name: Fuzz Test
-on: [push, pull_request]
+# GitHub Actions
+- name: Run Fuzz Test
+  run: |
+    go test -fuzz=FuzzReverse -fuzztime=10m -v
+  continue-on-error: true
 
-jobs:
-  fuzz:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
-        with:
-          go-version: '1.26'
-
-      - name: Run Fuzz Test
-        run: |
-          # 运行 10 分钟 fuzzing
-          go test -fuzz=FuzzReverse -fuzztime=10m -v
-        continue-on-error: true  # fuzzing 可能发现 bug
-
-      - name: Upload Crashers
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: fuzz-crashers
-          path: testdata/fuzz/FuzzReverse/crashers/
+- name: Upload Crashers
+  if: failure()
+  uses: actions/upload-artifact@v4
+  with:
+    name: fuzz-crashers
+    path: testdata/fuzz/FuzzReverse/crashers/
 ```
 
-## 总结
+## 适用场景
 
-Fuzz testing 是 Go 测试工具箱中的强大补充，特别适合：
-
-- 边界条件和异常输入
-- 安全敏感代码（parser、serializer、validator）
-- 复杂数据结构的序列化/反序列化
-- 协议实现（HTTP、WebSocket、JSON/XML/Protocol Buffers）
-
-与传统测试结合使用，可以显著提高代码质量和安全性。
+Fuzzing 特别适合：
+- 边界条件和异常输入（parser、validator）
+- 安全敏感代码（序列化/反序列化）
+- 协议实现（HTTP、WebSocket、JSON）
+- 数据转换（编码/解码）

@@ -1,47 +1,84 @@
 # Context 专题
 
-**context 是 Go 中传递请求作用域的截止时间、取消信号和共享值的标准接口——其本质是携带截止时间链和取消信号链的上下文容器。**
+**定义**：context 是 Go 中传递请求作用域的截止时间、取消信号和共享值的标准接口——其本质是携带截止时间链和取消信号链的上下文容器。
 
 ## Context 接口
 
-```go
-type Context interface {
-    Deadline() (deadline time.Time, ok bool)  // 截止时间
-    Done() <-chan struct{}                     // 关闭的 channel
-    Err() error                               // 取消原因
-    Value(key any) any                         // 获取值
-}
-```
+### 定义
+Context 接口定义了四个方法，分别对应截止时间、取消信号、取消原因和请求级共享值。
 
-```
+### 数学模型
+
+**Context 的数学本质是有向无环图（DAG）**：
+- 根 Context：$C_0$（`Background` 或 `TODO`）
+- 子 Context：$C_i = With\_X(C_{parent}, \dots)$
+- 每个 Context 节点携带：
+  - Deadline $D$（截止时间，可能为空）
+  - Done channel $Ch_{done}$（关闭时发出信号）
+  - Values $V$（键值对 map）
+
+**继承语义**：
+$$Deadline(C_i) = Deadline(C_{parent}) \text{ 或 } With\_Deadline \text{ 设置的新 deadline}$$
+$$Done(C_i) \supseteq Done(C_{parent})$$
+
+### 数据流
+
+<pre>
 Context 树结构：
-  background
-    ├─ WithCancel
-    │    └─ ctx.Done() 在 cancel() 时关闭
-    ├─ WithTimeout(parent, 5s)
-    │    └─ ctx.Done() 在超时或 parent cancel 时关闭
-    ├─ WithDeadline(parent, t)
-    │    └─ ctx.Done() 在截止时间或 parent cancel 时关闭
-    └─ WithValue(parent, key, value)
-         └─ ctx.Value(key) 获取值（继承自父）
-```
 
-### 内置 Context
-
-```go
-ctx := context.Background()           // 根 Context（不可取消）
-ctx := context.TODO()                // 临时占位
-ctx, cancel := context.WithCancel(parentCtx)
-ctx, cancel := context.WithTimeout(parentCtx, 5*time.Second)
-ctx, cancel := context.WithDeadline(parentCtx, time.Now().Add(5*time.Second))
-ctx := context.WithValue(parentCtx, key, value)
-```
+background (根 Context)
+  │
+  ├─ WithCancel(parent)
+  │    │
+  │    └─ ctx, cancel := ...
+  │         │
+  │         └─ ctx.Done() 在 cancel() 时关闭
+  │
+  ├─ WithTimeout(parent, 5s)
+  │    │
+  │    └─ ctx, cancel := ...
+  │         │
+  │         └─ ctx.Done() 在超时(5s) 或 parent cancel 时关闭
+  │
+  ├─ WithDeadline(parent, t)
+  │    │
+  │    └─ ctx, cancel := ...
+  │         │
+  │         └─ ctx.Done() 在截止时间(t) 或 parent cancel 时关闭
+  │
+  └─ WithValue(parent, key, value)
+       │
+       └─ ctx := ...
+            │
+            └─ ctx.Value(key) 返回 value（继承自父）
+</pre>
 
 ## WithCancel
 
-**创建一个可手动取消的 Context，调用 `cancel()` 时 Done() channel 关闭。**
+### 定义
+创建一个可手动取消的 Context，调用 `cancel()` 时 Done() channel 关闭。
 
-### 参考样例
+### 数据流
+
+<pre>
+WithCancel 生命周期：
+
+ctx, cancel := context.WithCancel(parentCtx)
+  │
+  ├─ 创建新的 Done channel
+  ├─ 将 cancel 函数绑定到 ctx
+  └─ 返回 ctx 和 cancel
+
+调用 cancel():
+  │
+  └─ 关闭 Done channel
+       │
+       ├─ 所有 select <-ctx.Done() 解除阻塞
+       ├─ ctx.Err() 返回 context.Canceled
+       └─ 子 Context 的 Done 也关闭（级联取消）
+</pre>
+
+### 参考存根
 
 ```go
 ctx, cancel := context.WithCancel(context.Background())
@@ -63,9 +100,18 @@ func doWork(ctx context.Context) {
 
 ## WithTimeout
 
-**创建带超时时间的 Context，超时自动取消——常用于 HTTP 请求、数据库查询等有明确时间限制的场景。**
+### 定义
+创建带超时时间的 Context，超时自动取消——常用于 HTTP 请求、数据库查询等有明确时间限制的场景。
 
-### 参考样例
+### 数学模型
+
+**Timeout 计算**：
+$$T_{deadline} = T_{now} + T_{timeout}$$
+$$T_{remaining} = T_{deadline} - T_{now}$$
+
+当 $T_{remaining} \leq 0$ 时，自动调用 cancel。
+
+### 参考存根
 
 ```go
 ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
@@ -77,9 +123,10 @@ resp, err := http.DefaultClient.Do(req)
 
 ## WithDeadline
 
-**创建带绝对截止时间的 Context，适用于需要在特定时间点完成的任务。**
+### 定义
+创建带绝对截止时间的 Context，适用于需要在特定时间点完成的任务。
 
-### 参考样例
+### 参考存根
 
 ```go
 ctx, cancel := context.WithDeadline(parentCtx, time.Now().Add(1*time.Minute))
@@ -88,9 +135,35 @@ defer cancel()
 
 ## WithValue
 
-**在 Context 中存储键值对，用于在 goroutine 之间传递请求级别的元数据（如 requestID、userID）。**
+### 定义
+在 Context 中存储键值对，用于在 goroutine 之间传递请求级别的元数据（如 requestID、userID）。
 
-### 参考样例
+### 机制
+
+**为什么 key 要用自定义类型**：Context 的 Value 查找基于类型和值的相等性。若使用 `string` 作为 key，不同包可能使用相同的 key 导致冲突。使用自定义类型（如 `type requestIDKey struct{}`）确保唯一性。
+
+**Context Value 的查找路径**：从当前 Context 向上逐级查找 key，直到找到或到达根 Context。
+
+### 数据流
+
+<pre>
+WithValue 查找：
+
+ctx := context.Background()
+ctx = context.WithValue(ctx, requestIDKey, "req-123")
+ctx = context.WithValue(ctx, userIDKey, "user-456")
+
+processRequest(ctx)
+
+func processRequest(ctx context.Context) {
+    requestID, _ := ctx.Value(requestIDKey).(string)
+    // 沿着 Context 树向上查找
+    // requestIDKey 找到，返回 "req-123"
+    // userIDKey 继续向上找，返回 "user-456"
+}
+</pre>
+
+### 参考存根
 
 ```go
 type key int
@@ -107,7 +180,14 @@ func processRequest(ctx context.Context) {
 
 ## 错误处理
 
-**ctx.Err() 返回 context.Canceled 或 context.DeadlineExceeded。**
+### 定义
+ctx.Err() 返回 context.Canceled 或 context.DeadlineExceeded。
+
+### 数学模型
+
+**错误语义**：
+- `context.Canceled`：主动取消（调用 cancel()）
+- `context.DeadlineExceeded`：时间耗尽（超时或截止时间到达）
 
 ```go
 select {
@@ -122,11 +202,17 @@ case <-ctx.Done():
 
 ### Context 作为第一个参数
 
+### 机制
+将 Context 作为函数的第一个参数是 Go 的惯用约定，使调用者可以控制超时和取消。
+
 ```go
 func fetchUser(ctx context.Context, id string) (*User, error)
 ```
 
 ### 不要在结构体中存储 Context
+
+### 机制
+Context 应该作为方法参数传递，而非存储在结构体中。因为 Context 代表请求的生命周期，存储在结构体中可能导致请求结束后 Context 被误用。
 
 ```go
 type Service struct {
@@ -135,6 +221,9 @@ type Service struct {
 ```
 
 ### 及时取消 Context
+
+### 机制
+子 Context 的超时应该短于父 Context，避免子任务超时后父任务仍在运行。
 
 ```go
 func parent() {
@@ -146,10 +235,14 @@ func parent() {
 func child(ctx context.Context) {
     ctx, cancel := context.WithTimeout(ctx, time.Second)
     defer cancel()
+    // 子任务最多运行 1 秒
 }
 ```
 
 ### 不要传递 nil Context
+
+### 机制
+nil Context 的行为未定义，可能导致死锁。应始终使用 `context.Background()` 或 `context.TODO()`。
 
 ```go
 ctx := context.Background()  // 或 context.TODO()
@@ -169,6 +262,7 @@ func retryWithTimeout(ctx context.Context, fn func() error) error {
         case <-ctx.Done():
             return ctx.Err()
         case <-time.After(time.Second):
+            // 重试
         }
     }
 }
@@ -185,7 +279,7 @@ for _, url := range urls {
     go func(url string) {
         resp, err := http.Get(url)
         if err != nil {
-            cancel()  // 快速失败
+            cancel()  // 快速失败，取消其他 goroutine
             return
         }
         results <- result{data: resp}
