@@ -153,7 +153,8 @@ import numpy as np
 def attention(Q, K, V):
     d_k = Q.shape[-1]
     scores = Q @ K.T / np.sqrt(d_k)
-    weights = np.exp(scores) / np.sum(np.exp(scores), axis=-1, keepdims=True)
+    scores -= scores.max(axis=-1, keepdims=True)  # 数值稳定性
+    weights = np.exp(scores) / np.exp(scores).sum(axis=-1, keepdims=True)
     return weights @ V
 ```
 
