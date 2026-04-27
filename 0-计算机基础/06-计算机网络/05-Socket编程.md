@@ -4,6 +4,8 @@
 
 Socket是操作系统提供给应用进程的端到端网络通信抽象，通过文件描述符封装协议栈的连接建立、数据发送、接收通知等能力，对应用层屏蔽传输层（TCP/UDP）乃至网络层的协议细节。
 
+**本质**：Socket是**内核网络协议栈的访问入口**。它将复杂的协议状态机（TCP三次握手状态机、拥塞控制算法等）封装为少数几个系统调用（socket/connect/listen/accept/send/recv），让应用进程可以像操作文件一样操作网络IO。这统一了IO语义，简化了分布式系统编程。
+
 ## 数学模型
 
 Socket地址 = (协议族, IP地址, 端口号)。TCP socket用五元组唯一标识：
@@ -21,6 +23,8 @@ $$
 $$
 
 实际受内核参数net.core.somaxconn和net.ipv4.tcp_max_syn_backlog限制。
+
+**归约终点**：Socket编程的核心问题是**如何在有限资源下处理并发连接**。这可归约为生产者-消费者问题——连接请求是生产者，SYN队列是缓冲区，accept()是消费者。backlog是缓冲区的容量上限。
 
 ## 数据流
 
@@ -69,11 +73,11 @@ SOCK_RAW (IP层):
 
 ## 机制
 
-**Socket抽象的物理意义**：Socket将网络协议栈封装为文件描述符，纳入Unix文件系统的IO模型。这意味着可以用read/write/close操作网络IO，统一了文件和网络编程接口，降低了学习成本。
+**Socket抽象的物理意义**：Socket将网络协议栈封装为文件描述符，纳入Unix文件系统的IO模型。这意味着可以用read/write/close操作网络IO，统一了文件和网络编程接口，降低了学习成本。这与一切皆文件的Unix设计哲学一致。
 
-**TCP socket状态机**：socket从CLOSED状态经过listen/connect进入ESTABLISHED，close时进入TIME_WAIT。状态转换由内核TCP状态机自动完成，应用层通过系统调用触发状态转换。
+**TCP socket状态机**：socket从CLOSED状态经过listen/connect进入ESTABLISHED，close时进入TIME_WAIT。状态转换由内核TCP状态机自动完成，应用层通过系统调用触发状态转换。状态转换是确定性的——给定一个事件序列，TCP状态机的下一状态是唯一确定的。
 
-**为什么listen backlog需要队列**：三次握手第三步（客户端ACK）到达时，如果服务器进程来不及调用accept()，已完成握手的连接需要暂存在已完成连接队列中。backlog是队列长度上限。半连接队列存放收到SYN但未完成三次握手的连接。
+**为什么listen backlog需要队列**：三次握手第三步（客户端ACK）到达时，如果服务器进程来不及调用accept()，已完成握手的连接需要暂存在已完成连接队列中。backlog是队列长度上限。半连接队列存放收到SYN但未完成三次握手的连接。这是一种**生产者-消费者缓冲**——内核是生产者，accept()是消费者。
 
 **backlog的约束**：实际backlog受限于内核参数somaxconn和tcp_max_syn_backlog。设置过大无效，设置过小会导致连接请求被直接拒绝或超时。
 
@@ -86,10 +90,12 @@ SOCK_RAW (IP层):
 - N次recv（按发送边界）
 - 或任意组合
 
+这与管道IO同构——写入N次，读取M次，N≠M是正常的。
+
 **TCP粘包解决方案**：
-- 定长协议：浪费带宽，但实现简单
-- 分隔符协议：内容不能含分隔符，实现复杂
-- 长度前缀协议：最通用，推荐
+- **定长协议**：浪费带宽，但实现简单
+- **分隔符协议**：内容不能含分隔符，实现复杂
+- **长度前缀协议**：最通用，推荐
 
 长度前缀格式：
 ```
@@ -101,17 +107,33 @@ SOCK_RAW (IP层):
 
 **UDP socket与TCP本质区别**：UDP socket不维护连接状态，sendto每次指定目标地址。同一socket可以向不同目标发送数据，也可以从不同源接收数据。UDP socket的peer address是消息的一部分，不是socket的属性。
 
-**SO_REUSEADDR的必要性**：服务器重启时，前一个socket可能处于TIME_WAIT状态（因为主动关闭）。SO_REUSEADDR允许bind已处于TIME_WAIT状态的端口，快速重启服务器而不等待2MSL。
+**SO_REUSEADDR的必要性**：服务器重启时，前一个socket可能处于TIME_WAIT状态（因为主动关闭）。SO_REUSEADDR允许bind已处于TIME_WAIT状态的端口，快速重启服务器而不等待2MSL。这对于需要快速重启的服务器（如热更新场景）至关重要。
 
-**非阻塞IO的必要性**：在高性能服务器中，阻塞accept/connect/read/write会导致线程阻塞。O_NONBLOCK让这些调用立即返回，通过select/epoll/kqueue监听文件描述符就绪状态，实现事件驱动编程。
+**非阻塞IO的必要性**：在高性能服务器中，阻塞accept/connect/read/write会导致线程阻塞。O_NONBLOCK让这些调用立即返回，通过select/epoll/kqueue监听文件描述符就绪状态，实现事件驱动编程。线程不再因IO等待而空转，提高了CPU利用率。
 
-**epoll vs select**：select使用线性数组存储待监听文件描述符，有最大FD_SETSIZE限制（通常1024），每次调用需要将fd数组从用户态拷贝到内核态。epoll使用红黑树管理fd，调用只在fd改变时更新内核态数据结构，支持水平触发和边缘触发。
+**epoll vs select的本质差异**：
+
+| 特性 | select | epoll |
+|------|--------|-------|
+| 数据结构 | 线性数组 | 红黑树 |
+| FD拷贝 | 每次调用全量拷贝 | 仅增量修改 |
+| 最大FD限制 | FD_SETSIZE(通常1024) | 无硬限制 |
+| 触发模式 | 水平触发 | 水平+边缘触发 |
+
+epoll使用红黑树管理fd，调用只在fd改变时更新内核态数据结构，避免了select每次将fd数组从用户态拷贝到内核态的开销。边缘触发（EPOLLET）只在状态变化时通知，需要配合非阻塞IO使用。
+
+**epoll水平触发 vs 边缘触发**：
+- **水平触发**（LT）：只要条件满足就持续通知，直到处理完毕
+- **边缘触发**（ET）：只在从无到有时通知一次
+
+对于读事件：LT模式下只要缓冲区有数据就会通知，ET模式下只在新数据到达时通知一次。这意味着ET模式下必须一次性读完所有数据，否则不会再收到通知。
 
 **违规后果**：
 - bind已占用端口：EADDRINUSE错误，socket无法绑定
 - connect前未bind：内核自动分配临时端口（ephemeral port）
 - TCP连接未处理backlog溢出：客户端收到ECONNREFUSED或超时
 - UDP socket广播地址配置错误：可能发送到错误网络
+- epoll边缘触发下未一次性处理所有就绪事件：剩余事件不再通知，程序卡住
 
 ## 参考存根
 

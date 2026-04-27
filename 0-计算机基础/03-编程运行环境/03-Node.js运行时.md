@@ -2,15 +2,17 @@
 
 ## 定义
 
-Node.js 是基于 V8 引擎的 **JavaScript 运行时**，通过**事件循环**和**非阻塞 I/O** 在单线程上实现高并发。V8 本身是 JIT 型 JavaScript 引擎，负责 JavaScript 到机器码的动态编译。
+Node.js 是基于 V8 JavaScript 引擎的 **事件驱动、非阻塞 I/O 运行时**。它通过**单线程事件循环**在单进程内实现高并发，而非通过多线程。V8 本身是 JIT 型 JavaScript 引擎，负责 JavaScript 到机器码的动态编译。Node.js 提供 JavaScript 无法直接操作的系统资源（文件、网络、加密）接口，封装了 libuv 提供的事件循环和线程池。
 
 $$
-T_{响应} = \underbrace{T_{轮询等待}}_{epoll/kqueue} + \underbrace{T_{回调执行}}_{事件循环} + \underbrace{T_{下次轮询等待}}
+T_\text{响应} = \underbrace{T_\text{轮询等待}}_{epoll/kqueue/IOCP} + \underbrace{T_\text{回调执行}}_{事件循环} + \underbrace{T_\text{下次轮询等待}}
 $$
 
 $$
-\text{并发上限} \approx \frac{T_{I/O等待}}{T_{回调执行}} \times (\text{线程池大小} + \text{异步 I/O 数})
+\text{并发上限} \approx \frac{T_\text{I/O等待}}{T_\text{回调执行}} \times (\text{线程池大小} + \text{异步 I/O 数})
 $$
+
+**归约终点**：Node.js 运行时最终归约为 **操作系统的 epoll/kqueue 系统调用**和 **V8 生成的机器指令**。所有高级抽象最终都映射到这两个底层操作。
 
 ## 数学模型
 
@@ -19,26 +21,23 @@ $$
 每阶段处理所有就绪回调或达到 slice 限制（默认 6ms）：
 
 $$
-\text{吞吐量} = \frac{1}{T_{单回调执行} + T_{阶段切换}}
+\text{吞吐量} = \frac{1}{T_\text{单回调执行} + T_\text{阶段切换}}
 $$
 
-理想情况下单回调 ~1μs，阶段切换 ~1μs，理论上限 ~500K ops/s。
+理想情况下单回调 ~1μs，阶段切换 ~1μs，理论上限 ~500K ops/s。实际受限因素：回调复杂度不均、V8 垃圾回收停顿、线程池饱和。
 
-实际受限因素：
-- 回调复杂度不均
-- V8 垃圾回收停顿
-- 线程池饱和
+**6ms slice 限制的设计意图**：防止某个阶段独占事件循环，确保 I/O 调度的公平性。若无此限制，poll 阶段的大量 I/O 回调可能导致 timers 和 check 阶段饥饿。
 
 ### 线程池排队模型
 
 $$
-\text{并发阻塞 I/O 数} = \text{UV\_THREADPOOL\_SIZE} + \text{epoll 异步 I/O 数}
+\text{最大并发阻塞 I/O 数} = \text{UV\_THREADPOOL\_SIZE} + \text{epoll 异步 I/O 数}
 $$
 
-默认 `UV_THREADPOOL_SIZE = 512`，可在启动前通过环境变量配置：
+默认 `UV_THREADPOOL_SIZE = 4`（Node.js 旧版本）或 `512`（较新版本），可通过启动前环境变量配置。注意：**线程池是共享资源**，饱和后新请求必须等待。
 
 ```bash
-UV_THREADPOOL_SIZE=8 node app.js
+UV_THREADPOOL_SIZE=8 node app.js  # 必须在启动前设置
 ```
 
 ### V8 JIT 优化模型
@@ -46,15 +45,15 @@ UV_THREADPOOL_SIZE=8 node app.js
 V8 使用两层编译 + 投机优化：
 
 $$
-\text{函数}(x_1, x_2, \ldots) \xrightarrow{\text{历史类型}} \text{假设}: \phi(x_1) = \text{int}, \phi(x_2) = \text{object}
+\text{热点函数}(x_1, x_2, \ldots) \xrightarrow{\text{历史类型反馈}} \text{假设}: \phi(x_1) = \text{int}, \phi(x_2) = \text{object}
 $$
 
 若假设成立：Turbofan 生成高度优化的机器码（类型特化、无装箱）
 若假设失败：**去优化**，回退到 Ignition 字节码，重新积累类型反馈
 
-去优化代价：~10-100ms（重新编译 + 重置优化状态）
+去优化代价：~10-100ms（重新编译 + 重置优化状态）。
 
-### 宏任务/微任务优先级
+### 微任务/宏任务优先级
 
 微任务在当前事件循环 tick 结束后立即执行，优先于所有宏任务：
 
@@ -62,7 +61,7 @@ $$
 \text{同步代码} \rightarrow \text{微任务队列} \rightarrow \text{下一个宏任务}
 $$
 
-`process.nextTick` 优先于 `Promise.then`。
+优先级：`process.nextTick` > `Promise.then` / `queueMicrotask`。
 
 ## 数据流
 
@@ -79,25 +78,29 @@ AST (抽象语法树)
     │
     ├──────────────────────────────────┐
     ▼                                  ▼
-解释执行                        热点检测
+解释执行                          热点检测
 (启动阶段)                    (调用计数 / 回边计数)
     │                                  │
     │                             Turbofan JIT
     │                                  │
-    │                             优化机器码
+    │                         优化机器码 (投机优化)
+    │                                  │
+    │                         类型反馈环 (Hidden Classes, IC)
+    │                                  │
+    │                         假设失败 → 去优化
     │                                  │
     └──────────────────────────────────┘
                 │
                 ▼
         JavaScript API 调用
-    (fs, net, http, crypto, ...)
+    (fs, net, http, crypto, zlib, ...)
                 │
                 ▼
         libuv (事件循环 + 线程池)
                 │
     ┌───────────┼───────────┐
     ▼           ▼           ▼
- epoll      kqueue       IOCP
+  epoll      kqueue       IOCP
  (Linux)    (macOS)    (Windows)
                 │
                 ▼
@@ -112,16 +115,16 @@ AST (抽象语法树)
     ▼ [Parser]
 AST
     │
-    ▼ [Ignition 解释器 或 Full-codegen]
-字节码 (Bytecode) 或 快速机器码 (冷代码路径)
+    ▼ [Ignition 解释器]
+字节码 (Bytecode) + 快速机器码 (冷代码路径)
     │
     ▼ [热函数检测]
 Hot counter ≥ CompileThreshold
     │
     ▼ [Turbofan 优化编译器]
 ├─ 类型特化 (Type Specialization)
-├─ 内联 (Inlining)
-├─ 逃逸分析 (Escape Analysis)
+├─ 内联 (Inlining) — 消除调用开销
+├─ 逃逸分析 (Escape Analysis) — 栈上分配
 ├─ 循环优化 (Loop Optimization)
 └─ 向量化 (SIMD)
     │
@@ -129,8 +132,8 @@ Hot counter ≥ CompileThreshold
 优化机器码 (Speculative)
     │
     ▼ [类型反馈环]
-├─ 隐藏类 (Hidden Classes)
-├─ 内联缓存 (Inline Cache)
+├─ 隐藏类 (Hidden Classes) — 对象形状追踪
+├─ 内联缓存 (Inline Cache) — 热点调用类型缓存
 └─ 计数反馈 (Counter Feedback)
     │
     ▼ [假设失败 → Deoptimizer]
@@ -143,24 +146,24 @@ Hot counter ≥ CompileThreshold
    ┌─────────────────────────────────────┐
    │            timers 阶段               │
    │  setTimeout(callback, delay)         │
-   │  setInterval(callback, interval)     │
+   │  setInterval(callback, interval)    │
    └─────────────┬───────────────────────┘
                  ▼
    ┌─────────────────────────────────────┐
    │       pending callbacks 阶段          │
-   │  延迟到下次循环的 I/O 回调            │
+   │  上次 I/O 遗留的延迟回调              │
    └─────────────┬───────────────────────┘
                  ▼
    ┌─────────────────────────────────────┐
    │       idle, prepare 阶段             │
-   │  libuv 内部使用                      │
+   │  libuv 内部使用                     │
    └─────────────┬───────────────────────┘
                  ▼
    ┌─────────────────────────────────────┐
    │            poll 阶段                 │
    │  获取新 I/O 事件                     │
-   │  若无回调 → 阻塞等待 (最大 max)       │
-   │  若有回调 → 执行直到队列清空或达限     │
+   │  若无回调 → 阻塞等待 (有最大超时)     │
+   │  若有回调 → 执行直到队列清空或达限    │
    └─────────────┬───────────────────────┘
                  ▼
    ┌─────────────────────────────────────┐
@@ -177,6 +180,11 @@ Hot counter ≥ CompileThreshold
                  │
                  └──────→ 返回 timers 阶段
 </pre>
+
+**poll 阶段的核心逻辑**：
+1. 有回调 → 执行所有可用回调（受 6ms slice 限制）
+2. 无回调但有 setImmediate → 跳转 check 阶段
+3. 无回调也无 setImmediate → 阻塞等待新 I/O 事件（有最大超时）
 
 ### 微任务与宏任务调度
 
@@ -212,18 +220,18 @@ JavaScript 调用 (fs.readFile / crypto.pbkdf2)
     │
     ▼ [工作线程]
 ├─ 文件系统操作 (read/write/open/...)
-├─ DNS 查询 (dns.lookup)
-├─ 加密操作 (crypto.*)
-└─ 压缩操作 (zlib.*)
+├─ DNS 查询 (dns.lookup) — getaddrinfo 可阻塞
+├─ 加密操作 (crypto.*) — 可能调用阻塞原语
+└─ 压缩操作 (zlib.*) — zlib 内部使用阻塞 API
     │
     ▼ [完成回调注册]
-回调加入事件循环队列
+回调加入事件循环的相应阶段队列
     │
     ▼ [事件循环执行]
-回调在相应阶段被调用
+回调在 poll/pending callbacks 阶段被调用
 </pre>
 
-注意：**网络 I/O 本身是异步的**（epoll/kqueue/IOCP），不需要线程池。线程池用于模拟无法异步化的**阻塞**操作系统 API。
+> **关键约束**：**网络 I/O 本身是异步的**（epoll/kqueue），不需要线程池。线程池专门用于模拟无法异步化的**阻塞操作系统 API**。这是理解 Node.js I/O 模型的核心。
 
 ## 机制
 
@@ -232,34 +240,42 @@ JavaScript 调用 (fs.readFile / crypto.pbkdf2)
 **约束条件**：
 
 1. **I/O 操作时间尺度**：磁盘/网络 I/O 等待时间 ~ms 级，CPU 计算时间 ~ns 级，相差 6 个数量级
-2. **阻塞浪费**：同步模型中线程在 I/O 等待时无法处理其他请求，造成资源浪费
+2. **阻塞浪费**：同步模型中线程在 I/O 等待时无法处理其他请求，造成线程资源浪费
 3. **事件驱动**：线程在 I/O 等待期间可注册回调，I/O 完成时由事件循环恢复执行
 
 $$
-\text{CPU 利用率} = \frac{T_{计算}}{T_{计算} + T_{I/O等待}}
+\text{CPU 利用率} = \frac{T_\text{计算}}{T_\text{计算} + T_\text{I/O等待}}
 $$
 
-同步模型 CPU 利用率极低；事件驱动模型通过切换任务掩盖 I/O 等待。
+同步模型中线程在 I/O 等待时 $T_\text{I/O等待}$ 计入分母但 $T_\text{计算}$ 无法增加，CPU 利用率极低。事件驱动模型通过切换到其他任务使 $T_\text{计算}$ 在等待期间增加，从而提升利用率。
 
 **违规后果**：
-- CPU 密集型任务阻塞事件循环 → 所有请求卡顿
-- 长同步循环（如复杂计算、大数据集排序）→ 事件循环无法推进
+- CPU 密集型任务阻塞事件循环 → 所有请求卡顿，事件循环无法推进
+- 长同步循环（如复杂计算、大数据集排序）→ 事件循环无法推进，超时计时器无法执行
 
 ### 事件循环设计原理
 
-六阶段顺序设计保证 I/O 调度的公平性：
+六阶段顺序设计保证 I/O 调度的公平性，防止任何阶段饥饿：
 
-1. **timers**：执行到期的定时器回调
-2. **pending callbacks**：上次 I/O 遗留的延迟回调
-3. **idle, prepare**：libuv 内部准备
-4. **poll**：核心 I/O 阶段，获取新事件
-5. **check**：timers 阶段后立即执行 `setImmediate`
-6. **close callbacks**：资源关闭回调
+1. **timers**：执行到期的定时器回调（`setTimeout`/`setInterval`），按插入顺序调用
+2. **pending callbacks**：上次 I/O 遗留的延迟回调（通常是某些系统错误处理）
+3. **idle, prepare**：libuv 内部使用，Node.js 开发者不直接接触
+4. **poll**：**核心 I/O 阶段**，获取新 I/O 事件，执行回调
+5. **check**：`setImmediate` 回调，timers 阶段之后立即执行
+6. **close callbacks**：`close` 事件处理（如 `socket.on('close')`）
 
-**poll 阶段特殊行为**：
-- 若有回调 → 执行所有可用回调
-- 若无回调且有 setImmediate → 跳转到 check 阶段
-- 若无回调且无 setImmediate → 阻塞等待新 I/O 事件
+**poll 阶段特殊行为决策树**：
+```
+poll 有回调? ──是──→ 执行所有可用回调直到队列清空或达到 slice 限制
+    │
+    否
+    │
+    poll 有 setImmediate? ──是──→ 跳转 check 阶段
+    │
+    否
+    │
+    阻塞等待新 I/O（最大等待时间取决于 timers 阶段最近到期时间）
+```
 
 ### 非阻塞 I/O 原理
 
@@ -267,38 +283,41 @@ $$
 同步阻塞模型:
 线程 ──请求 I/O──→ 阻塞等待 ←──返回结果── 磁盘/网络
      ↑
-     └── 线程在等待期间无法处理其他请求
+     └── 线程在等待期间无法处理其他请求（浪费 CPU 周期和内存）
 
 异步非阻塞模型:
 线程 ──注册回调──→ 事件循环返回 ←──回调排队──
      ↓
-处理其他请求
+处理其他任务（注册回调后立即返回，不等待）
      ↑
 I/O 完成通知 (epoll/kqueue/IOCP)
      ↓
-事件循环执行回调
+事件循环在下一次 poll 阶段执行回调
 </pre>
 
-epoll/kqueue/IOCP 是操作系统级别的 I/O 多路复用机制，单线程可监控数千个文件描述符的 I/O 状态。
+epoll/kqueue/IOCP 是操作系统级别的 I/O 多路复用机制：
+- **epoll** (Linux 2.6+)：红黑树管理文件描述符 + 就绪列表通知，单线程可监控数十万个文件描述符
+- **kqueue** (macOS/BSD)：基于 kqueue 系统调用，功能与 epoll 类似
+- **IOCP** (Windows)：异步 I/O 模型，completion port 机制
 
 ### libuv 线程池机制
 
-线程池大小受限（默认 512），用于**无法异步化**的阻塞操作：
+线程池大小受限（默认 512），用于**无法异步化的阻塞操作**：
 
 | 操作类型 | 是否使用线程池 | 原因 |
 |---------|---------------|------|
-| 文件系统 | 是 | OS API (read/write) 本身是阻塞的 |
-| 网络 I/O | 否 | 本身已异步 (epoll/kqueue) |
-| DNS 查询 | 是 | getaddrinfo 等可阻塞 |
-| 加密操作 | 是 | crypto_* 可能调用阻塞原语 |
-| 压缩操作 | 是 | zlib 内部使用阻塞 API |
+| 文件系统 (fs.readFile 等) | 是 | OS 的 read/write API 本身是阻塞的 |
+| 网络 I/O (http.request 等) | 否 | epoll/kqueue 本身已异步 |
+| DNS 查询 (dns.lookup) | 是 | getaddrinfo 可阻塞 |
+| 加密操作 (crypto.*) | 是 | crypto_* 可能调用阻塞原语 |
+| 压缩操作 (zlib.*) | 是 | zlib 内部使用阻塞 API |
+| 进程操作 (child_process) | 是 | waitpid 等可阻塞 |
 
-**约束**：线程池是共享资源，饱和后新请求需等待。
+**约束**：线程池是共享资源，饱和后新请求需等待（排队延迟）。
 
-**配置**：
-```bash
-UV_THREADPOOL_SIZE=8 node app.js  # 必须在启动前设置
-```
+**违规后果**：
+- 大量并发文件 I/O → 线程池饱和 → 新请求排队等待 → 延迟增加
+- 线程池过大 → 消耗额外内存，增加上下文切换
 
 ### V8 引擎机制
 
@@ -315,7 +334,9 @@ function Point(x, y) {
 
 属性**添加顺序**影响隐藏类：
 - `new Point(1, 2)` → 隐藏类 A
-- `new Point(1)` 后再 `p.y = 2` → 隐藏类 B（与 A 不兼容）
+- `new Point(1)` 后再 `p.y = 2` → 隐藏类 B（与 A 不兼容，V8 无法优化）
+
+这意味着：**对象形状（shape）决定隐藏类，形状不稳定导致 V8 无法内联和优化**。
 
 #### 内联缓存 (Inline Cache, IC)
 
@@ -327,25 +348,25 @@ function getX(p) {
 }
 ```
 
-类型稳定时：直接通过偏移量访问，无条件分支。
-类型变化时：IC 失效，重新学习。
+类型稳定时：直接通过偏移量访问（类似 C 结构体），无条件分支，接近原始速度。
+类型变化时：IC 失效（monomorphic → polymorphic → megamorphic），重新学习。
 
 #### 去优化 (Deoptimization)
 
 Turbofan 的投机优化失败时触发：
 
 触发条件：
-- 类型反馈变化（int → float）
+- 类型反馈变化（假设 int 实际为 float）
 - 隐藏类变更（添加新属性）
-- 计数器溢出（调用次数超限）
+- 调用计数器溢出
 
 去优化过程：
 1. 丢弃优化机器码
-2. 恢复字节码执行
+2. 恢复字节码执行（Ignition）
 3. 重置类型反馈
 4. 重新积累热点信息
 
-代价：~10-100ms 停顿。
+代价：~10-100ms 停顿（相当于一次 GC 停顿）。
 
 ### Node.js 模块系统
 
@@ -358,7 +379,7 @@ require('module')
 路径解析: node_modules / 内置模块 / 文件路径
     │
     ▼ [加载模块]
-读取文件 → 执行 (函数包装)
+读取文件 → 包装为函数执行 (function(exports, require, module, __filename, __dirname) { ... })
     │
     ▼ [module.exports]
 exports 对象暴露
@@ -367,13 +388,15 @@ exports 对象暴露
 require.cache[resolvedPath] = module
 ```
 
+模块首次加载后被缓存，后续 `require` 直接从缓存返回。
+
 #### ES Modules (import/export)
 
 ```javascript
-import → 静态分析 → 构建依赖图
+import → 静态分析 → 构建依赖图（所有 import 必须能在首次加载时解析）
     │
-    ▼ [所有依赖加载完成]
-ES 模块是**契约式加载**：import 必须能在模块首次加载时解析
+    ▼ [所有静态依赖加载完成]
+ES 模块是**契约式加载**：import 绑定在模块首次执行时建立
     │
     ▼ [执行]
 所有模块并行执行，但 import 绑定延迟到模块执行完毕
@@ -382,18 +405,21 @@ ES 模块是**契约式加载**：import 必须能在模块首次加载时解析
 import() → 按需加载 → 返回 Promise
 ```
 
-关键差异：ESM 在**所有静态依赖**加载完成后才开始执行，CommonJS 是**惰性加载**。
+关键差异：
+- CommonJS 是**惰性加载**（执行到该行才加载依赖模块）
+- ESM 是**契约式加载**（所有静态 import 必须在模块执行前完成解析，但实际执行可延迟）
 
 ### 约束与违规后果
 
 | 约束 | 违规后果 |
 |------|---------|
 | CPU 密集型任务应使用 worker_threads | 事件循环阻塞，所有请求卡顿 |
-| 监听器不使用时应移除 | 内存泄漏 |
-| 闭包避免引用大对象 | 内存泄漏 |
-| 缓存应有界限 | 内存耗尽 |
+| 监听器不使用时应移除 | 内存泄漏（每个监听器占用内存） |
+| 闭包避免引用大对象 | 内存泄漏（大对象被闭包引用无法 GC） |
+| 缓存应有界限 | 内存耗尽（Map/Object 无界增长） |
+| 错误应有超时处理 | 资源泄漏（未处理的 rejection 可能导致句柄泄漏） |
 
-**回调地狱**：深层嵌套回调 → 维护性差 → async/await 解决。
+**回调地狱**：深层嵌套回调 → 维护性差 → 难以追踪异步流程 → 使用 async/await 解决（本质是协程语法糖）。
 
 ## 参考存根
 
@@ -403,25 +429,50 @@ import() → 按需加载 → 返回 Promise
 console.log('1');
 setTimeout(() => console.log('2'), 0);
 Promise.resolve().then(() => console.log('3'));
-console.log('4');
-// 输出: 1 → 4 → 3 → 2
+process.nextTick(() => console.log('4'));
+console.log('5');
+// 输出: 1 → 5 → 4 → 3 → 2
+// 顺序解释: 同步 → process.nextTick → 微任务 → setTimeout
 ```
 
-### HTTP 服务器
+### HTTP 服务器（单线程事件循环）
 
 ```javascript
 const http = require('http');
 http.createServer((req, res) => {
+    // 单线程处理所有请求（高并发 I/O 型）
     res.writeHead(200);
     res.end('ok');
 }).listen(3000);
 ```
 
-### 异步文件读取
+### 异步文件读取（线程池）
 
 ```javascript
 const fs = require('fs').promises;
 async function read() {
     return await fs.readFile('test.txt', 'utf8');
+    // fs.readFile 使用 libuv 线程池，不阻塞事件循环
 }
+```
+
+### CPU 密集型任务（Worker Threads）
+
+```javascript
+const { Worker } = require('worker_threads');
+// CPU 密集型任务在独立线程执行，不阻塞主事件循环
+const worker = new Worker('compute-intensive.js', { workerData: input });
+worker.on('message', result => console.log(result));
+```
+
+### V8 Hidden Classes 示例
+
+```javascript
+// 形状稳定 → V8 优化
+const p1 = { x: 1, y: 2 };  // HiddenClass A
+const p2 = { x: 3, y: 4 };  // HiddenClass A（共享）
+
+// 形状不稳定 → V8 去优化
+const p3 = { x: 1 };        // HiddenClass B
+p3.y = 2;                    // 转换到 HiddenClass C（与 A 不兼容）
 ```
