@@ -1,69 +1,161 @@
-# CMake构建
+# CMake 构建
 
-**CMake是通过声明式配置描述构建产物与依赖关系的工具，通过生成器表达式将配置转化为各平台原生构建文件。**
+## 定义
 
-## 核心概念
+CMake 是**声明式构建配置语言**，通过 `CMakeLists.txt` 描述构建产物的图依赖关系，经生成器（Makefile、Ninja、Visual Studio 等）转换为目标平台的原生构建指令。其本质是将**构建意图（Target + Dependency Graph）**与**构建执行（Build System）**解耦。
 
-**Target是构建原子单元，通过target_*命令设置其属性，依赖传递由PUBLIC/PRIVATE/INTERFACE控制。**
+## 数学模型
+
+**构建依赖图**：
+
+构建系统本质上是一个 **DAG（有向无环图）**。设节点集合 $T$ 为 Target，边集合 $E \subseteq T \times T$ 表示依赖关系（$(A, B) \in E$ 表示 A 依赖 B，即 B 必须先于 A 构建）。
+
+**拓扑排序约束**：
+$$\forall (A, B) \in E: \text{build_order}(B) < \text{build_order}(A)$$
+
+CMake 通过 `add_dependencies`、`target_link_libraries` 等命令向图中插入节点和边。
+
+**生成器表达式的条件求值**：
+
+生成器表达式是配置感知的字符串模板，形式化为：
+$$E = \$\langle \text{<}type\text{:}cond\text{>}:value\rangle$$
+
+**求值函数**：
+$$\text{eval}(E, C) = \begin{cases} value & \text{if } \text{cond} \in C \\ \text{empty} & \text{otherwise} \end{cases}$$
+
+其中 $C$ 是配置集合（`Debug`, `Release`, `RelWithDebInfo` 等）。多条件链式展开：
+$$\text{eval}(\$<CONFIG:Debug>:debug_lib, \{Debug\}) = \text{"debug_lib"}$$
+
+**PUBLIC/PRIVATE/INTERFACE 依赖传递**：
+
+设 $D_T$ 为 Target $T$ 的直接依赖集，$P_T$ 为传播依赖集（影响其他 Target 的）。
+
+| 传递性 | 含义 | 公式 |
+|--------|------|------|
+| PRIVATE | 仅当前 Target 使用，不传播 | $P_T = D_T \cap \text{used_by}(T)$ |
+| PUBLIC | 当前 Target 使用，且传播 | $P_T = D_T$ |
+| INTERFACE | 仅传播，不直接使用 | $P_T = D_T$ |
+
+## 数据流
 
 <pre>
-CMakeLists.txt → [cmake] → Makefile/Ninja项目文件
-                      ↓
-            target_link_libraries()
+CMakeLists.txt
+       │
+       ▼
+┌─────────────────────────────────────────────────────────────┐
+│  配置阶段（Configure Step）                                   │
+│  1. CMakeLists.txt 解析（AST 构建）                          │
+│  2. find_package 查找依赖（模块/配置模式）                     │
+│  3. 变量求值与生成器表达式展开                                 │
+│  4. Target 图构建（add_executable, add_library 等）           │
+└─────────────────────────────────────────────────────────────┘
+       │
+       ▼
+[Cache] CMakeCache.txt（配置变量持久化）
+       │
+       ▼
+┌─────────────────────────────────────────────────────────────┐
+│  生成阶段（Generate Step）                                    │
+│  1. 拓扑排序确定构建顺序                                      │
+│  2. 生成器根据 Target 图生成原生构建文件                       │
+│     - Makefile（Ninja 兼容）                                  │
+│     - Ninja build.ninja                                       │
+│     - Visual Studio .sln/.vcxproj                             │
+└─────────────────────────────────────────────────────────────┘
+       │
+       ▼
+原生构建文件（Makefile / build.ninja）
+       │
+       ▼
+┌─────────────────────────────────────────────────────────────┐
+│  构建阶段（Build Step）                                       │
+│  编译器调用：cmake --build . --config Release                 │
+│  链接器调用：ld / link                                        │
+└─────────────────────────────────────────────────────────────┘
 </pre>
 
-### 最小项目
+**所有权流转**：
+
+- **CMakeLists.txt** 声明 Target 所有权（`add_library`/`add_executable`）
+- **依赖信息**通过 `target_link_libraries` 转移链接权
+- **构建产物**（`.a`, `.so`, `.exe`）由原生构建系统管理
+
+## 机制
+
+**find_package 两种模式**：
+
+**模块模式**（Module Mode）：CMake 搜索 `${CMAKE_MODULE_PATH}/FindXXX.cmake`。若找到，执行该模块，模块负责设置 `XXX_FOUND` 及相关变量。典型用于纯头文件库或支持 CMake 的现代库。
+
+**配置模式**（Config Mode）：CMake 搜索 `${XXX}_DIR` 或默认路径下的 `lib/cmake/XXX/` 或 `XXXConfig.cmake`。配置文件由库提供者编写，声明 `XXX_Target` 导入目标（CMake 3.x+ 推荐方式）。
 
 ```cmake
-cmake_minimum_required(VERSION 3.16)
-project(MyProject VERSION 1.0 LANGUAGES CXX)
-set(CMAKE_CXX_STANDARD 20)
-aux_source_directory(src SRCS)
-add_executable(myapp ${SRCS})
-```
+# 模块模式
+find_package(Threads REQUIRED)  # FindThreads.cmake
 
-## Target属性
-
-**target_include_directories设置包含路径，target_link_libraries设置链接库，PUBLIC/PRIVATE/INTERFACE决定传递性。**
-
-```cmake
-target_include_directories(mylib PUBLIC ${CMAKE_SOURCE_DIR}/include)
-target_link_libraries(app PRIVATE mylib)
-```
-
-### 传递性说明
-
-| 说明符 | 当前目标 | 依赖此目标的其他目标 |
-|--------|---------|-------------------|
-| PRIVATE | 使用 | 不继承 |
-| PUBLIC | 使用 | 继承 |
-| INTERFACE | 不使用 | 继承 |
-
-## find_package
-
-**find_package通过模块模式或配置模式查找库，生成导入目标供target_link_libraries使用。**
-
-```cmake
-find_package(Threads REQUIRED)
+# 配置模式
 find_package(Boost 1.70 REQUIRED COMPONENTS filesystem)
-target_link_libraries(myapp PRIVATE Threads::Threads Boost::filesystem)
+# → 查找 BoostConfig.cmake
 ```
 
-## 生成器表达式
+**target_* 命令的属性传播**：
 
-**生成器表达式$<CONFIG:Debug>在构建时根据配置动态替换，是条件编译选项的标准写法。**
+`target_include_directories`、`target_compile_options`、`target_link_libraries` 等命令设置 Target 属性。这些属性通过传递性说明符影响依赖图：
 
 ```cmake
-target_link_libraries(myapp PRIVATE
-    $<$<CONFIG:Debug>:debug_lib>
-    $<$<CONFIG:Release>:release_lib>
-)
+add_library(mylib INTERFACE)          # INTERFACE library（无构建产物）
+target_include_directories(mylib INTERFACE ${CMAKE_SOURCE_DIR}/include)
+# mylib 的消费者自动继承 include 路径
+
+add_executable(app PRIVATE mylib)
+# app 获得 mylib 的 INTERFACE 属性（include 路径）
+# 但 mylib 的实现不参与 app 的编译
 ```
 
-## 构建流程
+**编译特性检测 vs 包管理**：
 
-```bash
-mkdir build && cd build
-cmake .. -DCMAKE_BUILD_TYPE=Release
-cmake --build . --config Release
+| 方式 | 检测对象 | 典型命令 |
+|------|---------|---------|
+| `find_package` | 外部依赖 | 第三方库 |
+| `target_compile_features` | 编译器能力 | C++20/23 特性 |
+| `check_include_file` | 系统头文件 | 平台差异 |
+
+**CMake 作为图遍历问题**：
+
+CMake 的本质是**依赖图的拓扑排序 + 属性传播**。构建过程可抽象为：
+
+1. **图构建阶段**：解析 `CMakeLists.txt`，构建 Target DAG
+2. **拓扑排序阶段**：确定构建顺序（Kahn 算法或 DFS 后序）
+3. **属性传播阶段**：`target_link_libraries` 的传递性在 DAG 上做广度优先传播
+4. **生成阶段**：按拓扑序为每个 Target 生成构建规则
+
+关键操作：
+$$P_T^{\text{PUBLIC}} = \bigcup_{B \in D_T^{\text{PUBLIC}}} P_B^{\text{PUBLIC}} \cup D_T^{\text{PUBLIC}}$$
+
+即 PUBLIC 依赖的传递闭包。
+
+**约束条件与违反后果**：
+
+- **循环依赖**：Target 图必须为 DAG。若 `A` 依赖 `B` 且 `B` 依赖 `A`，CMake 报错 `"Target contains cycle"`。
+- **PRIVATE/PUBLIC/INTERFACE 混用错误**：若 `add_library(mylib STATIC)` 声明 PRIVATE 依赖，但消费者期望 PUBLIC，会导致链接错误（未定义符号）。
+- **生成器表达式求值时机**：生成器表达式在**生成阶段**求值，而非配置阶段。这意味着 `if(CMAKE_BUILD_TYPE STREQUAL "Debug")` 是错误的——应该用生成器表达式 `$<CONFIG:Debug>:value`。
+
+## 参考存根
+
+```cmake
+cmake_minimum_required(VERSION 3.20)
+project(MyApp VERSION 1.0 LANGUAGES CXX)
+
+set(CMAKE_CXX_STANDARD 23)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+add_library(mylib STATIC src/lib.cpp)
+target_include_directories(mylib PUBLIC ${CMAKE_SOURCE_DIR}/include)
+
+add_executable(app src/main.cpp)
+target_link_libraries(app PRIVATE mylib)
+target_link_options(app PRIVATE $<$<CONFIG:Debug>:-fsanitize=address>)
+#                                                        ↑ 缺失的闭合 > 已修正
+
+find_package(Threads REQUIRED)
+target_link_libraries(app PRIVATE Threads::Threads)
 ```
