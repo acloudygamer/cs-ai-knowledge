@@ -1,761 +1,235 @@
 # Python 3.14 新特性 <latest>
 
-Python 3.14 是前沿版本，包含多项重大改进：模板字符串 t-strings、类型提示惰性求值、子解释器支持、Zstd 压缩等。
+## 定义
 
-## 目录
+Python 3.14 是前沿版本，包含多项重大语言特性、标准库扩展和性能改进。模板字符串 t-strings 提供安全的延迟渲染；类型提示惰性求值消除模块加载时的类型解析开销；子解释器支持实现真正的多核并行；自由线程模式继续完善打破 GIL 瓶颈。
 
-1. [模板字符串 t-strings](#模板字符串-t-strings)
-2. [类型提示惰性求值](#类型提示惰性求值)
-3. [子解释器支持](#子解释器支持)
-4. [自由线程模式持续改进](#自由线程模式持续改进)
-5. [Zstd 压缩支持](#zstd-压缩支持)
-6. [异常语法改进](#异常语法改进)
-7. [外部调试器接口](#外部调试器接口)
-8. [UUID 新版本支持](#uuid-新版本支持)
-9. [REPL 语法高亮](#repl-语法高亮)
-10. [asyncio 改进](#asyncio-改进)
-11. [尾调用解释器](#尾调用解释器-tail-call-interpreter)
-12. [其他改进](#其他改进)
+## 数学模型
 
----
+### t-string 模板渲染
 
-## 模板字符串 t-strings <latest>
+t-string 的模板结构由字符串片段和插值对象交替组成：
 
-Python 3.14 引入模板字符串（t-strings），使用 `t` 前缀返回 `Template` 对象，提供延迟处理特性，适合安全渲染场景。
+$$
+\text{Template} = \bigcup_{i=0}^{n} (\text{strings}[i] \cup \text{interpolations}[i])
+$$
 
-### PEP 750 - 模板字符串字面量
+其中 $|\text{strings}| = |\text{interpolations}| + 1$。每个 `Interpolation` 元组包含 `(value, expression, conversion, format_spec)`。
 
-### 参考样例
+渲染函数 $f: \text{Template} \rightarrow \text{str}$：
 
-```python
-from string.templatelib import Template
+$$
+f(T) = \text{concat}(\text{map}(\text{convert}, T))
+$$
 
-# t-string 返回 Template 对象
-name = "World"
-template = t"Hello {name}!"
+其中 $\text{convert}$ 根据 conversion 标志（`!r`、`!s`、`!a`）应用 `repr`/`str`/`ascii` 转换。
 
-print(type(template))  # <class 'string.templatelib.Template'>
-```
+### 类型提示惰性求值语义 <latest>
 
-### 核心 API
+类型提示的求值时机从"模块加载时"推迟到"首次需要时"：
 
-`Template` 对象提供 `strings`、`interpolations`、`values` 属性访问模板结构。
+$$
+\text{lazy\_eval}(e) = \begin{cases}
+\text{Delayed}(e) & \text{定义时} \\
+\text{eval}(\text{Delayed}(e)) & \text{首次访问时} \\
+\text{cached}(\text{Delayed}(e)) & \text{后续访问时}
+\end{cases}
+$$
 
-### 参考样例
+这解决了循环前向引用问题：`class A: def f(self) -> B: ...` 和 `class B: ...` 无需 `"B"` 引号包裹。
 
-```python
-name = "World"
-template = t"Hello {name}!"
+### 子解释器 GIL 隔离 <latest>
 
-# strings: 字符串部分元组（比插值数量多1）
-print(template.strings)  # ('Hello ', '!')
+每个子解释器拥有独立的全局解释器锁（GIL）和独立 GIL 状态：
 
-# interpolations: 插值对象元组
-print(template.interpolations)  # (Interpolation(...),)
-print(template.interpolations[0].value)  # 'World'
-print(template.interpolations[0].expression)  # 'name'
+$$
+\text{Interpreter}_i \rightarrow \text{GIL}_i \quad (\text{独立于其他解释器})
+$$
 
-# values: 所有插值的值（快捷属性）
-print(template.values)  # ('World',)
-```
+线程共享同一 `Interpreter`，因此共享同一 GIL；子解释器各自独立 GIL，允许真正的多核并行。
 
-### 处理模板字符串
+## 数据流
 
-t-strings 没有内置 `substitute()` 方法，需要遍历模板自行处理。
+<pre>
+t-string 处理流程：
+源代码 ──解析──→ Template 对象
+                        │
+                        ├── Template.strings → 原始字符串片段
+                        ├── Template.interpolations → 插值对象列表
+                        └── Template.values → 插值结果（延迟）
+                              │
+                              ▼
+                        渲染函数处理
+                              │
+                              ├── 安全渲染：html.escape() 转义所有插值
+                              └── 快速渲染：直接字符串替换
 
-### 参考样例
+类型提示惰性求值流程：
+模块导入 ──→ 注解以 Delayed 形式存储（不求值）
+                │
+                ▼
+        首次 get_type_hints() 或类型检查
+                │
+                ▼
+        求值器计算具体类型 ──→ 缓存结果
+</pre>
 
-```python
-from string.templatelib import Template, Interpolation
-from typing import Literal
+## 机制
 
-def convert(value: object, conversion: Literal["a", "r", "s"] | None) -> object:
-    if conversion == "a":
-        return ascii(value)
-    elif conversion == "r":
-        return repr(value)
-    elif conversion == "s":
-        return str(value)
-    return value
+### t-string 的安全渲染特性 <latest>
 
-def f(template: Template) -> str:
-    """将 Template 处理为普通字符串（类似 f-string）"""
-    parts = []
-    for item in template:
-        match item:
-            case str() as s:
-                parts.append(s)
-            case Interpolation(value, _, conversion, format_spec):
-                value = convert(value, conversion)
-                value = format(value, format_spec)
-                parts.append(value)
-    return "".join(parts)
-
-# 使用
-name = "Alice"
-age = 30
-template = t"Hello {name!r}, value: {age:.2f}"
-print(f(template))  # Hello 'Alice', value: 30.00
-```
-
-### 安全性提升
-
-t-string 的延迟处理特性适合安全渲染，通过 `html.escape` 转义用户输入防止 XSS。
-
-### 参考样例
+t-string 的核心价值在于**延迟处理**——插值对象不在字面量解析时求值，而在迭代模板时逐一处理。这使得在渲染前对所有插值应用安全转义成为可能：
 
 ```python
-from string.templatelib import Template, Interpolation
 import html
 
 def safe_render(template: Template) -> str:
-    """安全渲染模板，自动转义插值"""
     parts = []
     for item in template:
         match item:
             case str() as s:
                 parts.append(s)
             case Interpolation(value, _, _, _):
-                parts.append(html.escape(str(value)))
+                parts.append(html.escape(str(value)))  # XSS 防护
+    return "".join(parts)
+```
+
+**约束**：Python 不内置 `substitute` 方法；需手动遍历 `Template` 对象实现渲染。
+
+### 子解释器的并行模型 <latest>
+
+子解释器通过 `interpreters` 模块创建：
+
+```python
+import interpreters
+interp = interpreters.create()
+interp.exec("""
+result = sum(range(10**7))
+""")
+```
+
+每个子解释器有独立的：
+- GIL（独立锁）
+- `sys.modules`
+- 内置名称空间
+- 导入系统
+
+共享的（通过显式传递）：
+- 进程内存空间
+- 文件描述符（需序列化传递）
+
+**约束**：子解释器间通信需通过 `Queue` 或序列化数据，不能直接共享 Python 对象。
+
+### 自由线程模式（GIL=0）<latest>
+
+PEP 703 的自由线程模式移除 GIL，允许多线程真正并行执行 CPU 密集型代码：
+
+```bash
+python3.14t -X gil=0 my_script.py  # 自由线程构建
+```
+
+**约束**：自由线程模式下 C 扩展必须线程安全；大量现有 C 扩展尚未适配，可能导致数据竞争。
+
+### except* 语法简化 <latest>
+
+PEP 758 将 `except*` 的括号改为可选：
+
+```python
+# 之前
+except* (ErrorA, ErrorB) as e:
+
+# 3.14
+except* ErrorA, ErrorB as e:
+```
+
+语法糖变更，语义不变。
+
+### 尾调用解释器（实验性）<latest>
+
+尾调用解释器将尾递归调用优化为迭代：
+
+```python
+def factorial(n, acc=1):
+    return factorial(n-1, n*acc) if n > 1 else acc  # 尾调用
+```
+
+传统解释器每次递归创建新栈帧；尾调用解释器在满足条件时复用当前栈帧。
+
+**约束**：需要自定义编译（`./configure --with-tail-call-interp`），默认构建不包含此功能。
+
+### UUID v6/v7/v8 <latest>
+
+| 版本 | 生成方式 | 特性 |
+|------|----------|------|
+| v1 | 基于 MAC 地址 + 时间戳 | 可追踪 |
+| v4 | 随机生成 | 隐私友好 |
+| v6 | 重排序时间戳（big-endian） | 数据库索引友好 |
+| v7 | Unix Epoch 毫秒时间戳 | 可排序、自增 |
+| v8 | 自定义 | 自定义字节内容 |
+
+v7 UUID 将时间戳置于高位，允许 MySQL/InnoDB 的自增主键行为，同时保持 UUID 的全局唯一性。
+
+### 性能提升 <latest>
+
+Python 3.14 在 PyPerformance 基准测试中比 3.13 平均快 9-15%，部分 Python 密集型任务可达 30-40% 提升。主要来源：
+- 字节码解释器优化
+- 内存分配器改进
+- 帧堆栈优化
+
+### 违反约束的后果
+
+| 特性 | 违反约束后果 |
+|------|-------------|
+| t-string 延迟渲染 | 在模板迭代前插值对象被 GC，导致运行时错误 |
+| 子解释器共享对象 | 传递未序列化的 Python 对象导致 `ValueError` |
+| 自由线程 C 扩展 | 数据竞争导致段错误或静默数据损坏 |
+| 尾调用解释器 | 默认构建无法使用；递归深度超过限制仍会导致栈溢出 |
+
+## 参考存根
+
+```python
+# t-string 安全渲染（t-strings 为 Python 3.14  provisional 特性）
+from string import Template
+import html
+
+def safe_render(template: Template) -> str:
+    # t-string 的 Template 对象接口以标准库 string.Template 为基础
+    # 注意：PEP 750 的完整 API 在 Python 3.14 中仍在完善
+    parts = []
+    for item in template:
+        match item:
+            case str() as s:
+                parts.append(s)
+            case _:
+                parts.append(html.escape(str(item)))
     return "".join(parts)
 
-user_input = "<script>alert('xss')</script>"
-template = t"<div>{user_input}</div>"
-result = safe_render(template)
-# <div>&lt;script&gt;alert(&#x27;xss&#x27;)&lt;/script&gt;</div>
-```
-
-### 迭代模板内容
-
-`Template` 对象可迭代，每个元素是字符串或 `Interpolation` 对象。
-
-### 参考样例
-
-```python
-name = "Python"
-version = "3.14"
-template = t"Hello {name} {version}"
-
-for item in template:
-    match item:
-        case str() as s:
-            print(f"String: {s!r}")
-        case Interpolation() as i:
-            print(f"Interpolation: value={i.value}, expression={i.expression}")
-```
-
-### 支持的插值语法
-
-t-strings 支持变量插值、表达式、转换标志（`!r` `!s` `!a`）、格式说明符和调试说明符 `=`。
-
-### 参考样例
-
-```python
-# 变量插值
-name = "Python"
-version = "3.14"
-t"Hello {name} {version}"
-
-# 表达式
-t"Result: {2 + 2}"
-
-# 转换标志
-t"{name!r}"   # repr
-t"{name!s}"   # str
-t"{name!a}"   # ascii
-
-# 格式说明符
-pi = 3.14159
-t"Pi: {pi:.2f}"  # Pi: 3.14
-
-# 调试说明符 =
-x = 5
-t"{x=}"  # strings[0]='x=', values=(5,)
-```
-
----
-
-## 类型提示惰性求值 <latest>
-
-PEP 649 改进类型提示机制，类型注释在需要时才求值，减少模块导入开销，不再需要前向引用引号。
-
-### PEP 649 - 注释延迟评估
-
-### 参考样例
-
-```python
-# Python 3.13 及之前：类型提示立即求值
-# 启动时需要完整解析所有类型，开销大
-
-# Python 3.14：类型提示延迟求值
-# 只有在真正需要时才进行求值
-```
-
-### 实际应用
-
-类型提示延迟求值减少模块导入时的开销，不需要前向引用加引号。
-
-### 参考样例
-
-```python
-# 在 Python 3.14 中，不需要前向引用加引号
+# 类型提示延迟求值（无需引号）
 class MyClass:
-    def method(self, other: OtherClass) -> MyClass:  # 不需要 "OtherClass"
+    def method(self, other: OtherClass) -> MyClass:  # 无需 "OtherClass"
         pass
 
-# 之前（Python 3.13 及之前）
-class MyClass:
-    def method(self, other: "OtherClass") -> "MyClass":  # 需要引号
-        pass
-```
-
-### 获取类型提示
-
-`typing.get_type_hints()` 已支持延迟求值。
-
-### 参考样例
-
-```python
-# 使用 typing.get_type_hints() 获取（已支持延迟求值）
-from typing import get_type_hints
-
-class MyClass:
-    x: int
-    y: str
-
-hints = get_type_hints(MyClass)
-print(hints)  # {'x': <class 'int'>, 'y': <class 'str'>}
-```
-
-> 注：PEP 649 的完整实现（`annotationlib` 模块）在 Python 3.14 中仍在完善，部分功能可能在后续版本中实现。
-
----
-
-## 子解释器支持 <latest>
-
-PEP 734/749 在标准库添加 `interpreters` 模块，每个子解释器有独立的 GIL，可实现真正并行。
-
-### PEP 734 / PEP 749 - 标准库中的子解释器
-
-### 参考样例
-
-```python
+# 子解释器
 import interpreters
-
-# 创建子解释器
 interp = interpreters.create()
-
-# 在子解释器中执行代码
 interp.exec("""
-import sys
-print(f"Running in interpreter: {id(sys)}")
+total = sum(i * i for i in range(10**7))
 """)
 
-# 在子解释器中运行函数
-def run_in_interpreter():
-    import interpreters
-    interp = interpreters.create()
-    interp.exec("""
-result = 42 * 2
-""")
-```
-
-### 与线程的区别
-
-线程共享同一 GIL，子解释器每个有独立 GIL，适合 CPU 密集型并行任务。
-
-### 参考样例
-
-```python
-import interpreters
-import threading
-
-# 线程：共享同一个 GIL
-def thread_task():
-    total = sum(i * i for i in range(1000000))
-    return total
-
-# 子解释器：每个解释器有独立的 GIL
-def interpreter_task():
-    interp = interpreters.create()
-    interp.exec("""
-total = sum(i * i for i in range(1000000))
-""")
-```
-
----
-
-## 自由线程模式持续改进 <latest>
-
-PEP 703 引入自由线程模式（Python 3.13），3.14 继续完善。`python -X gil=0` 或 `python3.14t` 启用。
-
-### PEP 703 - 自由线程模式持续改进
-
-### 参考样例
-
-```bash
-# 启用自由线程模式
-python -X gil=0 my_script.py
-
-# 或使用专门的 free-threaded 构建
-python3.14t
-```
-
-### 性能对比
-
-自由线程模式下 4 个线程能真正并行执行 CPU 密集型任务。
-
-### 参考样例
-
-```python
-import threading
-import time
-from concurrent.futures import ThreadPoolExecutor
-
-def cpu_task(n):
-    return sum(i * i for i in range(n))
-
-# 传统模式：GIL 限制
-start = time.time()
-with ThreadPoolExecutor(max_workers=4) as executor:
-    results = list(executor.map(cpu_task, [10**6] * 4))
-print(f"Traditional: {time.time() - start:.3f}s")
-
-# 自由线程模式：真正并行
-# 在 python -X gil=0 下运行
-# 4 个线程能真正并行执行
-```
-
----
-
-## Zstd 压缩支持 <latest>
-
-PEP 784 新增 `compression.zstd` 模块，支持 Zstandard 高效压缩算法，提供流式压缩接口。
-
-### PEP 784 - compression.zstd 模块
-
-### 参考样例
-
-```python
-import compression.zstd as zstd
-
-# 压缩数据
-data = b"Hello, Python 3.14! This is Zstandard compression."
-compressed = zstd.compress(data)
-print(f"Original: {len(data)} bytes")
-print(f"Compressed: {len(compressed)} bytes")
-
-# 解压缩
-decompressed = zstd.decompress(compressed)
-print(decompressed == data)  # True
-
-# 流式压缩
-with zstd.ZstdCompressor() as compressor:
-    with open("output.zst", "wb") as f:
-        for chunk in iter(lambda: f.read(8192), b""):
-            f.write(compressor.compress(chunk))
-        f.write(compressor.flush())
-```
-
-### 压缩级别
-
-Zstd 压缩级别范围 1-22，默认为 3，级别越高压缩率越大但越慢。
-
-### 参考样例
-
-```python
-import compression.zstd as zstd
-
-data = b"x" * 100000
-
-# 不同压缩级别（1-22，默认为 3）
-compressed_fast = zstd.compress(data, level=1)
-compressed_best = zstd.compress(data, level=22)
-
-print(f"Fast: {len(compressed_fast)} bytes")
-print(f"Best: {len(compressed_best)} bytes")
-```
-
----
-
-## 异常语法改进 <latest>
-
-PEP 758 允许 `except*` 表达式省略括号，语法更简洁。
-
-### PEP 758 - except* 表达式省略括号
-
-### 参考样例
-
-```python
-# 之前（Python 3.11+）
-try:
-    await task
-except* (ErrorA, ErrorB) as e:
-    print("ErrorA or ErrorB occurred")
-
-# Python 3.14：括号可选
-try:
-    await task
-except* ErrorA, ErrorB:
-    print("ErrorA or ErrorB occurred")
-```
-
-### except* 多异常捕获
-
-`except*` 捕获 `TaskGroup` 中不同类型的异常。
-
-### 参考样例
-
-```python
-async def demo():
-    try:
-        async with asyncio.TaskGroup() as tg:
-            tg.create_task(risky_task())
-    except* ValueError, TypeError:
-        print("Caught ValueError or TypeError from task group")
-    except* OSError:
-        print("Caught OSError from task group")
-```
-
----
-
-## 外部调试器接口 <latest>
-
-PEP 768 提供零开销外部调试器接口，减少调试时的性能开销，与 IDE 集成更紧密。
-
-### PEP 768 - 零开销外部调试器接口
-
-### 参考样例
-
-```python
-# Python 3.14 的调试器接口改进
-# 通过 -X debug 选项启用
-
-# 新的调试钩子
-import sys
-
-sys.add_debug_hook("step", lambda: print("Step"))
-sys.add_debug_hook("breakpoint", lambda: print("Breakpoint"))
-```
-
-### 调试优化
-
-PEP 768 提供了更高效的调试机制，减少了调试时的性能开销。
-
-### 参考样例
-
-```python
-# PEP 768 提供了更高效的调试机制
-# 减少了调试时的性能开销
-# 与 IDE 集成更紧密，支持更细粒度的断点控制
-```
-
----
-
-## UUID 新版本支持 <latest>
-
-Python 3.14 的 `uuid` 模块支持 v6/v7/v8，v7 是 Unix Epoch 时间戳（可排序），v8 是自定义格式。
-
-### UUID 版本 6-8
-
-### 参考样例
-
-```python
+# UUID v7（可排序）
 import uuid
-
-# UUID v1: 基于时间
-uuid_v1 = uuid.uuid1()
-print(f"v1: {uuid_v1}")
-
-# UUID v4: 随机生成
-uuid_v4 = uuid.uuid4()
-print(f"v4: {uuid_v4}")
-
-# UUID v6: 重新排序的时间戳（更友好的数据库索引）
-uuid_v6 = uuid.uuid6()
-print(f"v6: {uuid_v6}")
-
-# UUID v7: Unix Epoch 时间戳（可排序）
-uuid_v7 = uuid.uuid7()
-print(f"v7: {uuid_v7}")
-
-# UUID v8: 自定义
-uuid_v8 = uuid.uuid8()
-print(f"v8: {uuid_v8}")
-```
-
-### 命名空间改进
-
-v3/v5 命名空间 UUID 生成性能提升 40%。
-
-### 参考样例
-
-```python
-import uuid
-
-# v3/v5 生成更快（提升 40%）
-namespace = uuid.Namespace_URL
-name = "example.com"
-
-uuid_v3 = uuid.uuid3(namespace, name)
-uuid_v5 = uuid.uuid5(namespace, name)
-
-print(f"v3: {uuid_v3}")
-print(f"v5: {uuid_v5}")
+uid = uuid.uuid7()  # 高位是时间戳，数据库索引友好
 ```
 
 ---
 
-## REPL 语法高亮 <latest>
-
-Python 3.14 的 REPL 支持语法高亮、更好的多行编辑和持久化历史记录。
-
-### 交互式解释器改进
-
-### 参考样例
-
-```bash
-$ python3.14
-Python 3.14.0 (tags/v3.14.0:...)
-Type "help" for more information.
->>> # 代码现在有语法高亮
->>> def hello():
-...     print("Hello, World!")
-...
->>> hello()
-Hello, World!
-```
-
-### 多行编辑改进
-
-REPL 提供更好的多行编辑支持和自动缩进。
-
-### 参考样例
-
-```python
->>> # 更好的多行编辑支持
->>> # 自动缩进
->>> if True:
-...     if True:
-...         print("nested")  # 自动缩进
-...
-nested
-```
-
-### 持久化历史记录
-
-REPL 历史记录跨会话持久化，可使用方向键上下查看。
-
-### 参考样例
-
-```python
->>> # 历史记录现在跨会话持久化
->>> # 使用方向键上下查看历史
->>> for i in range(5):
-...     print(i)
-...
-0
-1
-2
-3
-4
-
-# 退出后再进入，可以按上箭头查看 for i in range(5)
-```
-
----
-
-## asyncio 改进 <latest>
-
-Python 3.14 改进了 `TaskGroup` 和异步迭代器性能。
-
-### TaskGroup 增强
-
-### 参考样例
-
-```python
-import asyncio
-
-async def demo():
-    # Python 3.14 改进了 TaskGroup
-    async with asyncio.TaskGroup() as tg:
-        # 更快的任务创建
-        for i in range(1000):
-            tg.create_task(asyncio.sleep(0.001))
-    # 所有任务完成
-```
-
-### 异步迭代器改进
-
-异步生成器在 Python 3.14 中更高效。
-
-### 参考样例
-
-```python
-import asyncio
-
-# 异步生成器改进
-async def async_generator(n):
-    for i in range(n):
-        yield i
-        await asyncio.sleep(0.01)
-
-async def main():
-    # Python 3.14 的异步迭代更高效
-    async for item in async_generator(100):
-        print(item, end=" ")
-    print()
-
-asyncio.run(main())
-```
-
----
-
-## 其他改进 <latest>
-
-### 尾调用解释器 (Tail-Call Interpreter)
-
-Python 3.14 引入了实验性的尾调用解释器（需要自定义编译），复用栈帧避免栈空间消耗。
-
-### 参考样例
-
-```bash
-# 实验性功能，需要自定义编译
-# 配置时添加 --with-tail-call-interp 参数
-./configure --with-tail-call-interp && make
-```
-
-```python
-# 尾调用优化的典型场景
-def factorial(n, acc=1):
-    return factorial(n-1, n*acc) if n > 1 else acc
-
-def tail_sum(n, total=0):
-    return total if n == 0 else tail_sum(n-1, total+n)
-
-# 传统解释器：每次递归调用都需要创建新的栈帧
-# 尾调用解释器：复用当前栈帧，避免栈空间消耗
-```
-
-> 注意：尾调用解释器是实验性功能，需要使用支持该编译选项的编译器手动编译 Python。默认构建不包含此优化。
-
-### 性能提升
-
-Python 3.14 相比 3.13 平均提升约 5-10%，部分 Python 密集型任务可提升 30-40%。
-
-### 参考样例
-
-```python
-# Python 3.14 相比 3.13 平均提升约 5-10%
-# 在 PyPerformance 基准测试中平均提速 9-15%
-# 部分 Python 密集型任务甚至可提升 30-40%
-
-import timeit
-
-def benchmark():
-    total = 0
-    for i in range(10000):
-        total += i
-    return total
-
-t = timeit.timeit(benchmark, number=100)
-print(f"Execution time: {t:.3f}s")
-```
-
-### 配置 API 改进
-
-PEP 741 提供了更灵活的解释器初始化配置方式。
-
-### 参考样例
-
-```python
-# PEP 741 - Python 配置 API
-# 更灵活的解释器初始化配置
-
-import sys
-
-# 新的配置方式
-sys.set_init_config({
-    "utf8_mode": True,
-    "dev_mode": False,
-})
-```
-
-### 工件验证
-
-PEP 761 过渡到 Sigstore 进行工件验证，Python 3.14 开始不再支持 PGP 签名。
-
-### 参考样例
-
-```python
-# PEP 761 - 过渡到 Sigstore 进行工件验证
-# Python 3.14 开始不再支持 PGP 签名
-
-# 使用 Sigstore 验证
-# pip install sigstore
-# sigstore verify python-3.14.0.tar.gz
-```
-
-### 标准库清理
-
-Python 3.14 移除了一些废弃模块和方法，改进弃用警告。
-
-### 参考样例
-
-```python
-# 移除了一些废弃模块和方法
-# 继续清理历史遗留代码
-
-# 改进的弃用警告
-import warnings
-warnings.warn(
-    "This feature is deprecated",
-    DeprecationWarning,
-    stacklevel=2
-)
-```
-
-### 错误信息改进
-
-Python 3.14 改进了 `NameError`、`ImportError` 的错误提示，提供更清晰的修复建议。
-
-### 参考样例
-
-```python
-# Python 3.14 继续改进错误提示
-
-# NameError 改进
-def demo():
-    print(undefined_var)
-
-demo()
-# NameError: name 'undefined_var' is not defined
-# Did you mean: 'defined_var'?
-
-# ImportError 改进
-try:
-    import nonexistent
-except ImportError as e:
-    print(e)
-# 更清晰的安装建议
-```
-
----
-
-## 总结
-
-| 特性 | PEP | 版本 | 类型 |
-|------|-----|------|------|
-| 模板字符串 t-strings | 750 | 3.14 | 语法 |
-| 类型提示惰性求值 | 649 | 3.14 | 语法 |
-| 子解释器 | 734 | 3.14 | 功能 |
-| 自由线程模式改进 | 703 | 3.13/3.14 | 功能 |
-| 尾调用解释器 | - | 3.14 | 性能 |
-| Zstd 压缩 | 784 | 3.14 | 标准库 |
-| except* 语法改进 | 758 | 3.14 | 语法 |
-| 外部调试器接口 | 768 | 3.14 | 功能 |
-| UUID v6-v8 | - | 3.14 | 标准库 |
-| REPL 语法高亮 | - | 3.14 | 功能 |
-| asyncio 改进 | - | 3.14 | 标准库 |
-| Python 配置 API | 741 | 3.14 | 功能 |
-| Sigstore 验证 | 761 | 3.14 | 安全 |
+## 版本对照
+
+| 特性 | Python 3.12（底座） | Python 3.14（前沿） |
+|------|-------------------|-------------------|
+| 类型提示 | 注解立即求值，前向引用需引号 | PEP 649 延迟求值，无需引号 |
+| 并行模型 | 线程共享 GIL | 子解释器独立 GIL |
+| t-string | 不支持 | PEP 750 模板字符串 |
+| except* 语法 | `except* (A, B)` | `except* A, B`（括号可选） |
+| UUID | v1/v3/v4/v5 | v6/v7/v8（新增） |
+| 尾调用 | 不支持 | 实验性（需自定义编译） |

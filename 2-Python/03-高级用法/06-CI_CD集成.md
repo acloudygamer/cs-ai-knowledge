@@ -1,14 +1,193 @@
 # CI/CD 集成
 
-GitHub Actions 是 GitHub 原生的 CI/CD 平台，通过 `.github/workflows/` 中的 YAML 文件定义工作流。`actions/checkout`、`actions/setup-python` 是常用 action。
+## 定义
 
-## GitHub Actions
+CI/CD 是软件交付流水线的两个阶段：CI（持续集成）将代码变更自动构建、测试并验证；CD（持续交付/部署）将验证后的产物自动部署到目标环境。GitHub Actions 通过声明式工作流文件（YAML）在云端_runner_（虚拟机容器）中执行，与 Git 事件（push、PR）绑定实现自动化。
 
-### 基础工作流
+## 数学模型
 
-GitHub Actions 工作流由 trigger（触发条件）、jobs（作业）、steps（步骤）组成。矩阵策略（matrix）支持多 Python 版本并行测试。
+### 工作流执行图
 
-### 参考样例
+工作流是有向无环图（DAG），节点为 jobs，边为 `needs` 依赖：
+
+$$\text{Workflow} = (J, E),\ J = \{\text{job}_i\},\ E \subseteq J \times J$$
+
+并行 jobs 满足 $j_a \nrightarrow j_b \land j_b \nrightarrow j_a$；串行 jobs 满足偏序关系。Job 内各 step 按声明顺序执行。
+
+### 缓存命中率
+
+CI 缓存的目的是减少重复依赖下载。缓存 key 的设计直接影响命中率：
+
+$$\text{hit} \iff \text{cache-key}_\text{generated} = \text{cache-key}_\text{stored}$$
+
+Key 生成公式（GitHub Actions 缓存 action）：
+
+$$\text{key} = \text{prefix} + \text{hash}(\text{dependencies-files})$$
+
+常见的缓存 key 策略：
+
+| 策略 | key 格式 | 命中率 |
+|------|----------|--------|
+| 精确版本 | `${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}` | 高（依赖不变时完全命中） |
+| 回退匹配 | `${{ runner.os }}-pip-` | 中（依赖变化但 OS 相同时部分命中） |
+| 锁文件 | `${{ runner.os }}-poetry-${{ hashFiles('**/poetry.lock') }}` | 高（锁文件变化才失效） |
+
+### 覆盖率门禁
+
+覆盖率检查在 CI 中作为质量门禁：
+
+$$\text{gate}(coverage, threshold) = \begin{cases} \text{pass} & coverage \geq threshold \\ \text{fail} & coverage < threshold \end{cases}$$
+
+`--cov-fail-under=80` 表示覆盖率低于 80% 时 CI 任务失败。
+
+## 数据流
+
+<pre>
+代码 Push / PR
+    │
+    ▼
+GitHub 事件触发
+    │
+    ├── push to main ──→ Workflow 启动
+    └── PR opened ─────→ Workflow 启动
+              │
+              ▼
+        Matrix Strategy（并行 job 生成）
+        python-version: [3.12, 3.14]
+              │
+              ▼
+        ┌─────────────────────────────────┐
+        │  Job: lint                      │
+        │  ┌──────────┐  ┌──────────────┐ │
+        │  │ checkout │→│ setup-python │ │
+        │  └──────────┘  └──────────────┘ │
+        │  ┌──────────────────────────┐    │
+        │  │ pip install ruff mypy   │    │
+        │  └──────────────────────────┘    │
+        │  ┌─────────┐  ┌─────────────┐   │
+        │  │ruff check│→│ mypy src/   │   │
+        │  └─────────┘  └─────────────┘   │
+        └─────────────────────────────────┘
+              │ needs
+              ▼
+        ┌─────────────────────────────────┐
+        │  Job: test                     │
+        │  ...                            │
+        └─────────────────────────────────┘
+              │ needs
+              ▼
+        ┌─────────────────────────────────┐
+        │  Job: build                    │
+        │  python -m build               │
+        └─────────────────────────────────┘
+              │ needs
+              ▼
+        ┌─────────────────────────────────┐
+        │  Job: publish (if main branch) │
+        └─────────────────────────────────┘
+</pre>
+
+## 机制
+
+### GitHub Actions 执行模型
+
+GitHub Actions 工作流运行在云端虚拟机（runner）中，每个 job 在独立的虚拟机实例上执行，虚拟机在 job 完成后销毁。Job 之间通过 artifacts 网络传递数据（压缩包、日志、构建产物），而非共享文件系统。
+
+**Job 与 Step 的执行语义**：
+- Job 内的 step 按声明顺序串行执行（除非使用 `continue-on-error`）
+- Job 之间按 `needs` 依赖偏序执行：无依赖的 job 并行启动
+- 每个 step 的退出码决定后续行为：零→成功，非零→失败
+
+**触发条件的精确语义**：
+- `push` + `branches: [main]`：仅 main 分支的 push 触发，包含 tag push（因 tag 属于 refs/heads 外）
+- `pull_request` + `branches: [main]`：仅 PR 目标为 main 时触发，包含 PR opened、synchronized、reopened
+- `workflow_dispatch`：允许手动从 GitHub UI 或 API 触发，需提供输入参数
+
+### Matrix 策略
+
+Matrix 是笛卡尔积展开：
+
+$$\text{_jobs} = |python-version| \times |os| \times |custom-vars}|$$
+
+```yaml
+strategy:
+  matrix:
+    python-version: ["3.12", "3.14"]
+    poetry-version: ["1.7", "1.8"]
+```
+
+产生 $2 \times 2 = 4$ 个并行 job 实例，每个消耗独立虚拟机实例和配额。Matrix 的每个维度独立展开，总实例数为各维度基数的乘积。
+
+### 缓存机制
+
+GitHub Actions 缓存是内容寻址存储（CAS）：
+
+1. 计算缓存内容的 hash 作为 key
+2. 上传时：content → hash → 存储（按 key 索引）
+3. 下载时：计算当前内容 hash，查找匹配 key，存在则恢复
+
+**约束**：缓存有 10GB 容量限制和 2 周过期（LRU 驱逐）。缓存 key 的哈希范围必须是确定性的（`hashFiles` 必须在文件存在时求值）。回退 key（`restore-keys`）允许缓存 key 部分匹配时恢复。
+
+**缓存失效原因**：
+- 依赖文件内容变化（`hashFiles` 结果不同）
+- 手动删除或达到容量上限被驱逐
+- 超过 2 周未访问被清理
+
+### Docker 多阶段构建
+
+Docker 多阶段构建将构建环境与运行环境分离，通过 `FROM ... AS alias` 命名中间阶段，`COPY --from=alias` 引用：
+
+```dockerfile
+FROM python:3.14-slim as builder    # 阶段1：构建
+WORKDIR /app
+COPY requirements.txt .
+RUN pip install --target=/app/deps -r requirements.txt
+
+FROM python:3.14-slim as runtime    # 阶段2：运行
+WORKDIR /app
+COPY --from=builder /app/deps /app/deps
+COPY --from=builder /app/src /app/src
+USER appuser
+CMD ["python", "src/main.py"]
+```
+
+**镜像层缓存机制**：
+- Docker 按顺序逐层检查缓存：若指令和依赖未变，则复用已构建层
+- `COPY requirements.txt` 层在 `RUN pip install` 前，当 requirements.txt 不变时 pip 层缓存命中
+- 代码变更时：`COPY src/` 层失效，但 requirements.txt 未变所以依赖层仍可用
+
+**非 root 运行的安全价值**：以 root 运行容器意味着攻击者成功逃逸后拥有宿主机 root 权限；非 root 用户将逃逸限制在容器命名空间。
+
+### tox 多环境矩阵
+
+tox 的 `envlist` 定义测试环境矩阵：
+
+$$\text{envlist} = \{\text{py312}, \text{py313}, \text{py314}, \text{lint}, \text{type}\}$$
+
+每个环境在独立 virtualenv 中执行，隔离依赖。`isolated_build = True` 让 tox 为每个环境创建独立构建。
+
+**tox 的隔离模型**：每个 testenv 环境有独立 virtualenv（`env/xxx/`），依赖安装和测试执行互不干扰。这与 GitHub Actions matrix 的区别在于：tox 在同一虚拟机内并行创建多个 virtualenv；matrix 为每个组合创建独立虚拟机（更高隔离但更高成本）。
+
+### 依赖锁定的必要性
+
+依赖解析的不确定性会导致"在我机器上能跑"问题：
+
+| 工具 | 锁定机制 | 解析策略 |
+|------|----------|----------|
+| pip | requirements.txt（手动或 pip-compile） | 冻结精确版本 |
+| poetry | poetry.lock | 求解 CSP，固定精确版本 |
+| pdm | pdm.lock | 求解 CSP |
+
+`pip-compile requirements.in` 将模糊约束（`requests>=2.28`）转化为精确约束（`requests==2.31.0`）。锁定后，即使上游发布新版本，安装的仍是锁定的精确版本。
+
+### 违反约束的后果
+
+- **并行 job 写入同一 artifact**：后写入覆盖先写入，导致部署版本不确定
+- **缓存 key 过于宽泛**：依赖包小版本更新但缓存未失效，安装了过期依赖
+- **跨 job 状态泄露**：依赖前序 job 的副作用状态，导致测试顺序依赖
+- **秘密信息泄露**：将 `secrets.XXX` 打印到日志，或在矩阵 job 中将 secret 传给不信任的 action
+
+## 参考存根
 
 ```yaml
 # .github/workflows/test.yml
@@ -21,74 +200,16 @@ on:
     branches: [main]
 
 jobs:
-  test:
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        python-version: ["3.12", "3.14"]
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ matrix.python-version }}
-
-      - name: Cache pip packages
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
-          restore-keys: |
-            ${{ runner.os }}-pip-
-
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-
-      - name: Run tests
-        run: pytest --cov=src tests/
-
-      - name: Upload coverage
-        uses: codecov/codecov-action@v4
-        with:
-          file: ./coverage.xml
-```
-
-完整 CI 工作流通常包含 lint、test、build、publish 阶段，各阶段可串行（`needs`）或并行执行。
-
-### 参考样例
-
-```yaml
-# .github/workflows/ci.yml
-name: CI
-
-on:
-  push:
-    branches: [main, develop]
-  pull_request:
-
-jobs:
   lint:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
-      - name: Setup Python
-        uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.14"
-
-      - name: Install lint tools
-        run: pip install ruff mypy
-
-      - name: Run ruff
-        run: ruff check .
-
-      - name: Run mypy
-        run: mypy src/
+      - run: pip install ruff mypy
+      - run: ruff check .
+      - run: mypy src/
 
   test:
     needs: lint
@@ -96,39 +217,20 @@ jobs:
     strategy:
       matrix:
         python-version: ["3.12", "3.14"]
-        poetry-version: "1.7"
-
     steps:
       - uses: actions/checkout@v4
-
-      - name: Setup Python
-        uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
-
-      - name: Setup Poetry
-        uses: abatilo/actions-poetry@v3
-        with:
-          poetry-version: ${{ matrix.poetry-version }}
-
-      - name: Cache Poetry packages
-        uses: actions/cache@v4
+      - uses: actions/cache@v4
         with:
           path: ~/.cache/pip
-          key: ${{ runner.os }}-poetry-${{ matrix.poetry-version }}-${{ hashFiles('**/poetry.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-poetry-
-
-      - name: Install dependencies
-        run: poetry install --all-extras
-
-      - name: Run tests
-        run: poetry run pytest --cov --cov-report=xml
-
-      - name: Upload coverage
-        uses: codecov/codecov-action@v4
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+      - run: pip install -r requirements.txt
+      - run: pytest --cov=src tests/
+      - uses: codecov/codecov-action@v4
         with:
-          files: ./coverage.xml
+          file: ./coverage.xml
           fail_ci_if_error: true
 
   build:
@@ -136,289 +238,27 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
-      - name: Build package
-        run: |
-          python -m pip install build
-          python -m build
-
-      - name: Upload package
-        uses: actions/upload-artifact@v4
+      - run: python -m pip install build
+      - run: python -m build
+      - uses: actions/upload-artifact@v4
         with:
           name: dist
           path: dist/
-
-  publish:
-    needs: build
-    if: github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/download-artifact@v4
-        with:
-          name: dist
-          path: dist/
-
-      - name: Publish to PyPI
-        uses: pypa/gh-action-pypi-publish@release/v1
-        with:
-          password: ${{ secrets.PYPI_TOKEN }}
 ```
-
-`pre-commit` 在提交前自动运行代码检查（ruff、mypy、flake8 等），确保代码质量。`.pre-commit-config.yaml` 定义钩子配置。
-
-### 安装与配置
-
-### 参考样例
-
-```bash
-pip install pre-commit
-pre-commit install
-```
-
-```yaml
-# .pre-commit-config.yaml
-repos:
-  - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.5.0
-    hooks:
-      - id: trailing-whitespace
-      - id: end-of-file-fixer
-      - id: check-yaml
-      - id: check-added-large-files
-      - id: check-merge-conflict
-      - id: debug-statements
-
-  - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.1.0
-    hooks:
-      - id: ruff
-        args: [--fix]
-      - id: ruff-format
-
-  - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v1.8.0
-    hooks:
-      - id: mypy
-        additional_dependencies: [types-all]
-```
-
-自定义钩子通过 `repo: local` 定义本地脚本钩子，可用于安全扫描、测试等自定义任务。
-
-### 参考样例
-
-```yaml
-# .pre-commit-config.yaml
-- repo: local
-  hooks:
-    - id: pytest-changed
-      name: pytest (changed files only)
-      entry: pytest --changed-in-HEAD-vs
-      language: system
-      pass_filenames: true
-      stages: [push]
-
-    - id: security-scan
-      name: Security scan
-      entry: python scripts/security_scan.py
-      language: system
-      always_run: true
-      pass_filenames: false
-```
-
-`tox` 通过 `tox.ini` 定义多环境测试矩阵（不同 Python 版本、lint、type-check），自动创建虚拟环境并运行测试。
-
-### 安装与配置
-
-### 参考样例
-
-```bash
-pip install tox
-```
-
-```ini
-# tox.ini
-[tox]
-envlist = py312,py313,py314,lint,type
-isolated_build = True
-
-[testenv]
-deps =
-    pytest
-    pytest-cov
-    pytest-asyncio
-commands =
-    pytest tests/ {posargs}
-
-[testenv:lint]
-deps =
-    ruff
-commands =
-    ruff check .
-
-[testenv:type]
-deps =
-    mypy
-    types-requests
-commands =
-    mypy src/
-
-[testenv:security]
-deps =
-    bandit
-commands =
-    bandit -r src/
-```
-
-```bash
-# 运行所有环境
-tox
-
-# 运行特定环境
-tox -e py312
-
-# 只运行 lint
-tox -e lint
-```
-
-## Docker 集成
-
-### Dockerfile 示例
 
 ```dockerfile
-# 构建阶段
+# Multi-stage Dockerfile
 FROM python:3.14-slim as builder
-
 WORKDIR /app
 COPY pyproject.toml poetry.lock* ./
-RUN pip install poetry && \
-    poetry config virtualenvs.create false && \
-    poetry install --no-root --without dev
+RUN pip install poetry && poetry config virtualenvs.create false
+COPY src/ /app/src/
+RUN poetry install --no-root --without dev
 
-# 运行阶段
 FROM python:3.14-slim
-
 WORKDIR /app
 COPY --from=builder /app /app
-COPY src/ /app/src/
-
-ENV PYTHONUNBUFFERED=1
-ENV PYTHONDONTWRITEBYTECODE=1
-
-# 非 root 用户运行
 RUN useradd -m appuser && chown -R appuser:appuser /app
 USER appuser
-
 CMD ["python", "-m", "src.main"]
 ```
-
-Multi-stage 构建分离 builder 和 runtime 阶段，减小最终镜像体积。使用非 root 用户运行容器是安全最佳实践。
-
-### 参考样例
-
-```dockerfile
-FROM python:3.14-slim as base
-WORKDIR /app
-COPY pyproject.toml poetry.lock* ./
-
-FROM base as builder
-RUN pip install poetry
-COPY src/ /app/src/
-RUN poetry install --no-root --only main
-
-FROM base as development
-RUN pip install poetry
-COPY src/ /app/src/
-RUN poetry install --no-root --with dev
-CMD ["poetry", "run", "fastapi", "dev", "src/main.py"]
-
-FROM builder as test
-RUN poetry install --with test
-COPY tests/ /app/tests/
-CMD ["poetry", "run", "pytest"]
-
-FROM builder as production
-RUN poetry install --only main --no-dev
-COPY --from=builder /app/src/ /app/src/
-CMD ["python", "-m", "src.main"]
-```
-
-依赖管理确保构建可重现。`pip-compile` 从 requirements.in 生成锁定的 requirements.txt。`poetry lock` 管理 Poetry 项目的依赖锁文件。
-
-### pip-compile（锁定依赖）
-
-### 参考样例
-
-```bash
-pip install pip-tools
-```
-
-```bash
-# requirements.in
-requests>=2.28
-click>=8.0
-```
-
-```bash
-pip-compile requirements.in  # 生成 requirements.txt（锁定版本）
-pip-compile --upgrade requirements.in  # 升级依赖
-```
-
-### poetry.lock
-
-```bash
-poetry lock --no-update    # 更新锁文件（不升级版本）
-poetry lock --update-all   # 升级所有依赖
-poetry check               # 检查依赖有效性
-```
-
-发布流程：本地构建（`python -m build`）→ `twine check` 验证 → `twine upload` 上传。TestPyPI 用于测试，正式发布到 PyPI。
-
-### 配置
-
-### 参考样例
-
-```toml
-# pyproject.toml
-[build-system]
-requires = ["setuptools>=61.0", "wheel"]
-build-backend = "setuptools.build_meta"
-
-[project]
-name = "mypackage"
-version = "0.1.0"
-description = "A short description"
-readme = "README.md"
-requires-python = ">=3.14"
-license = {text = "MIT"}
-authors = [
-    {name = "Your Name", email = "you@example.com"}
-]
-classifiers = [
-    "Programming Language :: Python :: 3",
-    "License :: OSI Approved :: MIT",
-]
-```
-
-```bash
-# 本地构建测试
-python -m pip install build
-python -m build
-twine check dist/*
-
-# 上传到 Test PyPI
-twine upload --repository testpypi dist/*
-pip install --index-url https://test.pypi.org/simple/ mypackage
-
-# 上传到正式 PyPI
-twine upload dist/*
-```
-
-## 常见问题
-
-| 问题 | 解决方案 |
-|------|----------|
-| Action 缓存失效 | 使用 `actions/cache@v4` 并正确配置 key |
-| 并行任务冲突 | 使用数据库 migrations 时加锁或串行化 |
-| Docker 构建慢 | 使用 multi-stage 减少镜像体积，利用缓存 |
-| 秘密信息泄露 | 使用 GitHub Secrets，不在日志中打印敏感值 |
-| 多 Python 版本兼容 | 使用 `matrix` 策略，`requires-python` 正确设置 |
