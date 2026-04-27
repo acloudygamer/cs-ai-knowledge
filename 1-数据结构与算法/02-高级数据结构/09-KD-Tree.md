@@ -1,12 +1,14 @@
-## KD-Tree
+# KD-Tree
 
-### 定义
+## 定义
 
-KD-Tree 是 k 维空间中的二叉搜索树，第 $d$ 层按第 $(d \bmod k)$ 维划分空间，交替维度保证各维均匀分割。
+KD-Tree（k-dimensional Tree）是 k 维空间中用于高效最近邻搜索的二叉搜索树，其核心思想是将 k 维空间递归地沿坐标轴方向二分，每层选择不同的维度作为划分超平面。
 
-**数学模型**
+第 $d$ 层按第 $(d \bmod k)$ 维划分空间，这种交替维度策略保证了所有维度的均匀分割——若固定按某一维划分，则该维度上方差会迅速归零，其他维度未充分分割。
 
-构建（递归中位数分割）：
+## 数学模型
+
+### 构建：递归中位数分割
 
 $$
 \text{splitDim} = \text{depth} \bmod k
@@ -16,45 +18,174 @@ $$
 \text{median} = \text{sortByDim}(P,\ \text{splitDim})[\lfloor|P|/2\rfloor]
 $$
 
-树的期望高度：$O(\log n)$（均匀分布时）
+**中位数选择的数学必然性**：中位数分割保证左右子树节点数大致相等（差 ≤ 1），从而树的深度为 $O(\log n)$。若选择其他划分点（如随机选一个），可能造成左右子树大小极度不均，退化为链表。
 
-最近邻搜索复杂度：平均 $O(\log n)$，高维退化至 $O(n)$
+### 树的期望高度
 
-维度灾难：设 $d$ 为维数，当 $d > 20$ 时，$n^{1-1/d} \approx n$，暴力搜索可能更优。
+**假设**：空间中的 n 个点独立同分布（均匀分布）。
 
-**数据流**
+递归关系：$T(n) = T(\lfloor n/2 \rfloor) + T(\lceil n/2 \rceil) + O(1)$
+
+由递归树展开可知 $T(n) = O(\log n)$，精确上界约为 $1.5 \log_2 n$。
+
+**最坏情况**：当输入点呈特定分布（如沿某维度的单调序列），高度退化为 $O(n)$。
+
+### 最近邻搜索复杂度
+
+**平均情况**：$O(\log n)$。每层搜索只进入一个分支（除非目标点恰好跨域），期望递归深度为 $O(\log n)$。
+
+**剪枝条件**：若目标点在当前维度的投影与当前节点的距离平方 $d_{\text{dim}}^2$ 已超过当前最近距离 $D^2$，则另一侧子树可被剪枝，因为任何点在该维度上的投影都更远。
+
+### 维度灾难
+
+设维度为 $d$，均匀分布在 $[0,1]^d$ 超立方体中。近邻点与目标点的距离期望约为：
+
+$$
+E[r] \approx \left(\frac{1}{\Gamma(d/2+1) \cdot \sqrt{\pi}}\right)^{1/d} \cdot n^{-1/d}
+$$
+
+当 $d$ 增大时，该距离趋向于常数（与 $n$ 无关），意味着以 $O(1)$ 半径的球几乎为空，需要检查大多数点才能找到近邻。
+
+**经验阈值**：$d > 20$ 时，KD-Tree 剪枝效率极低，暴力搜索可能更优。
+
+**归约终点**：KD-Tree 的本质是**空间坐标的二分层次化组织**，可归约为"Voronoi 图的二叉树近似"——每个节点定义的划分超平面将空间切分为两个子区域。
+
+## 数据流
+
+### 2D 空间点构建示例
 
 <pre>
-2D 空间点 [(2,3), (5,4), (9,6), (4,7), (8,1), (7,2)]
+输入点集: [(2,3), (5,4), (9,6), (4,7), (8,1), (7,2)]
 
-depth=0, dim=0 (x): 中位数 7 → 根 (7,2)
-左: [(2,3),(5,4),(4,7)]  右: [(9,6),(8,1)]
-depth=1, dim=1 (y): 左中位数 4 → (5,4), 右中位数 8 → (8,1)
+depth=0, dim=0 (x):
+  按 x 排序: [(2,3), (4,7), (5,4), (7,2), (8,1), (9,6)]
+  中位数索引 = 3 (⌊6/2⌋ = 3)
+  median = (7,2)  → 根节点
+
+  左子树 (x < 7): [(2,3), (4,7), (5,4)]
+  右子树 (x > 7): [(9,6), (8,1)]
+
+depth=1, dim=1 (y):
+  左子树按 y 排序: [(5,4), (2,3), (4,7)]
+  中位数 = (5,4)
+
+  (5,4) 的左: [(2,3)]  右: [(4,7)]
+  右子树按 y 排序: [(8,1), (9,6)]
+  中位数 = (9,6)
+
+  (9,6) 的左: [(8,1)]
 </pre>
 
-**机制**
+### 最近邻搜索路径
 
-最近邻搜索时，维护当前最近距离 $D$。若目标点在当前维度与节点的距离平方超过 $D$，则该维度的另一侧子树可剪枝。当维度升高，剪枝效率急剧下降——即维度灾难，此时应考虑 LSH 或 HNSW。
+<pre>
+搜索目标点 (6, 5) 的最近邻:
 
-**参考存根**
+从根 (7,2) 开始:
+  dim=0: |6-7|=1 < 当前最近距离（初始∞），更新最近=(7,2)
+  6 < 7 → 进入左子树 (5,4)
+
+(5,4):
+  dim=1: |5-4|=1，更新最近距离平方=1+1=2
+  5 < 5 → 左子树 [(2,3)]
+
+(2,3):
+  dim=0: |6-2|=4 > D=√2，**不进入**右子树 [(4,7)]
+  更新最近=(2,3)，距离平方=16+4=20 > 2，**不更新**
+
+回溯到 (5,4):
+  检查 (4,7) 是否需要访问：
+    各维度距离平方: dx²=(6-4)²=4, dy²=(5-7)²=4
+    和 8 < 当前最近距离 2？否，不更新
+
+最终最近邻: (7,2)，距离 √2
+
+注：(4,7) 虽在搜索路径上，但因剪枝条件被跳过
+</pre>
+
+## 机制
+
+### 划分维度选择的深层动机
+
+交替维度选择的原因：**保证空间划分的均衡性**。若固定按 x 轴划分，则 x 轴方向的点迅速被分割殆尽（深度约 $\log n$ 层后所有点都被分离），而 y 维度完全未使用。
+
+交替维度确保：每层划分都在前一维度充分分割的基础上，对新维度进行分割，从而使所有维度都均匀参与空间划分。
+
+### 剪枝条件的精确数学表达
+
+点 $p$ 到矩形 $R$ 的最近距离平方下界：
+
+$$
+d_{\text{bound}}(p, R)^2 = \sum_{i=1}^{k} \max(0,\ l_i - p_i)^2 + \max(0,\ p_i - r_i)^2
+$$
+
+其中 $l_i, r_i$ 是 $R$ 在第 $i$ 维的边界，$p_i$ 是 $p$ 的第 $i$ 坐标。
+
+**若 $d_{\text{bound}}^2 > D^2$（当前最近距离），则 $R$ 可完全剪枝**。
+
+### 高维退化的原因
+
+KD-Tree 的剪枝依赖于"目标点与划分超平面的距离"来判断是否访问另一侧。但在高维空间：
+
+- 划分超平面数量指数增长（每层一个）
+- 目标点到大多数超平面的距离仍然较大，但不足以剪枝
+- 需要检查的节点数趋向 $O(n)$
+
+### 替代方案
+
+- **Ball Tree / BBF**：改进高维查询
+- **LSH（局部敏感哈希）**：概率型近邻搜索，适合高维
+- **HNSW**：基于跳表的图索引，适合千万级向量检索
+
+## 参考存根
 
 ```python
+import heapq
+
 class KDNode:
     def __init__(self, pt, dim):
-        self.pt, self.dim = pt, dim
-        self.left = self.right = None
+        self.pt = pt
+        self.dim = dim
+        self.left = None
+        self.right = None
 
 class KDTree:
     def __init__(self, k=2):
-        self.k, self.root = k, None
+        self.k = k
+        self.root = None
 
-    def build(self, pts, depth=0):
-        if not pts: return None
+    def build(self, pts):
+        self.root = self._build(pts, 0)
+
+    def _build(self, pts, depth):
+        if not pts:
+            return None
         d = depth % self.k
         pts.sort(key=lambda x: x[d])
         mid = len(pts) // 2
         node = KDNode(pts[mid], d)
-        node.left = self.build(pts[:mid], depth + 1)
-        node.right = self.build(pts[mid + 1:], depth + 1)
+        node.left = self._build(pts[:mid], depth + 1)
+        node.right = self._build(pts[mid + 1:], depth + 1)
         return node
+
+    def nearest(self, target):
+        self.best = (float('inf'), None)
+        self._search(self.root, target)
+        return self.best[1]
+
+    def _search(self, node, target):
+        if not node:
+            return
+        d = node.dim
+        dist_sq = sum((a - b) ** 2 for a, b in zip(node.pt, target))
+        if dist_sq < self.best[0]:
+            self.best = (dist_sq, node.pt)
+
+        dx = target[d] - node.pt[d]
+        first = node.left if dx < 0 else node.right
+        second = node.right if dx < 0 else node.left
+
+        self._search(first, target)
+        if dx * dx < self.best[0]:
+            self._search(second, target)
 ```
