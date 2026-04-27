@@ -2,60 +2,154 @@
 
 > Pinia 是 Vue.js 的**新一代状态管理库**，以组合式 API 为核心，通过 setup 函数模式实现状态、计算属性和方法的统一管理。
 
-## 核心机制
+## 定义
 
-### 响应式数据流
+Pinia 的本质是一个**轻量级响应式状态容器**，直接构建在 Vue 3 的响应式系统（Proxy + Computed）之上，不发明新的响应式模型。
+
+与 Redux 的根本区别在于：
+- Redux 将状态视为**不可变快照**，每次更新生成新快照，通过引用相等检测判断变化
+- Pinia 将状态视为**响应式变量**，通过 Vue 的 Proxy 追踪依赖，自动在精确字段级别触发更新
+
+Pinia 的设计哲学是**最小化 API**：不强制样板代码，不强制要求 action type，利用 Vue 3 原生的 `ref`/`computed`/`watchEffect`，让 Vue 开发者零学习曲线。
+
+## 数学模型
+
+### 响应式更新粒度
+
+Pinia 的 state 基于 Vue `ref`，getters 基于 Vue `computed`。这意味着：
+
+- **更新粒度**：组件重渲染只在**实际使用的**响应式字段变化时触发，而非整个 Store
+- **缓存有效性**：computed 在依赖的 ref 未变化时返回缓存值，不重复求值
+- **惰性求值**：computed 只有在**被访问时**才求值，未被使用的 computed 永不执行
+
+设一个 Store 有 $N$ 个 state 字段和 $M$ 个 computed.getter，组件只使用其中 $k$ 个字段。当任意字段变化时，Vue 的响应式系统通过 Proxy get trap 建立依赖图，**只有依赖该字段的 computed 和组件**才会被标记为脏（dirty）。
+
+### storeToRefs 的本质
+
+`storeToRefs` 的作用是将 Store 中的响应式 state 和 getters 转换为**ref对象**（保持响应式），同时将普通方法（actions）排除在外：
+
+```javascript
+const { count } = storeToRefs(store)   // ref(count)，响应式
+const { increment } = store             // 普通函数，非响应式
+```
+
+这基于 Vue 3 的 `toRef` 机制：为源响应式对象的某个属性创建一个引用，该引用与源属性保持同步。
+
+## 数据流
 
 <pre>
-┌──────────────────────────────────────────────────┐
-│                   defineStore                    │
-│  ┌────────────────────────────────────────────┐  │
-│  │  state (ref) → getters (computed)          │  │
-│  │         ↓                                  │  │
-│  │  actions (methods) → state mutation        │  │
-│  └────────────────────────────────────────────┘  │
-└──────────────────────────────────────────────────┘
-                       │
-                       ▼
-┌──────────────────────────────────────────────────┐
-│                   组件中使用                     │
-│  useXxxStore() → 解构(state/getters/actions)   │
-│  storeToRefs(state) → 保持响应式               │
-└──────────────────────────────────────────────────┘
+defineStore('counter', setup 函数)
+        │
+        ├── ref(0)          → state.count
+        ├── computed(*2)     → getters.doubled
+        └── function()       → actions.increment
+        │
+        ▼
+Pinia 内部注册 Store（pinia._s.set('counter', store)）
+        │
+        ▼
+组件调用 useCounterStore()
+        │
+        ├── storeToRefs(store) → 解构后 ref 保持响应式
+        └── 直接解构 store      → actions 无需响应式
+        │
+        ▼
+组件中使用 ref
+        │
+        ▼
+当 state.count 变化 → 组件自动重渲染（精确到使用该字段的节点）
 </pre>
 
-Pinia 的 state 是 Vue `ref`，getters 是 `computed`，actions 是普通函数——完全基于 Vue 组合式 API，无需学习新概念。
+**数据形态变换**：
+- `ref(value)` → Vue 响应式变量，`.value` 访问
+- `computed(fn)` → 惰性求值的计算属性，依赖变化时自动失效缓存
+- `storeToRefs(store)` → 将 state/getters 转为 ref，actions 保持原始函数
 
-### setup vs 选项式
+**所有权**：Store 实例由 Pinia 持有（注册在 `pinia._s` map 中），组件通过 `useXxxStore()` 获取引用，多个组件调用同一 Store 返回**相同实例**（单例）。
+
+## 机制
+
+### Pinia 为何不需要手动订阅/取消订阅
+
+Vue 的响应式系统本身就是一张**依赖图**：
+
+```
+ref(count) ──依赖边──> computed(doubled) ──依赖边──> 组件的 render 函数
+     │
+     └───────────────────────依赖边─────────────────────────────> 另一组件
+```
+
+Pinia 的 state 是 `ref`，getters 是 `computed`，actions 是普通函数。当 `state.count` 变化时：
+1. Vue 自动将所有依赖 `count` 的 computed 和组件标记为 dirty
+2. 下一帧渲染时，脏 computed 重新求值，脏组件重新 render
+
+这与 MobX 的自动依赖追踪**本质上相同**，但 Pinia 直接复用 Vue 3 的基础设施，无需自建 DAG。
+
+### setup 风格 vs 选项式
 
 **setup 风格**（组合式，推荐）：
 
-```
-state = ref()
-getters = computed(() => ...)
-actions = function() {}
+```javascript
+const useCounterStore = defineStore('counter', () => {
+  const count = ref(0);                    // state
+  const doubled = computed(() => count.value * 2);  // getter
+  function increment() { count.value++; } // action
+  return { count, doubled, increment };
+});
 ```
 
 **选项式风格**（类似 Vuex）：
 
-```
-state = () => ({})
-getters = {}
-actions = {}
+```javascript
+const useCounterStore = defineStore('counter', {
+  state: () => ({ count: 0 }),
+  getters: { doubled: (state) => state.count * 2 },
+  actions: { increment() { this.count++; } }
+});
 ```
 
-### Store 组合
+setup 风格的本质：返回的对象直接作为 Store 的公有接口，`ref` 和 `computed` 自动被 Pinia 识别为 state 和 getters。
 
-Store 可以相互引用，通过函数调用访问其他 store：
+### 插件系统的本质
+
+Pinia 插件是一个**函数接收（store, pinia）参数**，在 Store 创建时注入逻辑：
 
 ```javascript
-const userStore = useUserStore();
-const orders = computed(() =>
-  userStore.orders.filter(o => o.userId === userStore.id)
-);
+const persistPlugin = (context) => {
+  const { store } = context;
+  // Store 创建时执行
+  const saved = localStorage.getItem(store.$id);
+  if (saved) store.$patch(JSON.parse(saved));
+  // 订阅状态变化
+  store.$subscribe((_, state) => {
+    localStorage.setItem(store.$id, JSON.stringify(state));
+  });
+};
 ```
 
----
+这等价于 AOP 的"通知（advice）"模式——在 Store 的生命周期关键点（创建、状态变化）插入横切逻辑。
+
+### 批量操作的事务语义
+
+`store.$patch()` 可批量应用状态变更：
+
+```javascript
+store.$patch({ count: 1, name: 'Alice' });
+```
+
+这与 MobX 的 `runInAction` 类似，提供**原子性批量更新**语义。与 MobX 不同的是，Pinia 不需要 `runInAction` 包装——因为 Vue 的响应式更新本身就是批量的（`queueMicrotask` 队列）。
+
+## 对比参照
+
+| 维度 | Pinia | Redux Toolkit | MobX |
+|------|-------|---------------|------|
+| **响应式模型** | Vue Proxy（属性级） | 不可变 + selector（引用级） | MobX Proxy（属性级） |
+| **API 风格** | 组合式/选项式 | 选项式 | 装饰器/函数式 |
+| **样板代码** | 极少 | 少 | 极少 |
+| **TypeScript 支持** | 极佳（类型推导） | 良好 | 良好 |
+| **DevTools** | 支持（时间旅行有限） | 完整时间旅行 | 有限 |
+| **异步处理** | 普通 async 函数 | createAsyncThunk | runInAction |
+| **学习曲线** | 低（Vue 开发者） | 中 | 中 |
 
 ## 核心 API
 
@@ -239,3 +333,19 @@ src/
 - 一个 Store 负责一个领域（用户、购物车、订单）
 - 避免单个 Store 混合多个无关状态
 - setup 风格更适合 TypeScript 类型推导
+
+## 参考存根
+
+```javascript
+// Pinia storeToRefs 的简化实现（基于 Vue 3 toRef）
+function storeToRefs(store) {
+  const refs = {};
+  for (const key in store) {
+    const val = store[key];
+    if (isRef(val) || isReactive(val)) {
+      refs[key] = toRef(store, key);
+    }
+  }
+  return refs;
+}
+```

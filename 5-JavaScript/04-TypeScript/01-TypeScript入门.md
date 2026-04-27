@@ -2,20 +2,63 @@
 
 > TypeScript 是 JavaScript 的超集，通过添加静态类型系统将类型错误从运行时提前到编译时发现。
 
-## 类型系统本质
+## 定义
 
-```
+TypeScript 的本质是**在 JavaScript 语法之上叠加了一层编译时类型检查层**。它不改变 JavaScript 的运行时语义，而是通过静态分析在代码执行前捕获类型错误，同时生成干净的可移植 JavaScript 代码。
+
+## 数学模型
+
+TypeScript 编译器（tsc）对每个语法构造执行**结构化类型检查**。设类型 $A$ 和 $B$ 的成员集合分别为 $M(A)$ 和 $M(B)$，赋值兼容性定义为：
+
+$$A \subtype B \iff \forall m \in M(B): m \in M(A) \land \text{type}(A.m) \subtype \text{type}(B.m)$$
+
+这意味着 TypeScript 的类型系统是**双向协变**的：子类型的属性类型可以是父类型属性类型的超类型（对于返回值）或子类型（对于参数）。这种设计允许"结构化子类型"——两个独立定义的类型只要结构匹配即可兼容，无需显式继承声明。
+
+**归约终点**：类型检查最终归约为对每个属性名的成员访问和基本类型相等性的判定，全部在编译时完成，不产生任何运行时开销。
+
+## 数据流
+
+<pre>
 源代码 (.ts)
     │
     ▼
-tsc --type-check──► 错误报告
+tsc --type-check──► 错误报告（编译期）
     │
     │──► 类型擦除 ──► JavaScript (.js)
-```
+    │    ( erase(T) = T' where T' has no type annotations )
+    │
+    ▼
+V8 Engine 执行（无类型信息）
+</pre>
 
-TypeScript 采用**结构化类型系统**（structural typing）：若 A 类型包含 B 类型的所有结构特征，则 A 可赋值给 B。这与 Java/C++ 的 nominal typing（按名称匹配）不同，允许 Duck Typing 的灵活性和类型安全共存。
+**所有权变换**：
+- 编译期：tsc 持有类型环境 $\Gamma$（变量→类型的映射），对每个表达式 $e$ 推导 $\Gamma \vdash e: T$
+- 代码生成：类型标注在生成 JavaScript 时完全移除，生成的 .js 文件不含任何类型信息
 
-## 基本类型
+## 机制
+
+**为什么选择结构化类型而非名义类型**：
+- 名义类型（Java/C++）要求类型通过显式声明建立关系；结构化类型允许"匿名"匹配，适合 JavaScript 动态添加属性的习惯
+- 这使得 TypeScript 可以在不修改原 JavaScript 库的前提下为其添加类型——只需提供 .d.ts 声明文件
+
+**any vs unknown 的设计权衡**：
+- `any` 绕过了所有类型检查，等价于告诉编译器"相信我"——适用于渐进式迁移老代码
+- `unknown` 要求使用前必须类型收窄（type narrowing），强制进行防御性检查，比 `any` 更安全
+
+**never 类型的含义**：表示"永远不可能到达"的状态，用于穷尽性检查（exhaustiveness checking）。当 switch 穷尽所有联合成员后，default 分支的类型被推断为 never，若漏掉分支则编译报错。
+
+**约束条件**：
+- TypeScript 默认不检查 null/undefined（`strictNullChecks` 关闭时），这与 JavaScript 的动态特性保持一致
+- 开启 `strict: true` 等价于同时开启 `strictNullChecks`、`strictPropertyInitialization`、`noImplicitAny` 等
+
+## 对比参照
+
+| 类型系统 | 代表语言 | 子类型条件 | 适用场景 |
+|----------|----------|------------|----------|
+| 结构化类型 | TypeScript, Go | 结构匹配即可 | 动态添加属性的语言 |
+| 名义类型 | Java, C++ | 显式继承声明 | 需要明确类型边界的系统 |
+
+## 基础类型
 
 ```typescript
 let name: string = 'Alice';
@@ -123,4 +166,15 @@ type NonNull = Exclude<string | null | undefined, null | undefined>;
     "moduleResolution": "bundler"
   }
 }
+```
+
+## 参考存根
+
+*TypeScript 类型检查的最简可执行证明：*
+
+```typescript
+// 编译：tsc --strict --noEmit app.ts
+// 预期：编译错误——Argument of type 'number' is not assignable to parameter of type 'string'
+function greet(name: string): string { return `Hello, ${name}`; }
+greet(42);
 ```

@@ -1,97 +1,211 @@
 # Jest 入门
 
-> **版本基准**：Node24+ES2024 | Node26+ES2026
+> **版本基准**: Node24+ES2024 (stable) | Node26+ES2026 (latest)
 
-## 本质断言
+## 定义
 
-**Jest 是 Facebook 开发的 JavaScript 测试框架，通过隔离执行和快照比对实现零配置自动化验证。**
-
----
-
-## 设计机制
-
-### 隔离执行模型
-
-Jest 在子进程或 worker 线程中运行每个测试文件，通过 `vm` 模块创建独立上下文，使全局状态（模块缓存、变量）无法跨文件共享。
-
-```
-测试套件A ──┬── 进程1 ── 独立vm上下文
-           │
-测试套件B ──┴── 进程2 ── 独立vm上下文
-```
-
-### 快照比对机制
-
-首次执行时将输出序列化存储为 `.snap` 文件，后续运行逐字节比对，差异即失败——此设计使 UI 组件的渲染结果可被回归测试。
-
-### 自动 mock 注入
-
-`jest.mock()` 拦截模块加载路径，返回 `jest.fn()` 伪造实现，而非执行真实 I/O、网络或文件系统操作。
+Jest 是 Facebook 开发的 JavaScript 测试框架，通过**子进程隔离执行**和**快照比对**实现零配置自动化验证。其核心价值在于将测试的**确定性**和**可重复性**从人工约定转化为框架保证——每个测试文件运行在独立 vm 上下文中，全局状态无法跨文件泄露。
 
 ---
 
-## 核心概念
+## 数学模型
 
-### 测试结构：describe-it
+### 测试隔离性形式化
 
-<pre>
-describe(套件名, () => {
-  it(用例名, () => {
-    expect(实际值).toBe(期望值)
-  })
-})
-</pre>
+设测试套件集合为 $T = \{t_1, t_2, ..., t_n\}$，每个测试 $t_i$ 运行在独立进程/上下文中。隔离性要求：
 
-- `describe` 分组相关用例，控制生命周期钩子作用域
-- `it` / `test` 语义等价，均为最小测试单元
-- `expect` 返回链路式断言对象，调用匹配器完成验证
+$$\forall i \neq j: \text{state}(t_i) \cap \text{state}(t_j) = \emptyset$$
 
-### 匹配器分类
+实际实现中：
+- 全局变量不共享
+- `require()` 缓存按 vm 上下文隔离
+- `jest.mock()` 的伪造对象不跨测试文件泄露
 
-| 类型 | 典型匹配器 | 设计意图 |
-|------|-----------|---------|
-| 相等 | `toBe`/`toEqual` | `toBe` 用 `Object.is`（精确相等），`toEqual` 深度递归比较 |
-| 布尔 | `toBeTruthy`/`toBeFalsy` | 隐式类型转换后的真假判断 |
-| 类型 | `toBeNull`/`toBeUndefined` | 精确类型，而非真假 |
-| 包含 | `toContain` | 数组含元素、字符串含子串、iterable 含项 |
-| 属性 | `toHaveProperty` | 检查路径存在性，支持 `a.b.c` 深路径 |
-| 异常 | `toThrow` | 封装 `try-catch`，验证抛出内容 |
+### 快照比对的触发条件
 
-### 生命周期钩子作用域
+快照文件 `.snap` 存储序列化后的输出 $S_{expect}$。每次测试运行时，当前输出 $S_{actual}$ 与 $S_{expect}$ 按字节比对：
 
-<pre>
-外层 describe
-  ├── beforeAll ─── 本层及所有子层之前执行一次
-  ├── beforeEach ─── 每个用例之前执行
-  │
-  └── 内层 describe（独立作用域）
-        ├── beforeAll ─── 仅内层之前
-        ├── afterAll  ─── 仅内层之后
-        ├── beforeEach
-        └── it / test
-</pre>
+$$\text{match} \iff S_{actual} \equiv S_{expect}$$
 
-**设计原因**：钩子与最近的 `describe` 绑定，内外层钩子按 setup→子层setup→用例→子层teardown→外层teardown 顺序执行，保证跨层设置的隔离性。
+不匹配时差异 $\Delta = S_{actual} \setminus S_{expect}$ 即为失败信息。
 
 ### Mock 函数状态机
 
 ```
-jest.fn() ──mockReturnValue──► 已配置（同步返回值）
-        ──mockResolvedValue──► 已配置（Promise 穿透）
-        ──mockImplementation──► 已配置（自定义逻辑）
-        │
-        └── clearAllMocks() ──► 调用记录清空，配置保留
-             resetAllMocks() ──► 调用记录+配置均清空
-                  restoreAllMocks() ──► 若由 spyOn 生成，恢复原始实现
+jest.fn() 初始状态
+    │
+    ├── mockReturnValue(v) ──► 已配置（同步返回值）
+    │
+    ├── mockResolvedValue(v) ──► 已配置（Promise 穿透）
+    │
+    ├── mockRejectedValue(v) ──► 已配置（Promise 拒绝）
+    │
+    ├── mockImplementation(fn) ──► 已配置（自定义逻辑）
+    │
+    ├── clearAllMocks() ──► 调用记录清空，配置保留
+    │
+    ├── resetAllMocks() ──► 调用记录+配置均清空
+    │
+    └── restoreAllMocks() ──► 若由 spyOn 生成，恢复原始实现
 ```
-
-### Timer Mock 隔离原理
-
-`jest.useFakeTimers()` 将 `setTimeout`/`setInterval` 替换为内存中模拟时钟，时间推进由 `jest.advanceTimersByTime()` 控制——此设计使异步测试在同步控制流中确定性执行。
 
 ---
 
-## 参考实现
+## 数据流
+
+<pre>
+测试套件入口
+    │
+    ▼
+Jest 收集测试文件 (glob: **/*.test.js)
+    │
+    ▼
+┌───────────────────────────────────────┐
+│  每个测试文件 ──► 子进程/Worker       │
+│     │                                 │
+│     ├── vm 模块创建独立上下文         │
+│     ├── require 缓存隔离              │
+│     └── 全局状态不共享                │
+└───────────────────────────────────────┘
+    │
+    ▼
+describe/it 执行
+    │
+    ├── beforeAll / beforeEach (setup)
+    │
+    ├── expect(value).toBe(expected) ──► 匹配器链
+    │                                    │
+    │                                    ├── toBe (Object.is 精确)
+    │                                    ├── toEqual (深比较)
+    │                                    ├── toContain (包含)
+    │                                    └── toThrow (异常)
+    │
+    └── afterEach / afterAll (teardown)
+    │
+    ▼
+快照比对（如使用）
+    │
+    ├── 首次运行 ──► 生成 .snap 文件
+    └── 后续运行 ──► 与 .snap 比对，差异即失败
+</pre>
+
+### Mock 注入数据流
+
+<pre>
+jest.mock('./module') 声明
+    │
+    ▼
+模块加载时拦截 (require/import)
+    │
+    ▼
+返回 jest.fn() 伪造实现
+    │
+    ▼
+测试执行调用伪造对象
+    │
+    ▼
+调用记录存入 mock.mock.calls
+</pre>
+
+### Timer Mock 数据流
+
+<pre>
+jest.useFakeTimers() 调用
+    │
+    ▼
+setTimeout/setInterval 被替换为内存时钟
+    │
+    ▼
+jest.advanceTimersByTime(ms)
+    │
+    ▼
+所有待处理回调按顺序执行
+    │
+    ▼
+回调执行无真实时间等待
+</pre>
+
+---
+
+## 机制
+
+### 子进程隔离的代价
+
+Jest 为每个测试文件创建独立进程或 worker 线程。这确保了：
+- 全局变量不泄露
+- 模块缓存不互相影响
+- 内存泄漏不会累积
+
+**代价**：进程间通信开销。对于 I/O 密集型测试（如文件操作），隔离开销可能超过测试本身执行时间。
+
+### 快照比对的适用场景
+
+快照最适合 **输出结构稳定但实现细节可变的场景**：
+- UI 组件渲染结果（DOM 结构）
+- 序列化后的数据结构
+- API 响应格式
+
+**约束**：
+- 快照是**字节省比对**，不验证语义正确性
+- 快照需要与源码一起版本控制，diff 需人工审查
+- 输出变化时必须确认是预期行为，否则更新快照
+
+### 自动 Mock 的拦截点
+
+`jest.mock()` 在模块加载时拦截，而非调用时。这意味着：
+
+```javascript
+jest.mock('./api');  // 声明位置不重要，在 import 之前即可
+import { fetchUser } from './api';
+```
+
+**机制**：Jest 的模块系统劫持 `require()` 路径解析，对匹配的模块返回伪造对象，而非执行真实模块代码。
+
+### Timer Mock 的确定性保证
+
+`jest.useFakeTimers()` 将真实时间替换为内存模拟时钟：
+- `setTimeout(cb, 1000)` 注册回调但不等待
+- `jest.advanceTimersByTime(1000)` 推进模拟时钟，触发所有到期回调
+- 回调执行顺序与真实事件循环一致
+
+**优势**：异步测试变成同步执行，无真实时间等待，测试速度不受超时时间影响。
+
+**约束**：只能 mock 顶层定时器（全局 `setTimeout`/`setInterval`），不能 mock 模块内部的局部定时器。
+
+### 生命周期钩子的作用域绑定
+
+`beforeAll`/`beforeEach` 等钩子与最近的 `describe` 绑定：
+
+```
+外层 describe
+  ├── beforeAll ──► 外层所有测试之前执行一次
+  ├── beforeEach ──► 外层每个测试之前执行
+  │
+  └── 内层 describe（独立作用域）
+        ├── beforeAll ──► 仅内层之前
+        ├── beforeEach ──► 内层每个测试之前
+        ├── it / test
+        ├── afterEach ──► 内层每个测试之后
+        └── afterAll ──► 内层所有测试之后
+```
+
+执行顺序：`setup(外层) → setup(内层) → test → teardown(内层) → teardown(外层)`
+
+---
+
+## 对比参照
+
+| 特性 | Jest | Mocha/Chai | Vitest |
+|------|------|------------|--------|
+| 测试隔离 | 子进程/vm 上下文 | 共享进程 | 线程/vm 上下文 |
+| 快照 | 内置支持 | 需第三方库 | 内置（V8 内置） |
+| Mock 语法 | `jest.fn()` | `sinon.stub()` | `vi.fn()` |
+| 速度 | 中（进程开销） | 快（共享进程） | 快（Chokidar HMR） |
+| 配置 | 零配置优先 | 需手动配置 | 兼容 Jest |
+
+---
+
+## 参考存根
 
 ```javascript
 // 最小测试单元
@@ -101,19 +215,11 @@ it('adds two numbers', () => {
 ```
 
 ```javascript
-// 同步匹配器
+// 匹配器示例
 expect(null).toBeNull();
 expect(undefined).toBeUndefined();
 expect('').toBeFalsy();
-```
-
-```javascript
-// 数组包含
 expect([1, 2, 3]).toContain(2);
-```
-
-```javascript
-// 对象深比较
 expect({ a: 1 }).toEqual({ a: 1 });
 ```
 
