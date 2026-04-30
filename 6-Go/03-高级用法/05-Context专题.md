@@ -82,6 +82,12 @@ ctx, cancel := context.WithCancel(parentCtx)
        └─ 子 Context 的 Done 也关闭（级联取消）
 </pre>
 
+### 机制
+
+**级联取消的数学语义**：
+$$\text{cancel}(C_i) \implies \forall C_j \in \text{descendants}(C_i): Done(C_j) \text{ 关闭}$$
+这由 Context 树的父子关系保证。
+
 ## WithTimeout
 
 ### 定义
@@ -95,6 +101,8 @@ $$T_{remaining} = T_{deadline} - T_{now}$$
 
 当 $T_{remaining} \leq 0$ 时，自动调用 cancel。
 
+**超时精度**：由于调度延迟，实际超时可能略晚于设定值。对于需要精确超时的场景，应使用 `WithDeadline` 而非 `WithTimeout`。
+
 ## WithValue
 
 ### 定义
@@ -105,6 +113,10 @@ $$T_{remaining} = T_{deadline} - T_{now}$$
 **为什么 key 要用自定义类型**：Context 的 Value 查找基于类型和值的相等性。若使用 `string` 作为 key，不同包可能使用相同的 key 导致冲突。使用自定义类型（如 `type requestIDKey struct{}`）确保唯一性。
 
 **Context Value 的查找路径**：从当前 Context 向上逐级查找 key，直到找到或到达根 Context。
+
+**约束条件**：
+- Value 查找是 O(depth) 的，树过深时可能影响性能
+- 不应存储大量数据到 Context（应只存元数据）
 
 ### 数据流
 
@@ -136,6 +148,13 @@ ctx.Err() 返回 context.Canceled 或 context.DeadlineExceeded。
 - `context.Canceled`：主动取消（调用 cancel()）
 - `context.DeadlineExceeded`：时间耗尽（超时或截止时间到达）
 
+**错误判定的数学形式**：
+$$Err(ctx) = \begin{cases}
+\text{Canceled} & \text{if } cancel \text{ called} \\
+\text{DeadlineExceeded} & \text{if } T_{now} > Deadline(ctx) \\
+\text{nil} & \text{otherwise}
+\end{cases}$$
+
 ## 最佳实践
 
 ### Context 作为第一个参数
@@ -143,15 +162,23 @@ ctx.Err() 返回 context.Canceled 或 context.DeadlineExceeded。
 ### 机制
 将 Context 作为函数的第一个参数是 Go 的惯用约定，使调用者可以控制超时和取消。
 
+**为什么作为第一个参数**：Context 语义上类似于"请求元数据"，与方法参数平起平坐比藏在结构体里更显式。
+
 ### 不要在结构体中存储 Context
 
 ### 机制
 Context 应该作为方法参数传递，而非存储在结构体中。因为 Context 代表请求的生命周期，存储在结构体中可能导致请求结束后 Context 被误用。
 
+**违反约束的后果**：使用已取消或过期的 Context 可能导致静默失败（操作正常返回但实际未生效）。
+
 ### 及时取消 Context
 
 ### 机制
 子 Context 的超时应该短于父 Context，避免子任务超时后父任务仍在运行。
+
+**约束条件**：
+$$T_{deadline}(C_{child}) \leq T_{deadline}(C_{parent})$$
+若子任务超时但父任务继续，可能导致资源泄漏或不一致状态。
 
 ### 不要传递 nil Context
 
@@ -196,3 +223,34 @@ for _, url := range urls {
     }(url)
 }
 ```
+
+### Context 与请求追踪
+
+<pre>
+Trace 传播：
+
+Client                   Server
+  │                         │
+  │── HTTP Request ────────►│
+  │   Header: trace-id      │
+  │                         │── WithValue(traceID, xxx)
+  │                         │   │
+  │                         │   └─── DB Query (trace-id 传播)
+  │                         │   │
+  │                         │   └─── External Call (trace-id 传播)
+  │                         │
+  │◄── HTTP Response ───────│
+</pre>
+
+## Context 取消的数学证明
+
+**定理**：若 Context 树满足以下条件，则 Context 取消是安全的：
+
+1. 每个子 Context 的截止时间 ≤ 父 Context 的截止时间
+2. 取消操作是幂等的（多次取消等价于一次）
+
+**证明**：
+- 由条件1，父 Context 取消时，所有子 Context 必然已到期或将被通知
+- 由条件2，取消操作的幂等性保证了并发安全的取消语义
+
+**推论**：使用 `WithTimeout` 时，应确保子任务的超时时间短于父任务。

@@ -47,6 +47,8 @@ race detector 通过 "shadow memory" 跟踪每次内存访问：
   - CPU：2-20x（每次访问的时钟检查）
 ```
 
+**检测完备性**：race detector 能检测到所有 data race，但不保证没有遗漏（因为是采样式检测）。
+
 ### 修复模式的正确性证明
 
 **sync.Mutex**：
@@ -178,6 +180,8 @@ Go 1.22+：for range 每次迭代新建变量
   }
 ```
 
+**修复的数学本质**：值捕获 vs 引用捕获的语义差异。
+
 ### 分段锁的设计原理
 
 ```
@@ -206,6 +210,29 @@ Go 1.22+：for range 每次迭代新建变量
   → 理论吞吐量提升 N 倍（理想情况）
 ```
 
+**分段锁的约束条件**：
+- key 分布应均匀（哈希函数质量）
+- N 太大浪费内存，太小锁竞争严重
+- 跨分片操作需要多把锁
+
+### 两阶段终止的数学语义
+
+```
+goroutine A                    goroutine B
+  │                              │
+  │── quit <- true              │
+  │                              │── select { case <-quit: break }
+  │                              │   现有任务继续执行
+  │                              │── 完成当前任务
+  │                              │── return
+  │                              │
+  ▼                              ▼
+干净退出                    不泄漏 goroutine
+```
+
+**终止的 happens-before 保证**：
+$$quit \ put \ hb \ quit \ get \ hb \ goroutine \ B \ termination$$
+
 ## 高级修复模式
 
 ### Copy-on-Write Map
@@ -223,6 +250,10 @@ Go 1.22+：for range 每次迭代新建变量
 写：整体复制，O(N) 复杂度
 适用场景：读多写少，数据量不太大
 ```
+
+**COW 的数学性质**：
+$$Read \始终返回 \_snapshot_{lastWrite}$$
+这保证了读取的一致性，但写入成本高。
 
 ### 两阶段终止
 
@@ -266,3 +297,12 @@ goroutine A                    goroutine B
 | 分段锁 | 高并发分片数据 | 减少锁竞争 |
 | channel | 序列化协调 | goroutine 间传递数据 |
 | mutex | 复杂共享状态 | 通用，正确性优先 |
+
+## Race Condition 的分类
+
+| 类型 | 描述 | 典型场景 |
+|------|------|----------|
+| 读写 race | 并发读写同一变量 | counter++ |
+| 检查-使用 race | 检查条件后使用对象 | if ptr != nil { ptr.Do() } |
+| 初始化 race | 多个 goroutine 初始化同一对象 | 单例模式 |
+| 销毁 race | 使用已释放对象 | 析构函数并发调用 |

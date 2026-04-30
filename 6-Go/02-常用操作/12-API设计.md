@@ -154,4 +154,19 @@ r.Route("/api", func(r chi.Router) {
         r.Route("/v2", v2Handlers.apply)
     })
 })
+
+// 统一错误响应
+type APIResponse struct {
+    Code    int         `json:"code"`
+    Message string      `json:"message"`
+    Data    interface{} `json:"data"`
+}
+
+func errorResponse(c *gin.Context, code int, message string) {
+    c.JSON(code, APIResponse{
+        Code:    code,
+        Message: message,
+        Data:    nil,
+    })
+}
 ```

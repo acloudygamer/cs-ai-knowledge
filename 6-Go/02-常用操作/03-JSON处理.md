@@ -32,6 +32,16 @@ JSON 序列化的本质是**带类型的字符串序列化**：在保持类型�
 
 **数学本质**：`omitempty` 判断"是否等于 Go 类型的零值"，`omitzero` 扩展判断"是否等于 Go 类型的零值 **或** 是否为空容器"。
 
+### 自定义序列化的性能差异
+
+标准库反射序列化 vs 自定义 MarshalJSON：
+
+| 操作 | 标准库 | 自定义 |
+|------|--------|--------|
+| 时间复杂度 | $O(n)$ 字段遍历 | $O(1)$ 固定开销 |
+| 内存分配 | 每字段 1-2 次 | 最多 1 次 |
+| 适用场景 | 通用结构 | 特殊类型（time.Time 等） |
+
 ## 数据流
 
 ### Marshal 过程
@@ -128,6 +138,23 @@ var m map[K]V = map[K]V{}  // 空映射，Go 1.24+ omitzero 会跳过
 
 性能提升：3-10 倍，取决于字段数和复杂度。
 
+### encodeState 的复用机制
+
+`json.Marshal` 内部使用 `encodeState` 缓冲池复用，避免每次序列化重新分配：
+
+```go
+// 简化原理
+var encodeStatePool = sync.Pool{
+    New: func() interface{} { return &encodeState{} },
+}
+
+func Marshal(v interface{}) ([]byte, error) {
+    enc := encodeStatePool.Get().(*encodeState)
+    defer encodeStatePool.Put(enc)
+    // 使用 enc 进行序列化
+}
+```
+
 ## 参考存根
 
 ```go
@@ -162,6 +189,12 @@ for dec.More() {
 // 高性能序列化（json-iterator）
 var jsonIterator = jsoniter.ConfigCompatibleWithStandardLibrary
 data, _ := jsonIterator.Marshal(&myStruct)
+
+// 流式编码写入（适合大文件）
+enc := json.NewEncoder(os.Stdout)
+for _, item := range items {
+    enc.Encode(item)  // 每次Encode自动写入\n
+}
 ```
 
 ## 性能选择决策
@@ -172,3 +205,4 @@ data, _ := jsonIterator.Marshal(&myStruct)
 | > 10万次/秒，高吞吐量 | `json-iterator` |
 | 需要流式处理大文件 | `json.Decoder` |
 | 极简依赖 | `encoding/json`（零外部依赖） |
+| 需要流式写入大文件 | `json.NewEncoder` |
