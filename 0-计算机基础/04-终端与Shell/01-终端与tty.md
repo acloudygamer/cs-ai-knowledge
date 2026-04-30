@@ -33,7 +33,7 @@ $$
 |------|-------|----------|------|
 | `\x03` (Ctrl+C) | ETX | 若 ISIG 开启，发送 SIGINT | 强制终止前台进程组 |
 | `\x1A` (Ctrl+Z) | SUB | 若 ISIG 开启，发送 SIGTSTP | 挂起前台进程组 |
-| `\x1C` (Ctrl+\\) | FS | 若 ISIG 开启，发送 SIGQUIT | 强制终止并转储核心 |
+| `\x1C` (Ctrl+\) | FS | 若 ISIG 开启，发送 SIGQUIT | 强制终止并转储核心 |
 | `\x04` (Ctrl+D) | EOT | 若在行首且 ICANON，开启 EOF | 通知读取方流结束 |
 
 **归约终点**：行规程的状态机可归约为 **字节变换函数** $f: \Sigma^{*} \times \Sigma \rightarrow \Sigma^{*} \times \{\text{Deliver}, \text{Collect}, \text{Signal}\}$，其输出取决于 ICANON/ECHO/ISIG/ICRNL 等标志位的配置。
@@ -50,6 +50,32 @@ $$
 $$
 
 当 Master 端关闭时，Slave 端的 `read()` 返回 0（EOF），这是因为 Master 的文件描述符关闭导致 socket 连接终止。
+
+### TIOCSTI 注入的语义约束
+
+TIOCSTI ioctl 允许向终端输入队列注入字节：
+
+$$
+\text{注入字节流} \xrightarrow{\text{行规程}} \text{等待被 read() 读取}
+$$
+
+**约束**：注入的字节经过完整的行规程处理，包括 ICANON/ECHO/ISIG。若注入 `\x03`，同样会触发 SIGINT。
+
+### 信号生成的数学描述
+
+终端信号的生成是一个**条件触发函数**：
+
+$$
+\text{Signal}(c, \text{flags}, \text{foreground\_pg}) =
+\begin{cases}
+\text{SIGINT} & c = \text{ETX} \land \text{ISIG} \land \text{foreground} \\
+\text{SIGQUIT} & c = \text{FS} \land \text{ISIG} \land \text{foreground} \\
+\text{SIGTSTP} & c = \text{SUB} \land \text{ISIG} \land \text{foreground} \\
+\text{None} & \text{otherwise}
+\end{cases}
+$$
+
+**foreground** 的判定条件：进程所属的进程组 ID（PGID）等于终端关联的前台进程组 PGID。
 
 ## 数据流
 
@@ -192,6 +218,29 @@ SIGWINCH 信号 ──发送给──► 前台进程组中未屏蔽该信号的
 - 窗口缩到极小（如 1x1）时，某些程序可能行为异常
 - 管道中的程序（`cmd1 | cmd2`）各自独立：只有直接连接终端的那个进程收到信号
 
+### Raw 模式与 CBREAK 模式的对比
+
+**Raw 模式（`cfmakeraw`）**：
+
+```c
+raw.c_lflag &= ~(ICANON | ECHO | ISIG);
+raw.c_cc[VMIN] = 0;  // read() 立即返回（无等待）
+raw.c_cc[VTIME] = 0; // 无超时
+```
+
+此时 `read()` 等到至少 1 字节即返回，行规程的 ICANON/ECHO/ISIG 均被禁用。程序直接接收原始输入字节流，包括 `\x03`（Ctrl+C）也会作为普通字节传递（除非通过 `TIOCSTI` 注入）。
+
+**CBREAK 模式**：
+
+```c
+// 部分启用 raw：保留 ISIG，禁用 ICANON/ECHO
+cbreak.c_lflag &= ~(ICANON | ECHO);
+cbreak.c_cc[VMIN] = 1;  // 至少 1 字节
+cbreak.c_cc[VTIME] = 0; // 无超时
+```
+
+Ctrl+C 在 CBREAK 模式下仍会发送 SIGINT。
+
 ## 参考存根
 
 ```c
@@ -216,6 +265,13 @@ struct termios raw;
 tcgetattr(STDIN_FILENO, &raw);
 cfmakeraw(&raw);
 tcsetattr(STDIN_FILENO, TCSAFLUSH, &raw);
+
+// 获取前台进程组
+pid_t foreground_pgid = tcgetpgrp(STDIN_FILENO);
+
+// 注入字节到终端输入队列（模拟用户输入）
+char c = 'a';
+ioctl(STDIN_FILENO, TIOCSTI, &c);
 ```
 
 ---

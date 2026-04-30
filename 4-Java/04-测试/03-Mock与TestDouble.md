@@ -49,6 +49,10 @@ mock.get(0);  // 返回 null（尚未设置预设）
 | Collection | 空集合（Collections.emptyList()） |
 | Optional | Optional.empty() |
 
+### Mock 对象的内存模型
+
+Mock 对象在堆中分配，其方法调用不触发真实实现。字节码层面，Mockito 生成类的子类并重写所有方法——方法体替换为预设返回值或默认值的逻辑。
+
 ---
 
 ## @Mock、@Spy、@InjectMocks
@@ -102,6 +106,8 @@ when(userRepository.findById(2L)).thenReturn(Optional.empty());
 when(mockedList.get(0)).thenReturn("first")
     .thenReturn("second");  // 第一次返回"first"，第二次返回"second"
 ```
+
+**状态机模型**：链式返回对应状态转移——每次调用从上一状态转移到下一状态。
 
 ### 抛出异常
 
@@ -208,6 +214,8 @@ try (MockedStatic<UUID> uuidMock = mockStatic(UUID.class)) {
 }  // 超出作用域自动恢复
 ```
 
+**作用域模型**：`MockedStatic` 实现 `AutoCloseable`，超出 try-with-resources 块后自动恢复原始行为。
+
 ---
 
 ## Mockito 验证语义
@@ -219,3 +227,24 @@ $$
 $$
 
 这与断言（验证返回值/状态）形成互补——**断言验证结果，验证调用验证过程**。
+
+---
+
+## 与 Spring 的集成
+
+### @MockBean
+
+Spring Boot Test 中使用 `@MockBean` 替换 Spring 上下文中的 Bean：
+
+```java
+@MockBean
+private UserService userService;
+```
+
+**机制**：`@MockBean` 从 Spring 上下文移除原 Bean，注册 Mock 对象到上下文。
+
+### 注入约束
+
+Spring 的依赖注入与 Mockito 的 `@InjectMocks` 可能冲突：
+- 构造器注入优先于字段注入
+- 若构造器参数全为 Mock，则创建新实例；否则使用反射注入字段

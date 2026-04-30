@@ -49,15 +49,67 @@ Kafka 支持三种消息投递语义，通过 Producer 和 Consumer 配置组合
 | at-least-once | acks=all | 手动提交 | 不可能 | 可能 |
 | exactly-once | 事务 | 事务 | 不可能 | 不可能 |
 
-**exactly-once 实现**（Kafka Streams）：
+**exactly-once 的形式化定义**：
+
+设消息 $m$ 被生产两次（由于 Producer 重试），记为 $m_1$ 和 $m_2$（$m_1 = m_2$）。exactly-once 保证：
+
+$$\forall m: \text{Deliver}(m) = 1$$
+
+即每条消息被 Consumer 处理恰好一次，无论 Producer 发送多少次。
+
+**幂等生产者的数学约束**：
+
+幂等生产者（`enable.idempotence=true`）为每条消息分配唯一 `producer_id + sequence_number`。设：
+- $p$ = producer ID（分配给每个 Producer 实例）
+- $seq$ = 序列号（每条消息递增）
+
+去重条件：
+$$(p, seq) \rightarrow \text{唯一确定一条消息}$$
+
+若检测到相同 $(p, seq)$，Kafka 拒绝重复，返回 -1。
+
+**Kafka Streams 的 exactly-once 实现**：
+
 ```
-事务内：
-  1. Producer 向 Kafka 写入
-  2. Consumer 从 Kafka 读取
+事务内（原子操作）：
+  1. Producer 向 Kafka 写入（output topic）
+  2. Consumer 从 Kafka 读取（input topic）
   3. 业务处理
-  4. 业务结果写回 Kafka
+  4. 业务结果写回 Kafka（output topic）
   5. 提交事务（offset + output 原子提交）
+
+数学保证：
+  offset 和 output 在同一事务中提交
+  → 若业务处理失败，事务回滚，offset 不提交
+  → 下次消费从上次 offset 重读，不会漏也不会重
 ```
+
+### 分区写入的法定写入多数
+
+Kafka 使用 **WAL（Write-Ahead Log）** + **ISR 复制** 保证持久性。
+
+设：
+- $W$ = 写入成功所需的确认副本数
+- $ISR$ = 当前与 Leader 同步的副本集合
+
+写入成功条件：
+$$|W \cap ISR| \geq W$$
+
+常见配置：
+- `acks=1`：$W=1$（仅 Leader），最快但可能丢数据
+- `acks=all`（或 -1）：$W=|ISR|$，最强一致性
+
+**脑裂问题与 fencing**：
+
+当网络分区导致多个副本认为自己为 Leader 时：
+```
+分区前：Leader = Replica_1，ISR = {1, 2, 3}
+分区后：Replica_1 无法与 Replica_2,3 通信
+        Replica_2 被选为新 Leader（ISR = {2, 3}）
+        Replica_1 仍认为自己是 Leader（旧 Leader）
+```
+
+**Fencing 机制**：每个 Write 请求携带 `epoch`（任期号）。旧 Leader 收到更高 epoch 的 Write 请求时自动失效。
 
 ## 数据流
 
@@ -91,6 +143,22 @@ Producer                              Broker
    │              ▼
    │ ◀── Commit Offset (异步) ─────────│
    │     └─ 记录已消费到的位置             │
+
+幂等 Producer 消息去重
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Producer 发送消息 m（第一次尝试）
+   │
+   │ P1 分配 (p_id=5, seq=100)
+   │ 写入 Leader → 写入 ISR → 返回 baseOffset=500
+   │ ⚠️ 网络超时，未收到响应
+   │
+Producer 重试发送消息 m（第二次尝试）
+   │
+   │ P1 分配相同 (p_id=5, seq=100)
+   │ Leader 检查：(p_id=5, seq=100) 已存在
+   │ → 返回 baseOffset=500（重复，拒绝写入）
+   │ ⚠️ Consumer 看到同一 offset，内容相同
 </pre>
 
 ## 机制
@@ -146,6 +214,48 @@ public class RegionPartitioner implements Partitioner {
 
 **顺序保证的场景**：若需要全局顺序，只能用单分区 Topic——但这会成为性能瓶颈。
 
+### 消费者组 offset 管理机制
+
+Consumer 提交 offset 表示"已成功处理到第 X 条消息"：
+
+**自动提交（`enable.auto.commit=true`）**：
+- `auto.commit.interval.ms` 间隔自动提交
+- 问题：Consumer 处理成功但提交前崩溃 → 重复消费
+
+**手动提交（`enable.auto.commit=false`）**：
+- Consumer 显式调用 `consumer.commitSync()` 或 `commitAsync()`
+- **at-least-once**：先处理，再提交。若处理后崩溃，offset 未提交 → 重读
+- **exactly-once**：在事务内同时提交 offset 和业务结果
+
+**offset 持久化存储**：
+- 默认：Kafka 内部 `__consumer_offsets` Topic
+- 可配置为外部存储（如数据库），支持 exactly-once 语义
+
+### 控制器（Controller）的选举机制
+
+每个 Kafka 集群有一个 Controller（通过 ZK/RAFT 选举）。
+
+Controller 职责：
+1. 管理分区 Leader 选举
+2. 监控 Broker 存活
+3. 触发分区副本分配
+
+**Controller 选举的 Raft 共识**：
+
+Kafka 3.x+ 使用 KRaft（基于 Raft）替代 ZK：
+
+```
+节点状态：FOLLOWER / CANDIDATE / LEADER
+
+选举过程：
+1. 节点转为 CANDIDATE，给自己投票
+2. 向其他节点发送 RequestVote
+3. 若获得多数投票 → 成为 LEADER
+4. 若收到更高 term 的消息 → 转为 FOLLOWER
+
+数学保证：多数票决确保唯一 Leader
+```
+
 ## 参考存根
 
 ```java
@@ -176,6 +286,25 @@ public class OrderService {
 
         // 3. 业务操作 + Kafka 发送在事务提交时一起提交
         // 若业务回滚，Kafka 消息也不会发送
+    }
+}
+
+// 展示幂等 Producer 的配置
+@Configuration
+public class IdempotentProducerConfig {
+    @Bean
+    public ProducerFactory<String, String> producerFactory() {
+        Map<String, Object> config = new HashMap<>();
+        config.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, "localhost:9092");
+        config.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
+        config.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
+        // 启用幂等生产者
+        config.put(ProducerConfig.ENABLE_IDEMPOTENCE_CONFIG, true);
+        // 确保幂等性的强一致性
+        config.put(ProducerConfig.ACKS_CONFIG, "all");
+        config.put(ProducerConfig.RETRIES_CONFIG, Integer.MAX_VALUE);
+        config.put(ProducerConfig.MAX_IN_FLIGHT_REQUESTS_PER_CONNECTION, 5);
+        return new DefaultKafkaProducerFactory<>(config);
     }
 }
 ```

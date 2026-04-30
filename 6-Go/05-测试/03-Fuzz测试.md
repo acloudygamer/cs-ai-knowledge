@@ -2,7 +2,7 @@
 
 ## 定义
 
-Go 1.18 引入的 fuzz testing 是测试领域的重要里程碑，专门用于发现边界条件和随机输入导致的 bug。其本质是**基于覆盖引导的随机输入生成**——fuzzer 通过追踪代码覆盖路径，选择能触发新执行路径的输入进行变异，从而系统性地探索输入空间。
+Go 1.18 引入的 fuzz testing 是测试领域的重要里程碑，专门用于发现边界条件和随机输入导致的 bug。其本质是**基于覆盖引导的随机输入生成**——fuzzer 通过追踪代码覆盖路径，选择能触发新执行路径的输入进行变异，从而系统性地探索输入空间。Fuzzing 与传统测试的本质区别在于：**输入生成方式**——传统测试依赖人工构造的已知输入，fuzzing 依赖自动变异生成的随机输入。
 
 ## 数学模型
 
@@ -24,11 +24,13 @@ F: 输入空间 → 代码覆盖空间
 fuzzing 通过系统性探索，在有限时间内最大化覆盖。
 ```
 
+**形式化描述**：设 $B$ 为分支集合，$Cov: Input \to \mathcal{P}(B)$ 为输入到覆盖分支集合的映射。Fuzzer 维护语料库 $C \subseteq Input$，目标是最大化 $|\bigcup_{c \in C} Cov(c)|$。
+
 ### 语料库最小化
 
 ```
 给定一个 crash 输入集合：
-  crashers = {c1, c2, ..., cn}
+  crashers = {c₁, c₂, ..., cₙ}
 
 最小化目标：
   找到最小的子集 S ⊆ crashers
@@ -42,10 +44,15 @@ fuzzing 通过系统性探索，在有限时间内最大化覆盖。
 最终语料库：能触发所有 crash 的最小输入集
 ```
 
+**最小化的必要性**：未最小化的 crashers 可能包含冗余输入，导致：
+- 复现测试时间长
+- CI 资源浪费
+- 难以分析根本原因
+
 ### 逆变不变性（Inverse Invariance）
 
 ```
-大多数 fuzzing 测试基于**逆变性**：
+大多数 fuzzing 测试基于**不变性**：
 
 对于函数 f：
   1. Double-Reverse 不变性：
@@ -58,6 +65,28 @@ fuzzing 通过系统性探索，在有限时间内最大化覆盖。
      a + b = b + a（某些数值运算）
 
 若不变性被违反 → 发现 bug
+```
+
+**不变性测试的数学框架**：设 $f: X \to Y$ 为被测函数，$P$ 为不变性谓词（如 $P(x, f(x)) = true$）。Fuzzer 搜索 $\exists x \in X: \neg P(x, f(x))$。若找到则证明 $f$ 有 bug。
+
+### 变异操作符的形式化
+
+```
+Go fuzzing 支持的变异操作：
+
+1. bit flip：随机选择一位并翻转
+   mut(x, i) = x ⊕ (1 << i)
+
+2. byte swap：交换相邻字节
+   mut(x, i) = x[i] ↔ x[i+1]
+
+3. arithmetic：在整数字节上做加/减
+   mut(x, i, δ) = x + δ（δ 为小整数）
+
+4. dictionary substitution：用已知 token 替换
+   mut(x, i, token) = x[:i] + token + x[i+1:]
+
+每个变异操作的目标是探索"邻近"的输入空间
 ```
 
 ## 数据流
@@ -98,16 +127,16 @@ f.Fuzz(func(t *testing.T, orig string) {
 <pre>
 testdata/fuzz/FuzzReverse/
     ├── seed0/           # 初始种子
-    │   └── input        # "hello"
+    │       └── input        # "hello"
     ├── seed1/
-    │   └── input        # "world"
+    │       └── input        # "world"
     ├── crashers/        # 发现的 crash
-    │   ├── 0a3b4c5d/
-    │   │   ├── input    # crash 输入字节
-    │   │   └── log      # crash 日志
-    │   └── ...
+    │       ├── 0a3b4c5d/
+    │       │       ├── input    # crash 输入字节
+    │       │       └── log      # crash 日志
+    │       └── ...
     └── minimize/
-        └── ...          # 最小化后的 crash
+            └── ...          # 最小化后的 crash
 
 go test -fuzz=FuzzReverse：
     ├── 首次运行：使用 seed 语料库
@@ -152,11 +181,14 @@ Fuzzing 的优势：
     3. 缓冲区溢出（超长输入）
     4. 格式化字符串漏洞（%s vs %x）
     5. 编码问题（UTF-8 截断、多字节字符）
+    6. 解析器边界错误（嵌套过深、括号不匹配）
 
 本质：穷举输入空间的"角角落落"
 ```
 
-### 内存泄漏的防护
+**为什么人工构造会遗漏**：人类倾向于构造"正常"输入，忽略极端情况。Fuzzer 通过系统性地变异字节，能够探索人工构造难以覆盖的边界区域。
+
+### fuzzing 循环中的内存泄漏防护
 
 ```
 Fuzzing 循环中的内存问题：
@@ -183,6 +215,11 @@ Fuzzing 循环中的内存问题：
   - 避免在函数外声明累积性变量
 ```
 
+**为什么无状态是必须的**：Fuzz 函数的每次调用可能运行在不同的 goroutine 中，累积性变量会导致：
+- 内存持续增长（OOM）
+- 测试间状态污染
+- 并行执行时的数据竞争
+
 ### 并行 fuzzing 的约束
 
 ```
@@ -195,6 +232,33 @@ go test -fuzz=FuzzA -fuzz=B 不支持：
     ├── -parallel=4 只影响单元测试并行
     ├── Fuzz 测试始终单线程
     └── 多个 fuzzing 需要启动多个进程
+```
+
+**为什么 fuzzing 是单线程的**：Fuzzing 的覆盖引导算法需要维护全局语料库状态，多线程访问需要同步。单线程设计避免了锁竞争，简化了实现。
+
+### crash 的分类与严重性
+
+```
+Fuzzing 发现的 crash 分为不同严重性：
+
+1. Panic（最严重）
+   - 触发 panic
+   - 程序崩溃
+   - 通常是 bug
+
+2. 断言失败（中等）
+   - t.Errorf / t.Fatal 被调用
+   - 程序继续运行
+   - 不变性被违反
+
+3. 超时（低）
+   - 处理时间过长
+   - 可能导致 DoS
+   - 需要设置 t.Parallel() 或内部超时
+
+4. 内存泄漏（低，但持续存在）
+   - 内存持续增长
+   - 最终 OOM
 ```
 
 ## 参考存根
@@ -235,7 +299,7 @@ func FuzzStringToInt(f *testing.F) {
         got, err := strconv.Atoi(s)
         if err == nil {
             back := strconv.Itoa(got)
-            if back != got {  // 注意：itoa 有符号问题
+            if back != s {  // 注意：itoa 有符号问题
                 t.Errorf("itoa(atoi(%q)) = %d", s, got)
             }
         }
@@ -337,6 +401,8 @@ func FuzzReverser(f *testing.F) {
   go tool cover -html=fuzzcov.out
 ```
 
+**Fuzzing 的时间-覆盖率权衡**：设总 fuzzing 时间为 $T$，覆盖率 $C(T)$ 随 $T$ 增长但逐渐趋于平稳（渐近线为代码的可达分支数）。实践中，通常 $T=24h$ 的覆盖率已经足够发现大多数 bug。
+
 ## 与 CI/CD 集成
 
 ```yaml
@@ -361,3 +427,8 @@ Fuzzing 特别适合：
 - 安全敏感代码（序列化/反序列化）
 - 协议实现（HTTP、WebSocket、JSON）
 - 数据转换（编码/解码）
+
+**不适用场景**：
+- 需要特定前置条件的业务逻辑
+- 依赖外部状态的操作
+- 执行时间过长的函数（fuzzing 需要大量迭代）

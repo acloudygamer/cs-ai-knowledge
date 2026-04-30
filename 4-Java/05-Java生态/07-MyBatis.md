@@ -30,6 +30,16 @@ $$\text{evaluate}(e, ctx) \rightarrow \{\text{true}, \text{false}\}$$
 - 集合操作：`ids.size() > 0`
 - 静态方法：`@java.lang.Math@max(a, b)`
 
+### 结果集映射的类型转换图
+
+MyBatis 通过 `ResultSetHandler` 将 JDBC `ResultSet` 映射为 Java 对象。设：
+- $R$ = ResultSet 中的列集合
+- $F$ = Java Bean 的字段集合
+- $\text{map}: R \rightarrow F$ = 列到字段的映射关系
+
+类型安全的条件：
+$$\forall f \in F: \text{type}(f) \text{ 可从 JDBC Type 转换}$$
+
 ## 数据流
 
 <pre>
@@ -70,6 +80,22 @@ MyBatis SQL 执行流程
 │                   结果集映射                                   │
 │                   (自动驼峰转换)                               │
 └──────────────────────────────────────────────────────────────┘
+
+MyBatis 插件拦截器的代理链
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Executor (被拦截)
+    │
+    └─▶ (代理) Plugin1
+              │
+              └─▶ (代理) Plugin2
+                        │
+                        └─▶ (代理) Plugin3
+                                  │
+                                  └─▶ (目标) Executor
+
+执行顺序：Plugin1 → Plugin2 → Plugin3 → Target
+返回顺序：Target → Plugin3 → Plugin2 → Plugin1
 </pre>
 
 ## 机制
@@ -126,6 +152,28 @@ $$R = R_1 \circ R_2 \circ R_3 \circ \cdots$$
 
 每个拦截器的 `plugin()` 方法返回包装后的代理对象，按注册顺序形成嵌套代理。
 
+### 分页插件的物理分页与逻辑分页
+
+MyBatis 的分页实现两种方式：
+
+**逻辑分页**（RowBounds）：
+```java
+List<User> users = sqlSession.selectList("query", null, new RowBounds(0, 10));
+// 先查出全部，再在内存中截取
+```
+
+**物理分页**（插件拦截 SQL）：
+```java
+// 插件改写 SQL
+SELECT * FROM user LIMIT 10 OFFSET 0
+```
+
+物理分页的数学约束：
+- 偏移量 $O$ 越大，数据库扫描越多（MySQL 的 `LIMIT O, N` 需扫描 $O+N$ 行）
+- 大偏移量分页性能劣化：$T_{\text{page}}(O, N) = O(N + O)$
+
+**优化方案**：使用游标分页（keyset pagination），避免大偏移量扫描。
+
 ## 参考存根
 
 ```java
@@ -143,6 +191,27 @@ public class SqlLogInterceptor implements Interceptor {
         Object result = invocation.proceed(); // 执行原方法
         System.out.println("SQL: " + sql + ", time: " + (System.currentTimeMillis() - start) + "ms");
         return result;
+    }
+
+    @Override
+    public Object plugin(Object target) {
+        return Plugin.wrap(target, this);
+    }
+}
+
+// 自定义 TypeHandler
+@MappedTypes(String.class)
+@MappedJdbcTypes(JdbcType.VARCHAR)
+public class TrimmingStringHandler implements TypeHandler<String> {
+    @Override
+    public void setParameter(PreparedStatement ps, int i, String value, JdbcType type) {
+        ps.setString(i, value != null ? value.trim() : null);
+    }
+
+    @Override
+    public String getResult(ResultSet rs, String columnName) {
+        String value = rs.getString(columnName);
+        return value != null ? value.trim() : null;
     }
 }
 ```

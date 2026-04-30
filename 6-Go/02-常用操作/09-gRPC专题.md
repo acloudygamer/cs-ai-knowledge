@@ -1,6 +1,8 @@
 # gRPC 专题
 
-**定义**：gRPC 是基于 HTTP/2 和 Protocol Buffers 的高性能 RPC 框架，其核心差异于 REST 是：**方法命名即服务契约**（`.proto` 文件定义）、**传输层二进制**（而非 JSON 文本）、**流是语言级一等公民**。
+## 定义
+
+gRPC 是基于 HTTP/2 和 Protocol Buffers 的高性能 RPC 框架，其核心差异于 REST 是：**方法命名即服务契约**（`.proto` 文件定义）、**传输层二进制**（而非 JSON 文本）、**流是语言级一等公民**。
 
 ## Protocol Buffers 编码机制
 
@@ -21,6 +23,8 @@ $$L_{encoded} = 1 + \lceil \log_{128}(|V|+1) \rceil + 1 + |V|$$
 $$R_{compression} = \frac{L_{JSON}}{L_{Protobuf}} = \frac{L_{name} + |V| + 3}{1 + \lceil \log_{128}(|V|+1) \rceil + 1 + |V|}$$
 
 实际测量：典型场景 $R \approx 3\!-\!10\times$。
+
+**归约终点**：Protobuf 的压缩效率来源于**消除冗余的字段名字符串**，用固定长度的字段编号替代，可归结为信息论中的"字典编码"思想。
 
 ### 数据流（消息编码）
 

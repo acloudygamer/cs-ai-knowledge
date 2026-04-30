@@ -1,14 +1,18 @@
 # MobX 入门
 
-> MobX 是**透明函数式响应式编程（TFRP）**状态管理库，通过自动依赖追踪实现"响应式更新"——状态变化时自动通知观察者。
+> **版本基准**: Node24+ES2024 (stable) | Node26+ES2026 (latest)
 
 ## 定义
+
+MobX 是**透明函数式响应式编程（TFRP）**状态管理库，通过自动依赖追踪实现"响应式更新"——状态变化时自动通知观察者。
 
 MobX 的本质是一个**基于代理的响应式数据流引擎**：Observable 状态被 Proxy 包装后，对象属性的每一次读取（getter）自动建立"观察者 → 被观察属性"的订阅关系；每一次赋值（setter）自动触发所有订阅者的回调。
 
 这与 Redux 的显式订阅完全不同：Redux 是**拉模型（pull）**——UI 显式用 `useSelector` 声明需要什么数据；MobX 是**推模型（push）**——Observable 变化时自动将变更推送给所有观察者。
 
 MobX 的核心承诺：**状态变化时，所有依赖该状态的计算和副作用自动保持同步，无需手动声明订阅/取消订阅。**
+
+---
 
 ## 数学模型
 
@@ -31,6 +35,8 @@ Computed 属性遵循**Lazy Evaluation**原则：
 
 这意味着 Computed 求值结果**自动缓存**，除非依赖的 Observable 发生变化，否则不会重复计算。
 
+**归约终点**：Computed 的实质是**依赖图的惰性求值节点**，只在被访问且依赖变化时才重新计算。
+
 ### 批量更新（Batch）
 
 `runInAction` 创建一个**事务边界**：在事务内所有 Observable 变化只触发**一次**通知，而非每次赋值都触发一次。这将通知次数从 $O(N)$ 降为 $O(1)$，其中 $N$ 为事务内的赋值次数。
@@ -42,6 +48,8 @@ runInAction(() => {
   store.z = 3;  // 不通知
 }); // 事务结束时统一通知一次
 ```
+
+---
 
 ## 数据流
 
@@ -70,6 +78,8 @@ Observable 对象（Proxy 包装）
 - autorun/reaction → 副作用函数，注册到 DAG
 
 **所有权**：Observable 状态由 MobX 运行时持有 Proxy 引用；Computed 结果缓存归 MobX 管理；autorun/reaction 的回调函数由调用方持有。
+
+---
 
 ## 机制
 
@@ -145,6 +155,8 @@ class Store {
 
 装饰器需要 Babel 或 TypeScript 的 `experimentalDecorators` 配置，且 ES2024+ 标准尚未原生支持类装饰器（仍为 TC39 提案第二阶段）。
 
+---
+
 ## 对比参照
 
 | 维度 | MobX | Redux | Zustand |
@@ -155,6 +167,9 @@ class Store {
 | **更新粒度** | 属性级（Proxy） | 对象级（引用相等检测） | 整体（selector 粒度） |
 | **异步更新** | `runInAction` | thunk/saga | 直接赋值 |
 | **DevTools** | 有限（状态快照） | 完整（时间旅行） | 基础 |
+| **学习曲线** | 较陡（Proxy 机制） | 中等 | 低 |
+
+---
 
 ## 核心 API
 
@@ -356,6 +371,8 @@ src/
 - computed 缓存昂贵计算
 - 及时清理 autorun/reaction 的 disposer
 - 分离观察范围，避免无关属性变化触发重渲染
+
+---
 
 ## 参考存根
 

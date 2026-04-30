@@ -139,6 +139,24 @@ ODR（One Definition Rule）要求：
 - 类模板特化在两个 TU 不同
 - inline 变量在两个 TU 有不同值
 
+## 对比参照
+
+| 特性 | 静态链接 | 动态链接 |
+|------|----------|----------|
+| 链接时机 | 编译/链接时 | 程序加载或运行时 |
+| 可执行文件大小 | 大（包含依赖库代码） | 小（只包含符号引用） |
+| 更新灵活性 | 需重新链接 | 可替换 .so/.dll |
+| 启动时间 | 快（无依赖解析） | 慢（需加载器解析依赖） |
+| 符号冲突风险 | 高（所有符号合并） | 低（每个库独立符号空间） |
+
+## 常见链接错误
+
+| 错误 | 原因 | 解决方案 |
+|------|------|----------|
+| undefined reference | 符号未定义或静态库顺序错误 | 检查库顺序（-lfoo 放在源文件后） |
+| multiple definition | ODR 违反（两个强符号） | 检查全局变量/函数定义 |
+| unresolved symbol | 动态库未加载 | 检查 LD_LIBRARY_PATH / rpath |
+
 ## 参考存根
 
 ```cpp
@@ -157,14 +175,6 @@ inline constexpr std::size_t cache_line = 64;
 // LTO 编译（GCC/Clang）
 // $ g++ -flto -O2 a.cpp b.cpp
 ```
-
-## 常见链接错误
-
-| 错误 | 原因 | 解决方案 |
-|------|------|----------|
-| undefined reference | 符号未定义或静态库顺序错误 | 检查库顺序（-lfoo 放在源文件后） |
-| multiple definition | ODR 违反（两个强符号） | 检查全局变量/函数定义 |
-| unresolved symbol | 动态库未加载 | 检查 LD_LIBRARY_PATH / rpath |
 
 ---
 

@@ -4,6 +4,8 @@
 
 Git是分布式版本控制系统，通过内容寻址存储和快照模型记录文件变更历史。核心抽象是**内容哈希寻址**：每个对象（blob/tree/commit）由其内容的 SHA-1 哈希唯一标识，内容不变则对象不变，这保证了版本历史的不可篡改性。
 
+**归约内核**：Git 的本质是**内容寻址的分布式文件系统**。所有数据（文件内容、目录结构、提交记录）都存储为对象，通过 SHA-1 哈希引用。这使得任何两个相同内容的对象在所有克隆中是共享的，无论它们在何时何地创建。
+
 ## 数学模型
 
 ### 分支合并复杂度
@@ -47,6 +49,8 @@ Git 仓库是**有向无环图（DAG）**：
 - 每个提交都有完整历史（通过 parent 指针追溯）
 - 历史不可修改（修改历史产生新节点）
 - 分支是节点的多个引用，无拷贝开销
+
+**DAG 的数学性质**：设 $C$ 是提交集合，$parent: C \to C^k$ 是 parent 指针函数。Git 的历史是 $parent$ 函数生成的偏序关系。
 
 ## 数据流
 
@@ -131,9 +135,48 @@ Git 的分布式模型中，每个克隆都是完整仓库：
 
 Rebase 重写历史提交意味着提交 SHA-1 改变。**黄金法则**：不要 rebase 已经推送的提交。
 
+### Git 对象模型的形式化
+
+四种核心对象的结构：
+
+| 对象类型 | 内容 | SHA-1 计算内容 |
+|----------|------|---------------|
+| blob | 文件内容 | content |
+| tree | 目录结构 | tree_entries (name, mode, sha) |
+| commit | 快照 + metadata | tree + parent + author + message |
+| tag | 对 commit 的引用 | tagger + message + object |
+
+对象通过内容哈希寻址保证了引用完整性。
+
 ## 参考存根
 
 ```bash
+# 基本 Git 操作
 git add .
 git commit -m "update"
+git push origin main
+
+# 分支操作
+git branch feature
+git checkout feature
+git merge feature
+
+# Rebase 示例
+git checkout feature
+git rebase main
+
+# 查看历史
+git log --oneline --graph
+git diff HEAD~3..HEAD
+```
+
+```bash
+# Git 对象查看
+git cat-file -t <sha>  # 对象类型
+git cat-file -p <sha>  # 对象内容
+git ls-tree <sha>      # tree 对象内容
+
+# 引用查看
+git show-ref          # 所有引用
+git rev-parse HEAD    # HEAD 的 SHA
 ```

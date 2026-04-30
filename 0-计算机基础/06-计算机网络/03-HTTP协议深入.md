@@ -6,9 +6,13 @@ HTTP是面向文本的无状态应用层协议，定义客户端与服务器之�
 
 **本质**：HTTP是一种**请求-响应语义的消息传递协议**。它不保存任何请求间的状态（无状态），每个请求必须包含服务器处理所需的所有信息。这使得HTTP服务器可以高度伸缩（无状态意味着任意请求可路由到任意服务器实例），代价是会话状态必须由客户端或应用层显式管理。
 
+**归约终点**：HTTP的请求-响应模型可归约为**有限状态自动机**——客户端发送请求后等待响应，收到响应后进入下一状态。这与迭代算法中的请求-响应循环同构。
+
 ## 数学模型
 
-HTTP/1.1持久连接复用次数约束。设连接建立后的第 $i$ 个请求响应周期为 $R_i$，连接寿命内的总请求数为：
+### HTTP/1.1持久连接复用次数约束
+
+设连接建立后的第 $i$ 个请求响应周期为 $R_i$，连接寿命内的总请求数为：
 
 $$
 N_{\text{max}} = \max \{ n \mid \sum_{i=1}^{n} T(R_i) \leq T_{\text{keepalive}} \}
@@ -16,7 +20,9 @@ $$
 
 其中 $T(R_i)$ 为第 $i$ 个请求-响应耗时，$T_{\text{keepalive}}$ 为持久连接超时（通常115秒）。
 
-HTTP/2多路复用：设连接中并发流数量为 $S$：
+### HTTP/2多路复用
+
+设连接中并发流数量为 $S$：
 
 $$
 S_{\text{max}} = 2^{31} - 1 \quad \text{（Stream ID上限）}
@@ -24,7 +30,9 @@ $$
 
 实际受限于拥塞窗口和服务器配置。
 
-HTTP缓存新鲜度判定（Cache-Control: max-age）：
+### HTTP缓存新鲜度判定
+
+Cache-Control: max-age 新鲜度判定：
 
 $$
 \text{fresh} \iff \text{now} < \text{created\_at} + \max\text{-age}
@@ -32,7 +40,9 @@ $$
 
 ETag条件请求：当 $\text{If-None-Match} = \text{ETag}$ 时返回 304 Not Modified，否则返回完整200 OK + body。
 
-**归约终点**：HTTP的请求-响应模型可归约为**有限状态自动机**——客户端发送请求后等待响应，收到响应后进入下一状态。这与迭代算法中的请求-响应循环同构。
+### 队头阻塞的量化影响
+
+设网络往返时间为 $RTT$，单个请求处理时间为 $T_s$，在HTTP/1.1下，$N$ 个请求的总时间为 $N \times (RTT + T_s)$（串行）。即使 $T_s$ 很小，高 $RTT$ 环境下性能仍会严重劣化。
 
 ## 数据流
 
@@ -56,7 +66,7 @@ Cache-Control: max-age=3600\r\n
 [body bytes...]
 </pre>
 
-HTTP/1.1 vs HTTP/2 vs HTTP/3 数据流对比：
+### HTTP/1.1 vs HTTP/2 vs HTTP/3 数据流对比
 
 ```
 HTTP/1.1:
@@ -78,7 +88,7 @@ Stream2: ──REQ2──▶              同一QUIC连接
           ◀──RES2──
 ```
 
-数据形态变换（HTTP请求）：
+### 数据形态变换
 
 ```
 应用数据 {"name":"test"}
@@ -118,8 +128,6 @@ Stream2: ──REQ2──▶              同一QUIC连接
 
 **队头阻塞的物理根源**：HTTP/1.1的持久连接中，请求必须串行处理——这是因为TCP是字节流协议，同一连接上的多个请求复用同一个字节流，接收方无法区分属于不同请求的字节。只有等待一个请求的完整响应返回，才能开始处理下一个请求。这与单队列单服务器的请求调度同构——FIFO顺序必须严格遵守。
 
-**队头阻塞的量化影响**：设网络往返时间为 $RTT$，单个请求处理时间为 $T_s$，在HTTP/1.1下，$N$ 个请求的总时间为 $N \times (RTT + T_s)$（串行）。即使 $T_s$ 很小，高 $RTT$ 环境下性能仍会严重劣化。
-
 **HTTP/2解决的是什么问题**：HTTP/2通过多路复用让多个请求同时在飞行中。但它仍然受TCP层队头阻塞影响——如果TCP丢包，HTTP/2的所有流都会卡住，因为TCP按序交付。这是一种**层间耦合**——HTTP/2无法完全解决TCP层的问题。
 
 **HTTP/3如何解决队头阻塞**：HTTP/3基于QUIC协议，QUIC在用户态实现自己的可靠传输和拥塞控制。每个QUIC流独立有序，丢包只影响该流，不影响其他流。这是用户态协议栈的优势——可以独立演进而不受TCP约束。QUIC的流隔离本质是将可靠性控制点从传输层移到应用层。
@@ -143,4 +151,14 @@ import http.client
 conn = http.client.HTTPSConnection("example.com")
 conn.request("GET", "/")
 resp = conn.getresponse()
+```
+
+```python
+# HTTP/2 示例（使用 h2 库）
+import h2.connection
+
+conn = h2.connection.H2Connection(config=h2.config.H2Configuration(client_side=True))
+conn.initiate_connection()
+conn.send_headers(stream_id=1, headers=[(':method', 'GET'), (':scheme', 'https'), (':authority', 'example.com'), (':path', '/')])
+conn.end_stream(stream_id=1)
 ```

@@ -25,6 +25,8 @@ Go 中的保证：
 
 **Data Race** = 两个操作对同一地址并发读写，且无 happens-before 关系
 
+**归约终点**：并发安全问题的本质是建立可靠的 happens-before 关系，所有同步原语都是建立这种关系的工具。
+
 ### race detector 的检测原理
 
 ```
@@ -204,56 +206,6 @@ Go 1.22+：for range 每次迭代新建变量
   → 理论吞吐量提升 N 倍（理想情况）
 ```
 
-## 参考存根
-
-```go
-// Mutex 保护
-var mu sync.Mutex
-func inc() {
-    mu.Lock()
-    counter++
-    mu.Unlock()
-}
-
-// 原子操作
-var counter atomic.Int64
-func inc() { counter.Add(1) }
-
-// sync.Once 单次初始化
-var once sync.Once
-var instance *Data
-func Get() *Data {
-    once.Do(func() { instance = &Data{} })
-    return instance
-}
-
-// Channel 序列化
-ch := make(chan func(map[string]int), 100)
-go func() {
-    for f := range ch { f(data) }
-}()
-func update(fn func(map[string]int)) { ch <- fn }
-
-// sync.Map
-var m sync.Map
-m.Store("key", 1)
-v, ok := m.Load("key")
-
-// 分段锁
-type ShardedMap struct {
-    shards [16]struct {
-        mu sync.Mutex
-        m  map[string]int
-    }
-}
-func (s *ShardedMap) Store(key string, val int) {
-    idx := fnv32(key) % 16
-    s.shards[idx].mu.Lock()
-    s.shards[idx].m[key] = val
-    s.shards[idx].mu.Unlock()
-}
-```
-
 ## 高级修复模式
 
 ### Copy-on-Write Map
@@ -284,7 +236,7 @@ goroutine A                    goroutine B
   │                              │── return
   │                              │
   ▼                              ▼
-  干净退出                    不泄漏 goroutine
+干净退出                    不泄漏 goroutine
 ```
 
 ## 检测工具

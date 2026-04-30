@@ -6,9 +6,9 @@
 
 | 编号 | 主题 | 说明 |
 |------|------|------|
-| [01-Redux入门](01-Redux入门.md) | Redux | 可预测状态容器，单向数据流 + 纯函数 reducer |
-| [02-MobX入门](02-MobX入门.md) | MobX | 透明函数式响应式编程，自动依赖追踪 |
-| [03-Pinia入门](03-Pinia入门.md) | Pinia | Vue 3 组合式 API 状态管理，轻量最小化 |
+| [01-Redux入门](./01-Redux入门.md) | Redux | 可预测状态容器，单向数据流 + 纯函数 reducer |
+| [02-MobX入门](./02-MobX入门.md) | MobX | 透明函数式响应式编程，自动依赖追踪 |
+| [03-Pinia入门](./03-Pinia入门.md) | Pinia | Vue 3 组合式 API 状态管理，轻量最小化 |
 
 ## 概念总览
 

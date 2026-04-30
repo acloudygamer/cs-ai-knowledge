@@ -12,7 +12,7 @@ Spring Boot 的本质是 **约定优于配置** 的自动化框架，通过 `spr
 
 $$P(B | C_1, C_2, ..., C_n) = \prod_{i=1}^{n} P(C_i | B)$$
 
-实际执行时，Spring 逐条件求值（AND 逻辑），任意一个 `$P(C_i) = 0$` 则 `$P(B) = 0$`，该配置类不注册。
+实际执行时，Spring 逐条件求值（AND 逻辑），任意一个 $P(C_i) = 0$ 则 $P(B) = 0$，该配置类不注册。
 
 ### 事件发布-订阅的有限状态机模型
 
@@ -23,6 +23,20 @@ Spring ApplicationEvent 可以建模为 **有限状态自动机（FSA）**：
 - 终止状态：DELIVERED
 
 `@TransactionalEventListener` 添加了一个 **guard condition**（事务提交后）：只有当发布线程的事务提交成功，才允许状态转换到 MULTICASTING。
+
+### Spring Boot 自动配置的偏序关系
+
+`@AutoConfigureBefore` 和 `@AutoConfigureAfter` 定义配置类的加载顺序：
+
+```
+@AutoConfigureAfter(DataSourceAutoConfiguration.class)
+public class MyAutoConfiguration { ... }
+```
+
+设配置类集合 $C$，偏序关系 $\prec$：
+$$A \prec B \iff A \text{ 在 } B \text{ 之前加载}$$
+
+若存在环形依赖（$A \prec B \prec C \prec A$），Spring Boot 启动失败。
 
 ## 数据流
 
@@ -53,7 +67,7 @@ SpringApplication.run() 执行路径
 │   │   └─ 排序 + 注册到 BeanFactory
 │   ├─ initMessageSource() — i18n 消息源
 │   ├─ initApplicationEventMulticaster() — 事件广播器
-│   ├─ onRefresh() — 子类扩展（如 WebFlux 创建 Reacter)
+│   ├─ onRefresh() — 子类扩展（如 WebFlux 创建 Reactor)
 │   ├─ registerListeners() — 注册静态监听器
 │   ├─ finishBeanFactoryInitialization() — 单例预实例化
 │   │   └─ BeanFactory.preInstantiateSingletons()
@@ -67,13 +81,7 @@ SpringApplication.run() 执行路径
 
 ### 条件装配的偏序关系
 
-`@Conditional` 注解之间存在隐式偏序：Spring Boot 的 `AutoConfiguration` 实际上按照 `spring.factories` 中定义的顺序执行（显式或隐式）。当同一 Bean 存在多个候选时：
-
-1. **优先级高者先评估**：若高优先级条件失败，低优先级不会被评估
-2. **OnBeanCondition**：检查容器中是否存在某类型 Bean——用于避免重复注册
-3. **OnClassCondition**：检查 classpath——用于可选依赖的自动配置
-
-**关键约束**：Spring Boot 2.x 的 `@EnableAutoConfiguration` 使用 `AutoConfigurationImportSelector`，读取 `META-INF/spring.factories`；Spring Boot 3.x 改为 `META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports`，结构更清晰。
+`@Conditional` 注解之间存在隐式偏序：Spring Boot 2.x 的 `@EnableAutoConfiguration` 使用 `AutoConfigurationImportSelector`，读取 `META-INF/spring.factories`；Spring Boot 3.x 改为 `META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports`，结构更清晰。
 
 ### @ConfigurationProperties 的松散绑定数学本质
 
@@ -111,7 +119,7 @@ Spring Boot 支持三种命名风格自动映射：
             ↓
         T1: 事务提交后，触发 synchronization.afterCommit()
             ↓
-        异步执行监听器（或按 transactionManager 同步执行）
+        异步执行监听器（或按 transaction_manager 同步执行）
 ```
 
 **约束条件**：
@@ -131,6 +139,25 @@ Spring Boot 支持三种命名风格自动映射：
 - 首次请求时间：$T_{\text{first}} = \sum_{j \in \text{needed}} T_{\text{init}}(j)$
 
 若懒加载 Bean 在请求时才初始化，且应用启动后立即接收请求，则 $T_{\text{first}}$ 延迟增加。Spring Boot 2.2+ 的 `spring.main.lazy-initialization=true` 全局启用懒加载，适用于启动速度优先的场景。
+
+### DevTools 的自动重启机制
+
+Spring Boot DevTools 使用 **类加载器替换** 实现快速重启：
+
+```
+标准重启：
+    停止 JVM → 重新加载所有类 → 重启应用（5-10s）
+
+DevTools 重启：
+    触发变更 → 杀死 DevTools 类加载器
+    → 创建新的 Base 类加载器（不重启）
+    → 保留 Restart 类加载器中的 Bean 实例
+    → 替换类引用 → 耗时 < 1s
+```
+
+**类加载器分离**：
+- **Base 类加载器**：第三方库（不重启）
+- **Restart 类加载器**：项目代码（重启时重新加载）
 
 ## 参考存根
 

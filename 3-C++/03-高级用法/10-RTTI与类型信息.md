@@ -67,7 +67,7 @@ $$
 <pre>
 多态对象                 vptr                    vtable                    type_info
    │                      │                        │                          │
-   ├─ Base* ptr ──────→  ┌┤─ 指向  ────────────→  ┌┤─ type_info*  ────────→  ├─ name()
+   ├─ Base* ptr ──────→  ┌┤─ 指向  ───────────→  ┌┤─ type_info*  ───────→  ├─ name()
    │                      ││                        ││                          │    │
    │                      ││                        ││                          │    ├─ hash_code()
    │                      ││                        ││                          │    │
@@ -140,6 +140,15 @@ struct std::hash<std::type_index> {
 ```
 
 这使得可以用 `std::unordered_map<std::type_index, Value>` 建立类型到值的映射，用于 Visitor 模式实现。
+
+## 对比参照
+
+| 特性 | 编译期方案 | 运行时方案 | 权衡 |
+|------|-----------|-----------|------|
+| 类型查询 | `decltype`/`auto` | `typeid` | 编译期无运行时代价 |
+| 类型转换安全 | 模板静态分发 | `dynamic_cast` | 动态转换有遍历开销 |
+| 类型信息存储 | 枚举/模板参数 | `type_info` | 运行时存储有空间开销 |
+| 常量求值 | `constexpr` | `consteval`（强制编译期） | consteval 失败直接编译错误 |
 
 ## 参考存根
 

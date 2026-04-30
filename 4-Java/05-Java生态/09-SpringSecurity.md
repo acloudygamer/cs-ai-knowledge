@@ -35,6 +35,40 @@ $$\text{hasPermission}(u, p) = \exists r \in R: (u,r) \in \text{assignments} \la
 
 RBAC 相比 ACL 的优势：**层次化授权**，权限变更只需修改角色，而非每个用户。
 
+### OAuth 2.0 + PKCE 的形式化安全分析
+
+PKCE（Proof Key for Code Exchange）防止 Authorization Code 拦截攻击。设：
+
+- $c_v$ = code_verifier（随机字符串，43-128字符）
+- $c_h$ = code_challenge = Base64URL(SHA256($c_v$))
+- $m$ = method（"S256" 表示 SHA256）
+
+**攻击者模型**：攻击者截获 Authorization Code，但无法获取 $c_v$（在客户端生成，从不传输）。
+
+**安全证明**：攻击者拥有 $code$ 和 $c_h$，但不知道 $c_v$。由于 SHA256 是单向函数：
+$$c_h = \text{SHA256}(c_v) \Rightarrow \text{无法逆推} c_v$$
+
+授权服务器验证：
+$$c_h \stackrel{?}{=} \text{SHA256}(c_v)$$
+
+攻击者无法构造正确的 $(code, c_v)$ 对，授权服务器拒绝兑换。
+
+**熵分析**：$c_v$ 的随机熵 $\geq 256$ 位，暴力破解不可行。
+
+### CSRF 攻击的博弈论建模
+
+CSRF 攻击成功的条件（攻击者视角）：
+1. 用户已登录目标站点，Session Cookie 有效
+2. 用户被诱导触发恶意请求（GET/POST/...）
+3. 浏览器自动携带 Cookie，服务器验证 Cookie 有效
+
+**防御的博弈结构**：攻击者诱使用户发送请求 $r$，服务器验证 Cookie + Token：
+
+$$\text{Verify}(r) = \text{CookieValid}(r) \land \text{TokenValid}(r.\text{csrf\_token})$$
+
+攻击者无法获取 Token（受同源策略保护），故：
+$$P(\text{攻击成功}) = 0$$
+
 ## 数据流
 
 <pre>
@@ -62,7 +96,7 @@ Spring Security 过滤器链
 │      │ Provider        │   验证密码                         │
 │      └────────┬────────┘                                   │
 │               │                                              │
-│               ▼                                              │
+│               ▼                                               │
 │      ┌─────────────────┐                                   │
 │      │ SecurityContext │ ← 认证成功，存入                    │
 │      │ Holder          │   SecurityContextHolder             │
@@ -72,6 +106,26 @@ Spring Security 过滤器链
 │  6. FilterSecurityInterceptor  ← 最终授权检查                 │
 │                                                              │
 └──────────────────────────────────────────────────────────────┘
+
+OAuth 2.0 Authorization Code + PKCE 流程
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  Client                              Auth Server              Resource Owner
+    │                                      │                        │
+    │ ─── Authorization Request ──────────▶│                        │
+    │      + code_challenge, code_method    │                        │
+    │                                      │ ◀── 登录界面 ───────────│
+    │                                      │ ──── 授权确认 ─────────▶│
+    │◀─── Redirect (code) ────────────────│                        │
+    │                                      │                        │
+    │ ─── Token Request ─────────────────▶│                        │
+    │      + code_verifier（不传输 code_challenge）                   │
+    │                                      │                        │
+    │     Auth Server 计算 S256(code_verifier)                       │
+    │     对比 code_challenge                                      │
+    │     ⚠️ 若不匹配：拒绝                                       │
+    │                                      │                        │
+    │◀─── Access Token ───────────────────│                        │
 </pre>
 
 ## 机制
@@ -156,6 +210,40 @@ CSRF 攻击成功的条件：
 
 **PKCE（Proof Key for Code Exchange）**：为防止 code 被截获，客户端先生成 `code_verifier`，发送其 hash `code_challenge`，后续用 `code_verifier` 证明自己。
 
+### Session 并发控制与会话固定攻击
+
+Spring Security 支持会话并发控制：
+
+```java
+http.sessionManagement()
+    .maximumSessions(1)
+    .expiredUrl("/session-expired");
+```
+
+**会话固定攻击（Session Fixation）**：攻击者预先设置会话 ID，用户登录后攻击者使用相同会话 ID 劫持会话。
+
+**防御机制**：
+1. 登录时创建新会话：`session fixation protection`
+2. 会话失效时转移旧会话属性到新课程
+
+**数学约束**：最大会话数限制下，新登录触发旧会话失效：
+$$|S_{\text{active}}| \leq N_{\text{max}}$$
+
+### 密码存储的盐值与哈希迭代
+
+单纯哈希不足以抵抗暴力破解和彩虹表攻击。
+
+**盐值（Salt）**：随机生成的字符串，与密码拼接后再哈希：
+$$\text{stored} = \text{Hash}(\text{password} + \text{salt})$$
+
+同一密码每次存储的盐不同，彩虹表攻击失效。
+
+**密钥派生函数（PBKDF2/Argon2）**：
+$$D = \text{PBKDF2}(\text{password}, \text{salt}, \text{iterations}, \text{keyLength})$$
+
+- iterations：迭代次数（建议 $\geq 10000$）
+- 每次迭代增加攻击者计算成本，但不增加合法验证成本（并行性除外）
+
 ## 参考存根
 
 ```java
@@ -186,6 +274,30 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             // Token 无效，继续链（后续 Filter 会拒绝）
         }
         chain.doFilter(request, response);
+    }
+}
+
+// 展示 PKCE 的 code_verifier 生成
+@Service
+public class OAuth2PkceService {
+    private final SecureRandom secureRandom = new SecureRandom();
+
+    // 生成 code_verifier（43-128 字符的 URL-safe 随机字符串）
+    public String generateCodeVerifier() {
+        byte[] buffer = new byte[32];
+        secureRandom.nextBytes(buffer);
+        return Base64.getUrlEncoder().withoutPadding().encodeToString(buffer);
+    }
+
+    // 计算 code_challenge = Base64URL(SHA256(code_verifier))
+    public String generateCodeChallenge(String codeVerifier) {
+        try {
+            MessageDigest md = MessageDigest.getInstance("SHA-256");
+            byte[] digest = md.digest(codeVerifier.getBytes(StandardCharsets.US_ASCII));
+            return Base64.getUrlEncoder().withoutPadding().encodeToString(digest);
+        } catch (NoSuchAlgorithmException e) {
+            throw new RuntimeException(e);
+        }
     }
 }
 ```

@@ -24,12 +24,34 @@ $$\forall (a, b) \in E: \text{init-order}(b) < \text{init-order}(a)$$
 | request | $\infty$（按HTTP请求） | 线程局部，非线程安全 |
 | session | $\infty$（按HTTP会话） | 会话局部，非线程安全 |
 
+### Spring AOP 的切面优先级数学
+
+多个切面同时作用于同一连接点时，执行顺序由优先级决定：
+
+$$\text{Order}(A_1) < \text{Order}(A_2) \Rightarrow A_1 \text{ 先于 } A_2 \text{ 执行（around 通知）}$$
+
+**around 通知的栈模型**：
+```
+@Around("pcd()")
+public Object around(ProceedingJoinPoint pjp) {
+    // before logic
+    Object result = pjp.proceed(); // 调用链中下一个通知或目标方法
+    // after logic
+    return result;
+}
+```
+
+around 通知形成**嵌套调用栈**，与递归类似：
+
+$$R_n \circ R_{n-1} \circ \cdots \circ R_1 \circ T$$
+
+其中 $R_i$ 为第 $i$ 个 around 通知，$T$ 为目标方法。
+
 ## 数据流
 
 <pre>
-┌─────────────────────────────────────────────────────────────────┐
-│                     Spring IoC 容器初始化                        │
-├─────────────────────────────────────────────────────────────────┤
+Spring IoC 容器初始化
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 │  1. BeanDefinition 注册                                           │
 │     配置 → BeanDefinitionMap (ConcurrentHashMap)                  │
 │            ↓                                                      │
@@ -49,6 +71,22 @@ $$\forall (a, b) \in E: \text{init-order}(b) < \text{init-order}(a)$$
 │     @PostConstruct                                               │
 │     init-method                                                  │
 └─────────────────────────────────────────────────────────────────┘
+
+AOP 代理创建时机
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+目标 Bean 实例化
+        ↓
+BeanPostProcessor.postProcessAfterInitialization()
+        ↓
+若匹配切面：
+  - JDK 动态代理：实现相同接口
+  - CGLIB：继承目标类
+        ↓
+返回代理对象（替换原始 Bean）
+
+客户端调用：
+  proxy.someMethod() → 拦截 → 通知链 → 目标方法
 </pre>
 
 **AOP 代理创建时机**：目标 Bean 实例化后，初始化阶段通过 `BeanPostProcessor` 包装为代理对象。若使用 JDK 动态代理，代理类实现与目标类相同的接口；若使用 CGLIB，代理类继承目标类。
@@ -112,6 +150,27 @@ CGLIB/JDK Proxy 拦截 → 调用目标方法
 | 字段注入 | ❌ | ❌ 需要反射 | ❌ 运行时失败 |
 
 构造函数注入迫使依赖在对象构造时完全初始化。Java 编译器确保了构造函数的完整执行，使得部分初始化的对象无法存在。同时，循环的构造函数依赖在容器启动时立即暴露，而非运行时。
+
+### BeanPostProcessor 的扩展机制
+
+`BeanPostProcessor` 是 Spring 框架最重要的扩展点之一：
+
+```java
+public interface BeanPostProcessor {
+    Object postProcessBeforeInitialization(Object bean, String beanName);
+    Object postProcessAfterInitialization(Object bean, String beanName);
+}
+```
+
+**执行时机**：
+- `postProcessBeforeInitialization`：在 `afterPropertiesSet` 和 init-method 之前
+- `postProcessAfterInitialization`：在 `afterPropertiesSet` 和 init-method 之后
+
+**常见用途**：
+- `AutowiredAnnotationBeanPostProcessor`：处理 `@Autowired` 和 `@Value`
+- `CommonAnnotationBeanPostProcessor`：处理 `@PostConstruct` 和 `@PreDestroy`
+- `RequiredAnnotationBeanPostProcessor`：处理 `@Required`
+- `AnnotationAwareAspectJAutoProxyCreator`：创建 AOP 代理
 
 ## 参考存根
 

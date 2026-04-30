@@ -6,6 +6,8 @@
 
 两者核心差异在于缓存层级和运算单元数量的取舍：CPU 用大缓存弥补内存延迟（以延迟换带宽），GPU 用海量线程掩盖内存延迟（以吞吐换延迟）。GPU 的设计哲学是：如果有足够多的线程在运行，总有一个线程的内存访问不阻塞，因此可以持续利用计算单元。
 
+**归约视角**：GPU 的计算模型可归约为"大规模同步数据流"——所有线程执行相同代码（SIMT），通过硬件屏障实现同步，数据级并行（Data-Level Parallelism，DLP）转化为吞吐率。
+
 ## 数学模型
 
 **GPU 理论吞吐：**
@@ -119,6 +121,20 @@ Warp 0  [线程 0-31] ──► IFetch ──► Decode ──► EX ──► M
   └─► 等待所有分支完成 ◄────────────────────────────────────┘
 </pre>
 
+**矩阵乘数据流（GEMM）：**
+
+<pre>
+矩阵 A (M×K)              矩阵 B (K×N)
+    │                          │
+    ↓ 分块到 共享内存           ↓ 分块到 共享内存
+Block A (16×16)            Block B (16×16)
+    │                          │
+    ↓ 每个线程计算              ↓
+    │  一个输出元素              │
+    ↓                          ↓
+结果矩阵 C (M×N) ←── 累加到 寄存器 → 写回
+</pre>
+
 ## 机制
 
 ### GPU 架构
@@ -213,6 +229,16 @@ __global__ void matmul(float* C, float* A, float* B, int M, int N, int K) {
 - 全局内存延迟需被大量线程隐藏
 - 寄存器溢出到局部内存会大幅降低性能
 
+### GPU 内存层次详解
+
+| 层次 | 带宽 | 延迟 | 作用域 |
+|------|------|------|--------|
+| 寄存器 | ~8 TB/s | ~0.5 ns | 线程私有 |
+| 共享内存 | ~1.5 TB/s | ~1 ns | block 内线程 |
+| L1 Cache | ~3 TB/s | ~10 ns | SM 内线程 |
+| L2 Cache | ~2 TB/s | ~30 ns | 全 SM |
+| 全局内存 | ~1 TB/s | ~500 ns | 所有线程 |
+
 ## 参考存根
 
 ```python
@@ -243,4 +269,22 @@ print(f"Time: {(time.time()-start)/100*1000:.2f} ms")
 // L2 Cache：约 2 TB/s，延迟 ~200ns
 // 共享内存：约 1.5 TB/s，延迟 ~1ns
 // 寄存器：约 8 TB/s，延迟 ~0.5ns
+```
+
+```cuda
+// Tensor Core WMMA 示例
+#include <mma.h>
+using namespace nvcuda::wmma;
+
+fragment<matrix_a, m, n, k, half, row_major> a_frag;
+fragment<matrix_b, m, n, k, half, col_major> b_frag;
+fragment<accumulator, m, n, k, float> c_frag;
+
+load_matrix_sync(a_frag, A, K);
+load_matrix_sync(b_frag, B, N);
+load_matrix_sync(c_frag, C, N);
+
+mma_sync(c_frag, a_frag, b_frag, c_frag);
+
+store_matrix_sync(C_out, c_frag, N, mem_row_major);
 ```

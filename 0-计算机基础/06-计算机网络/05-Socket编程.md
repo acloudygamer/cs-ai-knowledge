@@ -6,7 +6,11 @@ Socket是操作系统提供给应用进程的端到端网络通信抽象，通�
 
 **本质**：Socket是**内核网络协议栈的访问入口**。它将复杂的协议状态机（TCP三次握手状态机、拥塞控制算法等）封装为少数几个系统调用（socket/connect/listen/accept/send/recv），让应用进程可以像操作文件一样操作网络IO。这统一了IO语义，简化了分布式系统编程。
 
+**归约终点**：Socket编程的核心问题是**如何在有限资源下处理并发连接**。这可归约为生产者-消费者问题——连接请求是生产者，SYN队列是缓冲区，accept()是消费者。backlog是缓冲区的容量上限。
+
 ## 数学模型
+
+### Socket五元组标识
 
 Socket地址 = (协议族, IP地址, 端口号)。TCP socket用五元组唯一标识：
 
@@ -16,7 +20,9 @@ $$
 
 对于监听socket，DstIP和DstPort为空（wildcard），可接受任意匹配连接。
 
-TCP连接队列：服务器listen(socket, backlog)设置backlog为半连接（SYN队列）和全连接（accept队列）的上限。设并发连接到达率为 $\lambda$，服务率为 $\mu$：
+### TCP连接队列模型
+
+服务器listen(socket, backlog)设置backlog为半连接（SYN队列）和全连接（accept队列）的上限。设并发连接到达率为 $\lambda$，服务率为 $\mu$：
 
 $$
 \text{队列长度} = \frac{\lambda}{\mu - \lambda} \quad \text{（M/M/1队列，稳态条件} \lambda < \mu\text{）}
@@ -24,13 +30,11 @@ $$
 
 实际受内核参数net.core.somaxconn和net.ipv4.tcp_max_syn_backlog限制。
 
-**归约终点**：Socket编程的核心问题是**如何在有限资源下处理并发连接**。这可归约为生产者-消费者问题——连接请求是生产者，SYN队列是缓冲区，accept()是消费者。backlog是缓冲区的容量上限。
-
 ## 数据流
 
-<pre>
-TCP socket完整生命周期：
+### TCP socket完整生命周期
 
+<pre>
 服务器端：
 socket() → bind(8080) → listen(backlog=5) → accept() → read()/write() → close()
                                     ↑
@@ -42,9 +46,9 @@ socket() → connect("server", 8080) → write()/read() → close()
          三次握手完成，connect()返回
 </pre>
 
-<pre>
-UDP socket生命周期（无连接）：
+### UDP socket生命周期（无连接）
 
+<pre>
 服务器端：
 socket() → bind(8080) → recvfrom() → sendto() → close()
 
@@ -52,7 +56,7 @@ socket() → bind(8080) → recvfrom() → sendto() → close()
 socket() → sendto() → recvfrom() → close()
 </pre>
 
-Socket类型对比：
+### Socket类型对比
 
 ```
 SOCK_STREAM (TCP):
@@ -73,17 +77,29 @@ SOCK_RAW (IP层):
 
 ## 机制
 
-**Socket抽象的物理意义**：Socket将网络协议栈封装为文件描述符，纳入Unix文件系统的IO模型。这意味着可以用read/write/close操作网络IO，统一了文件和网络编程接口，降低了学习成本。这与一切皆文件的Unix设计哲学一致。
+### Socket抽象的物理意义
 
-**TCP socket状态机**：socket从CLOSED状态经过listen/connect进入ESTABLISHED，close时进入TIME_WAIT。状态转换由内核TCP状态机自动完成，应用层通过系统调用触发状态转换。状态转换是确定性的——给定一个事件序列，TCP状态机的下一状态是唯一确定的。
+Socket将网络协议栈封装为文件描述符，纳入Unix文件系统的IO模型。这意味着可以用read/write/close操作网络IO，统一了文件和网络编程接口，降低了学习成本。这与"一切皆文件"的Unix设计哲学一致。
 
-**为什么listen backlog需要队列**：三次握手第三步（客户端ACK）到达时，如果服务器进程来不及调用accept()，已完成握手的连接需要暂存在已完成连接队列中。backlog是队列长度上限。半连接队列存放收到SYN但未完成三次握手的连接。这是一种**生产者-消费者缓冲**——内核是生产者，accept()是消费者。
+### TCP socket状态机
 
-**backlog的约束**：实际backlog受限于内核参数somaxconn和tcp_max_syn_backlog。设置过大无效，设置过小会导致连接请求被直接拒绝或超时。
+socket从CLOSED状态经过listen/connect进入ESTABLISHED，close时进入TIME_WAIT。状态转换由内核TCP状态机自动完成，应用层通过系统调用触发状态转换。状态转换是确定性的——给定一个事件序列，TCP状态机的下一状态是唯一确定的。
 
-**bind()的wildcard地址**：bind("0.0.0.0")让socket监听所有网卡的连接；bind具体IP只监听该接口。客户端connect时由系统选择源IP和随机临时端口（ephemeral port）。
+### 为什么listen backlog需要队列
 
-**TCP粘包的成因**：TCP是字节流协议，无消息边界。Nagle算法可能合并小数据包（减少小包开销），接收缓冲区一次read可能返回多个send的数据，也可能只返回一个send的部分数据。
+三次握手第三步（客户端ACK）到达时，如果服务器进程来不及调用accept()，已完成握手的连接需要暂存在已完成连接队列中。backlog是队列长度上限。半连接队列存放收到SYN但未完成三次握手的连接。这是一种**生产者-消费者缓冲**——内核是生产者，accept()是消费者。
+
+### backlog的约束
+
+实际backlog受限于内核参数somaxconn和tcp_max_syn_backlog。设置过大无效，设置过小会导致连接请求被直接拒绝或超时。
+
+### bind()的wildcard地址
+
+bind("0.0.0.0")让socket监听所有网卡的连接；bind具体IP只监听该接口。客户端connect时由系统选择源IP和随机临时端口（ephemeral port）。
+
+### TCP粘包的成因
+
+TCP是字节流协议，无消息边界。Nagle算法可能合并小数据包（减少小包开销），接收缓冲区一次read可能返回多个send的数据，也可能只返回一个send的部分数据。
 
 **TCP粘包的数学本质**：TCP保证字节流顺序，但不保证消息边界。发送方的N次send可能在接收方表现为：
 - 1次recv（数据合并）
@@ -92,10 +108,13 @@ SOCK_RAW (IP层):
 
 这与管道IO同构——写入N次，读取M次，N≠M是正常的。
 
-**TCP粘包解决方案**：
-- **定长协议**：浪费带宽，但实现简单
-- **分隔符协议**：内容不能含分隔符，实现复杂
-- **长度前缀协议**：最通用，推荐
+### TCP粘包解决方案
+
+| 方案 | 原理 | 优点 | 缺点 |
+|------|------|------|------|
+| 定长协议 | 每条消息固定长度 | 实现简单 | 浪费带宽 |
+| 分隔符协议 | 消息间用特定分隔符分隔 | 不浪费带宽 | 内容不能含分隔符 |
+| 长度前缀协议 | 先发送长度，再发送数据 | 最通用 | 需解析长度 |
 
 长度前缀格式：
 ```
@@ -105,13 +124,19 @@ SOCK_RAW (IP层):
 └──────────┴─────────────────┘
 ```
 
-**UDP socket与TCP本质区别**：UDP socket不维护连接状态，sendto每次指定目标地址。同一socket可以向不同目标发送数据，也可以从不同源接收数据。UDP socket的peer address是消息的一部分，不是socket的属性。
+### UDP socket与TCP本质区别
 
-**SO_REUSEADDR的必要性**：服务器重启时，前一个socket可能处于TIME_WAIT状态（因为主动关闭）。SO_REUSEADDR允许bind已处于TIME_WAIT状态的端口，快速重启服务器而不等待2MSL。这对于需要快速重启的服务器（如热更新场景）至关重要。
+UDP socket不维护连接状态，sendto每次指定目标地址。同一socket可以向不同目标发送数据，也可以从不同源接收数据。UDP socket的peer address是消息的一部分，不是socket的属性。
 
-**非阻塞IO的必要性**：在高性能服务器中，阻塞accept/connect/read/write会导致线程阻塞。O_NONBLOCK让这些调用立即返回，通过select/epoll/kqueue监听文件描述符就绪状态，实现事件驱动编程。线程不再因IO等待而空转，提高了CPU利用率。
+### SO_REUSEADDR的必要性
 
-**epoll vs select的本质差异**：
+服务器重启时，前一个socket可能处于TIME_WAIT状态（因为主动关闭）。SO_REUSEADDR允许bind已处于TIME_WAIT状态的端口，快速重启服务器而不等待2MSL。这对于需要快速重启的服务器（如热更新场景）至关重要。
+
+### 非阻塞IO的必要性
+
+在高性能服务器中，阻塞accept/connect/read/write会导致线程阻塞。O_NONBLOCK让这些调用立即返回，通过select/epoll/kqueue监听文件描述符就绪状态，实现事件驱动编程。线程不再因IO等待而空转，提高了CPU利用率。
+
+### epoll vs select的本质差异
 
 | 特性 | select | epoll |
 |------|--------|-------|
@@ -122,13 +147,15 @@ SOCK_RAW (IP层):
 
 epoll使用红黑树管理fd，调用只在fd改变时更新内核态数据结构，避免了select每次将fd数组从用户态拷贝到内核态的开销。边缘触发（EPOLLET）只在状态变化时通知，需要配合非阻塞IO使用。
 
-**epoll水平触发 vs 边缘触发**：
+### epoll水平触发 vs 边缘触发
+
 - **水平触发**（LT）：只要条件满足就持续通知，直到处理完毕
 - **边缘触发**（ET）：只在从无到有时通知一次
 
 对于读事件：LT模式下只要缓冲区有数据就会通知，ET模式下只在新数据到达时通知一次。这意味着ET模式下必须一次性读完所有数据，否则不会再收到通知。
 
-**违规后果**：
+### 违规后果
+
 - bind已占用端口：EADDRINUSE错误，socket无法绑定
 - connect前未bind：内核自动分配临时端口（ephemeral port）
 - TCP连接未处理backlog溢出：客户端收到ECONNREFUSED或超时
@@ -141,4 +168,26 @@ epoll使用红黑树管理fd，调用只在fd改变时更新内核态数据结�
 import "net"
 l, err := net.Listen("tcp", ":8080")
 conn, _ := l.Accept()
+```
+
+```python
+# epoll 示例
+import select
+
+epoll = select.epoll()
+epoll.register(sock.fileno(), select.EPOLLIN | select.EPOLLET)
+
+events = epoll.poll()
+for fd, event in events:
+    if event & select.EPOLLIN:
+        data = sock.recv(1024)
+```
+
+```c
+// Linux TCP server 示例
+int server_fd = socket(AF_INET, SOCK_STREAM, 0);
+setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR, &opt);
+bind(server_fd, (struct sockaddr *)&addr, sizeof(addr));
+listen(server_fd, backlog);
+int client_fd = accept(server_fd, NULL, NULL);
 ```

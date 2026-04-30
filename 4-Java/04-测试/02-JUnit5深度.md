@@ -33,6 +33,12 @@ class IntegrationTest {
 }
 ```
 
+### 生命周期与测试隔离
+
+`PER_METHOD` 为每个测试方法创建新实例，确保测试间完全隔离——实例字段不共享状态。
+
+`PER_CLASS` 在整个测试类生命周期内复用同一实例——适合代价高昂的初始化（如数据库连接），但要求测试间无状态污染。
+
 ---
 
 ## 嵌套测试
@@ -62,6 +68,24 @@ class StackTest {
 
 - 外层`@BeforeEach`先于内层`@BeforeEach`执行
 - 内层`@AfterEach`先于外层`@AfterEach`执行
+
+**数据流**：
+
+<pre>
+外层 @BeforeEach
+         │
+         ▼
+内层 @BeforeEach
+         │
+         ▼
+      @Test
+         │
+         ▼
+内层 @AfterEach
+         │
+         ▼
+外层 @AfterEach
+</pre>
 
 ---
 
@@ -110,6 +134,8 @@ assertTimeoutPreemptively(Duration.ofMillis(100), () -> {
 });
 ```
 
+**差异的本质**：assertTimeout 在超时后仍继续执行完；assertTimeoutPreemptively 使用 Thread.interrupt() 强制中断。
+
 ### assertThat 匹配器风格（AssertJ）
 
 AssertJ通过流式API将断言链式化：
@@ -144,6 +170,8 @@ Stream<DynamicTest> dynamicTests() {
 ```
 
 **约束**：动态测试的显示名由`DynamicTest.dynamicTest(name, executable)`指定，支持中文。
+
+**执行模型**：每个 DynamicTest 对应一个独立的测试调用。
 
 ### DynamicContainer 动态容器
 
@@ -215,6 +243,8 @@ void setUp(RepetitionInfo info) {
 }
 ```
 
+**与参数化测试的区别**：`@RepeatedTest` 是同一逻辑重复执行 N 次（共享实例），参数化测试是不同参数实例。
+
 ---
 
 ## 依赖注入
@@ -274,3 +304,5 @@ public class TracingExtension implements BeforeEachCallback, AfterEachCallback {
     }
 }
 ```
+
+**SPI 机制**：JUnit 5 通过 `java.util.ServiceLoader` 发现扩展点实现，允许第三方框架（如 Spring）无缝集成。

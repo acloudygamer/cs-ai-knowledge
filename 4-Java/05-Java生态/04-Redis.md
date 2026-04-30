@@ -211,6 +211,18 @@ ZADD rate:${userId} ${now} ${请求ID} → 添加新请求
 
 时间复杂度：O(log N)（ZADD/ZRANGEBYSCORE 均为 O(log N)）。
 
+### AOF 持久化的 fsync 策略
+
+AOF（Append-Only File）通过追加写实现持久化：
+
+| fsync 策略 | 写入时机 | 性能 | 持久化保证 |
+|-----------|---------|------|-----------|
+| `always` | 每次写操作后 | 最慢 | 每次写都持久化 |
+| `everysec`（默认） | 每秒一次 | 中等 | 最多丢失 1 秒数据 |
+| `no` | 由 OS 决定 | 最快 | 丢失不定量数据 |
+
+**`everysec` 的实现**：后台线程每秒调用 `fsync()`，主线程不阻塞。
+
 ## 参考存根
 
 ```java

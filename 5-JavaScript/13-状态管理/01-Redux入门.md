@@ -1,8 +1,10 @@
 # Redux 入门
 
-> Redux 是 JavaScript 应用的**可预测状态容器**，通过单向数据流和纯函数 reducer 实现状态不可变更新。
+> **版本基准**: Node24+ES2024 (stable) | Node26+ES2026 (latest)
 
 ## 定义
+
+Redux 是 JavaScript 应用的**可预测状态容器**，通过单向数据流和纯函数 reducer 实现状态不可变更新。
 
 Redux 的本质是一个**有限状态自动机（FSM）**，具有以下性质：
 
@@ -11,6 +13,8 @@ Redux 的本质是一个**有限状态自动机（FSM）**，具有以下性质�
 - **单向数据流**：UI 层 dispatch action → reducer 计算新状态 → Store 通知订阅者 → UI 更新。
 
 纯函数约束使得给定相同 `(state, action)` 对，每次运行结果完全相同，这使得**时间旅行调试**（在历史状态间跳转）和**状态重放**（复现 bug）成为可能。
+
+---
 
 ## 数学模型
 
@@ -27,6 +31,8 @@ Redux 的状态归约本质上是**幺半群（monoid）**结构：
 
 多 reducer 通过 `combineReducers` 分解为**子幺半群的直接积**，每个子 reducer 管理状态树的某个分支。
 
+**归约终点**：幺半群结构确保状态演化的确定性和可组合性，任意序列的动作组合都等价于某个单一动作的效果。
+
 ### 中间件的组合结构
 
 Redux 中间件形成**函数组合（function composition）**链：
@@ -38,6 +44,8 @@ dispatch → m₁ → m₂ → ... → mₙ → reducer → state
 每个中间件形式为 `storeAPI => next => action => { ...; return next(action); }`。
 
 这等价于柯里化函数 `((next => action => ...) => (action => ...))` 的嵌套调用。最终 dispatch 穿过所有中间件到达 reducer 后，状态更新沿原路返回（观察者通过 `store.subscribe` 接收通知）。
+
+---
 
 ## 数据流
 
@@ -78,6 +86,8 @@ dispatch → m₁ → m₂ → ... → mₙ → reducer → state
 **中间件的延迟/异步扩展**：
 异步 action（如 API 调用）不直接 dispatch 原始 action，而是在中间件中注册 promise 或 callback，在异步完成后 dispatch 真正符合 reducer 签名的 action。这本质上是将**副作用（side effect）隔离在 reducer 之外**，保持 reducer 的纯粹性。
 
+---
+
 ## 机制
 
 ### 不可变更新（Immutability）
@@ -88,7 +98,9 @@ Redux 要求 reducer **不修改原状态，而是返回新对象**。这并非�
 - **变化追踪**：不可变更新使得任意时刻的状态快照都可保存，支持撤销/重做。
 - **时间旅行**：`redux-devtools` 记录每个 action 的前后状态快照，可在时间线上回退/前进。
 
-违反后果：若 reducer 直接修改 `state.prop = value`，状态引用不变，`subscribe` 不会触发回调，UI 无法更新，且 DevTools 记录为空（因为 Redux 用 `Object.freeze` 检测 mutation）。
+**约束**：reducer 必须是纯函数——无副作用、相同输入产生相同输出。
+
+**违反后果**：若 reducer 直接修改 `state.prop = value`，状态引用不变，`subscribe` 不会触发回调，UI 无法更新，且 DevTools 记录为空（因为 Redux 用 `Object.freeze` 检测 mutation）。
 
 ### 中间件的物理含义
 
@@ -117,6 +129,8 @@ $$R(s, a) = \left( r_1(s_1, a), r_2(s_2, a), \ldots, r_n(s_n, a) \right)$$
 
 其中 $s = (s_1, s_2, \ldots, s_n)$ 是状态树的分裂。每个子 reducer 只负责自己的状态分支，互不干扰。
 
+---
+
 ## 对比参照
 
 | 维度 | Redux（传统） | Redux Toolkit | MobX |
@@ -126,6 +140,9 @@ $$R(s, a) = \left( r_1(s_1, a), r_2(s_2, a), \ldots, r_n(s_n, a) \right)$$
 | **样板代码** | 多（action type 常量 + switch） | 少（createSlice 自动生成） | 少（无 action type） |
 | **异步处理** | 需中间件（thunk/saga） | createAsyncThunk | runInAction |
 | **调试工具** | DevTools 可时间旅行 | DevTools 可时间旅行 | DevTools 有限 |
+| **学习曲线** | 中等 | 中等 | 较陡（Proxy 机制） |
+
+---
 
 ## 核心 API
 
@@ -291,6 +308,8 @@ reducers: {
 ```
 
 实际生成新的状态树。
+
+---
 
 ## 参考存根
 

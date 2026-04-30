@@ -1,7 +1,5 @@
 # Node.js 基础
 
-Node.js 是基于 Chrome V8 引擎的 JavaScript 运行时，使用事件驱动、非阻塞 I/O 模型，以单线程承载高并发，以 C++ Addon 桥接系统级能力。
-
 ## 定义
 
 Node.js 的本质是**在单线程事件循环之上构建的异步 I/O 运行时**。它将耗时 I/O 操作委托给操作系统或 libuv 线程池，立即返回执行权，待 I/O 完成后再通过回调恢复执行。这种设计使单线程能够处理高并发连接，而无需为每个连接分配独立栈。
@@ -12,9 +10,19 @@ Node.js 的本质是**在单线程事件循环之上构建的异步 I/O 运行�
 
 **libuv 线程池模型**：线程池大小默认为 4（可通过 `UV_THREADPOOL_SIZE` 修改，最大 1024），用于处理无法异步化的系统调用（文件 I/O、DNS 查询等）。
 
-$$T_{\text{parallel}} = \max(t_1, t_2, ..., t_n) \quad \text{vs} \quad T_{\text{sequential}} = \sum t_i$$
+$$
+T_{parallel} = \max(t_1, t_2, ..., t_n) \quad \text{vs} \quad T_{sequential} = \sum t_i
+$$
 
 当 $n$ 个任务相互独立时，线程池并行化可将总耗时从 $O(n)$ 降至 $O(\log n)$ 或 $O(1)$（取决于任务类型和线程池饱和度）。
+
+**背压的数学约束**：设写入速度 $v_w$（字节/秒），数据产生速度 $v_d$（字节/秒），缓冲区大小 $B_{max}$。若 $v_w < v_d$，缓冲区以速率 $(v_d - v_w)$ 增长：
+
+$$
+\frac{dB}{dt} = v_d - v_w \quad \Rightarrow \quad B(t) = B_0 + (v_d - v_w)t
+$$
+
+当 $B(t) \rightarrow B_{max}$ 时，必须暂停生产者以避免溢出。
 
 **归约终点**：Node.js 的 I/O 模型可归约为"生产者-消费者"问题：I/O 设备是生产者，事件循环是消费者，回调队列是缓冲区。背压机制防止缓冲区无限增长。
 
@@ -92,7 +100,7 @@ Node.js 模块系统的本质是**文件作用域隔离 + 导出对象引用传�
 │ const m =   │ ◀──────────────│ module.exports = {} │
 │   require() │   m is reference to the same object   │
 └─────────────┘                └─────────────┘
-</pre>
+```
 
 ### 模块解析顺序
 
@@ -104,6 +112,15 @@ require('./utils');
 require('/etc/config');
 require('express');
 ```
+
+**模块解析算法的数学定义**：
+$$
+resolve(P_{cur}, r) = \begin{cases}
+\text{builtin}(r) & \text{if } r \in \{\text{fs}, \text{path}, \text{crypto}, ...\} \\
+\text{file}(P_{cur}, r) & \text{if } r \in \{./, ../, /\} \\
+\text{searchUp}(P_{cur}, r) & \text{otherwise}
+\end{cases}
+$$
 
 ### ES Modules vs CommonJS
 
@@ -138,6 +155,8 @@ Node.js I/O 的本质是**缓冲区双阶段传递**：数据从磁盘到内核�
          (read syscall)   (memcpy)
 </pre>
 
+**零拷贝优化**：Linux 的 `sendfile()` 系统调用可以在内核态直接将文件内容从 Page Cache 传输到 Socket Buffer，避免用户态拷贝。Node.js 的 `fs.createReadStream()` 底层利用此机制。
+
 流的核心价值在于**背压机制**：写入方通过 pipeline 自动感知读取方处理速度，积压时自动暂停，避免内存溢出。
 
 ```javascript
@@ -162,6 +181,8 @@ fs.readFile('x', (err, data) => { if (err) return; });
 readFile('x').catch(e => {});
 ```
 
+**错误传播的数学语义**：错误处理是一种"短路"机制。当错误发生时，控制流跳过正常路径，进入错误处理路径。这类似于命令式语言的异常机制，但通过回调参数显式传递。
+
 ---
 
 ## 缓冲与加密
@@ -180,6 +201,8 @@ crypto 模块本质是对 OpenSSL 的封装，提供摘要、对称加密、非�
 const { createHash } = require('crypto');
 createHash('sha256').update('x').digest('hex');
 ```
+
+---
 
 ## 参考存根
 

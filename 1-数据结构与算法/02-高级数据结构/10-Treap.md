@@ -173,11 +173,29 @@ def merge(left, right):
 def insert(node, key):
     if not node:
         return TreapNode(key)
-    if random.random() < 0.5:
+    # BST descent by key
+    if key < node.key:
         node.left = insert(node.left, key)
     else:
         node.right = insert(node.right, key)
     update(node)
+    # heapify-up: if child has higher priority, rotate up
+    if node.left and node.left.pri > node.pri:
+        # right rotate
+        child = node.left
+        node.left = child.right
+        child.right = node
+        update(node)
+        update(child)
+        return child
+    elif node.right and node.right.pri > node.pri:
+        # left rotate
+        child = node.right
+        node.right = child.left
+        child.left = node
+        update(node)
+        update(child)
+        return child
     return node
 
 def kth(node, k):

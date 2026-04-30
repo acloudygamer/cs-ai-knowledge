@@ -1,8 +1,10 @@
 # Pinia 入门
 
-> Pinia 是 Vue.js 的**新一代状态管理库**，以组合式 API 为核心，通过 setup 函数模式实现状态、计算属性和方法的统一管理。
+> **版本基准**: Node24+ES2024 (stable) | Node26+ES2026 (latest)
 
 ## 定义
+
+Pinia 是 Vue.js 的**新一代状态管理库**，以组合式 API 为核心，通过 setup 函数模式实现状态、计算属性和方法的统一管理。
 
 Pinia 的本质是一个**轻量级响应式状态容器**，直接构建在 Vue 3 的响应式系统（Proxy + Computed）之上，不发明新的响应式模型。
 
@@ -11,6 +13,8 @@ Pinia 的本质是一个**轻量级响应式状态容器**，直接构建在 Vue
 - Pinia 将状态视为**响应式变量**，通过 Vue 的 Proxy 追踪依赖，自动在精确字段级别触发更新
 
 Pinia 的设计哲学是**最小化 API**：不强制样板代码，不强制要求 action type，利用 Vue 3 原生的 `ref`/`computed`/`watchEffect`，让 Vue 开发者零学习曲线。
+
+---
 
 ## 数学模型
 
@@ -24,6 +28,8 @@ Pinia 的 state 基于 Vue `ref`，getters 基于 Vue `computed`。这意味着�
 
 设一个 Store 有 $N$ 个 state 字段和 $M$ 个 computed.getter，组件只使用其中 $k$ 个字段。当任意字段变化时，Vue 的响应式系统通过 Proxy get trap 建立依赖图，**只有依赖该字段的 computed 和组件**才会被标记为脏（dirty）。
 
+**归约终点**：Pinia 的实质是** Vue 响应式系统的直接复用**，无需额外的依赖图或订阅机制。
+
 ### storeToRefs 的本质
 
 `storeToRefs` 的作用是将 Store 中的响应式 state 和 getters 转换为**ref对象**（保持响应式），同时将普通方法（actions）排除在外：
@@ -34,6 +40,8 @@ const { increment } = store             // 普通函数，非响应式
 ```
 
 这基于 Vue 3 的 `toRef` 机制：为源响应式对象的某个属性创建一个引用，该引用与源属性保持同步。
+
+---
 
 ## 数据流
 
@@ -66,6 +74,8 @@ Pinia 内部注册 Store（pinia._s.set('counter', store)）
 - `storeToRefs(store)` → 将 state/getters 转为 ref，actions 保持原始函数
 
 **所有权**：Store 实例由 Pinia 持有（注册在 `pinia._s` map 中），组件通过 `useXxxStore()` 获取引用，多个组件调用同一 Store 返回**相同实例**（单例）。
+
+---
 
 ## 机制
 
@@ -139,6 +149,8 @@ store.$patch({ count: 1, name: 'Alice' });
 
 这与 MobX 的 `runInAction` 类似，提供**原子性批量更新**语义。与 MobX 不同的是，Pinia 不需要 `runInAction` 包装——因为 Vue 的响应式更新本身就是批量的（`queueMicrotask` 队列）。
 
+---
+
 ## 对比参照
 
 | 维度 | Pinia | Redux Toolkit | MobX |
@@ -150,6 +162,9 @@ store.$patch({ count: 1, name: 'Alice' });
 | **DevTools** | 支持（时间旅行有限） | 完整时间旅行 | 有限 |
 | **异步处理** | 普通 async 函数 | createAsyncThunk | runInAction |
 | **学习曲线** | 低（Vue 开发者） | 中 | 中 |
+| **Vue 集成度** | 原生 | 需 react-redux | 需 mobx-react |
+
+---
 
 ## 核心 API
 
@@ -333,6 +348,8 @@ src/
 - 一个 Store 负责一个领域（用户、购物车、订单）
 - 避免单个 Store 混合多个无关状态
 - setup 风格更适合 TypeScript 类型推导
+
+---
 
 ## 参考存根
 

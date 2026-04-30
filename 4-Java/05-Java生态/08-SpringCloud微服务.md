@@ -49,6 +49,33 @@ $$p_{\text{failure}} = \frac{\text{failures in window}}{\text{requests in window
 
 **选择依据**：服务注册对 **可用性** 要求更高——即使网络波动，也要能注册新服务实例，否则新实例无法被调用。Nacos 默认 AP 是合理选择。
 
+### 负载均衡的加权随机算法
+
+设服务实例集合 $I = \{i_1, i_2, ..., i_n\}$，每个实例有权重 $w_i$：
+
+```java
+// 加权随机算法
+int totalWeight = sum(w_i for i in instances);
+int random = nextInt(totalWeight);
+for (instance : instances) {
+    random -= instance.weight;
+    if (random < 0) return instance;
+}
+```
+
+**数学期望**：实例 $i$ 被选中的概率：
+$$P(i) = \frac{w_i}{\sum_{j=1}^{n} w_j}$$
+
+### 分布式链路追踪的采样率模型
+
+全量追踪开销大，通常采用 **采样追踪**：
+
+设请求总量 $N$，采样率 $p$（如 10%），实际追踪数：
+$$N_{\text{traced}} = N \cdot p$$
+
+**自适应采样**：高峰期降低采样率，低峰期提高采样率：
+$$p(t) = \min\left(p_{\text{max}}, \frac{p_{\text{base}}}{\text{rate}(t)}\right)$$
+
 ## 数据流
 
 <pre>
@@ -61,7 +88,7 @@ Spring Cloud 服务间调用流程
      │◀─── 返回实例列表 ─────────────────│
      │                                   │
      │     负载均衡选择一个实例              │
-     │ ◀── 选择 instance-2 ──────────────│
+     │ ◀─── 选择 instance-2 ──────────────│
      │                                   │
      │ ──── HTTP 请求（带 TraceId） ────▶│
      │     @FeignClient 拦截器添加 Header  │
@@ -71,6 +98,24 @@ Spring Cloud 服务间调用流程
      │     - CLOSED：直接调用              │
      │     - OPEN：执行 fallback           │
      │     - HALF_OPEN：允许试探请求        │
+
+Nacos 配置变更推送
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Nacos Server                              Nacos Client（SDK）
+     │                                        │
+     │◀──── 配置变更监听注册（长轮询）──────────│
+     │                                        │
+     │     变更发生时：                          │
+     │                                        │
+     │ ──── UDP 推送（变更通知） ─────────────▶│
+     │                                        │
+     │     客户端收到通知后：                    │
+     │                                        │
+     │◀──── HTTP GET /v1/cs/configs ───────│ 主动拉取最新配置
+     │───── 返回最新配置 ────────────────────▶│
+     │                                        │
+     │     @RefreshScope 重新创建 Bean         │
 </pre>
 
 ## 机制
@@ -144,6 +189,29 @@ X-B3-Sampled: 1                ← 是否采样
 
 Span 形成树结构：根 Span 是入口操作的 TraceId，后续每个子操作继承该 TraceId。
 
+### API 网关的请求路由模型
+
+Spring Cloud Gateway 基于 **谓词（Predicate）** + **过滤器（Filter）** 的路由模型：
+
+```
+Predicate: 匹配请求条件（路径、主机、Header 等）
+Filter: 请求前后处理（认证、日志、限流等）
+```
+
+路由定义：
+```yaml
+routes:
+  - id: user-service
+    uri: lb://user-service
+    predicates:
+      - Path=/api/user/**
+    filters:
+      - StripPrefix=1
+      - RequestRateLimiter=...
+```
+
+**过滤器链的执行顺序**：before 过滤器按顺序执行 → 代理请求 → after 过滤器逆序执行。
+
 ## 参考存根
 
 ```java
@@ -175,6 +243,21 @@ public class UserService {
 
     public User getUserById(Long id) {
         return circuitBreaker.executeSupplier(() -> userClient.getUserById(id));
+    }
+}
+
+// 展示 OpenFeign 的降级处理
+@FeignClient(name = "user-service", fallback = UserClientFallback.class)
+interface UserClient {
+    @GetMapping("/users/{id}")
+    User getUser(@PathVariable Long id);
+}
+
+@Component
+class UserClientFallback implements UserClient {
+    @Override
+    public User getUser(Long id) {
+        return new User(id, "fallback-name"); // 降级返回
     }
 }
 ```

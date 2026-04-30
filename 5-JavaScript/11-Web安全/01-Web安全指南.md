@@ -1,3 +1,5 @@
+> **版本基准**: Node24+ES2024 (stable) | Node26+ES2026 (latest)
+
 # Web 安全指南
 
 ## 目录
@@ -21,6 +23,8 @@
 
 XSS 是攻击者将恶意脚本注入可信页面，浏览器的同源策略无法区分脚本来源而执行，造成会话窃取、页面篡改等危害。
 
+XSS 的本质是**上下文混淆攻击**：攻击者利用输入未被正确转义，使原本应为数据的内容被解析为代码。
+
 ### 数学模型
 
 XSS 本质是**语法级别的上下文混淆**。设用户输入为字符串 $u$，注入后的页面上下文为 $C$，渲染引擎的解析器 $P$ 对 $(C, u)$ 的解析结果为 $T$。若 $|T|_{\text{script}} > 0$（产生了 script 节点）且该脚本执行上下文非预期，则 XSS 成立。
@@ -28,6 +32,8 @@ XSS 本质是**语法级别的上下文混淆**。设用户输入为字符串 $u
 攻击成功率与以下因素相关：
 - 输入过滤的完备性：设过滤函数 $F$ 将危险模式映射为无害表示，$F$ 的检测率 $\eta \in [0, 1]$。攻击者通过多态变形（大小写混淆、URL 编码、Unicode 混淆）降低 $\eta$。
 - CSP 覆盖率：设 CSP 声明的 script-src 白名单为 $W$，攻击者可控脚本源 $S_a$，若 $S_a \cap W = \emptyset$ 则 CSP 完全阻断。
+
+**归约终点**：XSS 归结为上下文敏感转义问题——相同字符串在不同上下文（HTML 内容、属性值、JavaScript 字符串）中需要不同的转义规则。
 
 ### 数据流
 
@@ -60,13 +66,6 @@ CSP 的本质是**内容安全策略声明**：服务端通过 `Content-Security
 - CSP 的 `unsafe-inline` 或 `unsafe-eval` 指令等于禁用了 CSP 的核心保护。
 - 存储型 XSS 若被长期忽略，攻击者可注入持久化的窃密脚本，影响所有后续访问者。
 
-### 参考存根
-
-```javascript
-const esc = s => s.replace(/[&<>"']/g,
-  c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-```
-
 ---
 
 ## CSRF（跨站请求伪造）
@@ -74,6 +73,8 @@ const esc = s => s.replace(/[&<>"']/g,
 ### 定义
 
 CSRF 利用浏览器自动携带目标站点 Cookie 的特性，迫使用户在已登录状态下向目标站发起非预期的请求，攻击者无需获取 Cookie 值。
+
+CSRF 的本质是**请求来源欺骗**：浏览器自动携带 cookie 使攻击者能够伪造用户身份。
 
 ### 数学模型
 
@@ -86,6 +87,8 @@ V(\text{request}, c_u) = \text{accept} \quad \text{且} \quad \text{request.orig
 $$
 
 服务端若不验证请求来源，仅依赖 cookie 身份，则伪造请求会被接受。SameSite Cookie 提供 cookie 级别的保护：Strict 模式要求浏览器只在同站请求时附加 cookie，Lax 模式允许导航请求附加。
+
+**归约终点**：CSRF 归结为**自动凭证 vs 手动凭证的不对称性**——cookie 自动发送，但验证令牌需要显式提供。
 
 ### 数据流
 
@@ -100,7 +103,7 @@ M 中的表单/请求自动携带 c_u 发送到 A
      │
      ▼
 A 服务端验证通过 ──▶ 执行非预期操作（转账、发消息等）
-```
+</pre>
 
 ### 机制
 
@@ -113,14 +116,6 @@ Cookie 的 SameSite 属性将 cookie 的发送范围收紧到同站请求，减�
 - CSRF Token 若放在 URL 参数中，可能通过 Referer 头泄露给第三方。
 - JSONP 请求不受 CORS 保护，可被跨域表单 POST 触发，导致 CSRF。
 
-### 参考存根
-
-```javascript
-// 服务端生成并验证 CSRF Token
-const token = crypto.randomBytes(32).toString('hex');
-// 验证: request.headers['x-csrf-token'] === token
-```
-
 ---
 
 ## 注入攻击
@@ -128,6 +123,8 @@ const token = crypto.randomBytes(32).toString('hex');
 ### 定义
 
 注入攻击是将用户输入作为代码结构的一部分被解析执行，破坏原有语义的边界，使攻击者能够突破输入域进入代码域。
+
+注入的本质是**语法上下文的跨界混淆**：用户输入本应为数据，却因边界未校验被解析为代码。
 
 ### 数学模型
 
@@ -142,6 +139,8 @@ $$
 $$
 Q'(x) = \text{`SELECT * FROM users WHERE name = ?`} \quad \text{（数据库引擎强制 } x \in \text{字面值空间）}
 $$
+
+**归约终点**：注入攻击归结为**解释器边界突破**，防护的核心是确保用户输入永远不被解释为代码。
 
 ### 数据流
 
@@ -168,15 +167,6 @@ NoSQL 注入类似，但针对文档数据库的查询操作符：攻击者通�
 - ORM 的 `findOne({username: input})` 若 `input` 是字符串则安全，但若前端发送 `{username: {$ne: null}}` 则可能被直接作为查询对象处理。
 - OS 命令注入（如 `exec(input)`）可使攻击者获得服务器 shell，危害无上限。
 
-### 参考存根
-
-```javascript
-// SQL 参数化
-db.execute('SELECT * FROM users WHERE name = ?', [username]);
-// NoSQL 类型检查
-if (typeof username !== 'string') throw new Error('Invalid');
-```
-
 ---
 
 ## 密码存储
@@ -200,6 +190,8 @@ r_{\text{guess}} = \frac{R}{2^{\text{rounds}}}
 $$
 
 当 rounds 从 10 增到 12 时，攻击者破解同一密码的时间增加约 4 倍。Salting 确保相同密码产生不同哈希，防止攻击者使用预计算的彩虹表进行查表攻击。
+
+**归约终点**：密码存储归结为**计算硬化的单向函数**，使得正向验证容易，逆向计算代价极高。
 
 ### 数据流
 
@@ -232,12 +224,6 @@ bcrypt/Argon2 是自适应哈希函数，其核心设计是**故意引入可配�
 - 若 cost 设置过低（如 4），现代 GPU 可在数秒内尝试数十亿次猜测。
 - 若使用 MD5/SHA-1（无 cost 参数），即使加了 salt，攻击者也可通过 GPU 高效破解。
 
-### 参考存根
-
-```javascript
-const hash = await bcrypt.hash(pwd, 12);  // cost = 2^12 = 4096 rounds
-```
-
 ---
 
 ## JWT 安全
@@ -245,6 +231,8 @@ const hash = await bcrypt.hash(pwd, 12);  // cost = 2^12 = 4096 rounds
 ### 定义
 
 JWT 是将声明（claims）组织为 JSON 后 Base64URL 编码并签名的令牌，用于在各方之间传递已认证信息。
+
+JWT 的本质是**自包含凭证**：令牌本身携带所有验证所需信息，无需服务端存储会话状态。
 
 ### 数学模型
 
@@ -255,6 +243,8 @@ JWT 由三部分组成：Header $. Payload $. Signature，记作 $J = \text{Base
 - 密钥熵：$K$ 的安全等级需 $\geq 128$ bits，密钥过短使暴力破解可行。
 
 Access Token 短期化减少泄露窗口：设泄露概率 $P_{\text{leak}}$ 随时间增长，Refresh Token 独立存储用于轮换，Access Token 过期后需用 Refresh Token 换新。
+
+**归约终点**：JWT 安全归结为**签名算法的不可篡改性**和**密钥的保密性**。
 
 ### 数据流
 
@@ -272,7 +262,7 @@ Access Token 短期化减少泄露窗口：设泄露概率 $P_{\text{leak}}$ 随
      │
      ▼
 服务端验证签名 + 过期时间 + 声明
-```
+</pre>
 
 ### 机制
 
@@ -284,15 +274,6 @@ JWT 默认不加密（仅签名），payload 任何人都可解码——敏感�
 - 若签名密钥泄露，任何人都能签发有效令牌，等价于获取了管理员权限。
 - 若使用 `alg: RS256` 但验证时允许 `alg: HS256`（将公钥当作对称密钥），攻击者可使用公钥伪造令牌。
 - 若 Access Token 永不过期，泄露等同于永久凭证。
-
-### 参考存根
-
-```javascript
-// 签发
-jwt.sign({userId: u.id}, process.env.JWT_SECRET, {expiresIn:'15m', alg:'HS256'});
-// 验证
-jwt.verify(token, process.env.JWT_SECRET, {algorithms:['HS256']});
-```
 
 ---
 
@@ -314,6 +295,8 @@ $$
 
 安全头的数学本质是**服务端声明浏览器应强制执行的安全策略**。HSTS（Strict-Transport-Security）要求浏览器在 `max-age` 时间内仅通过 HTTPS 访问，防止协议降级攻击。
 
+**归约终点**：HTTPS 安全归结为**密钥交换的数学困难性**和**证书链的信任验证**。
+
 ### 数据流
 
 <pre>
@@ -327,7 +310,7 @@ HTTP 请求
      │
      ▼
 后续请求加密传输
-```
+</pre>
 
 ### 机制
 
@@ -340,14 +323,6 @@ X-Frame-Options 防止点击劫持（Clickjacking）：攻击者将目标页面�
 - HSTS 的 `max-age` 设置过短，攻击者仍可在首次访问时进行协议降级。
 - 安全头若未设置，浏览器的默认行为可能更宽松，增加攻击面。
 
-### 参考存根
-
-```javascript
-res.setHeader('Strict-Transport-Security', 'max-age=31536000');
-res.setHeader('X-Frame-Options', 'DENY');
-res.setHeader('X-Content-Type-Options', 'nosniff');
-```
-
 ---
 
 ## CORS
@@ -355,6 +330,8 @@ res.setHeader('X-Content-Type-Options', 'nosniff');
 ### 定义
 
 CORS（跨域资源共享）是浏览器同源策略的例外机制，允许服务端通过显式声明来授权特定跨域请求。
+
+CORS 的本质是**服务端授权的跨域访问**：服务端通过响应头声明哪些外部源可以访问其资源。
 
 ### 数学模型
 
@@ -365,6 +342,8 @@ $$
 $$
 
 当 `Access-Control-Allow-Credentials: true` 时，`Access-Control-Allow-Origin` **不能**为 `*`，必须指定具体域名。
+
+**归约终点**：CORS 安全归结为**服务端白名单验证**，浏览器作为执行点强制该策略。
 
 ### 数据流
 
@@ -380,7 +359,7 @@ $$
      │ no │
      ▼    ▼
   直接发起请求   等待 Preflight 响应
-```
+</pre>
 
 ### 机制
 
@@ -413,6 +392,8 @@ $$
 
 $C = 2^{|S|}$ 种字段命名变体（camelCase、PascalCase、snake_case、全大写等），完整的敏感字段检测需要覆盖所有命名变体。
 
+**归约终点**：敏感数据处理归结为**模式匹配与替换**，核心是建立完整的敏感字段词库。
+
 ### 数据流
 
 <pre>
@@ -423,7 +404,7 @@ $C = 2^{|S|}$ 种字段命名变体（camelCase、PascalCase、snake_case、全�
      │
      ▼
 R(d) ──▶ 脱敏后写入
-```
+</pre>
 
 ### 机制
 
@@ -435,17 +416,6 @@ R(d) ──▶ 脱敏后写入
 - 若脱敏规则不完整，攻击者可通过变体命名绕过检测。
 - 若在错误消息中直接返回数据库错误（如 SQL 语法），可能泄露表结构信息。
 - 若前端 localStorage/sessionStorage 存储敏感 token，一旦 XSS 攻击成功即可读取。
-
-### 参考存根
-
-```javascript
-const redact = obj => {
-  const sen = ['password','token','secret','ssn'];
-  for (const k of Object.keys(obj))
-    if (sen.some(s => k.toLowerCase().includes(s))) obj[k] = '[REDACTED]';
-  return obj;
-};
-```
 
 ---
 
@@ -465,13 +435,15 @@ const redact = obj => {
 
 纵深防御要求 $V = V_{\text{type}} \land V_{\text{format}} \land V_{\text{range}}$，任一层失败则拒绝输入。
 
+**归约终点**：输入验证归结为**集合成员测试**，核心是定义清晰的合法输入集合。
+
 ### 数据流
 
 <pre>
 用户输入 u ──▶ 类型检查 ──▶ 格式检查（正则）──▶ 范围检查 ──▶ 业务逻辑
                       │                │              │
                    失败→拒绝         失败→拒绝       失败→拒绝
-```
+</pre>
 
 ### 机制
 
@@ -483,16 +455,6 @@ const redact = obj => {
 - 若只做类型验证不做格式验证，`typeof "123"` 通过但可能不符合预期格式。
 - 若范围验证边界不严格，`age: -1` 可能导致非法逻辑（如扣款操作）。
 - 若使用白名单而非黑名单过滤，新增危险输入模式时需要持续更新黑名单，而白名单天然覆盖已知合法输入。
-
-### 参考存根
-
-```javascript
-const schema = z.object({
-  username: z.string().min(3).max(30),
-  email: z.string().email(),
-  age: z.number().int().min(0).max(150)
-});
-```
 
 ---
 
@@ -512,6 +474,8 @@ $$
 
 若 $C(t) > N$ 则触发限流。精确滑动窗口算法维护每个请求的时间戳，在 $[t-W, t]$ 区间内计数，内存复杂度 $O(|T|)$。
 
+**归约终点**：速率限制归结为**计数器的时间窗口约束**，核心是实现精确的滑动窗口计数。
+
 ### 数据流
 
 <pre>
@@ -527,7 +491,7 @@ $$
      ▼                ▼
   返回 429        更新计数器
   (Too Many Requests)
-```
+</pre>
 
 ### 机制
 
@@ -539,13 +503,6 @@ Redis 的 `INCR` + `EXPIRE` 是常见的分布式实现：`INCR` 原子递增计
 - 若限流阈值设置过高，防护效果减弱；若设置过低，正常用户被误伤（可用性降级）。
 - 若 IP 限流使用单一计数器，多人共用 IP 时正常用户被误伤（需要更细粒度的用户维度）。
 - 若仅在 API 网关限流而未在应用层限流，攻击者可能直接打到绕过网关的端口。
-
-### 参考存根
-
-```javascript
-const limiter = rateLimit({windowMs: 15*60*1000, max: 100});
-app.use('/api', limiter);
-```
 
 ---
 

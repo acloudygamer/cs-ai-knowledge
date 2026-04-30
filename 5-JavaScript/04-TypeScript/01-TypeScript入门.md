@@ -1,7 +1,5 @@
 # TypeScript 入门
 
-> TypeScript 是 JavaScript 的超集，通过添加静态类型系统将类型错误从运行时提前到编译时发现。
-
 ## 定义
 
 TypeScript 的本质是**在 JavaScript 语法之上叠加了一层编译时类型检查层**。它不改变 JavaScript 的运行时语义，而是通过静态分析在代码执行前捕获类型错误，同时生成干净的可移植 JavaScript 代码。
@@ -10,9 +8,19 @@ TypeScript 的本质是**在 JavaScript 语法之上叠加了一层编译时类�
 
 TypeScript 编译器（tsc）对每个语法构造执行**结构化类型检查**。设类型 $A$ 和 $B$ 的成员集合分别为 $M(A)$ 和 $M(B)$，赋值兼容性定义为：
 
-$$A \subtype B \iff \forall m \in M(B): m \in M(A) \land \text{type}(A.m) \subtype \text{type}(B.m)$$
+$$
+A \subtype B \iff \forall m \in M(B): m \in M(A) \land \text{type}(A.m) \subtype \text{type}(B.m)
+$$
 
-这意味着 TypeScript 的类型系统是**双向协变**的：子类型的属性类型可以是父类型属性类型的超类型（对于返回值）或子类型（对于参数）。这种设计允许"结构化子类型"——两个独立定义的类型只要结构匹配即可兼容，无需显式继承声明。
+**结构化子类型的数学含义**：子类型的成员集合是父类型成员集合的超集，且对应成员类型满足协变关系。这意味着两个独立定义的类型只要结构匹配即可兼容，无需显式继承声明。
+
+**协变与逆变**：
+
+对于函数类型 $F = (p: P) \rightarrow R$：
+- 返回类型 $R$ 是**协变**的：$R_1 \subtype R_2 \implies F_1 \subtype F_2$
+- 参数类型 $P$ 是**逆变**的：$P_1 \subtype P_2 \implies F_2 \subtype F_1$
+
+TypeScript 默认使用**双向协变**（用于与 JavaScript 动态类型的兼容性），在 `strictFunctionTypes` 模式下启用逆变检查。
 
 **归约终点**：类型检查最终归约为对每个属性名的成员访问和基本类型相等性的判定，全部在编译时完成，不产生任何运行时开销。
 
@@ -23,8 +31,10 @@ $$A \subtype B \iff \forall m \in M(B): m \in M(A) \land \text{type}(A.m) \subty
     │
     ▼
 tsc --type-check──► 错误报告（编译期）
+    │                   │
+    │                   └── Γ ⊢ e: T （类型环境推导）
     │
-    │──► 类型擦除 ──► JavaScript (.js)
+    ├──► 类型擦除 ──► JavaScript (.js)
     │    ( erase(T) = T' where T' has no type annotations )
     │
     ▼
@@ -34,6 +44,7 @@ V8 Engine 执行（无类型信息）
 **所有权变换**：
 - 编译期：tsc 持有类型环境 $\Gamma$（变量→类型的映射），对每个表达式 $e$ 推导 $\Gamma \vdash e: T$
 - 代码生成：类型标注在生成 JavaScript 时完全移除，生成的 .js 文件不含任何类型信息
+- 运行时：V8 执行无类型的 JavaScript 代码
 
 ## 机制
 
@@ -50,6 +61,8 @@ V8 Engine 执行（无类型信息）
 **约束条件**：
 - TypeScript 默认不检查 null/undefined（`strictNullChecks` 关闭时），这与 JavaScript 的动态特性保持一致
 - 开启 `strict: true` 等价于同时开启 `strictNullChecks`、`strictPropertyInitialization`、`noImplicitAny` 等
+
+**类型推断的数学本质**：TypeScript 编译器维护一个类型环境 $\Gamma$，对每个变量绑定其推断类型。设表达式 $e$ 在环境 $\Gamma$ 下的类型为 $T$，记作 $\Gamma \vdash e: T$。类型推断使用联合推断（unification）求解类型变量。
 
 ## 对比参照
 
@@ -91,6 +104,11 @@ interface Error { ok: false; message: string; }
 type Employee = User & { department: string };
 ```
 
+**interface vs type 的本质差异**：
+- `interface` 支持声明合并（declaration merging），适合扩展第三方类型
+- `type` 支持更复杂的类型运算（联合、交叉、条件类型）
+- 本质上，interface 是类型别名的一种特殊形式
+
 ## 函数类型
 
 ```typescript
@@ -101,6 +119,10 @@ function greet(name: string, greeting?: string): string {
 }
 function sum(...nums: number[]): number { return nums.reduce((a, b) => a + b, 0); }
 ```
+
+**函数类型协变**：
+- 返回类型协变：子类型的返回类型可以赋值给父类型
+- 参数类型逆变（strictFunctionTypes 模式下）
 
 ## 泛型
 
@@ -114,6 +136,8 @@ function logLength<T extends HasLength>(arg: T): T {
   return arg;
 }
 ```
+
+**泛型的类型参数约束**：`<T extends HasLength>` 约束 T 必须有 `.length` 属性，这允许编译器在泛型函数内访问 `arg.length` 而不报错。
 
 ## 类
 
@@ -134,6 +158,11 @@ class Employee extends Person {
 }
 ```
 
+**访问修饰符的内存模型**：
+- `public`：任意位置可访问
+- `private`：仅类内部可访问（编译时约束，JavaScript 运行时无访问控制）
+- `protected`：类内部及子类可访问
+
 ## 类型守卫
 
 ```typescript
@@ -146,6 +175,8 @@ interface Bird { fly(): void; }
 function isFish(pet: Fish | Bird): pet is Fish { return (pet as Fish).swim !== undefined; }
 ```
 
+**类型守卫的形式化**：设守卫函数 $g$ 的类型签名为 $value \rightarrow value \text{ is } X$，当 $g(value)$ 返回 true 时，类型环境更新为 $\Gamma \vdash value: X$。
+
 ## 实用类型
 
 ```typescript
@@ -155,6 +186,8 @@ type UserWithoutEmail = Omit<User, 'email'>;
 type UserMap = Record<string, User>;
 type NonNull = Exclude<string | null | undefined, null | undefined>;
 ```
+
+**实用类型的本质**：它们是**映射类型**（mapped types）的具名版本，通过 `[P in keyof T]` 遍历类型键并对每个键进行变换。
 
 ## 配置文件
 

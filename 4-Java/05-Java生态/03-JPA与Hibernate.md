@@ -46,6 +46,17 @@ $$p \approx 1 - \frac{1}{n}$$
 
 其中 $f_i$ 为第 $i$ 个主对象的关联字段数。
 
+### 脏检查的变更集计算复杂度
+
+Hibernate 在 flush 时计算变更集。设 Entity 有 $n$ 个字段：
+
+- 快照比较：$O(n)$ 字段比较
+- UPDATE 生成：仅包含变更字段（非全量字段）
+
+脏检查的数学复杂度：
+$$T_{\text{dirty-check}} = O(n \cdot m)$$
+其中 $n$ 为 Entity 字段数，$m$ 为当前 Persistence Context 中的 Entity 数量。
+
 ## 数据流
 
 <pre>
@@ -71,6 +82,28 @@ persistenceContext (一级缓存)
                   │
                   └─ 默认 AUTO_flush_mode：
                      Session 事务提交时自动 flush
+
+Hibernate 脏检查快照机制
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+persistenceContext
+    │
+    ├─ snapshots: Map<Entity, Snapshot>
+    │                 │
+    │                 └─ Entity 加载时保存快照
+    │                     (各字段的原始值副本)
+    │
+    └─ entities: Map<Key, Entity>
+                    │
+                    └─ flush() 时：
+                       for each entity in entities
+                           compare current vs snapshot
+                           → 生成差异 UPDATE
+
+脏检查优化：
+    · 仅比较变更字段（从快照记录）
+    · 避免全量字段比较
+    · UPDATE 仅包含变更列
 </pre>
 
 **快照（Snapshot）机制**：Hibernate 在 Entity 加载时保存一份快照到 Persistence Context。flush 时逐字段对比当前值与快照，生成最小 UPDATE 语句。
@@ -139,6 +172,41 @@ JPA 要求双向关联中必须有一方为 **owning side**（外键维护方）
 employee.setDepartment(dept);  // 正确：owning side
 dept.getEmployees().add(employee); // 错误：inverse side，不生效
 ```
+
+### 1.5级缓存（ Persistence Context 作为持久化上下文）
+
+Hibernate 5.x 引入了 `PersistenceContext` 的 Session 共享机制：
+
+```java
+// 共享 PersistenceContext（1.5级缓存）
+@Session
+Session session; // 注入的 Session 共享同一个 PersistenceContext
+
+// 在同一个 PersistenceContext 内，多次 findById 返回同一引用
+User u1 = session.find(User.class, 1L); // 第一次：从 DB 加载
+User u2 = session.find(User.class, 1L); // 第二次：从缓存返回同一引用
+assert u1 == u2; // true：同一性保证
+```
+
+### 批量操作（Batch）与 JDBC 批量大小
+
+Hibernate 的 JDBC 批量处理：
+
+```java
+// 配置
+hibernate.jdbc.batch_size = 25
+hibernate.order_inserts = true   // 按 Entity 类型排序
+hibernate.order_updates = true    // 按主键排序
+
+// 效果：
+INSERT t_user (id, name) VALUES (1, 'A')
+INSERT t_user (id, name) VALUES (2, 'B')
+INSERT t_user (id, name) VALUES (3, 'C')
+... （合并为一次 JDBC batch 调用）
+```
+
+**JDBC batch 的数学约束**：每 `batch_size` 条语句执行一次 JDBC batch。设 $N$ 条 INSERT，JDBC 调用次数：
+$$N_{\text{jdbc-calls}} = \lceil N / \text{batch\_size} \rceil$$
 
 ## 参考存根
 

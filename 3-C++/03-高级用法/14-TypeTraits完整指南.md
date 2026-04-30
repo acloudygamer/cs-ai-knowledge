@@ -81,7 +81,7 @@ $$
       │                              ├─ is_integral<T>  ────────────→ true/false
       │                              ├─ is_pointer<T>    ────────────→ true/false
       │                              ├─ is_same<T, U>   ────────────→ true/false
-      │                              ├─ is_base_of<B, D> ───────────→ true/false
+      │                              ├─ is_base_of<B, D> ────────────→ true/false
       │                              │                                     │
       │                              └─ 类型转换 ─────────────────────→ 新类型
       │                                        │                        │
@@ -91,7 +91,7 @@ $$
       │                                        └─ decay<T> ──────────→ 裸类型
       │
       └─ if constexpr(cond) ──────────────→ 编译期分支选择（不实例化错误分支）
-```
+</pre>
 
 **所有权/变换**：
 - type traits 查询不改变 T 本身，返回布尔值或新类型
@@ -186,6 +186,16 @@ C++20 concepts 部分替代了 Type traits 的 SFINAE 用法：
 - **查询**：`std::integral<T>` concept 替代 `is_integral_v<T>`
 
 但 Type traits 仍然是底层实现工具：concepts 内部通常用 type traits 组合实现。
+
+## 对比参照
+
+| 特性 | SFINAE（enable_if） | if constexpr（C++17） | Concepts（C++20） |
+|------|---------------------|----------------------|-------------------|
+| 语法 | 模板参数技巧 | 编译期分支语句 | 约束声明语法 |
+| 错误分支处理 | 需精心设计避免硬错误 | 自动不实例化 | 约束检查失败即排除 |
+| 可读性 | 差（技巧性强） | 好（像普通 if） | 好（语义清晰） |
+| 组合能力 | 嵌套 enable_if | &&/\|\| 运算符 | requires 子句 |
+| 适用场景 | C++11/14 兼容 | C++17+ 通用 | C++20+ 约束声明 |
 
 ## 参考存根
 

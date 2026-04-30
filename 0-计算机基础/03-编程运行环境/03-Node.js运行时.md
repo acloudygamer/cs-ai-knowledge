@@ -36,6 +36,14 @@ $$
 
 默认 `UV_THREADPOOL_SIZE = 4`（Node.js 旧版本）或 `512`（较新版本），可通过启动前环境变量配置。注意：**线程池是共享资源**，饱和后新请求必须等待。
 
+**M/M/1 队列模型**：线程池可建模为单队列多服务台：
+
+$$
+\rho = \frac{\lambda}{\mu \cdot c}
+$$
+
+其中 $\lambda$ 是请求到达率，$\mu$ 是每个线程的服务率，$c$ 是线程池大小。当 $\rho \to 1$ 时，队列延迟趋向无穷大。
+
 ```bash
 UV_THREADPOOL_SIZE=8 node app.js  # 必须在启动前设置
 ```
@@ -105,7 +113,7 @@ AST (抽象语法树)
                 │
                 ▼
         操作系统 I/O
-```
+</pre>
 
 ### V8 编译流水线
 
@@ -186,6 +194,14 @@ Hot counter ≥ CompileThreshold
 2. 无回调但有 setImmediate → 跳转 check 阶段
 3. 无回调也无 setImmediate → 阻塞等待新 I/O 事件（有最大超时）
 
+**poll 阶段阻塞超时计算**：
+
+$$
+T_\text{poll阻塞} = \min(T_\text{下一个timer到期}, T_\text{最大等待})
+$$
+
+当 timers 队列中有即将到期的 timer 时，poll 阶段的阻塞超时设置为该 timer 的剩余时间。
+
 ### 微任务与宏任务调度
 
 <pre>
@@ -232,6 +248,27 @@ JavaScript 调用 (fs.readFile / crypto.pbkdf2)
 </pre>
 
 > **关键约束**：**网络 I/O 本身是异步的**（epoll/kqueue），不需要线程池。线程池专门用于模拟无法异步化的**阻塞操作系统 API**。这是理解 Node.js I/O 模型的核心。
+
+### V8 隐藏类转换图
+
+<pre>
+┌─────────┐
+│  HC0    │ ← new Point() 后添加 x 属性
+└────┬────┘
+     │ 添加 y 属性
+     ▼
+┌─────────┐
+│  HC1    │ ← 添加完所有属性后
+└─────────┘
+     │ (稳定状态)
+     ▼
+  [稳定隐藏类]
+</pre>
+
+**隐藏类转换的条件**：
+- 相同构造函数
+- 属性添加顺序完全相同
+- 无动态添加属性
 
 ## 机制
 
@@ -300,6 +337,14 @@ epoll/kqueue/IOCP 是操作系统级别的 I/O 多路复用机制：
 - **kqueue** (macOS/BSD)：基于 kqueue 系统调用，功能与 epoll 类似
 - **IOCP** (Windows)：异步 I/O 模型，completion port 机制
 
+**epoll 的时间复杂度**：
+
+| 操作 | 时间复杂度 |
+|------|------------|
+| epoll_create | $O(1)$ |
+| epoll_ctl (添加/修改/删除) | $O(\log n)$ |
+| epoll_wait | $O(1)$（返回就绪的文件描述符数量） |
+
 ### libuv 线程池机制
 
 线程池大小受限（默认 512），用于**无法异步化的阻塞操作**：
@@ -338,6 +383,11 @@ function Point(x, y) {
 
 这意味着：**对象形状（shape）决定隐藏类，形状不稳定导致 V8 无法内联和优化**。
 
+**隐藏类的稳定性条件**：
+1. 所有属性在构造函数中一次性添加
+2. 不动态添加/删除属性
+3. 不改变属性类型
+
 #### 内联缓存 (Inline Cache, IC)
 
 记录热点调用的类型信息，下次相同类型时直接使用缓存结果：
@@ -350,6 +400,13 @@ function getX(p) {
 
 类型稳定时：直接通过偏移量访问（类似 C 结构体），无条件分支，接近原始速度。
 类型变化时：IC 失效（monomorphic → polymorphic → megamorphic），重新学习。
+
+**IC 状态转换**：
+```
+Monomorphic (1种隐藏类) → Polyrnorphic (2-4种隐藏类) → Megamorphic (≥5种隐藏类)
+```
+
+Megamorphic 后，V8 停止内联该调用点，每次访问需要运行时查表。
 
 #### 去优化 (Deoptimization)
 
@@ -421,6 +478,31 @@ import() → 按需加载 → 返回 Promise
 
 **回调地狱**：深层嵌套回调 → 维护性差 → 难以追踪异步流程 → 使用 async/await 解决（本质是协程语法糖）。
 
+### Node.js 与 V8 的集成机制
+
+**libuv 与 V8 的任务协作**：
+
+```
+┌──────────────────────────────────────────────────────┐
+│                    Node.js                            │
+│  ┌─────────────────┐      ┌─────────────────────┐   │
+│  │   V8 Isolate    │ ←──→ │   libuv 事件循环     │   │
+│  │  (JavaScript堆) │      │  (异步 I/O + 线程池) │   │
+│  └─────────────────┘      └─────────────────────┘   │
+│           ↑                        ↑                 │
+└───────────│────────────────────────│─────────────────┘
+            │                        │
+            ▼                        ▼
+      [JavaScript 执行]      [系统调用 epoll/wait]
+```
+
+**Isolate 的隔离语义**：每个 Isolate 有独立的：
+- JavaScript 堆（内存完全隔离）
+- GC 堆（独立管理）
+- JIT 编译缓存（独立）
+
+不同 Isolate 之间的通信只能通过进程间通信（IPC）或网络。
+
 ## 参考存根
 
 ### 事件循环执行顺序
@@ -475,4 +557,18 @@ const p2 = { x: 3, y: 4 };  // HiddenClass A（共享）
 // 形状不稳定 → V8 去优化
 const p3 = { x: 1 };        // HiddenClass B
 p3.y = 2;                    // 转换到 HiddenClass C（与 A 不兼容）
+```
+
+### Worker Threads 数据传递
+
+```javascript
+const { Worker, MessageChannel } = require('worker_threads');
+
+const worker = new Worker('child.js');
+const { port1, port2 } = new MessageChannel();
+
+worker.postMessage({ port: port1 }, [port1]);
+port2.postMessage('hello from main');
+port2.on('message', (msg) => console.log('received:', msg));
+// 注意：Transferable 对象的所有权被转移，而非复制
 ```

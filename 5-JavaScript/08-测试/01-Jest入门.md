@@ -6,6 +6,8 @@
 
 Jest 是 Facebook 开发的 JavaScript 测试框架，通过**子进程隔离执行**和**快照比对**实现零配置自动化验证。其核心价值在于将测试的**确定性**和**可重复性**从人工约定转化为框架保证——每个测试文件运行在独立 vm 上下文中，全局状态无法跨文件泄露。
 
+Jest 的本质是一个**测试执行引擎**：给定测试套件描述（describe/it 块）和断言库（expect），引擎负责隔离执行、收集结果、生成报告。
+
 ---
 
 ## 数学模型
@@ -21,6 +23,8 @@ $$\forall i \neq j: \text{state}(t_i) \cap \text{state}(t_j) = \emptyset$$
 - `require()` 缓存按 vm 上下文隔离
 - `jest.mock()` 的伪造对象不跨测试文件泄露
 
+**归约终点**：隔离性归结为进程/上下文资源分配——每个测试获得独立的内存空间，状态泄露被进程边界物理阻断。
+
 ### 快照比对的触发条件
 
 快照文件 `.snap` 存储序列化后的输出 $S_{expect}$。每次测试运行时，当前输出 $S_{actual}$ 与 $S_{expect}$ 按字节比对：
@@ -28,6 +32,8 @@ $$\forall i \neq j: \text{state}(t_i) \cap \text{state}(t_j) = \emptyset$$
 $$\text{match} \iff S_{actual} \equiv S_{expect}$$
 
 不匹配时差异 $\Delta = S_{actual} \setminus S_{expect}$ 即为失败信息。
+
+**触发条件**：快照比对在 `expect(value).toMatchSnapshot()` 调用时执行。首次运行生成基准，后续运行对比基准。
 
 ### Mock 函数状态机
 
@@ -48,6 +54,12 @@ jest.fn() 初始状态
     │
     └── restoreAllMocks() ──► 若由 spyOn 生成，恢复原始实现
 ```
+
+状态转移语义：
+- `mockReturnValue`：设置同步返回值，后续调用返回该值
+- `mockResolvedValue`：设置 Promise resolve 值，`await fn()` 返回该值
+- `mockRejectedValue`：设置 Promise reject 错误，`await fn()` 抛出该错误
+- `mockImplementation`：覆盖整个函数逻辑
 
 ---
 
@@ -107,6 +119,8 @@ jest.mock('./module') 声明
 调用记录存入 mock.mock.calls
 </pre>
 
+**关键约束**：`jest.mock()` 在**模块加载时**拦截，而非调用时。伪造对象在 import 语句执行前就已生效。
+
 ### Timer Mock 数据流
 
 <pre>
@@ -138,6 +152,8 @@ Jest 为每个测试文件创建独立进程或 worker 线程。这确保了：
 
 **代价**：进程间通信开销。对于 I/O 密集型测试（如文件操作），隔离开销可能超过测试本身执行时间。
 
+**时间复杂度**：设测试执行时间为 $T_{exec}$，进程启动开销为 $T_{fork}$，总时间为 $T_{total} = T_{fork} + T_{exec}$。当 $T_{exec} \ll T_{fork}$ 时，隔离开销显著。
+
 ### 快照比对的适用场景
 
 快照最适合 **输出结构稳定但实现细节可变的场景**：
@@ -149,6 +165,8 @@ Jest 为每个测试文件创建独立进程或 worker 线程。这确保了：
 - 快照是**字节省比对**，不验证语义正确性
 - 快照需要与源码一起版本控制，diff 需人工审查
 - 输出变化时必须确认是预期行为，否则更新快照
+
+**违反约束的后果**：快照更新未经验证，可能掩盖真实的功能变更。
 
 ### 自动 Mock 的拦截点
 
@@ -202,6 +220,7 @@ import { fetchUser } from './api';
 | Mock 语法 | `jest.fn()` | `sinon.stub()` | `vi.fn()` |
 | 速度 | 中（进程开销） | 快（共享进程） | 快（Chokidar HMR） |
 | 配置 | 零配置优先 | 需手动配置 | 兼容 Jest |
+| Timer Mock | `useFakeTimers` | `sinon.useFakeTimers` | `useFakeTimers` |
 
 ---
 

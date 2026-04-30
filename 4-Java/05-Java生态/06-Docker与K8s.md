@@ -35,6 +35,19 @@ $$Score_i = w_1 \cdot \frac{\text{CPU\_used}}{\text{CPU\_allocatable}} + w_2 \cd
 
 得分最高的节点被选中调度。
 
+### Pod QoS 的优先级建模
+
+Kubernetes 为 Pod 分配 QoS 类别：**Guaranteed > Burstable > BestEffort**
+
+| QoS 级别 | 资源请求/限制 | OOM Score |
+|---------|-------------|-----------|
+| Guaranteed | both set and equal | -999（最后被 kill） |
+| Burstable | requests < limits | 中间值 |
+| BestEffort | neither set | 正值（最先被 kill） |
+
+**OOM Score 计算**（Linux 内核）：
+$$\text{oom\_score} = \text{base\_score} + \frac{\text{memory\_usage}}{\text{memory\_limit}}$$
+
 ## 数据流
 
 <pre>
@@ -85,6 +98,17 @@ Kubernetes 控制器调谐循环
          │
          ▼
       实际状态 → (再次调谐) → 期望状态
+
+Kubelet 状态上报循环
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Kubelet                    Kubernetes API Server
+    │                              │
+    │◀─── 心跳（每 10s）────────────│ 报告节点状态
+    │                              │
+    │◀─── Pod 创建请求（若需要）────│
+    │                              │
+    │───→ Pod 状态更新──────────────▶│
 </pre>
 
 ## 机制
@@ -142,6 +166,22 @@ spec:
 **最大总 Pod 数**：$N + S$
 
 Rolling Update 过程可建模为状态机，确保任意时刻都有至少 $N-U$ 个 Pod 可用——这是 **始终保持服务可用** 的数学保证。
+
+### 污点与容忍的调度控制
+
+污点（Taint）应用于 Node，容忍（Toleration）应用于 Pod：
+
+```
+Node: 污点 key=value:Effect
+       └── Effect: NoSchedule | PreferNoSchedule | NoExecute
+
+Pod:  tolerations 配置容忍
+```
+
+**NoExecute 污点**：不仅不调度新 Pod，还会驱逐已有 Pod（除非 Pod 有对应容忍）。
+
+**容忍的数学匹配**：
+$$\text{match}(t, \text{pod}) = \begin{cases} \text{true} & \text{若 } t \in \text{pod.tolerations} \\ \text{false} & \text{otherwise} \end{cases}$$
 
 ## 参考存根
 
