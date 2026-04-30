@@ -1,6 +1,6 @@
 # Redux 入门
 
-> **版本基准**: Node24+ES2024 (stable) | Node26+ES2026 (latest)
+> **版本基准**: React 18 (stable) | React 19 (latest) | Redux Toolkit 2.x (stable) | ES2024+ (stable) | ES2026+ (latest)
 
 ## 定义
 
@@ -8,101 +8,173 @@ Redux 是 JavaScript 应用的**可预测状态容器**，通过单向数据流�
 
 Redux 的本质是一个**有限状态自动机（FSM）**，具有以下性质：
 
-- **单一数据源**：整个应用的 state 汇聚为一棵不可变的树，存储于唯一的 Store。
-- **纯函数更新**：状态只能通过 `reducer(state, action) => newState` 的纯函数计算得出。
-- **单向数据流**：UI 层 dispatch action → reducer 计算新状态 → Store 通知订阅者 → UI 更新。
+- **单一数据源**：整个应用的 state 汇聚为一棵不可变的树，存储于唯一的 Store
+- **纯函数更新**：状态只能通过 `reducer(state, action) => newState` 的纯函数计算得出
+- **单向数据流**：UI 层 dispatch action → reducer 计算新状态 → Store 通知订阅者 → UI 更新
 
-纯函数约束使得给定相同 `(state, action)` 对，每次运行结果完全相同，这使得**时间旅行调试**（在历史状态间跳转）和**状态重放**（复现 bug）成为可能。
+**版本差异说明**：Redux Toolkit 2.x（基于 Redux 5.x）相比早期版本，默认启用了 Immer 的不可变语义，使得 reducer 可以使用可变语法而保持不可变语义。RTK Query 2.x 提供了更强大的数据获取和缓存管理。React 18 的 Concurrent Rendering 要求 reducer 状态必须是稳定的（不可变），否则会导致渲染不一致。
 
 ---
 
 ## 数学模型
 
-### 归约结构
+### 归约结构的幺半群形式
 
-Redux 的状态归约本质上是**幺半群（monoid）**结构：
+Redux 的状态归约本质上是**幺半群（Monoid）**结构：
 
+$$
+(S, \cdot, s_0)
+$$
+
+其中：
 - **状态集** $S$：所有合法应用状态的集合
-- **动作集** $A$：所有可dispatch的动作的集合
-- **约简函数** $r: S \times A \to S$：给定当前状态和动作，计算下一状态
+- **二元运算** $\cdot: S \times S \to S$：动作组合（先后执行两个动作等价于执行组合后的单一动作）
 - **单位元** $s_0 \in S$：初始状态
 
-合成律：$r(r(s, a_1), a_2) = r(s, \text{compose}(a_1, a_2))$，其中 compose 为动作的顺序组合。
+约简函数 $r: S \times A \to S$ 满足结合律：
 
-多 reducer 通过 `combineReducers` 分解为**子幺半群的直接积**，每个子 reducer 管理状态树的某个分支。
+$$
+r(r(s, a_1), a_2) = r(s, a_1 \cdot a_2)
+$$
 
-**归约终点**：幺半群结构确保状态演化的确定性和可组合性，任意序列的动作组合都等价于某个单一动作的效果。
+其中 $a_1 \cdot a_2$ 表示先执行 $a_1$ 再执行 $a_2$ 的组合动作。
 
-### 中间件的组合结构
+**combineReducers 的张量积结构**：多 reducer 通过 `combineReducers` 分解为子幺半群的**直积**：
 
-Redux 中间件形成**函数组合（function composition）**链：
+$$
+R(s, a) = \bigotimes_i r_i(s_i, a)
+$$
 
-```
+其中 $s = (s_1, s_2, \ldots, s_n)$ 是状态树的分裂。每个子 reducer $r_i$ 只负责自己的状态分支 $s_i$，子分支的约简互不干扰。
+
+### 中间件的函数组合
+
+Redux 中间件形成**柯里化函数组合链**：
+
+<pre>
 dispatch → m₁ → m₂ → ... → mₙ → reducer → state
+          ↑        ↑           ↑
+          └────────┴───────────┘
+              穿过链后原路返回
+</pre>
+
+每个中间件形式为：
+
+```javascript
+storeAPI => next => action => {
+  // 前置处理（拦截、记录、异步触发）
+  const result = next(action);  // 传递到下一个中间件
+  // 后置处理（记录结果、触发副作用）
+  return result;
+}
 ```
 
-每个中间件形式为 `storeAPI => next => action => { ...; return next(action); }`。
+这等价于柯里化函数的嵌套调用：
 
-这等价于柯里化函数 `((next => action => ...) => (action => ...))` 的嵌套调用。最终 dispatch 穿过所有中间件到达 reducer 后，状态更新沿原路返回（观察者通过 `store.subscribe` 接收通知）。
+$$
+\text{dispatch} = m_1 \circ m_2 \circ \cdots \circ m_n \circ \text{baseDispatch}
+$$
+
+### 不可变更新的引用语义
+
+Redux 用 `===` 比较新旧状态引用来判断是否变化：
+
+$$
+\text{changed} = \text{newState} \ !== \text{oldState}
+$$
+
+若引用相同（`changed = false`），Redux 认为状态未变，React-Redux 的 `useSelector` 跳过重渲染。
+
+**Immer 的 Copy-on-Write 语义**：RTK 允许 `state.push()` 这样的可变语法，但 Immer 在底层实现：
+
+1. 首次修改 `draftState` 时，启动事务，记录所有修改路径
+2. 事务提交时，基于修改路径构造新对象——**只有被修改的分支是新对象**，未修改的分支复用旧引用
+
+这使得：
+
+$$
+\text{produce}(\text{draft}, d \to d.\text{prop} = v) \approx \{
+  \ldots\text{draft},
+  \text{prop}: v
+\}
+$$
+
+但保持引用相等性优化：
+
+$$
+\text{produce}(\text{draft}, d \to {}) = \text{draft}
+$$
 
 ---
 
 ## 数据流
 
 <pre>
-┌─────────────┐   dispatch(a)   ┌─────────────┐
-│    UI 层    │ ─────────────── │   Action    │
-│ (React 等)  │                 │  { type, payload } │
-└──────┬──────┘                 └──────┬──────┘
-       │ store.getState()              │
-       │◀─────────────────────────────┘
-       │                         ┌──────▼──────┐
-       │                         │   Reducer    │
-       │                         │ (纯函数)     │
-       │                         │ S × A → S   │
-       │                         └──────┬──────┘
-       │ new state                        │
-       │◀────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────┐
+│                        Redux 数据流                               │
+└──────────────────────────────────────────────────────────────────┘
+
+  UI 事件（如点击）
        │
        ▼
-┌─────────────────┐
-│  Store          │
-│  .getState()   │
-│  .subscribe()   │
-│  .dispatch()   │
-└─────────────────┘
+  dispatch(action)
        │
        ▼
-  通知所有订阅者
-  (观察者模式)
+  ┌─────────────────────────────────────────────────────────────┐
+  │                    Middleware Chain                          │
+  │  ┌─────────┐    ┌─────────┐         ┌─────────┐             │
+  │  │  thunk  │ → │  logger │   → ... → │  ...    │             │
+  │  └─────────┘    └─────────┘         └─────────┘             │
+  └─────────────────────────────────────────────────────────────┘
+       │
+       ▼
+  Reducer (纯函数)
+  ┌─────────────────────────────────────────────────────────────┐
+  │  prevState ──(action)──▶ newState                          │
+  │      │                           │                           │
+  │      │    ┌──────────────────────┘                          │
+  │      │    │  Immer: 只修改的分支是新对象                      │
+  │      └────┘  未修改的分支复用旧引用                           │
+  └─────────────────────────────────────────────────────────────┘
+       │
+       ▼
+  Store._state 更新
+       │
+       ▼
+  通知所有 subscriber
+  (forEach 同步调用)
+       │
+       ▼
+  React 组件重渲染
+  (useSelector 精确订阅)
 </pre>
 
 **数据形态变换**：
-1. UI 事件 → plain object `action`（`{ type: string, payload?: any }`）
-2. `action` 经过中间件链（可改写、延迟、异步处理）
-3. `reducer` 接收 `(prevState, action)` → 返回 `newState`（新对象引用，引用不可变）
-4. `newState` 替换 `store._state`，Store 通知所有 subscriber
 
-**中间件的延迟/异步扩展**：
-异步 action（如 API 调用）不直接 dispatch 原始 action，而是在中间件中注册 promise 或 callback，在异步完成后 dispatch 真正符合 reducer 签名的 action。这本质上是将**副作用（side effect）隔离在 reducer 之外**，保持 reducer 的纯粹性。
+1. UI 事件 → plain object `action`（`{ type: string, payload?: unknown }`）
+2. `action` 经过中间件链（可改写、延迟、异步处理）
+3. `reducer` 接收 `(prevState, action)` → 返回 `newState`（新对象引用）
+4. `newState` 替换 `store._state`，Store 同步通知所有 subscriber
+
+**中间件的异步扩展**：异步 action（如 API 调用）不直接 dispatch 原始 action，而是在中间件中注册 promise 或 callback，在异步完成后 dispatch 真正符合 reducer 签名的 action。这本质上是将**副作用隔离在 reducer 之外**。
 
 ---
 
 ## 机制
 
-### 不可变更新（Immutability）
+### 不可变约束的物理含义
 
-Redux 要求 reducer **不修改原状态，而是返回新对象**。这并非语言限制，而是有意设计：
+Redux 要求 reducer **不修改原状态，而是返回新对象**。这是有意设计而非语言限制：
 
-- **引用相等检测**：`store.subscribe` 回调触发前，Redux 用 `===` 比较新旧状态引用——若引用相同，React-Redux 的 `useSelector` 认为状态未变，跳过重渲染。
-- **变化追踪**：不可变更新使得任意时刻的状态快照都可保存，支持撤销/重做。
-- **时间旅行**：`redux-devtools` 记录每个 action 的前后状态快照，可在时间线上回退/前进。
+**引用相等检测**：`store.subscribe` 回调触发前，Redux 用 `===` 比较新旧状态引用。若引用相同，React-Redux 的 `useSelector` 认为状态未变，跳过重渲染。
+
+**变化追踪**：不可变更新使得任意时刻的状态快照都可保存，支持撤销/重做。`redux-devtools` 记录每个 action 的前后状态快照，可在时间线上回退/前进。
 
 **约束**：reducer 必须是纯函数——无副作用、相同输入产生相同输出。
 
-**违反后果**：若 reducer 直接修改 `state.prop = value`，状态引用不变，`subscribe` 不会触发回调，UI 无法更新，且 DevTools 记录为空（因为 Redux 用 `Object.freeze` 检测 mutation）。
+**违反后果**：若 reducer 直接修改 `state.prop = value`，状态引用不变，`subscribe` 不会触发回调，UI 无法更新，且 DevTools 记录为空（RTK 用 `Object.freeze` 检测 mutation）。
 
-### 中间件的物理含义
+### 中间件的 AOP 本质
 
 中间件是 **AOP（面向切面编程）** 在 Redux 里的实现。dispatch 链路是切点（join point），中间件在切点上拦截、观测、修改 action。
 
@@ -115,19 +187,28 @@ Redux 要求 reducer **不修改原状态，而是返回新对象**。这并非�
 
 `createSlice` 允许 `state.push()` 这样的可变语法，但 Immer 在底层用 **Copy-on-Write** 策略：
 
-- 首次修改 `state` 时，Immer 启动事务，记住所有修改路径
-- 事务提交时，基于这些路径构造新对象的**只有被修改的分支**，未修改的分支直接复用旧引用
-- 结果：`draftState` 看起来可变，但 produce 后得到完全不可变的新状态
+```javascript
+// 表面：可变语法
+reducers: {
+  addItem: (state, action) => {
+    state.items.push(action.payload);
+  }
+}
 
-这使得 Redux Toolkit 的 reducer 既有命令式语法的可读性，又保持 Redux 的不可变语义。
+// 底层：produce 后生成不可变结果
+// produce(draft, draft => draft.items.push(payload))
+// → { ...draft, items: [...draft.items, payload] }
+```
 
-### combineReducers 的分割与组合
+### combineReducers 的状态树分裂
 
-`combineReducers` 将根 reducer 函数 $R: S \times A \to S$ 分解为子 reducer 的直接积：
+`combineReducers` 将根 reducer 函数 $R: S \times A \to S$ 分解为子 reducer 的直积：
 
-$$R(s, a) = \left( r_1(s_1, a), r_2(s_2, a), \ldots, r_n(s_n, a) \right)$$
+$$
+R(s, a) = \left( r_1(s_1, a), r_2(s_2, a), \ldots, r_n(s_n, a) \right)
+$$
 
-其中 $s = (s_1, s_2, \ldots, s_n)$ 是状态树的分裂。每个子 reducer 只负责自己的状态分支，互不干扰。
+其中 $s = (s_1, s_2, \ldots, s_n)$ 是状态树的分裂。**关键约束**：每个子 reducer 接收完整的 action，必须忽略不关心的 action 并返回原状态。
 
 ---
 
@@ -141,12 +222,13 @@ $$R(s, a) = \left( r_1(s_1, a), r_2(s_2, a), \ldots, r_n(s_n, a) \right)$$
 | **异步处理** | 需中间件（thunk/saga） | createAsyncThunk | runInAction |
 | **调试工具** | DevTools 可时间旅行 | DevTools 可时间旅行 | DevTools 有限 |
 | **学习曲线** | 中等 | 中等 | 较陡（Proxy 机制） |
+| **React 集成** | react-redux Provider | react-redux Provider | mobx-react observer |
 
 ---
 
 ## 核心 API
 
-### createStore
+### createStore（传统 Redux）
 
 ```javascript
 import { createStore } from 'redux';
@@ -156,22 +238,7 @@ store.dispatch({ type: 'INCREMENT' });
 store.getState();
 ```
 
-### combineReducers
-
-```javascript
-import { combineReducers } from 'redux';
-
-const rootReducer = combineReducers({
-  counter: counterReducer,
-  user: userReducer,
-});
-```
-
----
-
-## Redux Toolkit（官方推荐）
-
-### configureStore
+### configureStore（Redux Toolkit）
 
 ```javascript
 import { configureStore } from '@reduxjs/toolkit';
@@ -228,7 +295,7 @@ import { Provider, useSelector, useDispatch } from 'react-redux';
 
 const count = useSelector(state => state.counter.value);
 const dispatch = useDispatch();
-dispatch({ type: 'counter/increment' });
+dispatch(counterSlice.actions.increment());
 ```
 
 ### createSelector
@@ -244,70 +311,6 @@ const selectFiltered = createSelector(
   (items, filter) => items.filter(i => i.name.includes(filter))
 );
 ```
-
----
-
-## 高级模式
-
-### Middleware
-
-```javascript
-const logger = (storeAPI) => (next) => (action) => {
-  const result = next(action);
-  return result;
-};
-```
-
-### RTK Query
-
-```javascript
-import { createApi } from '@reduxjs/toolkit/query';
-
-const api = createApi({
-  reducerPath: 'api',
-  baseQuery: fetchBaseQuery({ baseUrl: '/api' }),
-  endpoints: (builder) => ({
-    getUser: builder.query({
-      query: (id) => `/users/${id}`,
-      providesTags: ['User'],
-    }),
-  }),
-});
-```
-
----
-
-## 最佳实践
-
-### 目录结构
-
-```
-src/
-  features/
-    counter/
-      counterSlice.ts
-      counterSelectors.ts
-      Counter.tsx
-  store/
-    index.ts
-    rootReducer.ts
-  app/
-    App.tsx
-```
-
-### Immutability
-
-Immer（Redux Toolkit 内置）允许"可变"语法写不可变更新：
-
-```javascript
-reducers: {
-  addItem: (state, action) => {
-    state.items.push(action.payload);
-  },
-}
-```
-
-实际生成新的状态树。
 
 ---
 
@@ -331,5 +334,24 @@ function createStore(reducer, initialState) {
       return () => { subscribers.splice(subscribers.indexOf(fn), 1); };
     }
   };
+}
+```
+
+```javascript
+// Redux Toolkit createSlice 等价底层
+function createSlice({ name, initialState, reducers }) {
+  const actionCreators = {};
+  for (const [key, reducerFn] of Object.entries(reducers)) {
+    actionCreators[key] = (payload) => ({ type: `${name}/${key}`, payload });
+  }
+
+  const reducer = (state = initialState, action) => {
+    const match = action.type.startsWith(name + '/');
+    if (!match) return state;
+    const slice = action.type.slice(name.length + 1);
+    return produce(state, draft => reducerFn(draft, action));
+  };
+
+  return { reducer, actions: actionCreators };
 }
 ```

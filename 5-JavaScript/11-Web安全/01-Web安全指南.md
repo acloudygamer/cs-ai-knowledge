@@ -131,7 +131,7 @@ Cookie 的 SameSite 属性将 cookie 的发送范围收紧到同站请求，减�
 注入攻击的数学本质是**语法上下文的跨界混淆**。以 SQL 注入为例：设查询模板为 $Q(x) = \text{`SELECT * FROM users WHERE name = '`} + x + \text{`'`}$，输入 $x = \text{`' OR '1'='1`}$ 导致解析结果改变：
 
 $$
-Q(\text{`' OR '1'='1`}) = \text{SELECT * FROM users WHERE name = '' OR '1'='1'}
+Q(\text{' OR '1'='1'}) = \text{SELECT * FROM users WHERE name = '' OR '1'='1'}
 $$
 
 原始查询是有限集合查询（返回特定用户），注入后变成恒真查询（返回所有用户）。参数化查询将 $Q$ 重写为 $Q'(x)$ 使 $x$ 只能作为字面值参与查询：

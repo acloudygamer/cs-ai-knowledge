@@ -8,22 +8,29 @@
 
 ### Observer 模式的复杂度
 
-传统轮询：`O(n)` 扫描 + `O(1)` 触发（无论是否变化）。
+传统轮询：$\mathcal{O}(n)$ 扫描 + $\mathcal{O}(1)$ 触发（无论是否变化）。
 
-Observer 模式：`O(1)` 回调触发，仅在实际变化时唤醒主线程。
+Observer 模式：$\mathcal{O}(1)$ 回调触发，仅在实际变化时唤醒主线程。
 
 **IntersectionObserver 交叉比计算**：
-$$ratio = \frac{Area(B_{target} \cap B_{root})}{Area(B_{target})}$$
 
-其中 $B_{target}$ 为目标边界框，$B_{root}$ 为根边界框（视口或指定容器）。浏览器内部在每次滚动/ resize 时重新计算，但**仅在 threshold 交叉状态变化时才触发回调**。
+$$
+ratio = \frac{Area(B_{target} \cap B_{root})}{Area(B_{target})}
+$$
+
+其中 $B_{target}$ 为目标边界框，$B_{root}$ 为根边界框（视口或指定容器）。浏览器内部在每次滚动/resize/visibilitychange 时重新计算，但**仅在 threshold 交叉状态变化时才触发回调**。
 
 ### ResizeObserver 的回调触发时机
 
 ResizeObserver 在**微任务队列**完成后触发回调，确保在 DOM 尺寸变化已应用但布局尚未完成时执行。这避免了在同一帧内多次触发。
 
+$$
+T_{callback} = T_{resize} + T_{microtask\_queue\_drain} + T_{frame\_render}
+$$
+
 ## 数据流
 
-<pre>
+```
 IntersectionObserver 流程：
 new IntersectionObserver(callback, options) → 注册观察
                                                ↓
@@ -105,49 +112,143 @@ navigator.wakeLock.request('screen') → WakeLockSentinel
 Clipboard API 流程：
 navigator.clipboard.writeText(text) → 写入系统剪贴板
 navigator.clipboard.readText() → 读取系统剪贴板
-</pre>
+```
 
 ## 机制
 
 ### IntersectionObserver 的懒加载语义
 
-IntersectionObserver 的核心价值在于**延迟初始化**：仅当元素进入视口附近（由 `rootMargin` 控制提前量）时才触发回调。这比 scroll 事件轮询更高效，因为：
-1. 浏览器在元素交叉状态变化时才通知，无需每帧计算
-2. `rootMargin` 可提前 50% 视口高度加载，用户不会感知到延迟
+IntersectionObserver 的核心价值在于**延迟初始化**：仅当元素进入视口附近（由 `rootMargin` 控制提前量）时才触发回调。
 
-**约束**：`rootMargin` 过大可能导致不必要的加载（如预加载整个页面）；`threshold` 为数组时，每个阈值都会触发回调。
+**rootMargin 的语义**：
+
+$$
+B_{effective} = B_{root} \oplus rootMargin
+$$
+
+其中 $\oplus$ 表示边界的扩展操作（top/right/bottom/left 分别扩展）。
+
+```javascript
+// rootMargin: '50px' 提前 50px 触发
+new IntersectionObserver(callback, { rootMargin: '50px' });
+// 等价于视口向上下左右各扩展 50px
+```
+
+**threshold 的交叉触发**：
+
+| threshold 值 | 触发条件 |
+|-------------|----------|
+| `0` | 元素边界刚接触根边界时 |
+| `0.5` | 50% 交叉时 |
+| `1` | 元素完全进入根时 |
+| `[0, 0.5, 1]` | 上述任一条件满足时 |
 
 ### ResizeObserver 的回调时机
 
-ResizeObserver 的回调在**下一帧渲染前**执行，但不保证在同一次渲染更新中不重复触发。若需要仅执行一次，应在回调中调用 `observer.disconnect()` 或使用标志位。
+ResizeObserver 的回调在**下一帧渲染前**执行，但不保证在同一次渲染更新中不重复触发。
+
+**收敛语义**：若需仅执行一次，应在回调中调用 `observer.disconnect()` 或使用标志位：
+
+```javascript
+let handled = false;
+new ResizeObserver(entries => {
+  if (handled) return;
+  handled = true;
+  // 处理逻辑
+}).observe(el);
+```
 
 ### MutationObserver 的批处理语义
 
-多个 DOM 变化会被**合并**为一次回调（浏览器内部去重），避免在短时间内多次触发回调导致性能问题。`MutationRecord` 包含 `oldValue`，需在 `observe` 选项中声明（`attributeOldValue: true` / `characterDataOldValue: true`），否则 `oldValue` 为 `null`。
+多个 DOM 变化会被**合并**为一次回调（浏览器内部去重）：
+
+$$
+callback(\{ mutations \}) = \text{合并}(\text{同一微任务周期内的所有 DOM 变化})
+$$
+
+**oldValue 约束**：
+
+| `observe` 选项 | `MutationRecord.oldValue` |
+|---------------|---------------------------|
+| `attributeOldValue: true` | 属性变化前的值 |
+| `characterDataOldValue: true` | 文本变化前的值 |
+| `childList: true` | 恒为 `null` |
 
 ### Payment Request API 的安全约束
 
-该 API 需要**用户手势**（`requestDevice`/`show` 必须在用户点击事件处理函数内调用），以防止钓鱼攻击。`canMakePayment()` 返回 `Promise<boolean>`，用于在 UI 上显示支付按钮前检测可用性。
+该 API 需要**用户手势**（`requestDevice`/`show` 必须在用户点击事件处理函数内调用），以防止钓鱼攻击：
+
+```javascript
+// 必须在用户点击事件内调用
+button.addEventListener('click', async () => {
+  const req = new PaymentRequest([{ supportedMethods: 'basic-card' }], {
+    total: { label: 'Total', amount: { currency: 'CNY', value: '99.00' } }
+  });
+  if (await req.canMakePayment()) req.show();
+});
+```
 
 ### Web Bluetooth/Web Serial 的权限模型
 
-这些 API 暴露硬件设备访问能力，浏览器强制：
-1. 用户手势触发设备选择 UI
-2. HTTPS 上下文（安全来源）
-3. 设备连接需要明确的 `requestDevice()`/`requestPort()` 调用
+这些 API 暴露硬件设备访问能力，浏览器强制三重约束：
+
+1. **用户手势触发**：设备选择 UI 必须在用户操作（如点击）后显示
+2. **HTTPS 上下文**：安全来源要求
+3. **明确请求**：`requestDevice()`/`requestPort()` 返回用户选择的设备
 
 ### Wake Lock 的生命周期
 
-`WakeLockSentinel` 在以下情况自动释放：
+`WakeLockSentinel` 在以下情况**自动释放**：
 - 页面不可见（`visibilitychange` 事件）
 - 设备息屏
 - 电池低电量
 
-页面重新可见时需要**重新请求**（如 `visibilitychange` 回调中重新 `request('screen')`）。
+```javascript
+let wl = await navigator.wakeLock.request('screen');
+
+document.addEventListener('visibilitychange', async () => {
+  if (document.visibilityState === 'visible') {
+    wl = await navigator.wakeLock.request('screen'); // 重新请求
+  }
+});
+```
 
 ### Clipboard API 的权限约束
 
-Clipboard API 同样需要用户手势（写入）或权限（读取需 `clipboard-read` 权限）。现代浏览器对剪贴板访问有严格限制，建议使用 **Async Clipboard API**（`navigator.clipboard.writeText()`）而非传统的 `document.execCommand('copy')`。
+Clipboard API 需要用户手势（写入）或权限（读取需 `clipboard-read` 权限）：
+
+```javascript
+// 写入：需要用户手势（如点击事件内）
+await navigator.clipboard.writeText(text);
+
+// 读取：需要 clipboard-read 权限
+const text = await navigator.clipboard.readText();
+```
+
+**备选方案**：传统 `document.execCommand('copy')` 在现代浏览器中仍可用，但已被废弃。
+
+### 其他高级 API
+
+**Web NFC**：
+```javascript
+const ndef = new NDEFReader();
+await ndef.scan();
+ndef.onmessage = event => console.log(event.message);
+```
+
+**Web USB**：
+```javascript
+const device = await navigator.usb.requestDevice({ filters: [{ vendorId: 0x1234 }] });
+await device.open();
+await device.transferOut(1, data);
+```
+
+**Web MIDI**：
+```javascript
+const midi = await navigator.requestMIDIAccess();
+const input = midi.inputs.get('...');
+input.onmidimessage = msg => console.log(msg);
+```
 
 ## 参考存根
 

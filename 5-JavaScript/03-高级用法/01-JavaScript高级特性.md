@@ -74,6 +74,8 @@ $$
 
 > **对比参照**：引用计数（早期）虽实现简单（计数归零即回收），但无法处理**循环引用**（对象 A 引用 B，B 引用 A，计数永不归零）。标记-清除从根对象出发，可达即保留，解决了循环引用问题。
 
+**V8 Orinoco GC 的增量标记与并发清理**：V8 采用增量标记（incremental marking）将 Stop-the-World 暂停分散到多个微任务间隙，配合写屏障（write barrier）维护标记一致性。老生代采用并发 Sweep/Compact，在后台线程执行，不阻塞主线程。
+
 ### 垃圾回收
 
 #### 数学模型
@@ -283,7 +285,7 @@ $$
 - `requestIdleCallback`：在闲时执行非关键任务
 - **Web Worker**：将计算密集任务转移至独立线程，不阻塞主线程
 
-Web Worker 的线程隔离模型：主线程与 Worker 通过消息队列通信，数据通过结构化克隆传递（不是共享内存），避免了数据竞争。
+Web Worker 的线程隔离模型：主线程与 Worker 通过消息队列通信，数据通过结构化克隆传递（不是共享内存），避免了数据竞争。结构化克隆无法处理函数、Symbol 和 DOM 节点；可转移对象（Transferable） zero-copy 转移所有权。
 
 ---
 
@@ -337,6 +339,8 @@ Proxy(obj, handler)
 - 性能开销约 10-20%，大多数场景可忽略
 - Proxy.revocable 返回 `{ proxy, revoke }`，调用 `revoke()` 后代理失效
 
+**Proxy 的归约能力**：Proxy 可归约为**元对象协议**（Meta-Object Protocol，MOP）模式。Java 的反射、Python 的 `__getattr__`、Ruby 的 method_missing 都属于同一归约类的不同实现。
+
 ### Reflect
 
 #### 机制
@@ -385,6 +389,8 @@ function getData(key) {
   // 否则重新计算...
 }
 ```
+
+**FinalizationRegistry 的约束**：回调时机不确定，不应依赖其进行确定性清理。仅用于辅助资源清理（如关闭文件描述符、释放 native 资源）。
 
 ---
 

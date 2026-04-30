@@ -69,7 +69,7 @@ INIT → READ_STARTLINE → READ_HEADERS → READ_BODY → COMPLETE
 
 ## 中间件洋葱模型
 
-Express/Koa 中间件的的本质是**责任链模式**：每个中间件接收 request、response、next，执行业务逻辑后决定是否调用 next 传递给下一个中间件，最终通过 response 向上冒泡。
+Express/Koa 中间件的本质是**责任链模式**：每个中间件接收 request、response、next，执行业务逻辑后决定是否调用 next 传递给下一个中间件，最终通过 response 向上冒泡。
 
 <pre>
 ┌─────────────────────────────────────┐
@@ -113,6 +113,8 @@ $$
 
 服务端验证客户端的 Key 并计算 Accept，完成握手。
 
+Node.js 24+ 中 `ws` 模块已支持 WebSocket Compression Extensions（permessage-deflate）。
+
 ```javascript
 const { WebSocketServer } = require('ws');
 const wss = new WebSocketServer({ port: 8080 });
@@ -130,6 +132,8 @@ HTTP/2 的本质是**单 TCP 连接上的流多路复用**：多个请求/响应
 |-----------|----------|----------|------------|
 
 每个帧携带 Stream ID，支持在同一连接上并行传输多个流。
+
+Node.js 24+ 中 HTTP/2 支持更完善的流量控制和优先级机制。
 
 ```javascript
 const http2 = require('http2');

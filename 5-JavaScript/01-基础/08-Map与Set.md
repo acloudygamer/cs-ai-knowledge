@@ -16,16 +16,20 @@ $$
 \end{cases}
 $$
 
-与 `===` 的区别：SameValueZero 认为 `NaN === NaN`（而 `===` 不等）。
+与 `===` 的关键区别：SameValueZero 认为 `NaN === NaN`（而 `===` 认为 `NaN !== NaN`）。
+
+SameValueZero 等价关系：
+- $a === b$ 时，$\text{SameValueZero}(a, b) = \text{true}$
+- $a = b = \text{NaN}$ 时，$\text{SameValueZero}(a, b) = \text{true}$
 
 ### Map 的查找复杂度
 
 Map 的 `get`、`set`、`has`、`delete` 操作在 V8 中实现为哈希表：
 $$
-O(1) \text{ 平均时间复杂度}
+T_{\text{操作}} = O(1) \quad \text{平均时间复杂度}
 $$
 
-最坏情况 $O(n)$（哈希冲突）。
+最坏情况 $O(n)$（当发生哈希冲突时，退化为链表/红黑树遍历）。
 
 ### WeakMap 的弱引用语义
 
@@ -37,7 +41,7 @@ $$
 \end{cases}
 $$
 
-当键被 GC 后，WeakMap 中对应条目自动删除。
+当键被 GC 后，WeakMap 中对应条目自动删除，无通知。
 
 ## 数据流
 
@@ -47,10 +51,13 @@ $$
 map.set(key, value)
     │
     ▼
-计算 key 的哈希值
+计算 key 的哈希值 h(key)
     │
     ▼
-哈希表查找/插入
+哈希表桶索引：index = h(key) mod N
+    │
+    ▼
+查找/插入（处理哈希冲突）
     │
     ▼
 更新或新增条目
@@ -83,13 +90,17 @@ WeakMap 条目自动删除（无通知）
 
 | 维度 | Map | Object |
 |------|-----|--------|
-| 键类型 | 任意类型 | 字符串或 Symbol |
+| 键类型 | 任意类型（包括对象、函数） | 字符串或 Symbol |
 | 键顺序 | 严格保序（插入顺序） | 基本有序（整数键排前） |
 | 原型链 | 无原型污染 | 有原型链（需 `Object.create(null)` 避免） |
-| 迭代 | 原生迭代器 | 需 `Object.entries()` |
+| 迭代 | 原生迭代器（for...of） | 需 `Object.entries()` |
 | 性能 | 增删查 O(1) | 增删查 O(1)（但原型查找 O(h)） |
+| size 属性 | `map.size` | `Object.keys(obj).length` |
 
-**为什么 Map 更适合做字典**：Object 的键被强制转字符串，对象键需要 `Map`。
+**为什么 Map 更适合做字典**：
+- Object 的键被强制转字符串，对象键需要 `Map`
+- Map 有原生 size 属性，Object 需要手动维护
+- Map 迭代顺序就是插入顺序
 
 ### Set 的唯一性保证
 
@@ -99,9 +110,15 @@ const set = new Set([NaN, NaN, undefined, undefined]);
 set.size  // 2（NaN 和 undefined 各一个）
 ```
 
+Set 的数学性质：
+$$
+\forall s \in \text{Set}: \quad |\{x \in s\}| = s.\text{size}
+$$
+每个元素在 Set 中最多出现一次。
+
 ### WeakMap 的应用场景
 
-**私有数据存储**：
+**私有数据存储**（替代 Symbol 或闭包）：
 ```javascript
 const privateData = new WeakMap();
 
@@ -133,13 +150,18 @@ $$
 \end{cases}
 $$
 
+**应用**：实现缓存，缓存对象被 GC 后自动失效。
+
 ### FinalizationRegistry 的回调时机
 
 FinalizationRegistry 回调**不保证及时执行**，且**不保证执行**：
 - GC 时机由 JavaScript 引擎决定
 - 进程退出时不保证回调
 
-**应用场景**：清理与对象生命周期绑定的资源（非内存）。
+**应用场景**：清理与对象生命周期绑定的资源（非内存），如：
+- 注销事件监听器
+- 关闭文件描述符
+- 断开网络连接
 
 ## 对比参照
 
@@ -161,6 +183,12 @@ const map = new Map();
 map.set(key, 'value');
 map.get(key);  // 'value'
 
+// Map 迭代
+const m = new Map([['a', 1], ['b', 2]]);
+for (const [k, v] of m) { console.log(k, v); }
+[...m.keys()];   // ['a', 'b']
+[...m.values()]; // [1, 2]
+
 // Set 的 NaN 处理
 const set = new Set([NaN, 1, NaN]);
 set.has(NaN);  // true
@@ -170,6 +198,7 @@ const pvt = new WeakMap();
 class Cache {
     constructor() { pvt.set(this, new Map()); }
     set(k, v) { pvt.get(this).set(k, v); }
+    get(k) { return pvt.get(this).get(k); }
 }
 
 // WeakRef 缓存
