@@ -20,6 +20,8 @@ $$
 
 其中 $T(R_i)$ 为第 $i$ 个请求-响应耗时，$T_{\text{keepalive}}$ 为持久连接超时（通常115秒）。
 
+**约束**：若某请求处理时间过长，$T(R_i) > T_{\text{keepalive}}$，则该请求本身就会触发超时。
+
 ### HTTP/2多路复用
 
 设连接中并发流数量为 $S$：
@@ -29,6 +31,12 @@ S_{\text{max}} = 2^{31} - 1 \quad \text{（Stream ID上限）}
 $$
 
 实际受限于拥塞窗口和服务器配置。
+
+**帧交错机制**：多路复用通过Stream ID隔离不同请求的帧，接收端根据Stream ID重组，不同事请求的帧可以 interleaved 传输：
+
+$$
+\text{ByteStream} = \bigcup_{i \in \text{Streams}} \text{Frames}(i) \quad \text{且} \quad \forall i \neq j: \text{Frames}(i) \cap \text{Frames}(j) = \varnothing
+$$
 
 ### HTTP缓存新鲜度判定
 
@@ -40,52 +48,103 @@ $$
 
 ETag条件请求：当 $\text{If-None-Match} = \text{ETag}$ 时返回 304 Not Modified，否则返回完整200 OK + body。
 
+**Last-Modified / If-Modified-Since变体**：
+
+$$
+\text{not\_modified} \iff \text{If-Modified-Since} \geq \text{Last-Modified}
+$$
+
 ### 队头阻塞的量化影响
 
-设网络往返时间为 $RTT$，单个请求处理时间为 $T_s$，在HTTP/1.1下，$N$ 个请求的总时间为 $N \times (RTT + T_s)$（串行）。即使 $T_s$ 很小，高 $RTT$ 环境下性能仍会严重劣化。
+设网络往返时间为 $RTT$，单个请求处理时间为 $T_s$，在HTTP/1.1下，$N$ 个请求的总时间为：
+
+$$
+T_{\text{总}}(N) = N \cdot (RTT + T_s) \quad \text{（串行）}
+$$
+
+即使 $T_s$ 很小，高 $RTT$ 环境下性能仍会严重劣化。例如 $RTT=100ms$，10个请求需要至少1秒。
+
+### HTTP语义的形式化
+
+HTTP请求和响应可建模为：
+
+$$
+\text{Request} = (\text{Method}, \text{URI}, \text{Headers}, \text{Body}) \quad \text{Response} = (\text{Status}, \text{Headers}, \text{Body})
+$$
+
+**约束**：Method决定是否可以有Body——GET/HEAD不能有Body（HTTP/1.1规范定义）。
 
 ## 数据流
 
-<pre>
-HTTP请求结构：
+### HTTP请求结构
 
+```
+┌─────────────────────────────────────────────────────┐
+│ Request Line: METHOD URI HTTP/Version\r\n            │
+├─────────────────────────────────────────────────────┤
+│ Headers: Key: Value\r\n                             │
+│ ...                                                  │
+│ \r\n                                                 │
+├─────────────────────────────────────────────────────┤
+│ Body (optional, for POST/PUT/PATCH): ...            │
+└─────────────────────────────────────────────────────┘
+
+示例：
 GET /index.html HTTP/1.1\r\n
 Host: example.com\r\n
 User-Agent: Mozilla/5.0\r\n
 Accept: text/html\r\n
 \r\n
-[可选body - 仅POST/PUT/PATCH]
+[无Body]
+```
 
-HTTP响应结构：
+### HTTP响应结构
 
+```
+┌─────────────────────────────────────────────────────┐
+│ Status Line: HTTP/Version StatusCode Reason\r\n      │
+├─────────────────────────────────────────────────────┤
+│ Headers: Key: Value\r\n                             │
+│ ...                                                  │
+│ \r\n                                                 │
+├─────────────────────────────────────────────────────┤
+│ Body: ...                                            │
+└─────────────────────────────────────────────────────┘
+
+示例：
 HTTP/1.1 200 OK\r\n
 Content-Type: text/html\r\n
 Content-Length: 1234\r\n
 Cache-Control: max-age=3600\r\n
 \r\n
 [body bytes...]
-</pre>
+```
 
 ### HTTP/1.1 vs HTTP/2 vs HTTP/3 数据流对比
 
 ```
-HTTP/1.1:
+HTTP/1.1 (持久连接，串行请求响应):
 客户端 ──REQ1──▶ 服务器 ──RES1──▶ 客户端
-客户端 ──REQ2──▶ 服务器 ──RES2──▶ 客户端   (串行，等待)
+客户端 ──REQ2──▶ 服务器 ──RES2──▶ 客户端   (必须等待RES1完成才能发REQ2)
           ↑
-      队头阻塞
+      队头阻塞：同一TCP连接上请求必须按序发送和接收
 
-HTTP/2 (多路复用):
+HTTP/2 (多路复用，同一TCP连接上并发):
 Stream1: ──REQ1──▶
 Stream2: ──REQ2──▶              同一TCP连接
+Stream3: ──REQ3──▶              帧交错传输
           ◀──RES1──
           ◀──RES2──
+          ◀──RES3──
+注意：HTTP/2仍受TCP层队头阻塞影响（丢包会阻塞所有Stream）
 
-HTTP/3 (QUIC):
+HTTP/3 (QUIC，多路复用+流级可靠性):
 Stream1: ──REQ1──▶
 Stream2: ──REQ2──▶              同一QUIC连接
-          ◀──RES1──             流级别隔离，无队头阻塞
+Stream3: ──REQ3──▶              流级别隔离，丢包只影响该流
+          ◀──RES1──
           ◀──RES2──
+          ◀──RES3──
 ```
 
 ### 数据形态变换
@@ -95,7 +154,11 @@ Stream2: ──REQ2──▶              同一QUIC连接
   ↓ JSON编码
 字节序列: 7b 22 6e 61 6d 65 22 3a 22 74 65 73 74 22 7d
   ↓ 挂载HTTP头
-[POST /api HTTP/1.1\r\nContent-Type: application/json\r\nContent-Length: 20\r\n\r\n7b 22 6e 61 6d 65 22 3a 22 74 65 73 74 22 7d]
+[POST /api HTTP/1.1\r\n
+Content-Type: application/json\r\n
+Content-Length: 20\r\n
+\r\n
+7b 22 6e 61 6d 65 22 3a 22 74 65 73 74 22 7d]
   ↓ 挂载TCP头
 [TCP头 | HTTP字节]
   ↓ 挂载IP头
@@ -108,15 +171,27 @@ Stream2: ──REQ2──▶              同一QUIC连接
 
 ## 机制
 
-**为什么HTTP是无状态的**：服务器不保存客户端状态，每个请求独立处理。这简化了服务器设计——无状态意味着服务器可以任意水平扩展，不需要在不同请求之间同步状态。代价是会话管理被推给客户端（Cookie）或应用层（JWT）。无状态是HTTP简单性的根源，也是其可伸缩性的保证。
+### 为什么HTTP是无状态的
 
-**约束**：
+服务器不保存客户端状态，每个请求独立处理。这简化了服务器设计——无状态意味着服务器可以任意水平扩展，不需要在不同请求之间同步状态。代价是会话管理被推给客户端（Cookie）或应用层（JWT）。无状态是HTTP简单性的根源，也是其可伸缩性的保证。
+
+**有状态 vs 无状态的权衡**：
+
+| 维度 | 无状态(HTTP) | 有状态 |
+|------|-------------|--------|
+| 服务器扩展性 | 高（任意请求到任意服务器） | 低（需会话亲和或分布式状态） |
+| 状态管理 | 客户端负责 | 服务器负责 |
+| 复杂交互 | 需要额外机制（Cookie/Token） | 原生支持 |
+| 正确性 | 依赖客户端正确保存状态 | 服务器直接管理 |
+
+### 约束
+
 - HTTP是文本协议，头部为ASCII编码（不含中文等非ASCII字符）
 - 请求必须有Host头（HTTP/1.1强制，用于虚拟主机区分）
 - GET/HEAD请求不能有body（HTTP/1.1规范定义）
 - 响应body必须匹配Content-Length或使用chunked transfer-encoding（接收方需要知道消息边界）
 
-**状态码分类的语义层级**：
+### 状态码分类的语义层级
 
 | 类别 | 范围 | 本质语义 | 设计意图 |
 |------|------|----------|----------|
@@ -126,31 +201,74 @@ Stream2: ──REQ2──▶              同一QUIC连接
 | 4xx | 400-499 | 客户端错误 | 请求本身有问题，客户端需修正 |
 | 5xx | 500-599 | 服务器错误 | 服务器未能正确处理合法请求 |
 
-**队头阻塞的物理根源**：HTTP/1.1的持久连接中，请求必须串行处理——这是因为TCP是字节流协议，同一连接上的多个请求复用同一个字节流，接收方无法区分属于不同请求的字节。只有等待一个请求的完整响应返回，才能开始处理下一个请求。这与单队列单服务器的请求调度同构——FIFO顺序必须严格遵守。
+### 队头阻塞的物理根源
 
-**HTTP/2解决的是什么问题**：HTTP/2通过多路复用让多个请求同时在飞行中。但它仍然受TCP层队头阻塞影响——如果TCP丢包，HTTP/2的所有流都会卡住，因为TCP按序交付。这是一种**层间耦合**——HTTP/2无法完全解决TCP层的问题。
+HTTP/1.1的持久连接中，请求必须串行处理——这是因为TCP是字节流协议，同一连接上的多个请求复用同一个字节流，接收方无法区分属于不同请求的字节。只有等待一个请求的完整响应返回，才能开始处理下一个请求。这与单队列单服务器的请求调度同构——FIFO顺序必须严格遵守。
 
-**HTTP/3如何解决队头阻塞**：HTTP/3基于QUIC协议，QUIC在用户态实现自己的可靠传输和拥塞控制。每个QUIC流独立有序，丢包只影响该流，不影响其他流。这是用户态协议栈的优势——可以独立演进而不受TCP约束。QUIC的流隔离本质是将可靠性控制点从传输层移到应用层。
+**关键约束**：队头阻塞发生在应用层（HTTP），但根源在传输层（TCP按序交付）。
 
-**缓存机制的双层设计**：
+### HTTP/2解决的是什么问题
+
+HTTP/2通过多路复用让多个请求同时在飞行中。但它仍然受TCP层队头阻塞影响——如果TCP丢包，HTTP/2的所有流都会卡住，因为TCP按序交付。这是一种**层间耦合**——HTTP/2无法完全解决TCP层的问题。
+
+### HTTP/3如何解决队头阻塞
+
+HTTP/3基于QUIC协议，QUIC在用户态实现自己的可靠传输和拥塞控制。每个QUIC流独立有序，丢包只影响该流，不影响其他流。这是用户态协议栈的优势——可以独立演进而不受TCP约束。QUIC的流隔离本质是将可靠性控制点从传输层移到应用层。
+
+### 缓存机制的双层设计
+
 - **强缓存**（max-age/Expires）：客户端不发送请求，直接使用本地缓存。服务器通过Cache-Control: max-age=N告知客户端缓存新鲜度。这是一种**服务端-driven缓存失效策略**。
+
+$$
+\text{客户端检查} \Rightarrow \text{now} < \text{cached\_at} + \text{max-age} \Rightarrow \text{使用缓存}
+$$
+
 - **协商缓存**（If-None-Match/If-Modified-Since）：客户端发送条件请求，服务器判断是否返回304（使用缓存）或200（返回新内容）。这是一种**客户端-server协作的缓存验证**。
 
-**HTTP语义与传输分离的意义**：HTTP的设计刻意将应用语义（方法、状态码、头部）与传输细节（TCP、持久连接、分块）分离。这使得HTTP可以独立于传输层运行——例如HTTP/3运行在QUIC上，HTTP仍然感知不到。这与编程语言中语义与执行环境分离的思想同构。
+$$
+\text{服务器检查} \Rightarrow \text{ETag match} \Rightarrow \text{返回304} \quad \text{ETag mismatch} \Rightarrow \text{返回200+新内容}
+$$
 
-**违规后果**：
-- 不设置Host头：HTTP/1.1服务器无法确定虚拟主机，目标服务器可能错误
-- 不设置Content-Length且不使用chunked：接收方无法确定消息边界，会一直等待直到连接关闭或超时
-- 缓存不设置Cache-Control：代理可能不缓存（浪费带宽）或缓存过久（用户看到过期内容）
-- GET请求带body：可能被中间代理拒绝或截断，不符合HTTP语义
+### HTTP语义与传输分离的意义
+
+HTTP的设计刻意将应用语义（方法、状态码、头部）与传输细节（TCP、持久连接、分块）分离。这使得HTTP可以独立于传输层运行——例如HTTP/3运行在QUIC上，HTTP仍然感知不到。这与编程语言中语义与执行环境分离的思想同构。
+
+### 违规后果
+
+- **不设置Host头**：HTTP/1.1服务器无法确定虚拟主机，目标服务器可能错误
+- **不设置Content-Length且不使用chunked**：接收方无法确定消息边界，会一直等待直到连接关闭或超时
+- **缓存不设置Cache-Control**：代理可能不缓存（浪费带宽）或缓存过久（用户看到过期内容）
+- **GET请求带body**：可能被中间代理拒绝或截断，不符合HTTP语义
 
 ## 参考存根
 
 ```python
 import http.client
+# 基础HTTP请求
 conn = http.client.HTTPSConnection("example.com")
 conn.request("GET", "/")
 resp = conn.getresponse()
+print(resp.status, resp.read())
+```
+
+```python
+# 使用 requests 库的协商缓存示例
+import requests
+
+# 首次请求
+resp = requests.get("https://example.com/style.css")
+etag = resp.headers.get("ETag")
+last_modified = resp.headers.get("Last-Modified")
+
+# 后续请求使用条件头部
+resp2 = requests.get(
+    "https://example.com/style.css",
+    headers={
+        "If-None-Match": etag,
+        # 或 "If-Modified-Since": last_modified
+    }
+)
+print(resp2.status)  # 200 (新内容) 或 304 (使用缓存)
 ```
 
 ```python
@@ -159,6 +277,13 @@ import h2.connection
 
 conn = h2.connection.H2Connection(config=h2.config.H2Configuration(client_side=True))
 conn.initiate_connection()
-conn.send_headers(stream_id=1, headers=[(':method', 'GET'), (':scheme', 'https'), (':authority', 'example.com'), (':path', '/')])
+conn.send_headers(stream_id=1, headers=[
+    (':method', 'GET'),
+    (':scheme', 'https'),
+    (':authority', 'example.com'),
+    (':path', '/')
+])
 conn.end_stream(stream_id=1)
+# 接收响应
+events = conn.receive_data(some_data)
 ```

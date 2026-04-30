@@ -31,6 +31,15 @@ $$
 
 其中 $\text{copy}(v)$ 是值拷贝，$\&v$ 是引用，$\text{c-ref}(v)$ 表示按引用捕获。
 
+**捕获的代数语义**：
+
+| 捕获方式 | 语义 | 所有权 |
+|----------|------|--------|
+| `[x]` | $\lambda y. \text{copy}(x) + y$ | 复制（独立副本） |
+| `[&x]` | $\lambda y. \&x \rightarrow x + y$ | 共享（引用） |
+| `[x = expr]` | $\lambda y. \text{eval}(expr) + y$ | 取决于 expr |
+| `[x = std::move(x)]` | $\lambda y. \text{move}(x) + y$ | 转移（独占） |
+
 ### 泛型 lambda 的类型推导
 
 设 lambda `auto f = [](auto a, auto b) { return a + b; }`
@@ -175,6 +184,17 @@ void call(Args... args) {
     };
 }
 ```
+
+## 违反约束的后果
+
+| 违反场景 | 系统行为 | 后果严重程度 |
+|----------|----------|--------------|
+| 捕获局部引用，闭包比变量寿命长 | 悬垂引用 | 未定义行为，可能崩溃 |
+| `[this]` 捕获后对象析构，闭包仍使用 | 悬垂 this 指针 | 未定义行为，可能崩溃 |
+| `[=]` 捕获大对象导致闭包过大 | 性能问题 | 闭包复制成本高 |
+| mutable Lambda 修改捕获值但不声明 mutable | 编译错误 | 代码无法编译 |
+| Lambda 捕获 unique_ptr 导致无法拷贝 | 仅能移动 | 限制了使用场景 |
+| std::function 包装大 Lambda | 堆分配 + 间接调用 | 性能显著退化 |
 
 ## 对比参照
 

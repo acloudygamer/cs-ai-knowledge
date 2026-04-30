@@ -4,6 +4,8 @@
 
 NumPy 是 Python 科学计算基础库，提供高性能 `ndarray` 多维数组。`ndarray` 本质是一块连续内存的视图，通过形状（shape）和步长（strides）将一维字节序列解释为多维逻辑结构。连续内存布局使 SIMD 并行化和 CPU 缓存预取成为可能，将逐元素运算的速度提升 10-100 倍。
 
+**归约视角**：ndarray 是**连续内存上的仿射映射视图**——数据本身是一维字节序列，通过 shape 和 strides 定义线性变换，将一维地址空间映射为多维逻辑结构。这个视图本身不持有数据，数据所有权属于底层内存缓冲区。
+
 ## 数学模型
 
 ### 内存布局与 strides
@@ -18,6 +20,10 @@ $$\text{strides}[d] = \prod_{k=d+1}^{D-1} \text{shape}[k] \times \text{itemsize}
 
 这意味着最后维度的stride最小（相邻元素在内存中连续），第一维stride最大（跳过一整个"行"）。
 
+**Fortran 连续数组**（列优先）的 strides 公式：
+
+$$\text{strides}[d] = \prod_{k=0}^{d-1} \text{shape}[k] \times \text{itemsize}$$
+
 ### 广播的数学约束
 
 广播从后向前对齐维度，两维度兼容当且仅当：
@@ -28,7 +34,7 @@ $$\forall d: \text{shape}_A[d] = \text{shape}_B[d] \quad \text{or} \quad \text{s
 
 $$\text{shape}_{\text{out}}[d] = \max(\text{shape}_A[d], \text{shape}_B[d])$$
 
-物理上，维度为 1 的数组在该维度上被虚拟复制（无实际内存拷贝），然后逐元素运算。
+物理上，维度为 1 的数组在该维度上被虚拟复制（无实际内存拷贝），然后逐元素运算。虚拟复制通过广播时动态计算地址实现，无需额外内存。
 
 ### 矩阵乘法的计算复杂度
 
@@ -36,6 +42,17 @@ $A \in \mathbb{R}^{m \times k}$，$B \in \mathbb{R}^{k \times n}$，$C = A @ B$�
 
 - 标准矩阵乘法：$O(m \times n \times k)$ 次乘加操作
 - BLAS（NumPy 默认使用）：分块优化，缓存友好，常数因子远小于纯 Python 实现
+
+**复杂度边界**：Strassen 算法将复杂度降为 $O(n^{2.807})$，但常数因子较大，实际应用中 BLAS 分块优化更常用。
+
+### 范数的数学定义
+
+| 范数 | 定义 | 应用 |
+|------|------|------|
+| L1 | $\|x\|_1 = \sum_i |x_i\|$ | 稀疏性度量 |
+| L2 | $\|x\|_2 = \sqrt{\sum_i x_i^2}$ | 欧氏距离 |
+| Frobenius | $\|A\|_F = \sqrt{\sum_{i,j} A_{ij}^2}$ | 矩阵大小度量 |
+| Spectral | $\\|A\\|_2 = \sigma_{\max}(A)$ | 矩阵条件数 |
 
 ## 数据流
 
@@ -74,6 +91,8 @@ ufunc / 聚合运算
 输出写入（out 参数指定或新建数组）
 </pre>
 
+**所有权**：视图共享底层数据指针，修改视图会反映到原数组（以及所有其他视图）。这是"写时复制"语义——读取共享，写入时触发拷贝。
+
 ## 机制
 
 ### 连续性（C order vs Fortran order）
@@ -85,6 +104,8 @@ ufunc / 聚合运算
 | non-contiguous | 不连续 | 存在步长断层 | 切片、转置后的数组 |
 
 `np.ascontiguousarray()` 强制转换为 C 连续，代价是分配新内存并拷贝数据。当与 C 扩展或 CUDA 交互时，必须保证连续性。
+
+**判断方法**：`arr.flags['C_CONTIGUOUS']` 或 `arr.flags['F_CONTIGUOUS']`。
 
 ### 向量化运算的物理实现
 
@@ -120,6 +141,15 @@ rng.random()  # 线程安全（内部使用 PCG64）
 
 `default_rng` 使用 PCG64 伪随机生成器，状态空间 $2^{128}$，远大于旧版 Mersenne Twister 的 $2^{19937}$。固定种子保证**相同序列**（可重复性），但不等同于**确定性**（并发执行顺序仍可影响结果）。
 
+### 线性代数运算的数值稳定性
+
+`np.linalg.solve(A, b)` 求解线性方程 $Ax = b$，优先于手写求逆再乘：
+
+- **稳定性**：求解时使用 LU 分解，条件数放大有界；求逆再乘会放大条件数
+- **复杂度**：求解 $O(n^3)$，求逆也是 $O(n^3)$，但求逆多一次矩阵乘法
+
+**条件数**：$\kappa(A) = \|A\| \cdot \|A^{-1}\|$，条件数越大，方程对扰动越敏感。
+
 ## 参考存根
 
 ```python
@@ -139,9 +169,6 @@ print(np.shares_memory(arr, v))  # True — 同一底层数据
 a = np.array([[1, 2, 3], [4, 5, 6]])  # (2,3)
 b = np.array([10, 20, 30])             # (3,)
 c = a + b  # b 广播为 (1,3) 然后逐元素加
-print(c)
-# [[11 22 33]
-#  [14 25 36]]
 
 # 矩阵乘法 vs 元素乘法
 A = np.array([[1, 2], [3, 4]])
@@ -154,10 +181,8 @@ A = np.array([[1, 2], [3, 4]])
 b = np.array([1, 2])
 x = np.linalg.solve(A, b)  # 首选
 x_bad = np.linalg.inv(A) @ b  # 次选（有条件数放大）
+
+# 随机数（推荐方式）
+rng = np.random.default_rng(42)
+print(rng.random((3, 2)))  # 3x2 均匀分布随机数
 ```
-
----
-
-**Python 3.14 增量特性**：无。
-
-**Python 3.14 重大变化**：无。

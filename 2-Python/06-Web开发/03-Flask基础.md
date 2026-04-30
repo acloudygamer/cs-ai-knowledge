@@ -4,6 +4,8 @@
 
 Flask 是核心极简但扩展生态丰富的 Python WSGI Web 框架，通过松耦合设计让开发者按需选择组件，而非强制捆绑。核心只提供路由、请求/响应对象和上下文本地代理；数据库、会话、认证等功能由扩展按需引入。这与 Django 的"batteries included"哲学形成鲜明对比。
 
+**归约视角**：Flask 的本质是**基于上下文局部变量的请求-响应分派器**——通过 LocalStack 维护请求级上下文，URL 映射表将请求路由到处理函数，处理函数通过上下文代理访问请求数据和会话信息。
+
 ## 数学模型
 
 ### 请求上下文栈（LocalStack）
@@ -42,6 +44,8 @@ $$T_{\text{match}} = O(R)$$
 
 Blueprint 注册后，Werkzeug 的 `Map` 维护一个按路径前缀构建的字典跳表（radix trie），典型路径查找均摊 $O(1)$，但 Blueprint 内部仍按注册顺序扫描。
 
+**约束**：当路由数超过 100 时，线性扫描的性能损耗开始显著。此时应使用 Blueprint 并确保高频路由在注册时排在前面。
+
 ### 事件驱动的并发模型（归约）
 
 Flask 本身是**同步阻塞 I/O** 模型。单个 worker 在同一时刻只能处理一个请求——其他请求必须排队等待。这意味着：
@@ -62,25 +66,29 @@ WSGI Server（Gunicorn / Werkzeug dev server）
     │
     ▼
 Flask app.__call__(environ) ──▶ RequestContext 压栈
+    │  environ: {REQUEST_METHOD, PATH_INFO, QUERY_STRING, ...}
     │                              │
     │                              ▼
     │                         app.preprocess_request()
+    │                         （执行 before_request 钩子）
     │                              │
     ▼                              ▼
 URL Resolver（app.url_map）──匹配──▶ 路由处理函数
+    │  线性扫描 / Radix Trie 查找
     │                              │
     │                              ▼
     │                         视图函数（业务逻辑）
+    │                         通过 request/session/g 访问上下文
     │                              │
     │                              ▼
     │                         蓝图特定 before_request 钩子
     │                              │
     ▼                              ▼
 Response 对象 ◀─── app.postprocess_request()
-    │
+    │  （执行 after_request 钩子）
     ▼
 RequestContext 弹栈
-    │
+    │  触发 teardown_request 钩子
     ▼
 WSGI Response（iterable of bytes）
 </pre>
@@ -99,6 +107,8 @@ WSGI Response（iterable of bytes）
 | **路由定义** | 装饰器（声明式） | URLconf（集中式） | 路径装饰器 + 类型注解 |
 | **数据绑定** | 无内置 ORM | ORM 内置 | Pydantic 模型 |
 | **异步支持** | 需扩展（Flask 2.3+） | 有限 | 原生 async/await |
+| **会话存储** | 签名 Cookie（默认） | 数据库/缓存/Cookie | 无内置 |
+| **请求对象** | 全局代理 `request` | 显式参数 `request` | 显式参数 `Request` |
 
 ## 机制
 
@@ -133,9 +143,9 @@ Flask session 是签名 Cookie——数据以 pickle 序列化后，经 HMAC-SHA
     │
     ▼  base64 解码 → (data, timestamp, mac_received)
     │
-    ▼ 重新计算 mac = HMAC-SHA256(secret_key, data + timestamp)
+    ▼  重新计算 mac = HMAC-SHA256(secret_key, data + timestamp)
     │
-    ▼ 恒定时间比对 mac == mac_received ？
+    ▼  恒定时间比对 mac == mac_received ？
     │    是 → session 数据有效
     │    否 → 签名验证失败（数据被篡改）
 ```
@@ -186,10 +196,12 @@ Flask 的 `@app.errorhandler` 捕获 Werkzeug 的 HTTPException 或任意 Python
 - 业务逻辑错误（数据验证失败、权限不足）应返回 `jsonify({"error": "..."}, 400)`，而非 `abort`——因为 `abort` 会跳过视图函数的后续代码
 - 未被捕获的异常最终由 `app.handle_exception()` 和 `app.handle_user_exception()` 处理
 
+**约束**：错误处理器中无法访问原始请求上下文（如 `request` 代理），因为错误可能在请求上下文弹出之后触发。若需要请求数据，必须在视图函数中保存到 `g` 对象。
+
 ## 参考存根
 
 ```python
-from flask import Flask, g, session, request
+from flask import Flask, g, session, request, jsonify, abort
 import hmac, hashlib
 
 app = Flask(__name__)
@@ -207,7 +219,13 @@ def teardown(exc):
 def login():
     data = request.get_json()
     session["user_id"] = data["username"]  # 签名 Cookie
-    return {"status": "ok"}
+    return jsonify({"status": "ok"})
+
+@app.route("/protected")
+def protected():
+    if "user_id" not in session:
+        abort(401)
+    return jsonify({"user": session["user_id"]})
 
 # 验证签名 cookie（在请求外测试）
 with app.test_request_context("/"):
@@ -218,9 +236,3 @@ def verify_mac(secret_key, data, mac):
     expected = hmac.new(secret_key, data, hashlib.sha256).hexdigest()
     return hmac.compare_digest(expected, mac)  # 恒定时间比对，防时序攻击
 ```
-
----
-
-**Python 3.14 增量特性**：无。
-
-**Python 3.14 重大变化**：无。

@@ -4,6 +4,8 @@
 
 pandas 是 Python 数据分析核心库，提供 `DataFrame`（二维表格）和 `Series`（一维标签数组）两种核心数据结构。`DataFrame` 本质是列式存储的 Series 字典——每列是独立 dtype 的 Series，共享同一索引系统。这使得按列操作（类型转换、聚合）极为高效，而按行操作（条件过滤、迭代）代价相对较高。
 
+**归约视角**：DataFrame 是**带标签的列式存储矩阵**，索引系统提供了 $O(1)$ 查找能力和自动对齐的二元运算能力。列式存储使向量化操作（整列同时计算）成为可能，是 pandas 高性能的核心。
+
 ## 数学模型
 
 ### 索引对齐代数
@@ -13,6 +15,8 @@ Series 的加法本质上是索引对齐的二元运算。设两个 Series $A$ �
 $$\text{result}[i] = \begin{cases} A[i] + B[i] & \text{if } i \in \text{index}(A) \cap \text{index}(B) \\ \text{NaN} & \text{otherwise} \end{cases}$$
 
 这种**外连接语义**（outer join semantics）是 pandas 大多数二元运算的默认行为，包括比较、逻辑运算。DataFrame 行对齐同理——不同 DataFrame 按行索引对齐，列名不匹配时产生 NaN。
+
+**约束**：NaN 的传播规则是 $\text{NaN} + x = \text{NaN}$，这使得任何涉及 NaN 的运算结果均为 NaN。
 
 ### 内存占用的数学模型
 
@@ -36,6 +40,20 @@ $$\text{DataFrame} \xrightarrow{\text{split by } k} \{G_1, G_2, \ldots, G_m\} \x
 
 其中 $k$ 是分组键，$f$ 是聚合/变换函数。聚合函数 $f$ 是**幂等压缩**：输入 $N$ 行，输出 $g \le N$ 行（通常 $g = |G_i|$）。
 
+### join 的代价模型
+
+pandas join 本质是**键值哈希连接**。设左表 $L$，右表 $R$，连接键为 $k$：
+
+- **内连接**：$L \bowtie_k R = \{ (l, r) \mid l[k] = r[k] \}$
+- **左连接**：内连接 + 左表未匹配行（右表字段为 NaN）
+
+代价：
+$$T_{\text{join}} = O(|L| + |R| + N_{\text{match}})$$
+
+其中 $N_{\text{match}}$ 是匹配对数量。
+
+**笛卡尔积风险**：多对多连接时，行数 $= |L_k| \times |R_k|$，可能引发内存爆炸。
+
 ## 数据流
 
 <pre>
@@ -51,7 +69,7 @@ Reader（pd.read_csv 等）─── 字节流解码 ───▶ DataFrame
     ▼
 DataFrame 内存模型：
   每列：Series[type_i]（连续内存）
-  索引：Index（共享行标签）
+  索引：Index（共享行标签，O(1) 哈希查找）
   ┌─────────────────────────────────────┐
   │        DataFrame                    │
   │  Index:  [0, 1, 2, 3, ...]         │
@@ -62,12 +80,12 @@ DataFrame 内存模型：
     │
     ▼
 Selection：
-  df[col]  ──▶ Series[col]（零拷贝视图）
+  df[col]  ──▶ Series[col]（零拷贝视图，共享内存）
   df.loc   ──▶ 标签索引（可能触发拷贝）
   df.iloc  ──▶ 位置索引（可能触发拷贝）
     │
     ▼
-Transform / Aggregate
+Transform / Aggregate（向量化操作）
     │
     ▼
 Writer（df.to_csv 等）─── DataFrame ──▶ 外部格式
@@ -90,6 +108,8 @@ pandas 索引不只是"行号"，而是可自定义的标签集。索引类型�
 
 索引用于快速查找（哈希表实现，$O(1)$ 平均）和对齐运算。`df.set_index("col")` 将列提升为索引后，该列转为索引结构，无法再按列方式访问——这是不可逆的所有权转移。
 
+**约束**：索引查找复杂度为 $O(1)$ 平均，但最坏 $O(n)$（哈希冲突）。若索引有大量重复值，哈希表退化为链表，查找退化到 $O(n)$。
+
 ### 数据选择的代价模型
 
 | 操作 | 返回类型 | 拷贝/视图 | 代价 |
@@ -107,22 +127,21 @@ pandas 索引不只是"行号"，而是可自定义的标签集。索引类型�
 - **`concat`**：轴向堆叠，保留所有索引（可能重复），不检查重复键冲突
 - **`merge`**：键值连接，类似 SQL JOIN，键重复时产生笛卡尔积
 
-**笛卡尔积风险**：多对多连接时，行数 $= |L| \times |R|$，可能引发内存爆炸。设左表匹配键 $k$ 的行数为 $l_k$，右表为 $r_k$，总输出行数：
-
-$$N_{\text{output}} = \sum_{k} l_k \times r_k$$
-
 ### 时间序列的特殊性
 
 `DatetimeIndex` 将时间戳作为第一公民，使时间对齐操作（merge、reindex）比字符串日期快 $10^2$-$10^3$ 倍（$O(1)$ 哈希查找 vs $O(n)$ 字符串比较）。
 
-`resample` 的数学含义是**分组聚合**：将时间轴按固定频率重新划分桶（bucket），对每个桶应用聚合函数：
-
-```python
-# 日数据按月聚合：每月的所有数据点 → 一个月标量
-ts.resample("M").sum()  # 本质：groupby + 时间分组
-```
+`resample` 的数学含义是**分组聚合**：将时间轴按固定频率重新划分桶（bucket），对每个桶应用聚合函数。
 
 升采样（低频→高频）需要插值，`interpolate` 默认线性插值，假设相邻点之间变化均匀。
+
+### 窗口函数的计算模型
+
+pandas 窗口函数（rolling/expanding）实现滑动窗口操作：
+
+$$Y_i = \frac{1}{w} \sum_{j=i-w+1}^{i} X_j \quad \text{（窗口大小 } w\text{）}$$
+
+rolling 窗口在每个位置计算窗口内聚合值，窗口滑动的步长默认为 1。窗口函数保持输入行数不变，仅计算新的聚合列。
 
 ## 参考存根
 
@@ -144,14 +163,7 @@ print(df["city"].nbytes)        # ~200 KB（category）
 # groupby + 聚合
 df = pd.DataFrame({"city": ["BJ", "SH", "BJ"], "sales": [100, 200, 150]})
 result = df.groupby("city")["sales"].agg(["sum", "mean", "count"])
-#        sum  mean  count
-# city
-# BJ    250  125.0      2
-# SH    200  200.0      1
+
+# 窗口函数
+df["rolling_mean"] = df["sales"].rolling(window=2).mean()
 ```
-
----
-
-**Python 3.14 增量特性**：无。
-
-**Python 3.14 重大变化**：无。

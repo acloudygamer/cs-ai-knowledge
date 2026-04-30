@@ -187,6 +187,17 @@ C++20 concepts 部分替代了 Type traits 的 SFINAE 用法：
 
 但 Type traits 仍然是底层实现工具：concepts 内部通常用 type traits 组合实现。
 
+## 违反约束的后果
+
+| 违反场景 | 系统行为 | 后果严重程度 |
+|----------|----------|--------------|
+| SFINAE 替换失败报硬错误（C++20 前） | 编译错误 | 代码无法编译 |
+| enable_if 条件为 false 且无其他候选 | 编译错误：找不到函数 | 代码无法编译 |
+| if constexpr 条件为 false 但 else 分支有错误 | C++17 后不报错，之前报硬错误 | 取决于 C++ 标准版本 |
+| 对 non-type-template-parameter 使用 is_const | 结果永远为 false | 可能导致逻辑错误 |
+| 模板参数不满足 concept 约束 | 编译错误 | 代码无法编译 |
+| is_same<T, U> 中 T 和 U 都是数组类型 | 退化为指针比较（衰减） | 可能导致非预期结果 |
+
 ## 对比参照
 
 | 特性 | SFINAE（enable_if） | if constexpr（C++17） | Concepts（C++20） |

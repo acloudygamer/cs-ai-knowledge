@@ -20,6 +20,8 @@ $$
 
 对于监听socket，DstIP和DstPort为空（wildcard），可接受任意匹配连接。
 
+**五元组唯一性约束**：在同一时刻，活跃连接的五元组必须唯一（ Protocol + SrcIP + SrcPort + DstIP + DstPort）。这是TCP协议确保数据正确路由和区分连接的基础。
+
 ### TCP连接队列模型
 
 服务器listen(socket, backlog)设置backlog为半连接（SYN队列）和全连接（accept队列）的上限。设并发连接到达率为 $\lambda$，服务率为 $\mu$：
@@ -30,30 +32,87 @@ $$
 
 实际受内核参数net.core.somaxconn和net.ipv4.tcp_max_syn_backlog限制。
 
+**队列溢出后果**：
+- 半连接队列满：SYN被丢弃，客户端重试
+- 全连接队列满：新ACK被忽略（不是拒绝，只是忽略）
+
+### epoll效率模型
+
+设监视的fd数量为 $N$，事件就绪的fd数量为 $k$：
+
+| 操作 | select | epoll |
+|------|--------|-------|
+| 注册fd | O(1) | O(1) |
+| 监视就绪 | O(N) | O(k) |
+| 每次调用拷贝 | 全量fd_set | 增量修改 |
+| 最大FD限制 | FD_SETSIZE | 无硬限制 |
+
+**epoll复杂度**：
+
+$$
+T_{\text{select}}(N) = O(N) \quad T_{\text{epoll}}(k) = O(k) \quad \text{当} k \ll N \text{ 时优势明显}
+$$
+
 ## 数据流
 
 ### TCP socket完整生命周期
 
 <pre>
-服务器端：
-socket() → bind(8080) → listen(backlog=5) → accept() → read()/write() → close()
-                                    ↑
-                              阻塞等待连接
-
-客户端：
-socket() → connect("server", 8080) → write()/read() → close()
-              ↓
-         三次握手完成，connect()返回
+服务器端：                                    客户端：
+socket() ──→ bind(8080)                      socket()
+     │                                            │
+     └→ listen(backlog=5)                      connect("server", 8080)
+              │                                      │
+              │  ←── SYN ────────────────────────── SYN ────
+              │  ── SYN/ACK ──────────────────────→│
+              │  ←── ACK ──────────────────────────│
+              │                                      │
+              │  三次握手在内核完成                      │
+              │                                      │
+              └→ accept() ← 返回client_fd             │
+                       │                             │
+                       ├→ read() ← 请求数据 ────────────────│
+                       │                             │
+                       ├→ write() → 响应数据 ────────────────→
+                       │                             │
+                       └→ close()                    │
+                                                  close()
 </pre>
+
+### TCP三次握手与Socket状态映射
+
+```
+客户端                              服务器
+  │                                  │
+  │ socket()                         │ socket()
+  │   ↓                              │   ↓
+  │ connect()                        │ bind()
+  │   ↓                              │   ↓
+  │ CLOSED ──── SYN ──────────────▶│ LISTEN
+  │           SYN_SENT                     │
+  │           ◀────────── SYN/ACK ────────│ SYN_RCVD
+  │           ─── ACK ──────────────▶│
+  │             ESTABLISHED                │
+  │                                      │ listen()
+  │                                      │   ↓
+  │                                      │ accept()
+  │                                      │   ↓
+  │                                      │ ESTABLISHED
+```
 
 ### UDP socket生命周期（无连接）
 
 <pre>
-服务器端：
-socket() → bind(8080) → recvfrom() → sendto() → close()
-
-客户端：
-socket() → sendto() → recvfrom() → close()
+服务器端：                                    客户端：
+socket() ──→ bind(8080)                      socket()
+     │                                            │
+     └→ recvfrom() ←── 数据 ──────────────────── sendto()
+              │                                    │
+              │                                    │
+              └→ sendto() → 响应 ──────────────── recvfrom()
+                       │                          │
+                       └──────────────────────────┘
+                              可能不同客户端
 </pre>
 
 ### Socket类型对比
@@ -81,21 +140,44 @@ SOCK_RAW (IP层):
 
 Socket将网络协议栈封装为文件描述符，纳入Unix文件系统的IO模型。这意味着可以用read/write/close操作网络IO，统一了文件和网络编程接口，降低了学习成本。这与"一切皆文件"的Unix设计哲学一致。
 
+**文件描述符的本质**：fd是一个整数索引，指向内核中打开的文件表条目。该条目包含文件类型、状态、偏移量，以及指向文件操作函数的指针。对于socket，文件操作函数指向协议栈的网络函数。
+
 ### TCP socket状态机
 
 socket从CLOSED状态经过listen/connect进入ESTABLISHED，close时进入TIME_WAIT。状态转换由内核TCP状态机自动完成，应用层通过系统调用触发状态转换。状态转换是确定性的——给定一个事件序列，TCP状态机的下一状态是唯一确定的。
+
+**状态转换触发**：
+- `socket()` → CLOSED（分配fd）
+- `connect()` → SYN_SENT（发送SYN）
+- `listen()` → LISTEN（开始监听）
+- `accept()` → 从已完成队列取连接
+- `close()` → FIN_WAIT_1（发送FIN）
 
 ### 为什么listen backlog需要队列
 
 三次握手第三步（客户端ACK）到达时，如果服务器进程来不及调用accept()，已完成握手的连接需要暂存在已完成连接队列中。backlog是队列长度上限。半连接队列存放收到SYN但未完成三次握手的连接。这是一种**生产者-消费者缓冲**——内核是生产者，accept()是消费者。
 
+**队列分工**：
+- **半连接队列（SYN queue）**：存放收到SYN但未完成握手的连接
+- **已完成连接队列（accept queue）**：存放已完成握手等待accept()的连接
+
 ### backlog的约束
 
 实际backlog受限于内核参数somaxconn和tcp_max_syn_backlog。设置过大无效，设置过小会导致连接请求被直接拒绝或超时。
 
+```bash
+# 查看和设置
+sysctl net.core.somaxconn
+sysctl net.ipv4.tcp_max_syn_backlog
+```
+
 ### bind()的wildcard地址
 
 bind("0.0.0.0")让socket监听所有网卡的连接；bind具体IP只监听该接口。客户端connect时由系统选择源IP和随机临时端口（ephemeral port）。
+
+**端口分配策略**：
+- 客户端connect时，内核分配临时端口（ephemeral port），范围通常为32768-60999
+- 服务器bind知名端口（<1024需要root）
 
 ### TCP粘包的成因
 
@@ -108,6 +190,8 @@ TCP是字节流协议，无消息边界。Nagle算法可能合并小数据包（
 
 这与管道IO同构——写入N次，读取M次，N≠M是正常的。
 
+**Nagle算法约束**：若发送方有未确认的小数据包，新的小数据包会被缓存直到确认到达。这减少了小包数量，但增加了延迟。
+
 ### TCP粘包解决方案
 
 | 方案 | 原理 | 优点 | 缺点 |
@@ -116,7 +200,8 @@ TCP是字节流协议，无消息边界。Nagle算法可能合并小数据包（
 | 分隔符协议 | 消息间用特定分隔符分隔 | 不浪费带宽 | 内容不能含分隔符 |
 | 长度前缀协议 | 先发送长度，再发送数据 | 最通用 | 需解析长度 |
 
-长度前缀格式：
+**长度前缀格式**：
+
 ```
 ┌──────────┬─────────────────┐
 │ 4字节长度 │    N字节数据     │
@@ -128,13 +213,26 @@ TCP是字节流协议，无消息边界。Nagle算法可能合并小数据包（
 
 UDP socket不维护连接状态，sendto每次指定目标地址。同一socket可以向不同目标发送数据，也可以从不同源接收数据。UDP socket的peer address是消息的一部分，不是socket的属性。
 
+**UDP的多播能力**：一个UDP socket可以向多个目标发送（通过sendto指定不同地址），也可以接收来自多个源的数据（recvfrom返回源地址）。
+
 ### SO_REUSEADDR的必要性
 
 服务器重启时，前一个socket可能处于TIME_WAIT状态（因为主动关闭）。SO_REUSEADDR允许bind已处于TIME_WAIT状态的端口，快速重启服务器而不等待2MSL。这对于需要快速重启的服务器（如热更新场景）至关重要。
 
+**TIME_WAIT约束**：主动关闭方在2MSL期间不能bind同一端口。SO_REUSEADDR让应用绕过此限制（OS层面允许，但需确保旧连接数据已消失）。
+
 ### 非阻塞IO的必要性
 
 在高性能服务器中，阻塞accept/connect/read/write会导致线程阻塞。O_NONBLOCK让这些调用立即返回，通过select/epoll/kqueue监听文件描述符就绪状态，实现事件驱动编程。线程不再因IO等待而空转，提高了CPU利用率。
+
+**阻塞 vs 非阻塞语义**：
+
+| 调用 | 阻塞模式 | 非阻塞模式 |
+|------|---------|-----------|
+| accept() | 等待连接 | EAGAIN（无连接） |
+| connect() | 等待完成 | EINPROGRESS（进行中） |
+| read() | 等待数据 | EAGAIN（无数据） |
+| write() | 等待缓冲区 | EAGAIN（缓冲区满） |
 
 ### epoll vs select的本质差异
 
@@ -143,6 +241,7 @@ UDP socket不维护连接状态，sendto每次指定目标地址。同一socket�
 | 数据结构 | 线性数组 | 红黑树 |
 | FD拷贝 | 每次调用全量拷贝 | 仅增量修改 |
 | 最大FD限制 | FD_SETSIZE(通常1024) | 无硬限制 |
+| 时间复杂度 | O(N) | O(k)，k为就绪fd数 |
 | 触发模式 | 水平触发 | 水平+边缘触发 |
 
 epoll使用红黑树管理fd，调用只在fd改变时更新内核态数据结构，避免了select每次将fd数组从用户态拷贝到内核态的开销。边缘触发（EPOLLET）只在状态变化时通知，需要配合非阻塞IO使用。
@@ -154,20 +253,37 @@ epoll使用红黑树管理fd，调用只在fd改变时更新内核态数据结�
 
 对于读事件：LT模式下只要缓冲区有数据就会通知，ET模式下只在新数据到达时通知一次。这意味着ET模式下必须一次性读完所有数据，否则不会再收到通知。
 
+**ET模式约束**：必须循环读取直到EAGAIN，否则剩余数据不再通知。
+
 ### 违规后果
 
-- bind已占用端口：EADDRINUSE错误，socket无法绑定
-- connect前未bind：内核自动分配临时端口（ephemeral port）
-- TCP连接未处理backlog溢出：客户端收到ECONNREFUSED或超时
-- UDP socket广播地址配置错误：可能发送到错误网络
-- epoll边缘触发下未一次性处理所有就绪事件：剩余事件不再通知，程序卡住
+- **bind已占用端口**：EADDRINUSE错误，socket无法绑定
+- **connect前未bind**：内核自动分配临时端口（ephemeral port）
+- **TCP连接未处理backlog溢出**：客户端收到ECONNREFUSED或超时
+- **UDP socket广播地址配置错误**：可能发送到错误网络
+- **epoll边缘触发下未一次性处理所有就绪事件**：剩余事件不再通知，程序卡住
+- **对已关闭socket写入**：SIGPIPE信号（默认终止进程）
 
 ## 参考存根
 
 ```go
 import "net"
-l, err := net.Listen("tcp", ":8080")
-conn, _ := l.Accept()
+// Go TCP服务器
+listener, _ := net.Listen("tcp", ":8080")
+for {
+    conn, err := listener.Accept()
+    if err != nil {
+        continue
+    }
+    go handleConnection(conn)
+}
+
+func handleConnection(conn net.Conn) {
+    buf := make([]byte, 1024)
+    n, _ := conn.Read(buf)
+    conn.Write(buf[:n])
+    conn.Close()
+}
 ```
 
 ```python
@@ -177,17 +293,40 @@ import select
 epoll = select.epoll()
 epoll.register(sock.fileno(), select.EPOLLIN | select.EPOLLET)
 
+# 等待事件
 events = epoll.poll()
 for fd, event in events:
     if event & select.EPOLLIN:
-        data = sock.recv(1024)
+        while True:
+            try:
+                data = sock.recv(1024)
+                if not data:
+                    break
+            except BlockingIOError:
+                break
+    elif event & select.EPOLLOUT:
+        # 可写
+        pass
 ```
 
 ```c
 // Linux TCP server 示例
 int server_fd = socket(AF_INET, SOCK_STREAM, 0);
+int opt = 1;
 setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR, &opt);
+
+struct sockaddr_in addr = {
+    .sin_family = AF_INET,
+    .sin_port = htons(8080),
+    .sin_addr.s_addr = INADDR_ANY
+};
 bind(server_fd, (struct sockaddr *)&addr, sizeof(addr));
-listen(server_fd, backlog);
+listen(server_fd, 128);
+
 int client_fd = accept(server_fd, NULL, NULL);
+char buf[1024];
+read(client_fd, buf, sizeof(buf));
+write(client_fd, buf, sizeof(buf));
+close(client_fd);
+close(server_fd);
 ```

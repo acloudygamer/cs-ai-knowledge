@@ -4,6 +4,8 @@
 
 Django 是一个遵循"batteries included"原则的 MTV（Model-Template-View）Web 框架，通过三层职责分离（数据持久化、展示渲染、业务编排）实现 Web 开发各层面的解耦。核心哲学是"不要重复自己"（DRY）——数据模型单次定义后，表单、Admin、API 自动从同一模型派生，而非各自重复声明。
 
+**归约视角**：Django 的 MTV 架构可归约为**模型-视图-模板**的三层分离，每层通过明确定义的接口通信。Model 层抽象数据库操作，View 层执行业务逻辑，Template 层负责展示渲染，三者通过 Context 字典传递数据，无直接依赖。
+
 ## 数学模型
 
 ### 请求处理队列模型
@@ -51,6 +53,8 @@ Django URL 分派使用正则匹配，路径表达式编译为以下优先序列
 
 匹配算法从 URLconf 列表头部扫描，**首次匹配即停止**，不进行最优匹配。因此更具体的路径必须放在更宽泛的路径之前。
 
+**约束**：若路径 `/items/<int:id>/delete` 放在 `/items/<int:id>` 之后，由于线性扫描的首次匹配原则，删除路径永远不会被匹配到——因为泛型路径已先匹配。
+
 ## 数据流
 
 <pre>
@@ -58,35 +62,36 @@ HTTP 请求字节流
     │
     ▼
 WSGI Handler（django/core/handlers/wsgi.py）
-    │
+    │  解析 environ dict：METHOD, PATH, QUERY_STRING, BODY
     ▼
 URL Resolver ──匹配──▶ URLconf 路由表（urls.py）
-    │                  │
-    │                  ▼
-    │             视图函数/类 + kwargs
+    │  正则编译 + 线性扫描，首次匹配即停止
+    │  匹配结果：视图函数/类 + kwargs（路径参数）
     │                  │
     ▼                  ▼
 Middleware.process_request ──▶ 视图
-    │（按声明顺序向下）    │
-    │                  ▼
-    │             ORM 查询（惰性，求值才发SQL）
-    │                  │
-    │                  ▼
-    │             模板渲染（Jinja2）
-    │                  │  Context + 模板文件
-    │                  ▼   ──▶ HTML 字符串
-    │             HttpResponse 对象
-    │                  │
-    ▼                  ▼
+    │（按 settings.py 声明顺序向下）  │
+    │                              ▼
+    │                         ORM 查询（惰性求值）
+    │                         首次遍历/求值才触发 SQL
+    │                              │
+    │                              ▼
+    │                         模板渲染（Jinja2）
+    │                         Context dict + 模板文件 → HTML
+    │                              │
+    │                              ▼
+    │                         HttpResponse 对象
+    │                              │
+    ▼                              ▼
 Middleware.process_response ◀──
-    │（按逆序向上）
+    │（按逆序向上，形成洋葱模型）
     ▼
-WSGI Response（bytes）
+WSGI Response（bytes 流）
 </pre>
 
 **所有权变换**：
 - HTTP 字节流 → `HttpRequest`（解析后持有 GET/POST/META/COOKIES）
-- 路由 kwargs → 视图函数的输入参数（值拷贝）
+- 路由 kwargs → 视图函数的输入参数（值拷贝，非引用）
 - ORM QuerySet → **惰性求值**：首次遍历才触发 SQL，结果缓存于 QuerySet 内部
 - 模板 Context → 模板引擎持有，渲染完成后释放
 - `HttpResponse` → 最终字节流，写入 WSGI 输出缓冲
@@ -100,6 +105,8 @@ WSGI Response（bytes）
 | **路由** | 正则 URLconf | 装饰器路径 | 类型注解路径 |
 | **中间件语义** | 可中断的洋葱模型 | 请求上下文栈 | 依赖注入 |
 | **DB 迁移** | 迁移系统（版本化） | 无内置（Alembic） | 无内置 |
+| **请求模型** | 隐式 request 参数 | 显式 request 全局代理 | 显式 request 参数 |
+| **ORM 模式** | 主动记录（Active Record） | 数据映射（Data Mapper） | 无（外部库如 SQLModel） |
 
 ## 机制
 
@@ -186,6 +193,17 @@ Django 迁移是数据库架构的版本化描述，由 `makemigrations` 生成�
 - 迁移文件中禁止引用模型方法（业务逻辑）——因为迁移可能在业务代码部署前运行
 - `StateApps` 用于在迁移中临时操作模型（不需要真实数据库）
 
+**版本化约束**：迁移必须可正向和反向应用。`migrate` 记录已应用的迁移版本，若回滚， Django 按记录逆向执行迁移序列。
+
+### 会话与认证的解耦设计
+
+Django 的会话框架与认证框架完全解耦：
+
+- **会话**：存储用户状态（`request.session`），后端可配置（数据库/缓存/签名 Cookie）
+- **认证**：处理用户密码哈希、登录/登出、权限检查，与会话通过 `request.user` 关联
+
+密码哈希使用 PBKDF2（默认）或 Argon2，通过 `make_password` / `check_password` 操作。这将用户提供的明文密码与存储的哈希比对，**不在任何地方存储明文密码**。
+
 ## 参考存根
 
 ```python
@@ -210,9 +228,3 @@ print(connection.queries[-1]['sql'])  # 打印实际 SQL
 # 预加载：SELECT ... JOIN category WHERE price > 100（1次）
 # 循环：SELECT ... WHERE id=1; SELECT ... WHERE id=2; ...（N次）
 ```
-
----
-
-**Python 3.14 增量特性**：无。
-
-**Python 3.14 重大变化**：无。

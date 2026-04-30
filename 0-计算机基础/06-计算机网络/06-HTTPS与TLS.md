@@ -32,6 +32,16 @@ $$
 
 其中TS为临时公钥（Client/Server Public Key），RS为对方公钥。
 
+**HKDF的数学定义**：
+
+$$
+\text{HKDF-Extract}(salt, ikm) = \text{HMAC}(salt, ikm)
+$$
+
+$$
+\text{HKDF-Expand}(prk, info, len) = \text{HMAC}(prk, info || 0) || \text{HMAC}(prk, info || 1) || \ldots
+$$
+
 ### 前向保密（PFS）的数学定义
 
 每次会话使用临时DH密钥（ECDHE），私钥泄露不影响历史会话。设会话密钥为 $K_s$，ECDHE私钥为 $x$，公钥为 $X=x \cdot G$：
@@ -50,6 +60,31 @@ $$
 \forall i: \text{VerifySig}(\text{Cert}_i, \text{Cert}_{i+1}.pubkey) = \text{true} \land \text{Cert}_n \in \text{TrustStore}
 $$
 
+**证书验证的完整流程**：
+
+1. 检查证书有效期：$\text{NotBefore} \leq \text{now} \leq \text{NotAfter}$
+2. 检查域名匹配：$\text{CN} = \text{hostname} \lor \text{SAN包含hostname}$
+3. 验证证书签名链：逐级向上直到信任锚
+4. 检查证书吊销状态：OCSP响应或CRL
+
+### AEAD加密的数学形式
+
+TLS 1.3使用AEAD（Authenticated Encryption with Associated Data）同时完成加密和认证：
+
+$$
+\text{AEAD}(k, n, a, p) \rightarrow (c, t)
+$$
+
+其中：
+- $k$：密钥
+- $n$：nonce（每次加密唯一）
+- $a$：关联数据（不加密但需认证）
+- $p$：明文
+- $c$：密文
+- $t$：认证标签
+
+解密验证：$\text{AEAD}^{-1}(k, n, a, c, t) \rightarrow p$ 或 $\perp$（失败）
+
 ## 数据流
 
 ### TLS 1.3完整握手（1-RTT）
@@ -61,13 +96,15 @@ $$
   │    supported_versions=TLS1.3                  支持的曲线
   │    key_share=client_ecdhe_public             客户端ECDH公钥
   │    signature_algorithms                      │
+  │    [可选] early_data                          │
   │                                              │
   │◀── ServerHello ──────────────────────────│  选定TLS1.3、 ECDHE参数
   │    version=TLS1.3                           服务器ECDH公钥
   │    key_share=server_ecdhe_public           │
   │                                              │
-  │◀── {Certificate} ────────────────────────│ 服务器证书链
-  │◀── {CertificateVerify} ──────────────────│ 用证书私钥签名
+  │◀── {EncryptedExtensions} ────────────────│  加密的扩展
+  │◀── {Certificate} ───────────────────────│ 服务器证书链
+  │◀── {CertificateVerify} ─────────────────│ 用证书私钥签名
   │◀── {Finished} ──────────────────────────│ 握手消息MAC
   │                                              │
   │─── {Finished} ────────────────────────────▶│
@@ -91,7 +128,7 @@ $$
   │─── ChangeCipherSpec ──────────────────▶│
   │─── Finished ────────────────────────────▶│
   │                                              │
-  │◀── ChangeCipherSpec ────────────────────│
+  │◀── ChangeCipherSpec ───────────────────│
   │◀── Finished ─────────────────────────────│
   │                                              │
   │    应用数据加密传输                           │
@@ -101,19 +138,50 @@ $$
 
 ```
 1. DNS解析        example.com → 93.184.216.34
+                  (RTT取决于解析路径)
+
 2. TCP握手        SYN → SYN/ACK → ACK              (+1 RTT)
-3. TLS握手        ClientHello → ServerHello/... → Finished  (+1 RTT)
+
+3. TLS握手        ClientHello → ServerHello/... → Finished  (+1 RTT for TLS 1.3)
+
 4. HTTP请求       GET / HTTP/1.1 + headers         (0 RTT, 已加密)
+
 5. TLS应用数据    [加密的HTTP请求]
+
 6. HTTP响应       200 OK + body (加密)
-总计: 2 RTT (TLS 1.3) 到首字节
+
+总计: 2-3 RTT 到首字节（DNS + TCP + TLS）
+```
+
+### TLS记录层封装
+
+```
+┌────────────────────────────────────────┐
+│ TLSRecord                               │
+│  ┌──────────┬──────────────────────────┐│
+│  │ ContentType │ ProtocolVersion      ││
+│  ├──────────┼──────────────────────────┤│
+│  │ Length   │                      ││
+│  ├──────────┴──────────────────────────┤│
+│  │ Fragment (加密后)                  ││
+│  └────────────────────────────────────┘│
+└────────────────────────────────────────┘
+
+TLSRecord数据流：
+  应用数据 → 分片 → 压缩 → MAC → 加密 → 添加Record头 → TCP发送
 ```
 
 ## 机制
 
 ### TLS分层设计的物理意义
 
-TLS位于TCP和应用层之间，利用TCP可靠传输承载加密握手，同时为HTTP提供机密性和完整性保护。对应用层透明，HTTP无需修改即可运行在TLS之上。这体现了协议分层原则——TLS可以服务于任何基于TCP的应用层协议。
+TLS位于TCP与应用层之间，利用TCP可靠传输承载加密握手，同时为HTTP提供机密性和完整性保护。对应用层透明，HTTP无需修改即可运行在TLS之上。这体现了协议分层原则——TLS可以服务于任何基于TCP的应用层协议。
+
+**TLS的职责边界**：
+- 提供机密性（加密）
+- 提供完整性（MAC/AEAD）
+- 提供身份认证（证书）
+- 不负责路由、可靠传输（依赖TCP）
 
 ### 对称加密 vs 非对称加密在TLS中的角色
 
@@ -122,21 +190,34 @@ TLS位于TCP和应用层之间，利用TCP可靠传输承载加密握手，同�
 
 TLS结合两者——用非对称加密建立会话密钥，用对称加密传输实际数据。
 
+**密钥交换的选择**：
+- RSA密钥传输：客户端用服务器公钥加密预主密钥。缺点：不提供前向保密（私钥泄露可解密历史流量）
+- ECDHE：双方各生成临时密钥对，交换公钥后计算共享秘密。优点：前向保密
+
 ### 证书认证的信任链
 
 浏览器验证服务器证书链直至根CA，根CA内置于操作系统/浏览器信任存储。证书验证检查：有效期（NotBefore ≤ now ≤ NotAfter）、域名匹配（CN/SAN）、签名有效性、证书未被吊销（OCSP/CRL）。
 
+**证书链验证的数学本质**：每级证书用自己的私钥签名下一级证书，验证就是用上级公钥验证签名，直到根CA。
+
 ### 证书类型的信任等级
 
-- **DV**（域名验证）：仅验证申请者对域名的控制权，CA发证快速
-- **OV**（组织验证）：验证组织合法性，证书包含注册信息
-- **EV**（扩展验证）：严格人工审核，证书包含更详细组织信息，浏览器地址栏显示绿色
+| 类型 | 验证内容 | 颁发速度 | 浏览器显示 |
+|------|---------|---------|-----------|
+| DV（域名验证） | 仅验证域名控制权 | 分钟级 | 普通锁 |
+| OV（组织验证） | 验证组织合法性 | 天级 | 普通锁 |
+| EV（扩展验证） | 严格人工审核 | 周级 | 绿色地址栏 |
 
 信任等级本质是对申请人身份验证严格程度的差异。DV仅证明"你控制了这个域名"，OV证明"这是一个合法注册的组织"，EV证明"这是一个经过人工验证的高信誉组织"。
 
 ### TLS 1.3的改进
 
-相比TLS 1.2，1.3减少RTT（1-RTT vs 2-RTT），移除不安全算法（RSA密钥交换、3DES、RC4、MD5签名），禁止压缩（CRIME攻击），强制前向保密。
+相比TLS 1.2，1.3：
+- **减少RTT**：1-RTT vs 2-RTT
+- **移除不安全算法**：RSA密钥交换、3DES、RC4、MD5签名
+- **禁止压缩**：CRIME攻击（利用TLS压缩推断明文）
+- **强制前向保密**：仅允许ECDHE密钥交换
+- **简化密码套件**：密码套件数从几百个减至5个
 
 ### 密码套件命名语义（TLS 1.3）
 
@@ -146,51 +227,120 @@ TLS_AES_128_GCM_SHA256 表示：
 - AEAD_GCM认证加密模式（同时提供机密性和完整性）
 - SHA-256哈希函数（用于HKDF）
 
+**GCM模式的数学原理**：
+
+$$
+c = \text{AES-CTR}(k, n, p) \quad t = \text{GHASH}(k, n, a, c) \quad \text{AEAD} = (c, t)
+$$
+
 ### AEAD（Authenticated Encryption with Associated Data）
 
 GCM模式同时完成加密和完整性保护，比先加密再MAC的组合方式更高效且更安全。AEAD确保密文不被篡改，否则解密失败。
+
+**认证加密的约束**：
+- nonce必须唯一（每次加密不能用相同nonce）
+- 密钥必须保密
+- 关联数据会被认证但不加密
 
 ### 0-RTT重连的风险
 
 使用PSK（预共享密钥）恢复会话，客户端在ClientHello中直接发送加密数据。存在重放攻击风险——攻击者可以截获并重放0-RTT数据。应用层需要做幂等性设计来缓解。
 
+**0-RTT的安全约束**：
+- 只能用于幂等请求（GET等）
+- 应用层应验证请求的幂等性
+- 服务器可限制0-RTT数据的大小
+
 ### 前向保密的意义
 
 如果没有前向保密，攻击者可以截获加密流量，长期保存流量内容将来如果服务器私钥泄露，攻击者可以解密所有历史流量。PFS确保每次会话使用临时密钥，即使长期私钥泄露也不影响历史会话。
+
+**PFS的数学保证**：
+
+$$
+K_s = x \cdot Y_{\text{server}} \quad x \text{ 在会话结束后丢弃}
+$$
+
+攻击者获得长期私钥后，只能得到 $Y_{\text{server}}$，无法得到 $x$（离散对数难题），因此无法计算 $K_s$。
 
 ### HSTS防降级攻击
 
 HTTP是明文协议，攻击者可以在TLS握手前劫持连接，阻止HTTPS升级。HSTS（HTTP Strict Transport Security）让浏览器在max-age内只通过HTTPS访问该域名，即使最初被劫持到HTTP，浏览器也会拒绝明文连接。
 
+**HSTS约束**：
+- 首次访问必须使用HTTPS
+- max-age内强制HTTPS
+- includeSubDomains对子域名也生效
+
 ### 证书透明度（Certificate Transparency, CT）
 
 为防止CA误发证书或被攻击，CT要求CA将签发的证书记录到公开的CT日志服务器。任何人都可以查询CT日志验证证书是否被正确签发。CT日志使用Merkle树提供高效的追加only日志证明。
 
+**Merkle树验证**：
+
+$$
+\text{root} = \text{Hash}(\text{left\_hash} || \text{right\_hash})
+$$
+
+给定叶节点和Merkle路径，可以独立验证叶节点在树中的位置。
+
 ### 违规后果
 
-- 证书过期：浏览器显示警告，连接可被中间人劫持（用户可能仍选择继续）
-- 证书域名不匹配：浏览器直接拒绝连接，无法绕过
-- 使用不安全的密码套件：存在被解密或注入风险
-- 证书链不完整：浏览器无法验证信任链，拒绝连接
-- 使用已知被破解的密钥交换（如RSA密钥传输）：无法提供前向保密
+- **证书过期**：浏览器显示警告，连接可被中间人劫持（用户可能仍选择继续）
+- **证书域名不匹配**：浏览器直接拒绝连接，无法绕过
+- **使用不安全的密码套件**：存在被解密或注入风险
+- **证书链不完整**：浏览器无法验证信任链，拒绝连接
+- **使用已知被破解的密钥交换（如RSA密钥传输）**：无法提供前向保密
+- **TLS版本降级**：FREAK、POODLE等攻击可强制使用弱密码套件
 
 ## 参考存根
 
 ```python
 import ssl, socket
+# Python HTTPS客户端
 ctx = ssl.create_default_context()
+ctx.check_hostname = True
+ctx.verify_mode = ssl.CERT_REQUIRED
+
 with socket.create_connection(("example.com", 443)) as s:
-    ss = ctx.wrap_socket(s, server_hostname="example.com")
-    ss.send(b"GET / HTTP/1.0\r\n\r\n")
+    with ctx.wrap_socket(s, server_hostname="example.com") as ss:
+        ss.send(b"GET / HTTP/1.0\r\n\r\n")
+        resp = ss.recv(4096)
+        print(resp)
 ```
 
 ```go
-// Go TLS 配置
+// Go TLS 服务器配置
 cert, _ := tls.LoadX509KeyPair("cert.pem", "key.pem")
 config := &tls.Config{
     Certificates: []tls.Certificate{cert},
     MinVersion: tls.VersionTLS13,
+    // 前向保密：仅允许ECDHE密钥交换
+    CurvePreferences: []tls.CurveID{
+        tls.CurveP256,
+        tls.X25519,
+    },
 }
 listener, _ := tls.Listen("tcp", ":443", config)
 conn, _ := listener.Accept()
+```
+
+```python
+# 使用 cryptography 库验证证书链
+from cryptography import x509
+from cryptography.hazmat.backends import default_backend
+
+with open("server_cert.pem", "rb") as f:
+    cert = x509.load_pem_x509_certificate(f.read(), default_backend())
+
+# 验证证书基本属性
+print(f"Subject: {cert.subject}")
+print(f"Issuer: {cert.issuer}")
+print(f"Not Before: {cert.not_valid_before_utc}")
+print(f"Not After: {cert.not_valid_after_utc}")
+
+# 验证域名
+from cryptography.x509.oid import NameOID
+cn = cert.subject.get_attributes_for_oid(NameOID.COMMON_NAME)[0]
+print(f"CN: {cn.value}")
 ```

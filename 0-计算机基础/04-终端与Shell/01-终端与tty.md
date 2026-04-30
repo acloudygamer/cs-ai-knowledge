@@ -11,7 +11,7 @@
 终端行规程是一个 **Moore 机**，状态空间 $Q$ 由以下变量共同决定：
 
 $$
-Q = (q_{\text{canon}},\ q_{\text{echo}},\ q_{\text{echo_pend}},\ q_{\text{signal}},\ B,\ t_{\text{last}})
+Q = (q_{\text{canon}},\ q_{\text{echo}},\ q_{\text{echo\_pend}},\ q_{\text{signal}},\ B,\ t_{\text{last}})
 $$
 
 其中：
@@ -22,7 +22,7 @@ $$
 **ICANON 模式的交付条件**（排反范式）：
 
 $$
-\text{Deliver}(B) \Leftrightarrow \left(\exists c \in B:\ c = \text{EOL} \lor c = \text{EOF}\right) \lor \left(|B| \geq 512 \land \Delta t_{\text{since_last}} \geq TIME\right)
+\text{Deliver}(B) \Leftrightarrow \left(\exists c \in B:\ c = \text{EOL} \lor c = \text{EOF}\right) \lor \left(|B| \geq 512 \land \Delta t_{\text{since\_last}} \geq TIME\right)
 $$
 
 当 $TIME = 0$（默认值）时，超时交付被禁用，行只有在遇到 EOL/EOF 时才交付。

@@ -45,12 +45,22 @@ $$
 
 然后在该地址读取 vptr，再查 type_info。
 
+**多重继承的对象布局**：
+
+$$
+\text{layout}(C) = \{\text{vptr}_0, \text{Base}_1\_subobject, \text{vptr}_1, \text{Base}_2\_subobject, \dots, \text{Derived\_part}\}
+$$
+
+偏移 $offset_i$ 由编译器在编译期确定，存储在 vtable 的调节条目中。
+
 ### type_info 的哈希冲突
 
 type_info 的哈希值用于 unordered_map 等容器。哈希函数 $h(\text{typeid})$ 满足：
 
 - $h(T_1) = h(T_2) \Rightarrow T_1 \equiv T_2$（完美哈希）
 - 但不保证逆否：$T_1 \equiv T_2 \not\Rightarrow h(T_1) = h(T_2)$（允许哈希碰撞，碰撞时用 name() 二次确认）
+
+**完美哈希的构造**：type_info 的 name() 返回的是修饰后的类型名，编译器确保唯一性。因此 name() 可以作为二次确认的依据。
 
 ### consteval 的停止定理
 
@@ -60,7 +70,12 @@ $$
 \text{consteval}(f, \text{args}) = \text{常量} \lor \text{编译错误}
 $$
 
-如果 consteval 函数包含无限循环，编译器会报"常量表达式求值无法终止"。但编译器有超时机制，超过阈值后报超时错误而非死循环检测。
+如果 consteval 函数包含无限递归，编译器会报"常量表达式求值无法终止"。但编译器有超时机制，超过阈值后报超时错误而非死循环检测。
+
+**停止保证的构造**：consteval 函数的停止性由以下规则保证：
+- 有界递归：递归深度必须可静态确定
+- 循环检测：编译器可以检测到明显的无限循环
+- 实例化深度限制：模板实例化深度超过阈值则报错
 
 ## 数据流
 
@@ -93,11 +108,19 @@ $$
 
 这实际上是一种 **类型擦除**：多态类型的运行时信息被"擦除"到 vtable 中，typeid/dynamic_cast 通过查询 vtable 恢复部分类型信息。
 
+**vtable 的构造**：每个多态类有一个 vtable，vtable 是类共享的（每个对象只存储 vptr）。vtable 的第一项通常是指向 type_info 的指针，后续是虚函数指针：
+
+$$
+\text{vtable}(T) = \{\text{typeid}(T), \text{vptr}_0, \text{vptr}_1, \dots\}
+$$
+
 ### RTTI 的性能代价
 
 **空间代价**：
 - 每个多态类型在 vtable 中占 1 个指针（type_info*）
 - 每个多态对象增加 1 个指针（vptr）
+
+对于一个包含 1000 个多态对象的程序，额外开销 = 1000 × 8字节（64位）= 8KB。
 
 **时间代价**：
 - `typeid`：O(1)，直接读取 vptr→vtable→type_info
@@ -140,6 +163,18 @@ struct std::hash<std::type_index> {
 ```
 
 这使得可以用 `std::unordered_map<std::type_index, Value>` 建立类型到值的映射，用于 Visitor 模式实现。
+
+## 违反约束的后果
+
+| 违反场景 | 系统行为 | 后果严重程度 |
+|----------|----------|--------------|
+| 对非多态类型使用 typeid(多态) | 编译期求值 | 返回静态类型的 typeid，可能不符合预期 |
+| 对非多态类型使用 dynamic_cast | 编译错误 | 代码无法编译 |
+| dynamic_cast 失败（类型不匹配） | 返回 nullptr | 若未检查，后续解引用产生未定义行为 |
+| 在构造函数中对非完全构造对象使用 typeid | 未定义行为 | 对象 vptr 可能未初始化 |
+| typeid 表达式的参数是 nullptr | 编译错误（临时量） | 代码无法编译 |
+| consteval 函数包含运行时分支 | 编译错误 | 无法产生常量表达式 |
+| 对同一 type_info 调用 name() | 未定义行为 | name() 可能返回平台相关的修饰名 |
 
 ## 对比参照
 

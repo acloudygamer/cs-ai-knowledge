@@ -466,6 +466,25 @@ import() → 按需加载 → 返回 Promise
 - CommonJS 是**惰性加载**（执行到该行才加载依赖模块）
 - ESM 是**契约式加载**（所有静态 import 必须在模块执行前完成解析，但实际执行可延迟）
 
+### 归约能力：Node.js 到操作系统调用的映射
+
+Node.js 的高并发模型可归约为一个**有限状态自动机**：
+
+$$
+\text{State} = \{\text{idle}, \text{poll}, \text{check}, \text{timers}, \text{close\_callbacks}\}
+$$
+
+状态转移由 I/O 事件触发，转移代价仅为 $O(1)$ 的函数调用。
+
+| Node.js 抽象 | 归约到 OS | 归约路径 |
+|-------------|----------|---------|
+| 异步 I/O | epoll/kqueue/IOCP | libuv → 系统调用 → 内核 → 硬件中断 |
+| 文件 I/O | 线程池 | libuv → pthread → 内核 → 磁盘驱动 |
+| 定时器 | min-heap + epoll 超时 | libuv timerfd → 内核 → 时间中断 |
+| 事件循环 | select/poll/epoll 循环 | libuv 主循环 → 系统调用轮询 |
+
+**核心归约洞察**：Node.js 的"单线程高并发"不是魔法，而是将多线程的复杂性（锁、上下文切换）转移到了操作系统内核（epoll）和少量工作线程（线程池）。程序员的认知负担大幅降低，但底层的复杂性并未消失——只是被封装在运行时中。
+
 ### 约束与违规后果
 
 | 约束 | 违规后果 |

@@ -20,6 +20,14 @@ $$
 
 每次调用返回 `side_effect` 序列的第 $n$ 个元素，或调用 `side_effect` 函数。
 
+**状态转移的数学语义**：
+
+| 操作 | 前置状态 | 后置状态 |
+|------|----------|----------|
+| `mock.method(1)` | $(c, H, R)$ | $(c+1, H \cup \{(1)\}, R)$ |
+| `mock.method.return_value = 42` | $(c, H, R)$ | $(c, H, R \cup \{method \mapsto 42\})$ |
+| `mock.method.assert_called_once()` | $(1, H, R)$ | 通过；若 $c \neq 1$ 则抛出 `AssertionError` |
+
 ### side_effect 的数学语义
 
 `side_effect` 将调用序号映射到结果：
@@ -28,7 +36,21 @@ $$
 \text{side\_effect}_n = \text{side\_effect}(args_n)
 $$
 
-当 `side_effect` 是列表时，映射是离散的；是函数时，映射是连续的（每次调用执行该函数）。
+**列表形式（离散映射）**：
+
+$$
+\text{side\_effect} = [v_1, v_2, \dots, v_n] \Rightarrow \text{call}_i \mapsto v_i
+$$
+
+若调用次数超出列表长度，抛出 `StopIteration`。
+
+**函数形式（连续映射）**：
+
+$$
+\text{side\_effect}(args) = f(args)
+$$
+
+每次调用执行该函数，可产生不同结果。
 
 ### Mock 与 Fake 的选择标准
 
@@ -40,6 +62,8 @@ $$
 $$
 
 其中 $S$ 是被测系统（SUT），$O$ 是测试目标。
+
+**本质区别**：Mock 验证**控制流**（调用顺序、参数、次数），Fake 提供**数据流**（可执行的业务逻辑替代）。
 
 ## 数据流
 
@@ -66,6 +90,8 @@ $$
          Foo.method 绑定替换为 Mock
 </pre>
 
+**名字空间替换机制**：`@patch` 在目标模块的 `__dict__`（命名空间）中做绑定替换。被替换的是**名字绑定**而非对象本身。
+
 ## 机制
 
 ### Mock 的接口动态实现
@@ -79,7 +105,9 @@ mock.foo.bar.baz()  # 完全合法
 # 每次访问返回新 Mock 或预设值
 ```
 
-这使得 Mock 能匹配任何接口，无需预先配置完整对象树。
+**延迟绑定**：Mock 在创建时不预设任何方法，所有属性访问返回新 Mock。这使其能匹配任何接口，无需预先配置完整对象树。
+
+**副作用**：若尝试调用一个未配置返回值/副作用的 MagicMock，返回另一个 MagicMock（而非抛出 AttributeError）。
 
 ### @patch 的命名空间替换
 
@@ -101,6 +129,18 @@ def test_fetch(mock_get):
 
 **约束**：必须 patch 实际使用的名字（被测模块的导入绑定），而非第三方库的名字。
 
+```python
+# 错误：patch 了库的名字，而非使用处的名字
+@patch("requests.get")  # 如果 mymodule 导入了 requests，则应该 patch "mymodule.requests"
+def test_bad(mock_get):
+    ...
+
+# 正确：patch 被测模块中的绑定
+@patch("mymodule.requests.get")
+def test_good(mock_get):
+    ...
+```
+
 ### MagicMock 的魔法方法
 
 `MagicMock` 自动实现 Python 魔法方法（`__len__`、`__iter__`、`__call__` 等），使 Mock 能以真实对象的方式参与运算：
@@ -111,6 +151,8 @@ mock_list.__iter__ = Mock(return_value=iter([1, 2, 3]))
 for x in mock_list:  # 能正常迭代
     print(x)
 ```
+
+**默认行为**：`__len__` 返回整数，`__str__` 返回 "MagicMock"，`__bool__` 返回 True，`__hash__` 返回基于对象 id 的哈希。
 
 ### Fake 的设计原则
 
@@ -130,17 +172,34 @@ class FakeUserRepository:
         return self._users.get(user_id)
 ```
 
-Fake 替代真实数据库时，必须满足：
-- 接口一致（方法签名兼容）
-- 行为可预测（无随机性）
-- 状态隔离（每个测试独立重置）
+**Fake 的必要条件**：
+- **接口一致**：方法签名兼容，调用方无需感知差异
+- **行为可预测**：无随机性，每次调用结果可重现
+- **状态隔离**：每个测试独立重置，无跨测试污染
 
-### 违反约束的后果
+### Mock 验证的语义陷阱
 
-- **Mock 期望与实际不符**：测试失败但不抛出异常（假阳性）
-- **Patch 目标错误**：替换了错误命名空间，测试看起来通过但未真正验证目标
-- **side_effect 列表耗尽**：继续调用抛出 `StopIteration`，测试失败
-- **Fake 状态跨测试泄露**：测试 B 继承了测试 A 的副作用，导致测试顺序依赖
+Mock 的 `assert_called_once_with` 验证的是**最后一次调用**是否匹配，而非**唯一调用**。若某方法被调用多次，只有最后一次参数会被验证：
+
+```python
+mock.method(1)
+mock.method(2)
+mock.method(3)
+mock.assert_called_once_with(2)  # 失败！因为验证的是最后一次调用(3)
+mock.assert_called_once_with(3)  # 通过
+```
+
+若需验证特定调用，使用 `mock.assert_called_with(*args, **kwargs)`（验证最近一次）或检查 `mock.call_args_list`。
+
+## 约束与违反后果
+
+| 约束 | 违反后果 |
+|------|---------|
+| Patch 目标必须是使用处的绑定 | 替换了错误命名空间，测试看起来通过但未真正验证目标 |
+| side_effect 列表不能耗尽 | 继续调用抛出 `StopIteration`，测试失败 |
+| Mock 期望与实际不符 | 测试失败但不抛出异常（假阳性） |
+| Fake 状态跨测试泄露 | 测试 B 继承了测试 A 的副作用，导致测试顺序依赖 |
+| Mock 验证调用顺序 | 若顺序错误但参数正确，可能误判通过 |
 
 ## 参考存根
 

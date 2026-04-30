@@ -4,6 +4,8 @@
 
 matplotlib 是 Python 可视化基础库，核心是 Artist 对象树和后端渲染引擎。Figure 是顶层容器，Axes 是绑定到 Figure 的绘图区域，Axis 管理坐标轴刻度和数据范围，Artist 是所有可见元素（Line2D、Rectangle、Text 等）的基类。pyplot 模块提供隐式状态管理，适合交互式探索；面向对象 API 提供显式控制，适合程序化制图。
 
+**归约视角**：matplotlib 的渲染管线可归约为**仿射变换链 + 光栅化**——数据坐标经多层仿射变换映射到像素坐标，再由后端光栅化引擎输出为像素缓冲区或矢量指令。
+
 ## 数学模型
 
 ### 坐标变换链
@@ -35,6 +37,8 @@ $$\begin{pmatrix} x_{\text{out}} \\ y_{\text{out}} \\ 1 \end{pmatrix} = M_{\text
 
 这使得平移、旋转、缩放、倾斜都可以用矩阵乘法统一处理。
 
+**组合后的变换**：$M_{\text{total}} = M_{\text{figure}} \cdot M_{\text{axes}} \cdot M_{\text{data}}$，矩阵乘法右结合。
+
 ### 颜色映射（Colormap）
 
 `imshow` 将 2D 数组映射为颜色的过程：
@@ -44,6 +48,16 @@ $$\begin{pmatrix} x_{\text{out}} \\ y_{\text{out}} \\ 1 \end{pmatrix} = M_{\text
 3. Colormap 查表：$c_{ij} = \text{cmap}(z_{ij})$，输出 RGBA
 
 Colormap 是从 $[0,1]$ 到 RGBA 的分段线性或非线性函数。viridis 等感知均匀 colormap 经过设计，确保相邻颜色在人眼感知上等距。
+
+**数学约束**：归一化是线性映射，若数据分布不均匀（如双峰分布），线性归一化可能导致颜色对比度不足。此时应使用非线性归一化（如对数归一化 `LogNorm`，幂律归一化 `PowerNorm`）。
+
+### 渲染分辨率与文件大小
+
+标量场 $Z(x, y)$ 经 `imshow` 渲染为栅格图像。设输出分辨率为 $W \times H$ 像素，每个像素反锯齿采样 $s \times s$ 个点：
+
+$$\text{渲染代价} = O(W \times H \times s^2)$$
+
+矢量后端（PDF/SVG）不栅格化，输出文件大小与分辨率无关，但渲染时仍需光栅化预览。
 
 ## 数据流
 
@@ -61,22 +75,28 @@ Artist 对象创建
     ▼
 Artist 树构建（添加到 Axes）
     │
-    ├── Axes.patch（背景）
-    ├── Axis（x/y 刻度）
-    ├── 数据 Artist（Line2D, Bar, ...）
-    └── 装饰 Artist（Legend, Title）
+    ├── Axes.patch（背景 Rectangle）
+    ├── Axis（x/y 刻度，Tick 列表）
+    │   ├── Tick（Major/Minor 刻度线）
+    │   ├── Label（刻度标签文本）
+    │   └── Line2D（网格线）
+    ├── 数据 Artist（Line2D / Bar / Scatter / Hist）
+    ├── Legend（Proxy Artist）
+    └── child Axes（colorbar / inset）
     │
     ▼
 fig.canvas.draw() ──▶ 后端渲染器
     │
-    ├── Agg（Anti-Grain Geometry）→ PNG
-    ├── Cairo → SVG/PDF
-    ├── Qt5Agg → Qt 窗口
+    ├── Agg（Anti-Grain Geometry）→ PNG/JPEG
+    ├── Cairo → SVG/PDF/PS
+    ├── Qt5Agg / TkAgg → GUI 窗口
     └── HTML5 Canvas → 浏览器
     │
     ▼
-像素缓冲区 / 矢量指令
+像素缓冲区 / 矢量指令 / 窗口显示
 </pre>
+
+**Artist 生命周期**：创建 → 添加到容器 → `draw()` 调用 → 从容器移除 → 垃圾回收。显式删除：`ax.lines.pop()` 或 `del ax.lines[0]`。
 
 ## 机制
 
@@ -117,7 +137,7 @@ matplotlib 后端分为两类：
 
 ### 交互事件流
 
-matplotlib 内置事件系统：
+matplotlib 内置事件系统，事件捕获和处理流程：
 
 ```python
 def on_click(event):
@@ -130,6 +150,8 @@ cid = fig.canvas.mpl_connect('button_press_event', on_click)
 
 事件在 Canvas 层面捕获，经过 Figure → Axes 的冒泡路径，每个 Artist 可独立处理事件（如缩放、平移）。这与 Web 的 DOM 事件冒泡模型完全对应。
 
+**事件类型**：button_press_event、motion_notify_event、key_press_event、resize_event、draw_event 等。
+
 ### 保存图片的格式选择
 
 | 格式 | 类型 | 适用场景 |
@@ -140,6 +162,17 @@ cid = fig.canvas.mpl_connect('button_press_event', on_click)
 | EPS | 矢量 | LaTeX 排版，科学出版标准 |
 
 `bbox_inches="tight"` 自动裁剪白边，但可能导致图例被裁掉——因为图例通常有透明背景，包围盒计算时可能被忽略。解决方案：显式指定 `bbox_inches="tight", pad_inches=0.1`。
+
+### 样式与 rcParams
+
+matplotlib 的全局配置通过 `rcParams` 字典管理：
+
+```python
+plt.rcParams['lines.linewidth'] = 2
+plt.rc.style.use('seaborn-v0_8-darkgrid')  # 预设样式
+```
+
+rcParams 影响所有后续渲染，适合在脚本开头一次性配置。样式文件（.mplstyle）可打包为可复用配置。
 
 ## 参考存根
 
@@ -168,11 +201,9 @@ def on_press(event):
     print(f"x={event.xdata}, y={event.ydata}")
 fig, ax = plt.subplots()
 cid = fig.canvas.mpl_connect('button_press_event', on_press)
-plt.show()
+
+# 多子图
+fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 4))
+ax1.plot([1, 2, 3], [4, 5, 6])
+ax2.scatter([1, 2, 3], [4, 5, 6])
 ```
-
----
-
-**Python 3.14 增量特性**：无。
-
-**Python 3.14 重大变化**：无。
