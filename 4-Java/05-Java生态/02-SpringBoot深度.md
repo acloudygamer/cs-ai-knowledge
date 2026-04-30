@@ -4,6 +4,14 @@
 
 Spring Boot 的本质是 **约定优于配置** 的自动化框架，通过 `spring-boot-autoconfigure` 模块实现classpath 依赖的自动感知和 Bean 的条件注册，将原本需要手动配置的 Spring 应用转变为"添加依赖即可运行"的零配置体验。
 
+**核心价值**：
+- **自动配置**：classpath检测 → 条件评估 → Bean注册
+- **starter依赖**：一键引入全套依赖栈
+- **嵌入式服务器**：无需部署WAR，直接运行JAR
+- **生产就绪**：健康检查、指标监控开箱即用
+
+---
+
 ## 数学模型
 
 ### 自动配置的贝叶斯条件概率模型
@@ -12,7 +20,7 @@ Spring Boot 的本质是 **约定优于配置** 的自动化框架，通过 `spr
 
 $$P(B | C_1, C_2, ..., C_n) = \prod_{i=1}^{n} P(C_i | B)$$
 
-实际执行时，Spring 逐条件求值（AND 逻辑），任意一个 $P(C_i) = 0$ 则 $P(B) = 0$，该配置类不注册。
+实际执行时，Spring 逐条件求值（AND 逻辑），任意一个 $P(C_i) = 0$ 则 $B$ 不注册。
 
 ### 事件发布-订阅的有限状态机模型
 
@@ -37,6 +45,8 @@ public class MyAutoConfiguration { ... }
 $$A \prec B \iff A \text{ 在 } B \text{ 之前加载}$$
 
 若存在环形依赖（$A \prec B \prec C \prec A$），Spring Boot 启动失败。
+
+---
 
 ## 数据流
 
@@ -76,6 +86,8 @@ SpringApplication.run() 执行路径
 └─[5] ApplicationRunner / CommandLineRunner 执行
     └─ 按 @Order 排序，同 Order 内随机
 </pre>
+
+---
 
 ## 机制
 
@@ -158,6 +170,42 @@ DevTools 重启：
 **类加载器分离**：
 - **Base 类加载器**：第三方库（不重启）
 - **Restart 类加载器**：项目代码（重启时重新加载）
+
+---
+
+## 深度：自动配置的SPI机制
+
+### SpringFactoriesLoader 的工作原理
+
+Spring Boot 使用 `SpringFactoriesLoader` 加载 `META-INF/spring.factories`（2.x）或 `META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports`（3.x）：
+
+```java
+// 加载流程
+List<String> factories = SpringFactoriesLoader.loadFactoryNames(
+    AutoConfiguration.class,
+    classLoader
+);
+// 返回所有自动配置类的全限定名
+```
+
+**文件格式（2.x）**：
+```properties
+# META-INF/spring.factories
+org.springframework.boot.autoconfigure.EnableAutoConfiguration=\
+  org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration,\
+  org.springframework.boot.autoconfigure.orm.jpa.HibernateJpaAutoConfiguration
+```
+
+### 条件注解的求值顺序
+
+`@ConditionalOnClass` → `@ConditionalOnBean` → `@ConditionalOnProperty` → `@ConditionalOnMissingBean`
+
+**求值顺序的原因**：
+1. 先检查类是否存在（避免 ClassNotFoundException）
+2. 再检查Bean是否存在
+3. 最后检查配置属性
+
+---
 
 ## 参考存根
 

@@ -4,6 +4,14 @@
 
 Kafka 是分布式流处理平台，其本质是 **持久化日志（Immutable Log）**——消息只能追加（append），不能修改或删除。Kafka 通过 **顺序写磁盘** 实现高吞吐（远超随机写），通过 **分区（Partition）** 实现水平扩展，通过 **消费者组（Consumer Group）** 实现负载均衡和消息冗余消费。
 
+**核心价值**：
+- **高吞吐**：顺序写磁盘 + 页缓存 + 零拷贝
+- **持久化**：消息持久化到磁盘，可重复消费
+- **水平扩展**：分区机制，支持并行消费
+- **容错**：副本机制，保证消息不丢失
+
+---
+
 ## 数学模型
 
 ### 磁盘顺序写的性能建模
@@ -68,22 +76,6 @@ $$(p, seq) \rightarrow \text{唯一确定一条消息}$$
 
 若检测到相同 $(p, seq)$，Kafka 拒绝重复，返回 -1。
 
-**Kafka Streams 的 exactly-once 实现**：
-
-```
-事务内（原子操作）：
-  1. Producer 向 Kafka 写入（output topic）
-  2. Consumer 从 Kafka 读取（input topic）
-  3. 业务处理
-  4. 业务结果写回 Kafka（output topic）
-  5. 提交事务（offset + output 原子提交）
-
-数学保证：
-  offset 和 output 在同一事务中提交
-  → 若业务处理失败，事务回滚，offset 不提交
-  → 下次消费从上次 offset 重读，不会漏也不会重
-```
-
 ### 分区写入的法定写入多数
 
 Kafka 使用 **WAL（Write-Ahead Log）** + **ISR 复制** 保证持久性。
@@ -110,6 +102,8 @@ $$|W \cap ISR| \geq W$$
 ```
 
 **Fencing 机制**：每个 Write 请求携带 `epoch`（任期号）。旧 Leader 收到更高 epoch 的 Write 请求时自动失效。
+
+---
 
 ## 数据流
 
@@ -160,6 +154,8 @@ Producer 重试发送消息 m（第二次尝试）
    │ → 返回 baseOffset=500（重复，拒绝写入）
    │ ⚠️ Consumer 看到同一 offset，内容相同
 </pre>
+
+---
 
 ## 机制
 
@@ -255,6 +251,8 @@ Kafka 3.x+ 使用 KRaft（基于 Raft）替代 ZK：
 
 数学保证：多数票决确保唯一 Leader
 ```
+
+---
 
 ## 参考存根
 

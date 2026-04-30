@@ -4,6 +4,14 @@
 
 MyBatis 是 **SQL 映射框架**，本质是将 SQL 语句从 Java 代码中分离到 XML/注解中，通过 JDBC 的 `PreparedStatement` 实现参数绑定和结果集映射。与 JPA/Hibernate 的 ORM 不同，MyBatis 将 SQL 控制权完全交给开发者，不自动生成 SQL——这是对 **SQL 确定性** 与 **自动化的权衡**。
 
+**核心价值**：
+- **SQL 完全可控**：优化器提示、复杂查询、数据库特定语法
+- **类型安全**：编译时检查（配合注解处理器）
+- **轻量级**：无 ORM 复杂度，学习曲线平缓
+- **结果映射灵活**：自动映射 + 自定义映射
+
+---
+
 ## 数学模型
 
 ### N+1 问题的查询复杂度分析
@@ -39,6 +47,8 @@ MyBatis 通过 `ResultSetHandler` 将 JDBC `ResultSet` 映射为 Java 对象。�
 
 类型安全的条件：
 $$\forall f \in F: \text{type}(f) \text{ 可从 JDBC Type 转换}$$
+
+---
 
 ## 数据流
 
@@ -97,6 +107,8 @@ Executor (被拦截)
 执行顺序：Plugin1 → Plugin2 → Plugin3 → Target
 返回顺序：Target → Plugin3 → Plugin2 → Plugin1
 </pre>
+
+---
 
 ## 机制
 
@@ -174,6 +186,8 @@ SELECT * FROM user LIMIT 10 OFFSET 0
 
 **优化方案**：使用游标分页（keyset pagination），避免大偏移量扫描。
 
+---
+
 ## 参考存根
 
 ```java
@@ -215,3 +229,34 @@ public class TrimmingStringHandler implements TypeHandler<String> {
     }
 }
 ```
+
+---
+
+## 深度：MyBatis 与 JPA 的范式对比
+
+### 设计哲学差异
+
+| 维度 | MyBatis | JPA/Hibernate |
+|------|---------|---------------|
+| SQL 控制权 | 完全交给开发者 | 框架生成 |
+| 学习曲线 | 平缓（SQL 已知） | 陡峭（ORM 概念） |
+| 查询灵活性 | 高（SQL 完全可控） | 中（JPQL/HQL） |
+| 性能调优 | 容易（直接优化 SQL） | 困难（需理解生成SQL） |
+| 数据库迁移 | 容易（SQL 显式） | 困难（依赖抽象） |
+
+### 归约视角
+
+MyBatis 将 Java 对象**归约**为 SQL 参数，将 ResultSet **映射**为 Java 对象——这是一个**双向变换**：
+
+```
+Java Object  →  SQL Parameters  →  Database
+Java Object  ←  ResultSet       ←  Database
+```
+
+JPA/Hibernate 将 Java 对象**直接映射**为数据库行——这是**同构变换**：
+
+```
+Java Object  ⇄  Database Row
+```
+
+两种范式各有适用场景：MyBatis 适合 SQL 复杂、优化要求高的场景；JPA 适合对象模型复杂、业务逻辑为主的场景。

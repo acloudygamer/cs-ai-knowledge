@@ -4,6 +4,13 @@
 
 Spring Framework 的本质是一个**控制反转（IoC）容器**，通过依赖注入（DI）实现对象生命周期的管理，将对象间依赖关系的构建责任从应用代码转移给容器。框架同时通过 AOP（面向切面编程）将横切关注点（事务、安全、日志）与业务逻辑解耦。
 
+**核心价值**：
+- **解耦**：对象不再负责依赖的创建，依赖由外部注入
+- **可测性**：依赖可通过Mock替换，单元测试更简单
+- **可维护性**：对象关系在配置中显式声明，变更影响可追踪
+
+---
+
 ## 数学模型
 
 ### 依赖注入的图论建模
@@ -13,7 +20,28 @@ Spring Framework 的本质是一个**控制反转（IoC）容器**，通过依�
 设 $\text{in-degree}(v)$ 表示节点 $v$ 的入度（依赖数量），则有效注入的必要条件是：
 $$\forall (a, b) \in E: \text{init-order}(b) < \text{init-order}(a)$$
 
-若图中存在环（循环依赖），拓扑排序不存在，容器启动失败。Spring 通过构造式注入的"短生命周期优先"规则部分化解循环依赖，但构造函数循环依赖仍然无法解决。
+**循环依赖检测**：若图中存在环（循环依赖），拓扑排序不存在，容器启动失败。
+
+**Spring的循环依赖处理**：
+- 构造函数循环依赖：**无法解决**，启动失败
+- setter注入循环依赖：**通过三级缓存解决**
+
+### 三级缓存机制
+
+Spring解决setter循环依赖的三级缓存：
+
+```
+一级缓存（singletonObjects）：完全成熟的单例Bean
+二级缓存（earlySingletonObjects）：提前暴露的Bean（未完成属性注入）
+三级缓存（singletonFactories）：Bean工厂，解决循环依赖
+```
+
+**循环依赖解决流程**：
+1. A创建中，属性注入B，发现缓存无B
+2. B创建中，属性注入A，从三级缓存获取A的工厂
+3. 工厂创建A的早期引用，存入二级缓存
+4. B完成创建，存入一级缓存
+5. A获取到B的引用，完成创建
 
 ### Bean 作用域的资源约束
 
@@ -23,6 +51,8 @@ $$\forall (a, b) \in E: \text{init-order}(b) < \text{init-order}(a)$$
 | prototype | $\infty$ | 每次新建，无共享状态 |
 | request | $\infty$（按HTTP请求） | 线程局部，非线程安全 |
 | session | $\infty$（按HTTP会话） | 会话局部，非线程安全 |
+| application | 1（ServletContext生命周期） | 需要外部同步 |
+| websocket | $\infty$（WebSocket生命周期） | 非线程安全 |
 
 ### Spring AOP 的切面优先级数学
 
@@ -46,6 +76,8 @@ around 通知形成**嵌套调用栈**，与递归类似：
 $$R_n \circ R_{n-1} \circ \cdots \circ R_1 \circ T$$
 
 其中 $R_i$ 为第 $i$ 个 around 通知，$T$ 为目标方法。
+
+---
 
 ## 数据流
 
@@ -89,7 +121,7 @@ BeanPostProcessor.postProcessAfterInitialization()
   proxy.someMethod() → 拦截 → 通知链 → 目标方法
 </pre>
 
-**AOP 代理创建时机**：目标 Bean 实例化后，初始化阶段通过 `BeanPostProcessor` 包装为代理对象。若使用 JDK 动态代理，代理类实现与目标类相同的接口；若使用 CGLIB，代理类继承目标类。
+---
 
 ## 机制
 
@@ -103,9 +135,14 @@ public class UserService {
 }
 ```
 
-问题在于：`UserRepository` 的具体实现被硬编码在 `UserService` 中。若需要切换到 `JpaUserRepository`，必须修改 `UserService` 源码。这违反了 **依赖倒置原则（DIP）**：高层模块不应依赖低层模块，两者都应依赖抽象。
+问题在于：`UserRepository` 的具体实现被硬编码在 `UserService` 中。若需要切换到 `JpaUserRepository`，必须修改 `UserService` 源码。
 
-IoC 容器通过将依赖的实例化责任转移，使 `UserService` 只声明"我需要什么"，而不负责"如何获取"。这将依赖关系从编译时绑定推迟到运行时解析，实现了关注点分离。
+**依赖倒置原则（DIP）**：
+- 高层模块不应依赖低层模块
+- 两者都应依赖抽象
+- 抽象不应依赖细节，细节应依赖抽象
+
+IoC 容器通过将依赖的实例化责任转移，使 `UserService` 只声明"我需要什么"，而不负责"如何获取"。
 
 ### AOP 的本质：方法拦截的职责链
 
@@ -138,8 +175,10 @@ CGLIB/JDK Proxy 拦截 → 调用目标方法
 - `@ConditionalOnClass`：检查 classpath 是否有某类——使可选依赖成为自动配置的前提
 - `@ConditionalOnMissingBean`：确保用户自定义 Bean 优先于自动配置——尊重用户意图
 - `@ConditionalOnProperty`：实现配置开关（如 `spring.rabbitmq.enabled=false` 可禁用某自动配置）
+- `@ConditionalOnBean`：检查某 Bean 是否存在
+- `@ConditionalOnMissingClass`：检查某类是否不存在
 
-**优先级链**：用户显式注册的 Bean > 用户自定义配置类 > Spring Boot 自动配置。这确保了框架的"零配置"不会覆盖用户意图。
+**优先级链**：用户显式注册的 Bean > 用户自定义配置类 > Spring Boot 自动配置。
 
 ### 构造函数注入为何是最佳实践
 
@@ -149,7 +188,7 @@ CGLIB/JDK Proxy 拦截 → 调用目标方法
 | Setter 注入 | ❌ | ✅ | ❌ 运行时失败 |
 | 字段注入 | ❌ | ❌ 需要反射 | ❌ 运行时失败 |
 
-构造函数注入迫使依赖在对象构造时完全初始化。Java 编译器确保了构造函数的完整执行，使得部分初始化的对象无法存在。同时，循环的构造函数依赖在容器启动时立即暴露，而非运行时。
+构造函数注入迫使依赖在对象构造时完全初始化。Java 编译器确保了构造函数的完整执行，使得部分初始化的对象无法存在。
 
 ### BeanPostProcessor 的扩展机制
 
@@ -169,8 +208,9 @@ public interface BeanPostProcessor {
 **常见用途**：
 - `AutowiredAnnotationBeanPostProcessor`：处理 `@Autowired` 和 `@Value`
 - `CommonAnnotationBeanPostProcessor`：处理 `@PostConstruct` 和 `@PreDestroy`
-- `RequiredAnnotationBeanPostProcessor`：处理 `@Required`
 - `AnnotationAwareAspectJAutoProxyCreator`：创建 AOP 代理
+
+---
 
 ## 参考存根
 
@@ -199,3 +239,45 @@ public class AopProxyDemo {
 interface Target { void execute(); }
 class TargetImpl implements Target { public void execute() {} }
 ```
+
+---
+
+## Spring循环依赖深度解析
+
+### 三级缓存解决循环依赖的数学证明
+
+设Bean A和Bean B互相依赖（setter注入），证明三级缓存可解决：
+
+**初始化状态**：
+- A创建中：放入三级缓存 `singletonFactories`
+- B创建中：需要A的依赖
+
+**获取早期引用**：
+- B从三级缓存获取A的ObjectFactory
+- 调用 `getObject()` 获取早期A引用
+- 早期A引用存入二级缓存 `earlySingletonObjects`
+- B完成创建，存入一级缓存
+
+**A获取B的引用**：
+- A从一级缓存获取B的完整引用
+- A完成创建，存入一级缓存
+
+**数学保证**：
+$$
+\exists \text{ path } A \rightarrow B \rightarrow A \implies \text{循环依赖可解}
+$$
+
+当且仅当依赖关系是**非构造函数依赖**时成立。
+
+### 构造器循环依赖为何无法解决
+
+设A构造函数依赖B，B构造函数依赖A：
+
+```
+A() → new B()
+B() → new A()
+```
+
+**数学本质**：拓扑排序要求 $\text{init-order}(B) < \text{init-order}(A)$ 且 $\text{init-order}(A) < \text{init-order}(B)$，矛盾。
+
+**结论**：构造器循环依赖在数学上无解。

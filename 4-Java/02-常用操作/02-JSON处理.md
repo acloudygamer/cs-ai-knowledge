@@ -1,4 +1,4 @@
-# JSON处理
+# JSON 处理
 
 ## 定义
 
@@ -14,6 +14,8 @@ $$T_{serialize}(G) = O(|V| + |E|)$$
 
 每个节点需经过：类型判断 → 序列化器选择 → 值写入。边遍历受对象图深度影响，但无环形引用时为树遍历 $O(|V| + |E|)$。
 
+**约束**：存在环形引用时，若无 `@JsonIdentityInfo` 或自定义处理，序列化将无限递归（StackOverflowError）。
+
 ### 树构建 vs 流式解析
 
 Gson 的 `JsonParser` 构建完整 `JsonElement` 树，内存占用：
@@ -28,6 +30,8 @@ $$M_{stream} = O(d \cdot s)$$
 
 其中 $d$ 为最大嵌套深度，通常 $d \ll |V|$。
 
+**对比**：对于 1000 个节点的 JSON，树模式需分配 ~80KB 节点对象，流式模式仅需 ~4KB（假设最大深度 10）。
+
 ### 循环引用压缩率
 
 Jackson 的 `@JsonIdentityInfo` 为每个对象分配唯一标识符 $\text{oid}$。设对象图中唯一对象数为 $|U|$，出现次数为 $f_i$，总引用数为 $R = \sum_{i=1}^{|U|} f_i$。压缩后输出边数：
@@ -40,22 +44,22 @@ $$R' = |U| + (R - |U|) = R$$
 
 <pre>
 Jackson 序列化数据流：
-┌─────────────┐    ┌──────────────┐    ┌─────────────────┐    ┌──────────────┐
+┌─────────────┐    ┌──────────────┐    ┌─────────────────┐    ┌──────────────────┐
 │ Java Object │───▶│ ObjectMapper │───▶│ SerializerProvider│───▶│ UTF8JsonGenerator│
-└─────────────┘    └──────────────┘    └─────────────────┘    └──────┬───────┘
-                                                                     │
-                                                             ┌───────▼────────┐
-                                                             │  输出 byte[]    │
-                                                             └────────────────┘
+└─────────────┘    └──────────────┘    └─────────────────┘    └─────────┬────────┘
+                                                                      │
+                                                             ┌─────────▼────────┐
+                                                             │  输出 byte[]      │
+                                                             └──────────────────┘
 
 Jackson 反序列化数据流：
 ┌─────────────┐    ┌──────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│  byte[]/String│───▶│  UTF8StreamParser│───▶│  JsonNode Tree  │───▶│  Java Object    │
+│  byte[]     │───▶│ UTF8StreamParser│───▶│  JsonNode Tree  │───▶│  Java Object    │
 └─────────────┘    └──────────────┘    └─────────────────┘    └─────────────────┘
                            │                    │
                            ▼                    ▼
-                    Lexer → Tokenizer    ObjectMapper.readValue()
-                    (字节→Token序列)       (树→对象映射)
+                    Lexer → Token序列     ObjectMapper.readValue()
+                    (字节→Token)           (树→对象映射)
 
 Gson 反序列化数据流：
 ┌─────────────┐    ┌──────────────┐    ┌─────────────────┐    ┌─────────────────┐
@@ -67,8 +71,8 @@ Gson 反序列化数据流：
 </pre>
 
 **所有权变换**：
-- Jackson：序列化时 Java 对象 → Token序列 → UTF-8字节，所有权从 JVM 堆内存转移到堆外字节缓冲区
-- Gson：反序列化时 String → Token（栈上int标记）→ 字段直接写入对象，所有权变换少一次中间复制
+- Jackson 序列化：Java 对象 → Token序列 → UTF-8字节，所有权从 JVM 堆内存转移到堆外字节缓冲区
+- Gson 反序列化：String → Token（栈上int标记）→ 字段直接写入对象，所有权变换少一次中间复制
 
 ## 机制
 
@@ -77,11 +81,13 @@ Gson 反序列化数据流：
 `ObjectMapper` 在首次遇到类型 $T$ 时，通过 `SerializerProvider` 查找或构建 `JsonSerializer<T>`。查找路径：
 
 1. 检查 `@JsonSerialize(as = T.class)` 注解
-2. 检查 `SerializerProvider` 缓存
-3. 通过 `BeanDescription`  introspect 属性，查找 `@JsonValue`、`@JsonRawValue`
+2. 检查 `SerializerProvider` 缓存（首次构建后复用）
+3. 通过 `BeanDescription` introspect 属性，查找 `@JsonValue`、`@JsonRawValue`
 4. 降级为黑盒反射 `BeanSerializer`
 
-**关键约束**：这个构建过程在首次调用时发生，后续调用复用缓存的序列化器实例。因此 Jackson 适合大量同类对象的重复序列化，初始化成本被均摊。
+**关键约束**：构建过程在首次调用时发生，后续调用复用缓存的序列化器实例。因此 Jackson 适合大量同类对象的重复序列化，初始化成本被均摊。
+
+**违反约束后果**：若序列化器构建后修改了类结构（如添加新字段），需调用 `ObjectMapper.refresh()` 或创建新实例，否则新增字段被忽略。
 
 ### Gson 的 TypeAdapter 链式调用
 
@@ -104,7 +110,16 @@ RuntimeClass → [Factory₁: T₁?] → [Factory₂: T₂?] → ... → [Reflec
 
 Jackson 的 `@JsonIdentityInfo` 将对象图的有向边转化为**生成树 + 回边标记**：每个节点首次出现时输出完整内容并记录 oid；后续出现只输出 `"$ref": "oid"`。
 
-**违反约束的后果**：若循环引用未标注且序列化器未检测，将导致 StackOverflowError（递归无限深入）。
+**违反约束后果**：若循环引用未标注且序列化器未检测，将导致 StackOverflowError（递归无限深入）。
+
+### 性能约束与优化策略
+
+| 场景 | 推荐方案 | 原因 |
+|------|----------|------|
+| 大 JSON（>1MB） | Jackson 流式 API | 树模式 OOM |
+| 大量同类对象序列化 | Jackson 缓存序列化器 | 初始化成本均摊 |
+| 简单场景、快速开发 | Gson | API 简洁、反射直接字段 |
+| 需要注解处理器 | Jackson | 丰富的注解支持 |
 
 ## 参考存根
 
@@ -133,4 +148,20 @@ var gson = new GsonBuilder()
         }
     })
     .create();
+```
+
+```java
+// Jackson 循环引用处理
+@JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class)
+class Node {
+    public String name;
+    public Node parent;
+    public List<Node> children;
+}
+```
+
+```java
+// Gson 泛型处理
+Type type = new TypeToken<List<Person>>(){}.getType();
+List<Person> people = gson.fromJson(json, type);
 ```

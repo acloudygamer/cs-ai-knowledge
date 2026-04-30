@@ -4,6 +4,16 @@
 
 Spring Cloud 是分布式系统解决方案的 **抽象层**，本质是通过声明式服务发现实现服务地址的动态管理，通过声明式 HTTP 客户端（OpenFeign）实现服务间调用的简化，通过断路器（Circuit Breaker）实现故障隔离，通过 API 网关实现统一入口。Spring Cloud 不是具体实现，而是集成规范——具体实现由 Netflix、Alibaba 等提供。
 
+**核心组件**：
+- **服务发现**：Eureka、Nacos、Consul
+- **负载均衡**：Ribbon、Spring Cloud LoadBalancer
+- **声明式HTTP客户端**：OpenFeign
+- **断路器**：Resilience4j、Hystrix（已停止维护）
+- **配置中心**：Spring Cloud Config、Nacos
+- **API网关**：Spring Cloud Gateway、Zuul（已停止维护）
+
+---
+
 ## 数学模型
 
 ### 断路器的有限状态机
@@ -76,6 +86,8 @@ $$N_{\text{traced}} = N \cdot p$$
 **自适应采样**：高峰期降低采样率，低峰期提高采样率：
 $$p(t) = \min\left(p_{\text{max}}, \frac{p_{\text{base}}}{\text{rate}(t)}\right)$$
 
+---
+
 ## 数据流
 
 <pre>
@@ -108,7 +120,7 @@ Nacos Server                              Nacos Client（SDK）
      │                                        │
      │     变更发生时：                          │
      │                                        │
-     │ ──── UDP 推送（变更通知） ─────────────▶│
+     │ ──── UDP 推送（变更通知） ───────────── ▶│
      │                                        │
      │     客户端收到通知后：                    │
      │                                        │
@@ -117,6 +129,8 @@ Nacos Server                              Nacos Client（SDK）
      │                                        │
      │     @RefreshScope 重新创建 Bean         │
 </pre>
+
+---
 
 ## 机制
 
@@ -163,7 +177,7 @@ Nacos Server                              Nacos Client（SDK）
      │                                        │
      │     变更发生时：                         │
      │                                        │
-     │ ──── UDP 推送（变更通知） ─────────────▶│
+     │ ──── UDP 推送（变更通知） ───────────── ▶│
      │                                        │
      │     客户端收到通知后：                    │
      │                                        │
@@ -211,6 +225,8 @@ routes:
 ```
 
 **过滤器链的执行顺序**：before 过滤器按顺序执行 → 代理请求 → after 过滤器逆序执行。
+
+---
 
 ## 参考存根
 
@@ -261,3 +277,47 @@ class UserClientFallback implements UserClient {
     }
 }
 ```
+
+---
+
+## 深度：微服务架构的分布式一致性问题
+
+### 两阶段提交（2PC）的阻塞模型
+
+分布式事务的 2PC 协议：
+
+```
+阶段1（Prepare）：
+    协调者向所有参与者发送 Prepare
+    参与者锁定资源并投票 Yes/No
+    协调者收到所有投票
+
+阶段2（Commit/Rollback）：
+    协调者发送 Commit 到所有参与者
+    参与者提交事务并释放锁
+```
+
+**阻塞问题**：若协调者在阶段2崩溃，参与者将永远锁定资源。
+
+### Saga 模式的最终一致性
+
+Saga 模式将分布式事务分解为一系列本地事务：
+
+```
+Saga = T1 / T2 / T3 / ... / Tn
+
+补偿事务：
+    C1, C2, ..., Cn（每个 Ti 有一个补偿 Ci）
+    若 Tj 失败，执行 C1, C2, ..., Cj-1
+```
+
+**与 2PC 的对比**：
+
+| 维度 | 2PC | Saga |
+|------|-----|------|
+| 协调方式 | 集中式 | 分布式 |
+| 阻塞 | 是 | 否 |
+| 一致性 | 强一致 | 最终一致 |
+| 性能 | 低 | 高 |
+
+Saga 适用于对一致性要求不高、可接受最终一致的场景（如订单 → 支付 → 物流）。

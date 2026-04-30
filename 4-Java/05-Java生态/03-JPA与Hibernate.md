@@ -4,6 +4,14 @@
 
 JPA（Java Persistence API）是 Java 持久化的 **标准化 ORM 规范**，定义了实体（Entity）、持久化上下文（Persistence Context）、实体管理器（EntityManager）和查询语言（JPQL）的接口契约。Hibernate 是 JPA 规范的主流实现，通过 **脏检查（dirty checking）** 机制在事务提交时自动生成最小化 SQL，通过 **Persistence Context** 保证同一事务内的对象同一性（identity）。
 
+**核心价值**：
+- **标准化**：跨实现的 API 统一
+- **自动化**：SQL 生成自动化
+- **对象化**：关系数据 → 对象图
+- **缓存**：一级缓存减少 DB 往返
+
+---
+
 ## 数学模型
 
 ### 一级缓存的命中率建模
@@ -18,6 +26,8 @@ Persistence Context 本质是 **键值缓存**，键为主键，值为 Entity �
 $$T_{\text{total}} = N \cdot (h \cdot T_{\text{hit}} + (1-h) \cdot T_{\text{miss}})$$
 
 Hibernate 默认在 Session 关闭时清空缓存，故一级缓存的生命周期 = 事务生命周期。
+
+**优化方向**：通过合理设计查询顺序，最大化缓存命中率。
 
 ### 乐观锁的冲突检测概率
 
@@ -56,6 +66,8 @@ Hibernate 在 flush 时计算变更集。设 Entity 有 $n$ 个字段：
 脏检查的数学复杂度：
 $$T_{\text{dirty-check}} = O(n \cdot m)$$
 其中 $n$ 为 Entity 字段数，$m$ 为当前 Persistence Context 中的 Entity 数量。
+
+---
 
 ## 数据流
 
@@ -106,7 +118,7 @@ persistenceContext
     · UPDATE 仅包含变更列
 </pre>
 
-**快照（Snapshot）机制**：Hibernate 在 Entity 加载时保存一份快照到 Persistence Context。flush 时逐字段对比当前值与快照，生成最小 UPDATE 语句。
+---
 
 ## 机制
 
@@ -121,7 +133,7 @@ persistenceContext
         │                │ remove()
         │                ↓
         │            ┌──────────┐
-        └───────────▶│ REMOVED │
+        └───────────▶│ REMOVED  │
                      └──────────┘
                           │
                      flush()/commit()
@@ -167,25 +179,11 @@ JPA 要求双向关联中必须有一方为 **owning side**（外键维护方）
 - **inverse side**：`mappedBy` 指向 owning 侧的字段名，不维护外键
 
 **关键约束**：只有 owning side 的修改才会同步到数据库。设置 inverse 侧的关联不会触发外键更新：
+
 ```java
 // 这不会同步到数据库！因为 department 是 inverse side
 employee.setDepartment(dept);  // 正确：owning side
 dept.getEmployees().add(employee); // 错误：inverse side，不生效
-```
-
-### 1.5级缓存（ Persistence Context 作为持久化上下文）
-
-Hibernate 5.x 引入了 `PersistenceContext` 的 Session 共享机制：
-
-```java
-// 共享 PersistenceContext（1.5级缓存）
-@Session
-Session session; // 注入的 Session 共享同一个 PersistenceContext
-
-// 在同一个 PersistenceContext 内，多次 findById 返回同一引用
-User u1 = session.find(User.class, 1L); // 第一次：从 DB 加载
-User u2 = session.find(User.class, 1L); // 第二次：从缓存返回同一引用
-assert u1 == u2; // true：同一性保证
 ```
 
 ### 批量操作（Batch）与 JDBC 批量大小
@@ -207,6 +205,32 @@ INSERT t_user (id, name) VALUES (3, 'C')
 
 **JDBC batch 的数学约束**：每 `batch_size` 条语句执行一次 JDBC batch。设 $N$ 条 INSERT，JDBC 调用次数：
 $$N_{\text{jdbc-calls}} = \lceil N / \text{batch\_size} \rceil$$
+
+---
+
+## 深度：Entity 同一性保证的数学本质
+
+### Persistence Context 的同一性模型
+
+设 Persistence Context 为 $PC$，实体主键为 $k$，则同一性保证为：
+$$\forall k, \forall e_1, e_2 \in PC: e_1.id = e_2.id = k \implies e_1 = e_2$$
+
+**物理意义**：同一主键在同一 Persistence Context 内永远指向同一 Java 对象引用。
+
+**与数据库同一性的区别**：
+- Java 同一性：`e1 == e2`（同一引用）
+- 数据库同一性：主键相同
+- JPA 同一性：Persistence Context 级别 = Java 同一性
+
+### 快照隔离（Snapshot Isolation）
+
+Hibernate 的事务隔离级别模型：
+- **Session 级别**：一个 Session = 一个 Persistence Context
+- **事务隔离**：通过版本号或悲观锁实现
+
+$$T_{\text{hibernate}} = T_{\text{业务逻辑}} \times T_{\text{脏检查}} \times T_{\text{SQL执行}}$$
+
+---
 
 ## 参考存根
 
@@ -231,7 +255,6 @@ public void testEntityStates() {
     em.persist(user); // MANAGED
     user.setName("Bob"); // 脏检查跟踪此变更
     em.getTransaction().commit(); // flush → 生成 UPDATE（因 version 未变）
-    // 注意：persist 后 entity 仍是 MANAGED，不需要 merge
 }
 
 // 演示 merge

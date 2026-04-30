@@ -24,16 +24,20 @@ $$T_{pipeline}(n) = O\left(\min\left(n \cdot k_{non-short}, \sum_{i=1}^{p} \text
 
 对于非短路管道，复杂度为 $O(n \cdot k)$。对于含 `limit(n)` 的管道，均摊复杂度为 $O(n \cdot k_{before\_limit})$。
 
+**归约终点**：Stream 管道的复杂度本质上由管道拓扑决定，而非流的元素总数。
+
 ### 并行 Stream 的任务分解
 
 `parallelStream()` 使用 Fork/Join 框架，将源数据分割为多个子任务：
 
-设分割函数 `Spliterator.trySplit()` 将大小为 $n$ 的源分割为 $[n/2, n/2]$（或按启发式规则）。最大并行度 $P$ 受 `ForkJoinPool.common()`  parallelism 控制（默认 `Runtime.availableProcessors()`）。
+设分割函数 `Spliterator.trySplit()` 将大小为 $n$ 的源分割为 $[n/2, n/2]$（或按启发式规则）。最大并行度 $P$ 受 `ForkJoinPool.common()` parallelism 控制（默认 `Runtime.availableProcessors()`）。
 
 总任务数 $T$ 满足：
-$$T = O(\frac{n}{\text{minChunkSize}})$$
+$$T = O\left(\frac{n}{\text{minChunkSize}}\right)$$
 
 当每个子任务的处理代价超过分割/合并开销时，并行化收益最大化。
+
+**约束**：若流的 `Spliterator` 实现不支持有效分割（如 LinkedList），并行度受限。
 
 ### sorted() 的外部排序约束
 
@@ -74,7 +78,7 @@ Stream 管道数据流（串行）：
 [e₀, e₁, e₂, e₃, e₄, e₅, e₆, e₇]
         │
         ▼ trySplit()
-    [e₀,e₁,e₂,e₃]  [e₄,e₅,e₆,e₃]
+    [e₀,e₁,e₂,e₃]  [e₄,e₅,e₆,e₇]
         │                  │
         ▼ trySplit()      ▼ trySplit()
     [e₀,e₁] [e₂,e₃]  [e₄,e₅] [e₆,e₇]
@@ -146,6 +150,15 @@ Stream 操作必须是**无副作用**的函数：
 
 **根本原因**：并行 Stream 的 `forEach` 使用 `ForkJoinTask`，多个线程同时消费源，若操作有副作用则需要外部同步。
 
+### 并行 Stream 的 Fork/Join 框架
+
+Fork/Join 采用工作窃取（Work-Stealing）策略：
+- 每个线程拥有独立的双端队列
+- 空闲线程从其他线程队列尾部窃取任务
+- 最大程度利用多核资源
+
+**约束**：对于小数据集（< 1000 元素），并行化开销（分割、合并）可能超过收益，应使用串行 Stream。
+
 ## 参考存根
 
 ```java
@@ -182,4 +195,14 @@ var spliterator = list.spliterator();
 System.out.println("Character estimate: " + spliterator.estimateSize());
 spliterator.trySplit();  // [1,2,3,4] vs [5,6,7,8]
 spliterator.trySplit();  // 继续分割
+```
+
+```java
+// 自定义 Collector
+Collector.of(
+    ArrayList::new,
+    List::add,
+    (left, right) -> { left.addAll(right); return left; },
+    list -> list.stream().filter(...).toList()
+)
 ```

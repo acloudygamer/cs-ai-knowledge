@@ -23,6 +23,8 @@ $$\text{ver}(a) = \begin{cases}
 
 $$\text{nearest}(a) = v_j \text{ where } j = \arg\min_i |p_i|$$
 
+**归约终点**：依赖冲突解决本质上是图论中的最短路径问题，路径长度定义为边数而非权重。
+
 ### DAG 拓扑排序的构建顺序
 
 Maven 生命周期阶段（validate → compile → test → package → install → deploy）构成线性序。插件 goal 绑定到阶段，构建时按阶段顺序执行。
@@ -62,7 +64,7 @@ Maven 构建数据流：
          ▼
     ┌────────────────────────────────────┐
     │  Artifact 节点                      │
-    │  [group:artifact:version]          │
+    │  [groupId:artifactId:version]       │
     └────────────────────────────────────┘
          │
          ├──────────────────┬──────────────┐
@@ -128,7 +130,7 @@ Maven 构建数据流：
 | 依赖的 scope | 传递到依赖于该项目的 scope |
 |--------------|---------------------------|
 | `compile` | `compile` |
-| `provided` | `provided`（仅限直接依赖） |
+| `provided` | `compile` |
 | `runtime` | `runtime` |
 | `test` | 不传递 |
 
@@ -160,6 +162,19 @@ test 阶段默认绑定:
     </executions>
 </plugin>
 ```
+
+### reactor 的环形依赖检测
+
+Maven reactor 在构建前检测模块依赖图中的环。若存在环形依赖：
+
+```
+A → B → C
+    └── D → C
+```
+
+构建顺序通过拓扑排序确定。若添加 `D → A` 形成环，reactor 抛出 `ProjectCycleException`。
+
+**检测算法**：深度优先搜索（DFS）+ 回溯标记，复杂度 $O(|V| + |E|)$。
 
 ## 参考存根
 
@@ -194,4 +209,32 @@ mvn dependency:tree -Dverbose \
         <mirrorOf>central</mirrorOf>
     </mirror>
 </mirrors>
+```
+
+```xml
+<!-- dependencyManagement 版本锁定 -->
+<dependencyManagement>
+    <dependencies>
+        <dependency>
+            <groupId>com.google.guava</groupId>
+            <artifactId>guava</artifactId>
+            <version>32.1.3-jre</version>
+        </dependency>
+    </dependencies>
+</dependencyManagement>
+```
+
+```xml
+<!-- 传递依赖排除 -->
+<dependency>
+    <groupId>com.example</groupId>
+    <artifactId>legacy-lib</artifactId>
+    <version>1.0</version>
+    <exclusions>
+        <exclusion>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-api</artifactId>
+        </exclusion>
+    </exclusions>
+</dependency>
 ```

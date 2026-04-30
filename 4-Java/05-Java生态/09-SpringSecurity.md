@@ -4,6 +4,14 @@
 
 Spring Security 的本质是 **过滤器链（Filter Chain）**——所有请求在到达 DispatcherServlet 前必须经过一系列安全过滤器，在请求到达 Controller 之前完成身份认证（Authentication，确认用户是谁）和授权（Authorization，确认用户能做什么）。
 
+**核心功能**：
+- **认证**：用户名/密码、OAuth2、JWT、LDAP...
+- **授权**：RBAC、权限注解、方法级安全
+- **防护**：CSRF、XSS、Clickjacking...
+- **会话管理**：登录、登出、并发会话控制
+
+---
+
 ## 数学模型
 
 ### BCrypt 的计算复杂度
@@ -69,6 +77,8 @@ $$\text{Verify}(r) = \text{CookieValid}(r) \land \text{TokenValid}(r.\text{csrf\
 攻击者无法获取 Token（受同源策略保护），故：
 $$P(\text{攻击成功}) = 0$$
 
+---
+
 ## 数据流
 
 <pre>
@@ -127,6 +137,8 @@ OAuth 2.0 Authorization Code + PKCE 流程
     │                                      │                        │
     │◀─── Access Token ───────────────────│                        │
 </pre>
+
+---
 
 ## 机制
 
@@ -244,6 +256,8 @@ $$D = \text{PBKDF2}(\text{password}, \text{salt}, \text{iterations}, \text{keyLe
 - iterations：迭代次数（建议 $\geq 10000$）
 - 每次迭代增加攻击者计算成本，但不增加合法验证成本（并行性除外）
 
+---
+
 ## 参考存根
 
 ```java
@@ -301,3 +315,45 @@ public class OAuth2PkceService {
     }
 }
 ```
+
+---
+
+## 深度：Spring Security 的方法级授权
+
+### @PreAuthorize 注解的表达式语言
+
+```java
+@PreAuthorize("hasRole('ADMIN') and #userId == authentication.principal.id")
+public void updateUser(Long userId, UserUpdate update) {
+    // ...
+}
+```
+
+**SpEL 表达式求值**：
+- `#userId`：方法参数
+- `authentication.principal`：当前认证主体
+- `hasRole()`：角色检查
+- `hasAuthority()`：权限检查
+
+### 方法级安全的实现原理
+
+```
+@PreAuthorize 注解
+        │
+        ↓
+AspectJ 切面拦截
+        │
+        ↓
+方法执行前：调用 AuthorizationManager
+        │
+        ├── hasRole() 检查
+        ├── 自定义表达式求值
+        │
+        ↓ 通过/拒绝
+    方法继续执行 / 抛出 AccessDeniedException
+```
+
+**与过滤器链授权的区别**：
+- 过滤器链：URL 级别授权（粗粒度）
+- 方法级：方法级别授权（细粒度）
+- 两者可同时使用，叠加生效

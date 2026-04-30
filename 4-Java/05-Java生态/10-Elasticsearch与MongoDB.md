@@ -4,6 +4,18 @@
 
 **Elasticsearch** 是基于 **倒排索引（Inverted Index）** 的全文搜索引擎，本质是将文本切分为词项（Term），建立词项到文档的映射，实现 $O(1)$ 词项查找。**MongoDB** 是 **文档数据库**，本质是将 JSON 文档作为存储单元，通过 MMAP 内存映射文件实现磁盘读写的高性能。两者代表了检索型存储与文档型存储的两个极端。
 
+**Elasticsearch 核心价值**：
+- 全文搜索：TF-IDF、BM25 相关性算法
+- 日志分析：ELK Stack
+- 实时分析：聚合计算
+
+**MongoDB 核心价值**：
+- 灵活 schema：无固定结构，字段可增删
+- 文档模型：天然的对象映射
+- 水平扩展：分片集群
+
+---
+
 ## 数学模型
 
 ### 倒排索引的查找复杂度
@@ -75,6 +87,8 @@ $$VC = \langle c_1, c_2, ..., c_n \rangle$$
 **写入版本号**：写入时 $c_i = c_i + 1$
 **比较规则**：$VC_1 < VC_2$ 当且仅当 $\forall i: VC_1[i] \leq VC_2[i]$ 且 $\exists j: VC_1[j] < VC_2[j]$
 
+---
+
 ## 数据流
 
 <pre>
@@ -144,6 +158,8 @@ MongoDB 写入流程
 └──────────────────────────────────────────────────────────────┘
 </pre>
 
+---
+
 ## 机制
 
 ### Elasticsearch 的分片与副本一致性
@@ -206,6 +222,8 @@ $$BM25(D, Q) = \sum_{i=1}^{n} \text{IDF}(q_i) \cdot \frac{f(q_i, D) \cdot (k_1 +
 
 **饱和性**：BM25 解决了词频线性增长的问题——词频超过某阈值后，排名分数不再显著增加。
 
+---
+
 ## 参考存根
 
 ```java
@@ -242,3 +260,28 @@ public List<CityStats> getTopCities() {
         .getMappedResults();
 }
 ```
+
+---
+
+## 深度：倒排索引的压缩数学
+
+### Frame of Reference 编码
+
+对于递增的 docID 序列 $[x_0, x_1, ..., x_{n-1}]$，存储差值 $[x_0, x_1-x_0, x_2-x_1, ...]$：
+
+设最大差值为 $d_{\max}$，每个差值需要 $\lceil \log_2(d_{\max}) \rceil$ bits。
+
+**压缩率**：
+$$\text{compression} = \frac{\sum \lceil \log_2(\Delta_i) \rceil}{\sum \lceil \log_2(x_i) \rceil}$$
+
+### Roaring Bitmap 的混合压缩
+
+Roaring Bitmap 将 docID 空间划分为 $2^{16}$ 个桶（每个桶 65536 个 ID）：
+
+| 桶类型 | 条件 | 存储方式 |
+|--------|------|----------|
+| 空桶 | 无 docID | 无存储 |
+| 稀疏桶 | $< 4096$ 个 docID | 16位整数数组 |
+| 稠密桶 | $\geq 4096$ 个 docID | Bitmap（65536 bits） |
+
+**优势**：稀疏文档集节省大量空间，稠密文档集使用紧凑 Bitmap。

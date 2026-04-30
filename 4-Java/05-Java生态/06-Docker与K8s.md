@@ -4,6 +4,13 @@
 
 **Docker** 是容器化 runtime，其本质是通过 Linux Namespace 实现进程级资源隔离，通过 cgroup 实现资源限制，通过 UnionFS 实现分层镜像。**Kubernetes** 是容器编排引擎，其本质是 **声明式状态机**——用户声明期望状态（YAML），Kubernetes 控制器不断调谐（reconcile）实际状态直到与期望状态一致。
 
+**核心价值**：
+- **容器化**：一致性环境，消除"在我机器上能跑"
+- **编排**：多容器自动调度、扩缩容、自愈
+- **声明式**：基础设施即代码，可版本化、可复现
+
+---
+
 ## 数学模型
 
 ### cgroup 资源限制的约束模型
@@ -47,6 +54,8 @@ Kubernetes 为 Pod 分配 QoS 类别：**Guaranteed > Burstable > BestEffort**
 
 **OOM Score 计算**（Linux 内核）：
 $$\text{oom\_score} = \text{base\_score} + \frac{\text{memory\_usage}}{\text{memory\_limit}}$$
+
+---
 
 ## 数据流
 
@@ -110,6 +119,8 @@ Kubelet                    Kubernetes API Server
     │                              │
     │───→ Pod 状态更新──────────────▶│
 </pre>
+
+---
 
 ## 机制
 
@@ -183,6 +194,8 @@ Pod:  tolerations 配置容忍
 **容忍的数学匹配**：
 $$\text{match}(t, \text{pod}) = \begin{cases} \text{true} & \text{若 } t \in \text{pod.tolerations} \\ \text{false} & \text{otherwise} \end{cases}$$
 
+---
+
 ## 参考存根
 
 ```dockerfile
@@ -234,3 +247,39 @@ spec:
       failureThreshold: 30         # 30 * 10s = 300s 最大启动时间
       periodSeconds: 10
 ```
+
+---
+
+## 深度：容器网络的命名空间隔离
+
+### 网络命名空间的隔离模型
+
+每个容器拥有独立的网络命名空间：
+
+```
+容器 A 网络命名空间                容器 B 网络命名空间
+┌─────────────────────┐          ┌─────────────────────┐
+│ eth0@if10 (veth)    │          │ eth0@if20 (veth)    │
+│ IP: 10.1.1.2        │          │ IP: 10.1.1.3        │
+│ MAC: 02:42:0a:01:01:02│          │ MAC: 02:42:0a:01:01:03│
+│ 端口空间: 独立         │          │ 端口空间: 独立         │
+└─────────────────────┘          └─────────────────────┘
+```
+
+**隔离保证**：
+- IP 地址空间隔离（不同容器可使用相同IP）
+- 端口空间隔离（不同容器可监听相同端口）
+- 网络设备隔离（独立的 eth0、路由表、iptables）
+
+### cgroup v2 资源限制的数学形式化
+
+```bash
+# CPU 限制：200ms CPU时间/100ms周期 = 2个CPU
+echo "200000 100000" > /sys/fs/cgroup/system.slice/container.scope/cpu.max
+
+# 内存限制：512MB
+echo "536870912" > /sys/fs/cgroup/system.slice/container.scope/memory.max
+```
+
+**约束满足性**：
+$$\text{CPU}_{\text{usage}} \leq \frac{\text{CPU}_{\text{quota}}}{\text{CPU}_{\text{period}}}$$

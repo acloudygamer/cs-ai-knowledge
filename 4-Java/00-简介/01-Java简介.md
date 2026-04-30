@@ -24,15 +24,27 @@ $$T_{jit}(m) = \begin{cases} O(m \cdot k) & \text{解释执行（未达阈值）
 
 其中 $m$ 为方法规模（指令数），$k$ 为解释执行每条指令的常数开销。
 
-### 虚拟线程的调度模型
+### 类加载的层次结构
 
-虚拟线程调度是**work-stealing 算法的用户态实现**。$M$ 个 carrier threads 构成线程池，$N$ 个虚拟线程（$N \gg M$）映射到池上：
+类加载器形成**树形层次结构**：
 
-$$
-\text{负载均衡}: \forall T_i \in \text{pool}, \text{任务数}(T_i) \approx \frac{N}{M}
-$$
+```
+Bootstrap ClassLoader (C++ 实现)
+       ↑
+Extension ClassLoader (加载 jre/lib/ext)
+       ↑
+Application ClassLoader (加载 classpath)
+```
 
-当虚拟线程阻塞时（如 I/O 等待），其 carrier thread 被释放以执行其他虚拟线程的任务，实现**阻塞与调度的解耦**。
+**双亲委派模型**：类加载请求向上传递直到 Bootstrap ClassLoader，只有父加载器无法完成时，才由子加载器自己加载。这保证了类的唯一性——Object 类始终由 Bootstrap ClassLoader 加载。
+
+### 元空间（Metaspace） vs 堆内存
+
+JDK 8 前使用永久代（PermGen）存储类元数据，存在大小上限（通常 64MB）导致的 `OutOfMemoryError: PermGen space`。JDK 8+ 改为元空间，使用本地内存，不受堆大小限制。
+
+**数学约束**：
+- 类元数据大小 = $\sum(\text{类名长度}) + \sum(\text{方法签名长度}) + \text{常量池大小}$
+- 元空间默认无上限，但受物理内存限制
 
 ## 数据流
 
@@ -99,23 +111,6 @@ C/C++ 中内存释放由程序员手动管理，悬空指针和内存泄漏是�
 
 **归约终点**：值类型 vs 引用类型的区分本质上是**数据局部性**（temporal/spatial locality）的权衡——连续内存访问可利用 CPU 缓存行预取，减少缓存未命中。
 
-### 虚拟线程（JDK 21+）
-
-虚拟线程是 Java 21 引入的**用户态协程**，目的是实现高并发低内存占用。虚拟线程不绑定 OS 线程，多个虚拟线程可共享同一个 OS 线程（carrier thread）。
-
-数学模型：若每个 OS 线程栈大小为 $S_{OS}$（通常 1MB），并发 $N$ 个任务，OS 线程模型内存代价 $O(N \cdot S_{OS})$；虚拟线程栈大小 $S_V$（按需增长，通常 1KB 级别），总内存代价 $O(N \cdot S_V)$。
-
-**虚拟线程 vs 传统线程的关键差异**：
-
-| 维度 | 传统线程 | 虚拟线程 |
-|------|----------|----------|
-| 栈大小 | 固定 1MB | 按需增长（1KB 级别） |
-| 调度 | OS 调度 | JVM 调度（work-stealing） |
-| 阻塞代价 | carrier 线程阻塞 | 挂起虚拟线程，carrier 线程释放 |
-| 适用场景 | CPU 密集型 | I/O 密集型（高并发） |
-
-**挂起机制**：虚拟线程的挂起发生在阻塞操作（sleep、I/O、synchronized）时。JVM 将虚拟线程的状态保存到堆中的Continuation对象，carrier thread 被释放用于执行其他虚拟线程。恢复时，从保存点继续执行。
-
 ### JIT 编译器的优化策略
 
 JIT 编译器在运行时收集的**热反馈信息**（hot feedback）包括：
@@ -127,13 +122,49 @@ JIT 编译器在运行时收集的**热反馈信息**（hot feedback）包括：
 
 **去虚化**：当 class profiling 显示某虚调用始终指向同一类型时，JIT 将其替换为直接调用。
 
-### 元空间（Metaspace） vs 堆内存
+### 模块系统（JDK 9+）
 
-JDK 8 前使用永久代（PermGen）存储类元数据，存在大小上限（通常 64MB）导致的 `OutOfMemoryError: PermGen space`。JDK 8+ 改为元空间，使用本地内存，不受堆大小限制。
+Java 9 引入模块化系统（Jigsaw），通过 `module-info.java` 声明模块依赖：
 
-**数学约束**：
-- 类元数据大小 = $\sum(\text{类名长度}) + \sum(\text{方法签名长度}) + \text{常量池大小}$
-- 元空间默认无上限，但受物理内存限制
+```java
+module com.example.myapp {
+    requires com.example.lib;
+    exports com.example.api;
+}
+```
+
+**模块化的约束**：
+- 未声明 `requires` 的模块不可访问
+- 未声明 `exports` 的包不可访问
+- `exports ... to ...` 可限定导出目标
+
+**数学约束**：模块依赖形成 DAG，不能出现循环依赖。这保证了模块系统的可组合性。
+
+### 密封类（JDK 17）
+
+密封类（sealed class）强制子类的有限集合，保证类型穷尽性：
+
+```java
+sealed interface Shape permits Circle, Rectangle, Triangle {}
+```
+
+**约束**：穷尽性检查确保 `switch (shape)` 无需 default 分支——所有可能的情况都被枚举。编译器在编译时验证穷尽性，遗漏任何子类型都是编译错误。
+
+### record 类型（JDK 16+）
+
+Record 是 JDK 16+ 的**透明数据载体**：
+
+```java
+record Point(int x, int y) {}
+```
+
+编译器自动生成：
+- 私有 final 字段：`x`, `y`
+- 构造器：`Point(int x, int y)`
+- Accessor 方法：`x()`, `y()`
+- `equals()`/`hashCode()`/`toString()`
+
+**数学本质**：Record 是**积类型**（product type），其所有字段构成数据的笛卡尔积。
 
 ## 发展历程
 
@@ -143,10 +174,11 @@ JDK 8 前使用永久代（PermGen）存储类元数据，存在大小上限（�
 | 1995 | Java 1.0 发布 | WORA 理念确立，字节码抽象层 |
 | 2006 | Sun 开源 Java（OpenJDK） | 字节码规范开放 |
 | 2010 | Oracle 收购 Sun | Java 进入 Oracle 时代 |
-| 2017 | Java 9 改为每 6 个月一个新版本 | 模块化系统（Jigsaw）引入 |
-| 2021 | Java 17 LTS | ZGC、密封类等现代特性成熟 |
-| 2023 | Java 21 LTS | **虚拟线程**正式加入（协程模型） |
-| 2025 | Java 25 | Instance Main Methods 简化入口代码 |
+| 2014 | Java 8 LTS | Lambda 表达式、Stream API、默认方法 |
+| 2017 | Java 9 | 模块化系统（Jigsaw）、每 6 个月一个新版本 |
+| 2018 | Java 11 LTS | 移除 Java EE 和 CORBA 模块、HTTP Client API |
+| 2021 | Java 17 LTS | **密封类**正式稳定、Pattern Matching for switch（预览） |
+| 2023 | Java 21 LTS | 虚拟线程正式加入（协程模型）、record 模式匹配 |
 
 ## 参考存根
 
@@ -168,3 +200,23 @@ public class HelloWorld {
 ```
 
 `main` 方法签名固定是 Java 语言的契约，由 JVM 在启动时寻找并作为入口。
+
+```java
+// sealed class 示例（Java 17）
+sealed interface Shape permits Circle, Rectangle, Triangle {}
+
+final class Circle implements Shape {
+    private final double radius;
+    Circle(double radius) { this.radius = radius; }
+    double getRadius() { return radius; }
+}
+
+sealed class Rectangle implements Shape {
+    private final double width, height;
+    Rectangle(double w, double h) { this.width = w; this.height = h; }
+    double getWidth() { return width; }
+    double getHeight() { return height; }
+}
+
+final class Triangle implements Shape {}
+```
