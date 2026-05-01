@@ -2,6 +2,8 @@
 
 ## 定义
 
+> **版本基准**: universal
+
 Range Minimum (Maximum) Query（RMQ）：给定数组 $A[1..n]$，预处理后可在 $O(1)$ 或 $O(\log n)$ 时间内回答区间 $[l, r]$ 的最小值（或最大值）的位置/值。
 
 RMQ 是许多字符串问题（如 LCA 最近公共祖先）的基础构件——LCA 问题可归约为 RMQ，RMQ 也可归约为 LCA，两者的预处理方案可以互相转化。

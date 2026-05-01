@@ -1,5 +1,7 @@
 # CI/CD
 
+> **版本基准**: universal
+
 ## 定义
 
 CI/CD 是将代码变更从提交到生产的自动化流水线实践，包括持续集成（Continuous Integration）、持续交付（Continuous Delivery）和持续部署（Continuous Deployment）。CI 确认每次提交都通过质量门禁；CD 将代码变更自动推进到预生产环境；持续部署进一步自动化到生产环境。

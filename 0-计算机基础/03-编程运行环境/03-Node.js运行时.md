@@ -1,5 +1,7 @@
 # Node.js 运行时
 
+> **版本基准**: universal
+
 ## 定义
 
 Node.js 是基于 V8 JavaScript 引擎的 **事件驱动、非阻塞 I/O 运行时**。它通过**单线程事件循环**在单进程内实现高并发，而非通过多线程。V8 本身是 JIT 型 JavaScript 引擎，负责 JavaScript 到机器码的动态编译。Node.js 提供 JavaScript 无法直接操作的系统资源（文件、网络、加密）接口，封装了 libuv 提供的事件循环和线程池。

@@ -1,5 +1,7 @@
 # HTTPS与TLS
 
+> **版本基准**: universal
+
 ## 定义
 
 HTTPS是HTTP over TLS的组合，TLS运行在TCP之上，在TCP三次握手完成后进行TLS握手，建立加密会话后传输HTTP语义数据，实现传输层机密性、完整性保护和服务器身份认证。

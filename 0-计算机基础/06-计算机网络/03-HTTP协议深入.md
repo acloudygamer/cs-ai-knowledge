@@ -1,5 +1,7 @@
 # HTTP协议深入
 
+> **版本基准**: universal
+
 ## 定义
 
 HTTP是面向文本的无状态应用层协议，定义客户端与服务器之间请求-响应语义，以 METHOD + URI + headers + body 为数据交换格式，通过TCP连接传输。

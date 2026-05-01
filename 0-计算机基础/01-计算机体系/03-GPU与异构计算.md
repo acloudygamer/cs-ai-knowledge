@@ -1,5 +1,7 @@
 # GPU 与异构计算
 
+> **版本基准**: universal
+
 ## 定义
 
 异构计算是使用不同类型处理器（CPU+GPU/FPGA）协同完成计算，通过各自擅长的任务类型实现优势互补。CPU 设计追求低延迟（Latency-optimized），擅长复杂分支和串行任务；GPU 设计追求高吞吐（Throughput-optimized），擅长大规模数据并行任务。

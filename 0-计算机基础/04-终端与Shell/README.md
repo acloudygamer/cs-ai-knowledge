@@ -1,5 +1,7 @@
 # 终端与Shell
 
+> **版本基准**: universal
+
 ---
 updated: 2026-04-25
 versions:
