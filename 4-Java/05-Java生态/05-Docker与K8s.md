@@ -28,6 +28,8 @@ $$\frac{T_A}{T_B} = \frac{w_A}{w_B}$$
 
 权重是相对值，不是绝对值。若只有一个容器，即使权重很低也能使用全部空闲 CPU。
 
+**归约视角**：cgroup 资源限制可归约为**令牌桶模型的资源配额分配**——每个 cgroup 按权重或配额获得资源份额。
+
 ### Kubernetes 调度器的装箱算法（Bin Packing）
 
 Pod 调度 = 将 Pod 放入最优节点，本质是 **多维装箱问题（Multi-dimensional Bin Packing）**：
@@ -42,6 +44,11 @@ $$Score_i = w_1 \cdot \frac{\text{CPU\_used}}{\text{CPU\_allocatable}} + w_2 \cd
 
 得分最高的节点被选中调度。
 
+**FFD 算法的不变量**：
+$$\text{装箱后的平均利用率} \geq \frac{1}{\text{OPT} + 1} \cdot 100\%$$
+
+其中 OPT 为最优装箱的箱数。FFD 的近似比为 $\frac{11}{9} \cdot \text{OPT}$。
+
 ### Pod QoS 的优先级建模
 
 Kubernetes 为 Pod 分配 QoS 类别：**Guaranteed > Burstable > BestEffort**
@@ -54,6 +61,8 @@ Kubernetes 为 Pod 分配 QoS 类别：**Guaranteed > Burstable > BestEffort**
 
 **OOM Score 计算**（Linux 内核）：
 $$\text{oom\_score} = \text{base\_score} + \frac{\text{memory\_usage}}{\text{memory\_limit}}$$
+
+**OOM Kill 的数学保证**：OOM Killer 选择 $\max(\text{oom\_score})$ 的进程杀死。Guaranteed Pod 的 oom_score_adj 为 -999，保证其最后被考虑。
 
 ---
 
@@ -136,6 +145,8 @@ Kubelet                    Kubernetes API Server
 - 容器启动极快（只需创建薄的 R/W 层）
 - 镜像构建可复用层缓存
 
+**CoW 的性能代价**：首次写入时需要复制整个文件。若镜像是大文件（如数据库），首次写入延迟可能较高。
+
 ### Pod 的本质：共享命名空间
 
 Pod 内的容器共享：
@@ -145,6 +156,8 @@ Pod 内的容器共享：
 - **PID 命名空间**：容器 1 的进程在容器 2 中可见（Kubernetes 特有的 "shareProcessNamespace"）
 
 **存储卷共享**：通过 `emptyDir` 或 `persistentVolumeClaim`，Pod 内多个容器可读写同一卷。
+
+**归约视角**：Pod 可归约为**共享命名空间的进程组**——Pod 内的容器是同一网络/IPC/UTS 上下文中的独立进程。
 
 ### 探针机制的安全语义
 
@@ -158,6 +171,10 @@ Pod 内的容器共享：
 - `failureThreshold × periodSeconds` 应大于应用最大启动时间
 - livenessProbe 不应检查外部依赖（否则依赖故障会触发无限重启）
 - readinessProbe 失败时 Pod IP 从 Endpoints 移除，但容器不重启
+
+**违反约束的后果**：
+- livenessProbe 检查外部依赖：外部故障 → livenessProbe 失败 → kubelet 重启 → 外部仍故障 → 无限重启
+- 启动时间超过 livenessProbe 容忍：Pod 被误杀
 
 ### Rolling Update 的数学保证
 
@@ -283,3 +300,13 @@ echo "536870912" > /sys/fs/cgroup/system.slice/container.scope/memory.max
 
 **约束满足性**：
 $$\text{CPU}_{\text{usage}} \leq \frac{\text{CPU}_{\text{quota}}}{\text{CPU}_{\text{period}}}$$
+
+### 容器网络模型与主机网络的对比
+
+| 维度 | 容器独立网络 | 主机网络（--network=host） |
+|------|-------------|--------------------------|
+| IP 地址 | 独立（veth pair） | 共享主机 IP |
+| 端口空间 | 隔离（可重复监听相同端口） | 冲突（不可重复监听） |
+| 网络栈 | 独立（eth0、路由表、iptables） | 共享主机网络栈 |
+| 通信延迟 | 额外 veth 跳转 | 无额外跳转 |
+| 安全性 | 隔离强 | 隔离弱 |

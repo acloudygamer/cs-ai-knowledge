@@ -160,10 +160,12 @@ fuse-status: 硬性计数 X/2 软性计数 X/3
 **加载约定**：每次 TeamCreate 后，Lead 必须确认每个 teammate 已加载对应 Agent 定义。
 SendMessage `[DISPATCH]` 时附带说明：`请先阅读 .claude/agents/<role>.md 了解业务规则`
 
-## 关闭团队
+## Team Skill
 
-所有目录完成后，Lead 执行：
-1. TaskList 确认所有任务 completed
-2. SendMessage `[DISPATCH]` 给所有 teammate：`任务全部完成，请确认关闭`
-3. 等待所有 teammate 回复 `[REPLY] 已确认`
-4. TeamDelete 清理团队
+团队协作操作手册：`.claude/skills/agent_team.md`
+
+## Team 清理
+
+完成团队工作后，执行 `TeamDelete` 清理团队。
+
+如果 TeamDelete 失败（`Already leading`），直接创建新 team 继续工作，不阻塞等待。

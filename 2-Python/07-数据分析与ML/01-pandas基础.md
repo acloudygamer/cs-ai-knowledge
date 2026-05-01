@@ -91,9 +91,28 @@ Transform / Aggregate（向量化操作）
 Writer（df.to_csv 等）─── DataFrame ──▶ 外部格式
 </pre>
 
-**内存所有权**：pandas 采用写时复制（Copy-on-Write）策略。链式赋值（如 `df["A"][0] = 1`）先触发 DataFrame 拷贝再写入，防止意外修改原始数据。`inplace=True` 参数可绕过拷贝直接修改，但已被 deprecate。
+**内存所有权**：pandas 采用写时复制（Copy-on-Write，CoW）策略。链式赋值（如 `df["A"][0] = 1`）先触发 DataFrame 拷贝再写入，防止意外修改原始数据。
+
+> **Python 3.14+**：Copy-on-Write 默认开启（`copy_on_write=True`），所有链式操作在修改前显式拷贝，替代已废弃的 `inplace=True`。
 
 ## 机制
+
+### Copy-on-Write 语义（Python 3.14+）
+
+pandas 的 Copy-on-Write 确保所有链式赋值不会产生意外副作用：
+
+```python
+df = pd.DataFrame({"A": [1, 2, 3], "B": [4, 5, 6]})
+df2 = df[df["A"] > 1]      # CoW：df2 视图共享 df 的底层数据
+df2.loc[0, "B"] = 999       # 触发拷贝：df2 获得独立副本
+# df["B"] 仍为 [4, 5, 6]（未被修改）
+```
+
+**触发条件**：当对视图 DataFrame 进行写入操作（`__setitem__`、`rename`、`reindex`、`melt`、`pivot` 等）时，CoW 机制触发物理拷贝。读操作（`df[mask]`、`df.head()`）保持零拷贝视图。
+
+**约束**：CoW 仅在以下条件同时满足时触发——(1) `copy_on_write` 选项开启（Python 3.14+ 默认）；(2) 存在数据共享（切片视图、`.loc` 返回的视图等）；(3) 写入操作修改了该共享数据。若写入的是原始 DataFrame（非视图），则直接修改，无 CoW 开销。
+
+**违反后果**：若在 CoW 关闭时对视图写入，原始 DataFrame 也会被修改——这在数据分析中是隐蔽的数据污染源，尤其在函数边界处（传入 DataFrame，函数内部视图修改，调用方外部数据被意外改动）。
 
 ### 索引系统的本质
 
@@ -159,6 +178,11 @@ df = pd.DataFrame({"city": ["BJ"] * 100000 + ["SH"] * 100000})
 print(df["city"].nbytes)        # ~1.6 MB（object）
 df["city"] = df["city"].astype("category")
 print(df["city"].nbytes)        # ~200 KB（category）
+
+# Copy-on-Write（Python 3.14+）
+df = pd.DataFrame({"A": [1, 2, 3], "B": [4, 5, 6]})
+df2 = df[df["A"] > 1]           # 视图，无拷贝
+df2.loc[2, "B"] = 999          # CoW 触发物理拷贝，df 不受影响
 
 # groupby + 聚合
 df = pd.DataFrame({"city": ["BJ", "SH", "BJ"], "sales": [100, 200, 150]})

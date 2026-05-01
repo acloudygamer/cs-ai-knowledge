@@ -21,6 +21,11 @@ $$L = \lambda W$$
 - 中间件链的 $N_{\text{mw}}$（每个中间件增加 $\mathbb{E}[S]$）
 - 连接池大小 $K$（当 $\rho > 0.7$ 时应扩容）
 
+**队列饱和分析**：M/G/1 队列的平均响应时间公式：
+$$W = \frac{\lambda \mathbb{E}[S^2]}{2(1-\rho)} + \mathbb{E}[S]$$
+
+其中 $\mathbb{E}[S^2]$ 是服务时间的二阶矩。当 $\rho \to 1$ 时，分母 $1-\rho \to 0$，响应时间 $W \to \infty$——这是队列饱和的数学表述。
+
 ### ORM 查询代价的形式化分析
 
 Django ORM 查询代价由三部分构成：解析代价 + 网络代价 + 计算代价。
@@ -55,6 +60,14 @@ Django URL 分派使用正则匹配，路径表达式编译为以下优先序列
 
 **约束**：若路径 `/items/<int:id>/delete` 放在 `/items/<int:id>` 之后，由于线性扫描的首次匹配原则，删除路径永远不会被匹配到——因为泛型路径已先匹配。
 
+### 中间件的格代数
+
+Django 中间件链构成一个**格（lattice）结构**。设中间件集合 $M = \{M_1, M_2, \ldots, M_n\}$，定义偏序关系：
+
+$$M_i \prec M_j \iff i < j \text{（在 settings.py 中的注册顺序）}$$
+
+`process_request` 沿此偏序向下传播，`process_response` 逆序向上返回。这个结构形成一个**有界格**——顶为最末注册的中间件，底为最先注册的中间件。
+
 ## 数据流
 
 <pre>
@@ -74,6 +87,7 @@ Middleware.process_request ──▶ 视图
     │                              ▼
     │                         ORM 查询（惰性求值）
     │                         首次遍历/求值才触发 SQL
+    │                         QuerySet 持有 SQL 描述 + 缓存
     │                              │
     │                              ▼
     │                         模板渲染（Jinja2）
@@ -95,6 +109,8 @@ WSGI Response（bytes 流）
 - ORM QuerySet → **惰性求值**：首次遍历才触发 SQL，结果缓存于 QuerySet 内部
 - 模板 Context → 模板引擎持有，渲染完成后释放
 - `HttpResponse` → 最终字节流，写入 WSGI 输出缓冲
+
+**关键中间态**：QuerySet 是查询的**描述对象**而非结果集。它持有 SQL 字符串和参数，直到首次求值（遍历、切片、`count()`、`list()`）时才真正执行查询。
 
 ## 对比参照
 
@@ -195,6 +211,8 @@ Django 迁移是数据库架构的版本化描述，由 `makemigrations` 生成�
 
 **版本化约束**：迁移必须可正向和反向应用。`migrate` 记录已应用的迁移版本，若回滚， Django 按记录逆向执行迁移序列。
 
+**迁移状态机**：迁移系统维护一个状态机，状态为已应用/未应用的迁移名称集合。`migrate` 命令执行时，系统根据当前状态计算需要应用或回滚的迁移序列，保证最终一致性。
+
 ### 会话与认证的解耦设计
 
 Django 的会话框架与认证框架完全解耦：
@@ -203,6 +221,8 @@ Django 的会话框架与认证框架完全解耦：
 - **认证**：处理用户密码哈希、登录/登出、权限检查，与会话通过 `request.user` 关联
 
 密码哈希使用 PBKDF2（默认）或 Argon2，通过 `make_password` / `check_password` 操作。这将用户提供的明文密码与存储的哈希比对，**不在任何地方存储明文密码**。
+
+**PBKDF2 的安全性**：PBKDF2 通过迭代哈希 $H^n(\text{salt} + \text{password})$ 提供防护。默认配置（SHA256，360,000 次迭代）使每次密码验证计算代价约 100ms，难以暴力破解。
 
 ## 参考存根
 
@@ -227,4 +247,11 @@ print(connection.queries[-1]['sql'])  # 打印实际 SQL
 # 在模板中预加载 vs 循环查询的代价对比
 # 预加载：SELECT ... JOIN category WHERE price > 100（1次）
 # 循环：SELECT ... WHERE id=1; SELECT ... WHERE id=2; ...（N次）
+
+# 中间件短路示例
+class RateLimitMiddleware:
+    def process_request(self, request):
+        if self.is_rate_limited(request):
+            return JsonResponse({'error': 'rate limited'}, status=429)
+        # 返回 None 继续处理链
 ```

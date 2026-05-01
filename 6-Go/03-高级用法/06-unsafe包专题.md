@@ -31,6 +31,11 @@ uintptr：纯整数，不持有 GC 根，GC 不知道它引用了哪个对象
 
 设对象地址为 `addr`，存活概率 $P_{alive}(t)$ 随 GC 轮次递减。`uintptr` 持有的地址在下一轮 GC 后可能指向已释放对象——这是**悬挂指针**的数学根源。
 
+**悬挂指针的概率模型**：
+
+设 $P_{gc}(t)$ 为 $t$ 时刻发生 GC 的概率：
+$$P_{悬挂} = P(\text{uintptr 指向已释放对象}) = \sum_{t} P_{gc}(t) \cdot P_{对象已死|gc}(t)$$
+
 **归约终点**：指针安全问题的本质是**所有权归属**——GC 追踪的对象永远安全，不被追踪的对象在 GC 后可能失效。
 
 ## 数据流
@@ -69,6 +74,16 @@ string（只读）
     ▼
 若需写时拷贝：bytes.Clone() 或手动 make + copy
 </pre>
+
+**零拷贝的所有权约束**：
+
+```go
+// string 和 []byte 共享底层数组
+s := "hello"
+b := unsafe.Slice((*byte)(unsafe.StringData(s)), len(s))
+// b 指向 s 的底层数组，不拷贝
+// 写入 b 会导致未定义行为
+```
 
 ### Sizeof/Alignof/Offsetof 的内存布局模型
 
@@ -125,6 +140,12 @@ uintptr 问题：
 - uintptr 算术运算必须在同一个表达式内完成 `unsafe.Pointer(p) + offset`
 - 禁止将 uintptr 存储到变量中跨 GC 调用
 
+**违反约束的数学后果**：
+
+设 $addr_{original}$ 为对象原始地址，$addr_{moved}$ 为 GC 后新地址：
+$$addr_{uintptr} = addr_{original}$$
+$$addr_{moved} \neq addr_{original} \implies addr_{uintptr} \text{ 指向已释放内存}$$
+
 ### 结构体字段偏移的运行时确定性
 
 Go 编译器为每个 struct 类型生成**编译期固定的偏移表**。`unsafe.Offsetof` 是编译器内部已知信息的运行时查询接口：
@@ -138,9 +159,28 @@ Go 编译器为每个 struct 类型生成**编译期固定的偏移表**。`unsa
 **对齐要求**：字段偏移必须是字段大小的整数倍，或结构体对齐要求（二者取小）。
 
 **结构体大小公式**：
+
 $$Size(T) = \sum_{i} (Align(Field_i) - 1 + Size(Field_i)) \approx \sum_{i} Size(Field_i) + Padding_i$$
 
 这保证了任意字段的地址都是该字段大小或结构体对齐的倍数。
+
+**对齐的约束**：
+
+| 字段类型 | 大小 | 对齐要求 |
+|---------|------|---------|
+| bool | 1 | 1 |
+| int8 | 1 | 1 |
+| int16 | 2 | 2 |
+| int32 | 4 | 4 |
+| int64 | 8 | 8 |
+| float32 | 4 | 4 |
+| float64 | 8 | 8 |
+| *T | 8 | 8 |
+
+**padding 的计算**：
+
+设字段 $i$ 的起始偏移为 $offset_i$，大小为 $size_i$，对齐为 $align_i$：
+$$offset_i = \lceil offset_{i-1} + size_{i-1} \rceil_{align_i}$$
 
 ## 参考存根
 
@@ -185,13 +225,35 @@ _ = unsafe.Alignof(User{})  // 8
 | `*T → uintptr → 算术 → unsafe.Pointer → *T2` | 不安全 | GC 可能在算术运算期间移动对象 |
 | `unsafe.StringData` + 写操作 | 不安全 | string 底层是只读的 |
 
+**安全操作的数学保证**：
+
+`*T → unsafe.Pointer → *T2` 是安全的，因为：
+$$\text{unsafe.Pointer 持有 GC 根} \implies \text{对象在 GC 期间保持可达}$$
+
 ### 跨平台兼容
 
 不同架构的字段偏移可能不同，必须使用 `unsafe.Offsetof` 获取**运行时偏移**，而非硬编码常量。
 
+**偏移的架构差异**：
+
+| 架构 | int 大小 | 指针大小 | 典型对齐 |
+|------|---------|---------|---------|
+| amd64 | 8 | 8 | 8 |
+| arm64 | 8 | 8 | 8 |
+| 386 | 4 | 4 | 4 |
+
 ### 升级兼容性
 
 Go 版本升级可能导致结构体布局变化。使用 `unsafe` 操作结构体字段的项目必须在每次 Go 升级后重新测试。
+
+**Go 1 兼容性承诺的边界**：
+
+Go 1 承诺：
+- 旧版本编译的二进制兼容新版本
+- 但结构体布局可能在不同版本间变化
+
+使用 `unsafe` 访问结构体字段意味着：
+$$V_{go升级} \implies \text{必须重新编译并测试}$$
 
 ## 性能与安全权衡
 
@@ -213,3 +275,10 @@ Go 版本升级可能导致结构体布局变化。使用 `unsafe` 操作结构�
 - 直接内存 I/O
 
 **代价**：失去 Go 的内存安全保证，程序行为完全依赖程序员正确性。
+
+**形式化安全性**：
+
+设程序使用 `unsafe` 的操作集合为 $U$：
+$$安全 \iff \forall u \in U: u \text{ 满足 unsafe 的约束}$$
+
+违反任一约束即导致未定义行为。

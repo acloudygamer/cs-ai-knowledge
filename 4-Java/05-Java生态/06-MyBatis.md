@@ -26,6 +26,12 @@ MyBatis 是 **SQL 映射框架**，本质是将 SQL 语句从 Java 代码中分�
 
 **JOIN FETCH 的 trade-off**：单次查询返回数据量约 $N \times K$ 行，数据量过大时可能撑爆网络缓冲区。
 
+**网络往返的数学约束**：设网络往返延迟为 $T_{\text{rtt}}$，则：
+$$T_{\text{total}}(N+1) = T_{\text{rtt}} \cdot (1 + N)$$
+$$T_{\text{total}}(JOIN) = T_{\text{rtt}} \cdot 1 + T_{\text{DB}}(N \cdot K)$$
+
+当 $N$ 很大时，$T_{\text{rtt}} \cdot N$ 成为主导因素。
+
 ### OGNL 表达式求值器
 
 OGNL（Object-Graph Navigation Language）用于动态 SQL 的条件判断。设上下文对象为 $ctx$，表达式 $e$ 求值为布尔值：
@@ -164,6 +170,8 @@ $$R = R_1 \circ R_2 \circ R_3 \circ \cdots$$
 
 每个拦截器的 `plugin()` 方法返回包装后的代理对象，按注册顺序形成嵌套代理。
 
+**归约视角**：拦截器链可归约为**函数复合（Function Composition）**——每个拦截器是一个函数，复合后的函数在目标方法执行前后添加横切逻辑。
+
 ### 分页插件的物理分页与逻辑分页
 
 MyBatis 的分页实现两种方式：
@@ -260,3 +268,12 @@ Java Object  ⇄  Database Row
 ```
 
 两种范式各有适用场景：MyBatis 适合 SQL 复杂、优化要求高的场景；JPA 适合对象模型复杂、业务逻辑为主的场景。
+
+### SQL-Mapping 范式的数学本质
+
+MyBatis 的 SQL-Mapping 可形式化为一个**函数**：
+$$f: \text{SQL} \times \text{Params} \rightarrow \text{ResultSet} \rightarrow \text{Java Object}$$
+
+每一层都有明确的输入输出，且整个过程是确定性的——给定相同 SQL、相同参数、相同数据库状态，映射结果完全相同。
+
+这与 JPA 的 ORM 不同：JPA 的查询过程是 `EntityManager` 内部实现的，对开发者不透明。

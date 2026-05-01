@@ -180,6 +180,48 @@ $$
 
 **用途**：中位数计算（`nth = first + size/2`）、top-k 问题（分区后对前半部分递归排序）。
 
+### C++23 std::ranges::to 的容器转换语义
+
+**[C++23]** `std::ranges::to<Container>()` 将任何 range 直接转换为容器，消除了 `push_back` 循环的模板代码：
+
+$$
+\text{ranges\_to}: \text{Range} \times \text{ContainerType} \rightarrow \text{ContainerType}
+$$
+
+**转换路径的数学描述**：
+
+```cpp
+// 旧方式：显式循环
+std::vector<int> v;
+for (auto x : some_range) v.push_back(x);
+
+// C++23：声明式转换
+auto v = some_range | std::views::transform(f) | std::ranges::to<std::vector<int>>();
+
+// 或更直接
+std::vector<int> v = some_range | std::ranges::to<std::vector>();
+```
+
+**类型推导的约束**：
+
+`ranges::to<T>()` 要求目标容器 `T` 满足 `std::ranges::container`（即有 `insert`/`push_back`/`emplace` 成员）。推导形式允许编译器推断目标类型：
+
+```cpp
+// 自动推导：目标容器从上下文推断
+auto v = some_range | std::ranges::to<std::vector>();  // 推导出 std::vector<range的元素类型>
+```
+
+**与 `std::accumulate` 的对比**：
+
+| 维度 | `accumulate` | `ranges::to` |
+|------|--------------|--------------|
+| 表达能力 | 仅数值聚合 | 任意容器构造 |
+| 语法 | 函数式 | 管道式 |
+| 类型安全 | 模板参数指定 | 自动推导 |
+| 组合性 | 嵌套调用 | `|` 管道组合 |
+
+**数学本质**：`ranges::to` 是**函子（Functor）**在 range 上的具体化——它保持 range 的"形状"信息（元素类型、迭代器类别），同时完成容器所有权的分配与初始化。
+
 ## 参考存根
 
 ```cpp

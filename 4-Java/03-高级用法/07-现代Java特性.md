@@ -92,6 +92,8 @@ $$\text{sealedStatus}(C_i) \in \{\text{sealed}, \text{non-sealed}, \text{final}\
 
 $$\bigcup_{i} \text{covered}(case_i) = \bigcup_{C \in P} \text{leafTypes}(C)$$
 
+**违反穷尽性**：编译错误——编译器无法证明所有可能情况都被处理。
+
 ### 数据流
 
 <pre>
@@ -264,6 +266,8 @@ synchronized(obj) {
 }
 // 替代方案：ReentrantLock（可中断、可超时）
 ```
+
+**归约终点**：虚拟线程的调度模型可归约为**用户态协程**——通过 `park()`/`unpark()` 实现协作式任务切换，与Go的goroutine、Erlang的actor模型本质相同。
 
 ---
 

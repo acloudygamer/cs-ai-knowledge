@@ -42,6 +42,14 @@ JSON 序列化的本质是**带类型的字符串序列化**：在保持类型�
 | 内存分配 | 每字段 1-2 次 | 最多 1 次 |
 | 适用场景 | 通用结构 | 特殊类型（time.Time 等） |
 
+### encodeState 的复用机制
+
+`json.Marshal` 内部使用 `encodeState` 缓冲池复用：
+
+$$A_{stdlib} = \frac{\text{每字段分配次数}}{N_{字段}} \approx 1.5 \text{次/字段}$$
+
+对象池将分配成本均摊到多次序列化，避免每次重新分配缓冲区。
+
 ## 数据流
 
 ### Marshal 过程
@@ -63,7 +71,7 @@ Go 结构体
 
 **数据所有权变换**：
 - 输入：Go 结构体（堆/栈内存）
-- 中间：临时字符串缓冲区
+- 中间：临时字符串缓冲区（sync.Pool 复用）
 - 输出：完整 JSON 文本（堆内存）
 
 ### 流式解析（json.Decoder）
@@ -79,6 +87,10 @@ JSON 文件/流
     ▼
 无需一次性加载整个文件
 </pre>
+
+**流式解析的内存优势**：设 JSON 文件大小为 $M$，目标结构体大小为 $S$，内存复杂度：
+- `json.Unmarshal`：$O(M)$ 内存（一次性加载）
+- `json.Decoder`：$O(S)$ 内存（逐个处理）
 
 ### 自定义序列化
 
@@ -138,22 +150,7 @@ var m map[K]V = map[K]V{}  // 空映射，Go 1.24+ omitzero 会跳过
 
 性能提升：3-10 倍，取决于字段数和复杂度。
 
-### encodeState 的复用机制
-
-`json.Marshal` 内部使用 `encodeState` 缓冲池复用，避免每次序列化重新分配：
-
-```go
-// 简化原理
-var encodeStatePool = sync.Pool{
-    New: func() interface{} { return &encodeState{} },
-}
-
-func Marshal(v interface{}) ([]byte, error) {
-    enc := encodeStatePool.Get().(*encodeState)
-    defer encodeStatePool.Put(enc)
-    // 使用 enc 进行序列化
-}
-```
+**代码生成的数学本质**：将反射的运行时类型查找 $O(1)$ per field 转变为编译时确定的直接字段访问，消除了反射的间接层。
 
 ## 参考存根
 

@@ -14,6 +14,8 @@ $$\text{Workflow} = (J, E),\ J = \{\text{job}_i\},\ E \subseteq J \times J$$
 
 并行 jobs 满足 $j_a \nrightarrow j_b \land j_b \nrightarrow j_a$；串行 jobs 满足偏序关系。Job 内各 step 按声明顺序执行。
 
+**DAG 的拓扑排序**：工作流调度器对 DAG 进行拓扑排序，确定 jobs 的执行顺序。拓扑排序结果不唯一，但必须满足所有偏序约束。
+
 ### 缓存命中率
 
 CI 缓存的目的是减少重复依赖下载。缓存 key 的设计直接影响命中率：
@@ -39,6 +41,23 @@ $$\text{key} = \text{prefix} + \text{hash}(\text{dependencies-files})$$
 $$\text{gate}(coverage, threshold) = \begin{cases} \text{pass} & coverage \geq threshold \\ \text{fail} & coverage < threshold \end{cases}$$
 
 `--cov-fail-under=80` 表示覆盖率低于 80% 时 CI 任务失败。
+
+### Matrix 策略的组合数学
+
+Matrix 是笛卡尔积展开：
+
+$$\text{jobs} = |python-version| \times |os| \times |custom-vars|$$
+
+```yaml
+strategy:
+  matrix:
+    python-version: ["3.12", "3.14"]
+    poetry-version: ["1.7", "1.8"]
+```
+
+产生 $2 \times 2 = 4$ 个并行 job 实例，每个消耗独立虚拟机实例和配额。
+
+**资源消耗的数学约束**：总资源消耗为 $O(\prod |dim_i|)$。若维度过多，job 数量指数增长可能导致配额耗尽。
 
 ## 数据流
 
@@ -105,18 +124,9 @@ GitHub Actions 工作流运行在云端虚拟机（runner）中，每个 job 在
 
 ### Matrix 策略
 
-Matrix 是笛卡尔积展开：
+Matrix 是笛卡尔积展开，产生 $2 \times 2 = 4$ 个并行 job 实例，每个消耗独立虚拟机实例和配额。Matrix 的每个维度独立展开，总实例数为各维度基数的乘积。
 
-$$\text{_jobs} = |python-version| \times |os| \times |custom-vars}|$$
-
-```yaml
-strategy:
-  matrix:
-    python-version: ["3.12", "3.14"]
-    poetry-version: ["1.7", "1.8"]
-```
-
-产生 $2 \times 2 = 4$ 个并行 job 实例，每个消耗独立虚拟机实例和配额。Matrix 的每个维度独立展开，总实例数为各维度基数的乘积。
+**约束**：Matrix 维度过多会导致 job 数量指数增长。例如 4 个维度各 3 个值产生 81 个 job，可能耗尽 GitHub Actions 的并发配额。
 
 ### 缓存机制
 
@@ -186,6 +196,7 @@ $$\text{envlist} = \{\text{py312}, \text{py313}, \text{py314}, \text{lint}, \tex
 - **缓存 key 过于宽泛**：依赖包小版本更新但缓存未失效，安装了过期依赖
 - **跨 job 状态泄露**：依赖前序 job 的副作用状态，导致测试顺序依赖
 - **秘密信息泄露**：将 `secrets.XXX` 打印到日志，或在矩阵 job 中将 secret 传给不信任的 action
+- **Matrix job 数量过多**：超出 GitHub Actions 并发配额，部分 job 排队等待
 
 ## 参考存根
 

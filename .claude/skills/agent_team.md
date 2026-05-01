@@ -169,56 +169,18 @@ SendMessage(to: "reviewer", message: "[HANDOVER] deliverables: [<文件A>.md, <�
 ## 场景四：关闭团队
 
 ### 1. 确认所有任务完成
-
 ```
 TaskList
-# 确认所有任务 status: completed
 ```
 
 ### 2. 发送关闭请求
-
 ```
-SendMessage(to: "reviewer", message: "任务全部完成，请关闭会话")
-SendMessage(to: "architect", message: "任务全部完成，请关闭会话")
+SendMessage(to: "teammate", message: "任务完成，请确认关闭")
 ```
 
-### 3. 等待确认并解散
+### 3. TeamDelete 清理团队
 
-- 所有 teammate 确认关闭（approve: true）后
-- TeamDelete 清理团队
-
-### 关闭前检查清单
-
-```
-1. TaskList 所有任务 completed？
-2. 每个 teammate 都收到关闭消息？
-3. 所有 teammate 都已 approve？
-```
-
-### 关闭异常处理
-
-**"失联"vs"拒绝"的区分**：
-
-| 现象 | 原因 | 处理 |
-|------|------|------|
-| SendMessage 发不出/无响应 | Teammate 进程僵死或断连 | 重试 3 次，仍无响应视为失联 → 标记异常退出，通知用户手动 TeamDelete |
-| 发出了但 teammate 回复拒绝 | Teammate 认为任务未完成 | 确认任务状态，若确实完成则再次请求关闭 |
-
-**失联处理**（不适用强制关闭）：
-```
-1. TaskList 确认该 teammate 的任务实际状态
-2. TaskUpdate 手动标记其任务为 completed（如未标记）
-3. 在主会话中通知用户：该 teammate 已失联，请手动 TeamDelete
-4. 标记该 teammate 为异常退出
-```
-
-**拒绝关闭处理**（Teammate 逻辑上拒绝）：
-```
-1. TaskList 确认任务确实已完成
-2. TaskUpdate 手动标记其任务为 completed（如未标记）
-3. SendMessage(to: "拒绝的 teammate", message: "任务已完成，请确认关闭请求")
-4. 等待回复，仍拒绝则通知用户手动处理
-```
+如果 TeamDelete 失败，直接创建新 team 继续工作，不强制清理残留目录。
 
 ---
 
@@ -318,12 +280,3 @@ which tmux  # 验证 tmux 可用
 { "teammateMode": "split-pane" }
 ```
 
-#### tmux 推荐配置（~/.tmux.conf）
-
-支持通知透传和功能键：
-
-```bash
-set -g allow-passthrough on
-set -s extended-keys on
-set -as terminal-features 'xterm*:extkeys'
-```

@@ -25,6 +25,9 @@ Go 中的保证：
 
 **Data Race** = 两个操作对同一地址并发读写，且无 happens-before 关系
 
+形式化：
+$$\text{data\_race}(op_1, op_2) \iff \text{同一地址} \land \text{并发} \land \neg(op_1 \text{ hb } op_2 \lor op_2 \text{ hb } op_1)$$
+
 **归约终点**：并发安全问题的本质是建立可靠的 happens-before 关系，所有同步原语都是建立这种关系的工具。
 
 ### race detector 的检测原理
@@ -52,6 +55,7 @@ race detector 通过 "shadow memory" 跟踪每次内存访问：
 ### 修复模式的正确性证明
 
 **sync.Mutex**：
+
 ```
 Lock() → critical section → Unlock()
   Lock() 之前的写 hb Critical section 内的所有访问
@@ -62,12 +66,14 @@ Lock() → critical section → Unlock()
 ```
 
 **sync.Once**：
+
 ```
 once.Do(f) 保证 f 恰好执行一次（见设计模式章节）
   → 不存在并发初始化 race
 ```
 
 **atomic**：
+
 ```
 atomic store/load 保证原子性：
   硬件保证 store 在同一 cache line 的后续 load 之前完成
@@ -91,6 +97,16 @@ Timeline A (with mutex):
   │
   └── 同一锁保护的 critical section 形成 total order
 </pre>
+
+**Lost Update 的数学表示**：
+
+设 $inc$ 操作包含 $read \rightarrow compute \rightarrow write$：
+$$G_1: r_1(x) \rightarrow w_1(x+1)$$
+$$G_2: r_2(x) \rightarrow w_2(x+1)$$
+
+若 $r_1$ 和 $r_2$ 都读到相同值 $x$，则：
+$$w_1(x+1) \text{ hb } w_2(x+1) \implies \text{最终值} = x+2$$
+$$\neg(w_1 \text{ hb } w_2 \lor w_2 \text{ hb } w_1) \implies \text{最终值} = x+1 \text{（丢失一次更新）}$$
 
 ### check-then-act race 的数据流
 
@@ -252,7 +268,9 @@ $$quit \ put \ hb \ quit \ get \ hb \ goroutine \ B \ termination$$
 ```
 
 **COW 的数学性质**：
+
 $$Read \始终返回 \_snapshot_{lastWrite}$$
+
 这保证了读取的一致性，但写入成本高。
 
 ### 两阶段终止
@@ -306,3 +324,21 @@ goroutine A                    goroutine B
 | 检查-使用 race | 检查条件后使用对象 | if ptr != nil { ptr.Do() } |
 | 初始化 race | 多个 goroutine 初始化同一对象 | 单例模式 |
 | 销毁 race | 使用已释放对象 | 析构函数并发调用 |
+
+## 死锁的数学条件
+
+死锁发生当以下四个条件同时满足（Coffer 条件）：
+
+1. **互斥**：资源一次只能被一个 goroutine 持有
+2. **持有并等待**：goroutine 持有资源同时等待其他资源
+3. **不可抢占**：资源不能被强制从 goroutine 手中夺走
+4. **循环等待**：存在 goroutine 的循环等待链 $G_1 \rightarrow G_2 \rightarrow \cdots \rightarrow G_n \rightarrow G_1$
+
+**打破死锁的方法**：
+
+| 条件 | 打破方法 |
+|------|---------|
+| 互斥 | 使用无锁数据结构 |
+| 持有并等待 | 一次性获取所有资源 |
+| 不可抢占 | 使用 timeout 或 try-lock |
+| 循环等待 | 按固定顺序获取锁 |

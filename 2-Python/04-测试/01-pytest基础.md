@@ -8,7 +8,7 @@ pytest 是 Python 的第三方测试框架，其核心设计哲学是**断言即
 
 ### 断言重写机制
 
-pytest 在收集阶段对测试模块进行 AST 变换，将 `assert expr` 替换为增强版断言调用。原始字节码 `assert expr` 仅报告布尔结果；重写后的断言报告子表达式的具体值：
+Python 的原始 `assert expr` 字节码仅报告布尔结果，不携带任何关于 `expr` 内部子表达式的信息。pytest 在收集阶段对测试模块进行 AST 变换，将 `assert expr` 替换为增强版断言调用：
 
 $$
 \text{Rewrite}(\text{assert } e) = \text{AssertExpr}(e, \text{source}(e))
@@ -22,6 +22,10 @@ $$
 \text{fail with introspection} & v = \text{False}
 \end{cases}
 $$
+
+重写后的断言失败时，格式化器捕获原始表达式的 AST 节点，在失败上下文中重新求值各子表达式，从而报告 `a = 1, b = 2, a + b = 4` 而非仅 `AssertionError`。
+
+**归约终点**：断言重写的代价归结为**AST 遍历 + 节点重写 + 源码保留**。AST 遍历本身是 $O(N)$ 的，重写节点数为测试文件中的 assert 语句总数 $K$，总复杂度 $O(N + K)$。
 
 ### 浮点比较
 
@@ -47,7 +51,15 @@ $$
 s \leq t \iff \text{lifetime}(s) \supseteq \text{lifetime}(t)
 $$
 
-高作用域 fixture 在低作用域测试进入时已存在；低作用域测试退出时，高作用域 fixture 继续存活。
+| 关系 | 语义 |
+|------|------|
+| session > module | session 在整个测试会话期间存在 |
+| module > class | module scope 在整个 .py 运行期间存在 |
+| class > function | class scope 在类存在期间存在 |
+
+**格的性质**：
+- 存在上界（session）和下界（function）
+- 任意两个作用域有唯一最小上界（lub）和最大下界（glb）
 
 ### Fixture DAG 的拓扑排序
 
@@ -58,6 +70,8 @@ $$
 $$
 
 pytest 在收集阶段对 DAG 做拓扑排序，保证依赖在被注入前已完成初始化。
+
+**拓扑排序的数学定义**：对 DAG $(V, E)$ 的拓扑排序是顶点序列 $v_1, v_2, \dots, v_n$ 使得对每条边 $(v_i, v_j) \in E$ 都有 $i < j$。
 
 ### raises 的语义模型
 
@@ -71,6 +85,8 @@ $$
 \end{cases}
 $$
 
+**re-raise 的语义**：当 `raises` 块内抛出的异常被匹配后，该异常被压制（不向外传播）。但若异常在 `raises` 块外传播（例如异常从 `raises` 上下文管理器本身抛出），该异常不会被压制，会正常向上传播。这保证了 `pytest.raises` 不会意外吞掉非预期异常。
+
 ## 数据流
 
 <pre>
@@ -80,7 +96,9 @@ pytest 启动
     │      │
     │      ├── 递归搜索 cwd/ 下的 test_*.py、*_test.py
     │      ├── 对每个测试模块执行 AST 重写（assert 增强）
-    │      └── 收集 conftest.py 中的 fixture 定义
+    │      ├── 解析 conftest.py 中的 fixture 定义 → fixture 注册表
+    │      ├── fixture DAG 拓扑排序（检测循环依赖）
+    │      └── 注册插件 hooks（setup / teardown）
     │
     ├── 依赖解析
     │      └── fixture DAG 拓扑排序
@@ -98,6 +116,12 @@ pytest 启动
            └── session scope fixtures teardown
 </pre>
 
+**所有权转移**：
+1. pytest 持有测试会话的所有权
+2. Fixture factory 函数创建资源实例，将**资源所有权**转移给测试函数
+3. 测试函数执行完毕后，通过 yield 将所有权返还给 fixture
+4. Fixture teardown 阶段释放资源，将所有权返还给操作系统/堆
+
 **AST 重写时机**：重写发生在收集阶段而非导入阶段，因此即使测试文件有语法错误，pytest 仍能报告有意义的错误信息（而非 "SyntaxError"）。
 
 ## 机制
@@ -107,6 +131,8 @@ pytest 启动
 pytest 在收集阶段调用 `pytest.assertion.rewrite` 遍历模块 AST，找到所有 `Assert` 节点并替换为 `Call` 节点。重写后的字节码在断言失败时调用 pytest 的断言报告格式化器，该格式化器捕获原始表达式的 AST 节点并在失败时重新求值各子表达式。
 
 **关键约束**：AST 重写要求测试模块可被 Python 解析器成功解析。若测试文件存在 `SyntaxError`，pytest 无法加载该模块，但会在报告前尝试给出具体位置。
+
+**Python assert 字节码行为**：原始 `assert expr` 编译为 `POP_JUMP_IF_TRUE` + `LOAD_ASSERTION_ERROR` + `RAISE_VARARGS`。前者检查expr结果为False时跳转到AssertionError加载，后者触发异常。pytest 的重写将 `assert expr` 替换为函数调用，绕过了这个机制。
 
 ### pytest.raises 的声明式语义
 
@@ -161,6 +187,20 @@ $$
 
 **异常处理**：若 setup 部分抛异常，yield 后的 cleanup 不会执行；若测试函数抛异常，cleanup 仍会执行。
 
+### pytest 的插件架构与 Hook 系统
+
+pytest 的核心是极简的 hook 调度器。插件（无论是内置的还是通过 conftest.py / pytest_plugins 注册的）通过 hook 规范函数参与测试生命周期：
+
+| Hook | 时机 | 典型用途 |
+|------|------|---------|
+| `pytest_collection_modifyitems` | 收集完成后、items 列表已确定 | 动态修改测试项、添加 markers |
+| `pytest_runtest_setup` | 每个测试项执行前 | per-test 资源准备 |
+| `pytest_runtest_teardown` | 每个测试项执行后 | 清理 per-test 资源 |
+| `pytest_report_header` | 报告生成前 | 添加自定义信息到测试报告头 |
+| `pytest_terminal_summary` | 测试会话结束后 | 添加自定义摘要信息 |
+
+**数据流**：hook 调用形成树形结构（而非线性链），每个 hook 点允许多个插件注册，同步执行。插件注册顺序：`pytest_plugins` 变量 → conftest.py → 命令行 `--p` 参数。
+
 ## 约束与违反后果
 
 | 约束 | 违反后果 |
@@ -170,6 +210,7 @@ $$
 | Fixture 在 teardown 中抛出异常 | 该 fixture 的 teardown 未完成，后续 fixture teardown 仍会执行，但最终 pytest 报告多个异常 |
 | 浮点比较使用默认容差过严 | `abs=0` 导致 0.1+0.2 不等于 0.3（默认 rel=1e-7 对零点附近无效） |
 | 异常压制 | pytest.raises 内部 try/except 压制异常 → 测试假阳性通过 |
+| conftest.py 中 import 顺序 | 后导入的 conftest.py 会覆盖先导入的同名 fixture（按文件路径字母顺序） |
 
 ## 参考存根
 
@@ -196,4 +237,10 @@ class TestBank:
     def setup_method(self): pass
     def teardown_method(self): pass
     def test_balance(self): assert True
+
+# 自定义 hook
+def pytest_collection_modifyitems(items):
+    for item in items:
+        if "slow" in item.keywords:
+            item.add_marker(pytest.mark.slow)
 ```

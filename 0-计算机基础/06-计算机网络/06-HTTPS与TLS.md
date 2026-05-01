@@ -286,6 +286,50 @@ $$
 
 给定叶节点和Merkle路径，可以独立验证叶节点在树中的位置。
 
+### HKDF的数学定义
+
+TLS 1.3使用HKDF（HMAC-based Extract-and-Expand Key Derivation Function）从DH共享密钥导出所有会话密钥：
+
+$$
+\text{HKDF-Extract}(salt, ikm) = \text{HMAC}(salt, ikm)
+$$
+
+$$
+\text{HKDF-Expand}(prk, info, len) = \text{HMAC}(prk, info || 0) || \text{HMAC}(prk, info || 1) || \ldots
+$$
+
+HKDF的Extract阶段将任意长度输入转换为固定长度伪随机密钥（PRK），Expand阶段使用PRK生成指定长度的密钥材料。这确保了DH输出的随机性足以用于会话密钥。
+
+### ECDHE密钥交换的数学原理
+
+椭圆曲线Diffie-Hellman交换（ECDHE）基于椭圆曲线离散对数难题：
+
+$$
+Q = x \cdot G
+$$
+
+已知基点 $G$ 和结果 $Q$，求 $x$ 在计算上不可行。ECDHE双方各选择随机私钥 $x$（客户端）和 $y$（服务器），交换公钥 $X = x \cdot G$ 和 $Y = y \cdot G$，然后计算共享密钥：
+
+$$
+K = x \cdot Y = x \cdot (y \cdot G) = (xy) \cdot G = y \cdot X
+$$
+
+监听者只知道 $X$ 和 $Y$，无法得到 $xy$（需要离散对数），因此无法计算 $K$。
+
+### TLS 1.3的5个密码套件
+
+TLS 1.3仅允许5个密码套件，每个指定完整的加密参数组合：
+
+| 密码套件 | 对称加密 | AEAD模式 | HKDF哈希 |
+|----------|----------|----------|----------|
+| TLS_AES_128_GCM_SHA256 | AES-128 | GCM | SHA-256 |
+| TLS_AES_256_GCM_SHA384 | AES-256 | GCM | SHA-384 |
+| TLS_CHACHA20_POLY1305_SHA256 | ChaCha20 | Poly1305 | SHA-256 |
+| TLS_AES_128_CCM_SHA256 | AES-128 | CCM | SHA-256 |
+| TLS_AES_128_CCM_8_SHA256 | AES-128 | CCM-8 | SHA-256 |
+
+GCM和Poly1305都是AEAD模式，同时提供加密和完整性保护。ChaCha20-Poly1305在ARM等低端硬件上性能更优（无硬件加速时）。
+
 ### 违规后果
 
 - **证书过期**：浏览器显示警告，连接可被中间人劫持（用户可能仍选择继续）

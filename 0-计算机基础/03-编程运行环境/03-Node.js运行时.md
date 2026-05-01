@@ -405,7 +405,7 @@ function getX(p) {
 
 **IC 状态转换**：
 ```
-Monomorphic (1种隐藏类) → Polyrnorphic (2-4种隐藏类) → Megamorphic (≥5种隐藏类)
+Monomorphic (1种隐藏类) → Polymorphic (2-4种隐藏类) → Megamorphic (≥5种隐藏类)
 ```
 
 Megamorphic 后，V8 停止内联该调用点，每次访问需要运行时查表。

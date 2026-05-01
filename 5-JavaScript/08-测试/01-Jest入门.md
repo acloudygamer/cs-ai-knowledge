@@ -18,12 +18,7 @@ Jest 的本质是一个**测试执行引擎**：给定测试套件描述（descr
 
 $$\forall i \neq j: \text{state}(t_i) \cap \text{state}(t_j) = \emptyset$$
 
-实际实现中：
-- 全局变量不共享
-- `require()` 缓存按 vm 上下文隔离
-- `jest.mock()` 的伪造对象不跨测试文件泄露
-
-**归约终点**：隔离性归结为进程/上下文资源分配——每个测试获得独立的内存空间，状态泄露被进程边界物理阻断。
+**归约终点**：隔离性归结为**进程级资源分配**——每个测试获得独立的内存空间，状态泄露被进程边界物理阻断。
 
 ### 快照比对的触发条件
 
@@ -31,9 +26,7 @@ $$\forall i \neq j: \text{state}(t_i) \cap \text{state}(t_j) = \emptyset$$
 
 $$\text{match} \iff S_{actual} \equiv S_{expect}$$
 
-不匹配时差异 $\Delta = S_{actual} \setminus S_{expect}$ 即为失败信息。
-
-**触发条件**：快照比对在 `expect(value).toMatchSnapshot()` 调用时执行。首次运行生成基准，后续运行对比基准。
+不匹配时差异 $\Delta = S_{actual} \setminus S_{expect}$ 即为失败信息。快照比对是**全等判定**，而非语义等价。
 
 ### Mock 函数状态机
 
@@ -55,11 +48,21 @@ jest.fn() 初始状态
     └── restoreAllMocks() ──► 若由 spyOn 生成，恢复原始实现
 ```
 
-状态转移语义：
+**状态转移语义**：
 - `mockReturnValue`：设置同步返回值，后续调用返回该值
 - `mockResolvedValue`：设置 Promise resolve 值，`await fn()` 返回该值
 - `mockRejectedValue`：设置 Promise reject 错误，`await fn()` 抛出该错误
 - `mockImplementation`：覆盖整个函数逻辑
+
+**关键区分**：`clearAllMocks()` 仅清空调用记录 `mock.calls`，配置（返回值、实现）保留；`resetAllMocks()` 清空调用记录**且清空配置**，函数恢复到 `jest.fn()` 初始状态。前者适合保持测试间的 mock 配置连续性，后者适合每个测试完全独立。
+
+### Worker Pool 并行执行模型
+
+Jest 默认并行启动 `workers = max(CPU_cores - 1, 1)` 个 worker 进程。设测试文件集合为 $F = \{f_1, ..., f_m\}$，worker 数为 $W$：
+
+$$T_{total} = \max_{i \in [1,m]} T(f_i, \text{worker}(i)) + T_{coord}$$
+
+其中 $\text{worker}(i) = i \mod W$ 负责分发，分发协调开销 $T_{coord}$ 包含 IPC 序列化/反序列化。
 
 ---
 
@@ -72,13 +75,18 @@ jest.fn() 初始状态
 Jest 收集测试文件 (glob: **/*.test.js)
     │
     ▼
-┌───────────────────────────────────────┐
-│  每个测试文件 ──► 子进程/Worker       │
-│     │                                 │
-│     ├── vm 模块创建独立上下文         │
-│     ├── require 缓存隔离              │
-│     └── 全局状态不共享                │
-└───────────────────────────────────────┘
+┌───────────────────────────────────────────────┐
+│  Worker Pool (默认 max(CPU-1, 1) 个 worker)   │
+│     │                                          │
+│     ├── Worker 1 ←→ f₁, f_{1+W}, ...         │
+│     ├── Worker 2 ←→ f₂, f_{2+W}, ...         │
+│     └── ...                                    │
+│         每个 worker:                            │
+│           ├── fork() → 独立进程                │
+│           ├── vm 模块创建独立上下文            │
+│           ├── require 缓存隔离                │
+│           └── 全局状态不共享                   │
+└───────────────────────────────────────────────┘
     │
     ▼
 describe/it 执行
@@ -104,7 +112,7 @@ describe/it 执行
 ### Mock 注入数据流
 
 <pre>
-jest.mock('./module') 声明
+jest.mock('./module') 声明（hoisted 到模块顶部）
     │
     ▼
 模块加载时拦截 (require/import)
@@ -119,25 +127,37 @@ jest.mock('./module') 声明
 调用记录存入 mock.mock.calls
 </pre>
 
-**关键约束**：`jest.mock()` 在**模块加载时**拦截，而非调用时。伪造对象在 import 语句执行前就已生效。
+**关键约束**：`jest.mock()` 在**模块加载时**拦截，而非调用时。伪造对象在 import 语句执行前就已生效。Jest 通过 Babel 插件将所有 `jest.mock()` 调用**提升（hoist）**到模块顶部，确保无论代码中声明位置如何，拦截在所有 import 之前。
 
-### Timer Mock 数据流
+### Timer Mock 数据流与事件循环交互
 
 <pre>
 jest.useFakeTimers() 调用
     │
+    ├── 替换全局 setTimeout → 内部链表节点
+    ├── 替换 setInterval → 内部链表节点
+    └── 替换 process.hrtime → 模拟时钟
+    │
     ▼
-setTimeout/setInterval 被替换为内存时钟
+setTimeout(cb, delay) 注册
+    │
+    ├── 创建节点 {callback: cb, dueTime: clock.now + delay}
+    └── 插入按 dueTime 排序的链表
     │
     ▼
 jest.advanceTimersByTime(ms)
     │
+    ├── clock.now += ms
+    ├── 循环弹出链表头部直到 dueTime > clock.now
+    └── 同步执行所有到期回调（无真实时间等待）
+    │
     ▼
 所有待处理回调按顺序执行
     │
-    ▼
-回调执行无真实时间等待
+    └── 回调执行无真实时间等待，测试速度不受超时影响
 </pre>
+
+**约束**：Timer Mock 只替换全局 `setTimeout`/`setInterval`/`setImmediate`，无法 mock 模块内部闭包捕获的定时器引用。若模块在 `jest.useFakeTimers()` 之前已引用了原始定时器，mock 失效。
 
 ---
 
@@ -145,14 +165,16 @@ jest.advanceTimersByTime(ms)
 
 ### 子进程隔离的代价
 
-Jest 为每个测试文件创建独立进程或 worker 线程。这确保了：
-- 全局变量不泄露
-- 模块缓存不互相影响
-- 内存泄漏不会累积
+Jest 为每个测试文件创建独立进程（默认）或在同一进程内使用 vm 上下文隔离（`--runInBand`）。两种模式对比：
 
-**代价**：进程间通信开销。对于 I/O 密集型测试（如文件操作），隔离开销可能超过测试本身执行时间。
+| 维度 | 并行（默认） | 串行（--runInBand） |
+|------|------------|-------------------|
+| 进程开销 | $T_{fork}$ 一次 | 无额外进程 |
+| 状态隔离 | 进程边界天然隔离 | 需手动清理 |
+| 适用场景 | CPU 密集型测试 | I/O 密集型、调试时 |
+| $T_{total}$ | $T_{fork} + \max(T_i)$ | $\sum T_i$ |
 
-**时间复杂度**：设测试执行时间为 $T_{exec}$，进程启动开销为 $T_{fork}$，总时间为 $T_{total} = T_{fork} + T_{exec}$。当 $T_{exec} \ll T_{fork}$ 时，隔离开销显著。
+**时间复杂度**：当 $T_{exec} \ll T_{fork}$ 时（如大量快速单元测试），并行化收益为负——进程启动开销主导总时间，此时应使用 `--runInBand`。
 
 ### 快照比对的适用场景
 
@@ -166,29 +188,36 @@ Jest 为每个测试文件创建独立进程或 worker 线程。这确保了：
 - 快照需要与源码一起版本控制，diff 需人工审查
 - 输出变化时必须确认是预期行为，否则更新快照
 
-**违反约束的后果**：快照更新未经验证，可能掩盖真实的功能变更。
+**违反约束的后果**：快照更新未经验证，可能掩盖真实的功能变更。典型场景：组件重构后直接 `jest -u` 更新快照，实际 bug 被静默接受。
 
-### 自动 Mock 的拦截点
+### 自动 Mock 的拦截点与 Hoisting 机制
 
-`jest.mock()` 在模块加载时拦截，而非调用时。这意味着：
+`jest.mock()` 在模块加载时拦截，通过 Babel 插件将所有 `jest.mock()` 调用 hoist 到模块顶部：
 
 ```javascript
-jest.mock('./api');  // 声明位置不重要，在 import 之前即可
+// 源代码（jest.mock 在 import 之后）
 import { fetchUser } from './api';
+jest.mock('./api');  // Babel hoist 到顶部
+
+// 实际执行顺序
+jest.mock('./api');  // 1. 拦截
+import { fetchUser } from './api';  // 2. 获取已 mock 的对象
 ```
 
-**机制**：Jest 的模块系统劫持 `require()` 路径解析，对匹配的模块返回伪造对象，而非执行真实模块代码。
+**机制**：Jest 的模块系统劫持 `require()` 路径解析，对匹配模块返回伪造对象，而非执行真实模块代码。这要求伪造对象在被导入前就已完全配置完毕。
 
 ### Timer Mock 的确定性保证
 
 `jest.useFakeTimers()` 将真实时间替换为内存模拟时钟：
-- `setTimeout(cb, 1000)` 注册回调但不等待
+- `setTimeout(cb, 1000)` 注册回调但不等待真实时间
 - `jest.advanceTimersByTime(1000)` 推进模拟时钟，触发所有到期回调
-- 回调执行顺序与真实事件循环一致
+- 回调执行顺序与真实事件循环一致（按 dueTime 顺序）
 
 **优势**：异步测试变成同步执行，无真实时间等待，测试速度不受超时时间影响。
 
-**约束**：只能 mock 顶层定时器（全局 `setTimeout`/`setInterval`），不能 mock 模块内部的局部定时器。
+**约束**：
+- 只能 mock 顶层定时器（全局 `setTimeout`/`setInterval`），不能 mock 模块内部的局部定时器
+- `setImmediate` 和 `process.nextTick` 有各自的 fake 实现，但行为不完全等价于真实事件循环
 
 ### 生命周期钩子的作用域绑定
 
@@ -208,6 +237,8 @@ import { fetchUser } from './api';
 ```
 
 执行顺序：`setup(外层) → setup(内层) → test → teardown(内层) → teardown(外层)`
+
+**关键约束**：同一 `describe` 内的 `beforeEach` 会为每个 `it` 执行一次；跨 `describe` 的状态不自动隔离——内层 `beforeEach` 执行时，外层的已执行但其设置的状态可能已被后续测试修改。
 
 ---
 

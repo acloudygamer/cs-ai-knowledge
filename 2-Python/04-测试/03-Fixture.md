@@ -58,7 +58,18 @@ $$
 \end{cases}
 $$
 
-### 参数化 fixture 的展开模型
+**yield vs return 的关键差异**：
+- `return`：函数结束即完成，无 teardown 语义
+- `yield`：函数被"暂停"，teardown 在消费方完成后执行
+
+$$
+\text{fixture\_semantics}(f) = \begin{cases}
+\text{return} \Rightarrow \text{无清理} \\
+\text{yield} \Rightarrow \text{强制清理}
+\end{cases}
+$$
+
+### 参数化 Fixture 的展开模型
 
 `@pytest.fixture(params=...)` 生成参数化的 fixture 实例，每个参数值产生独立的 fixture 实例：
 
@@ -67,6 +78,25 @@ $$
 $$
 
 测试函数接收到参数化 fixture 时，pytest 自动为每个参数值生成一个独立测试实例。
+
+**与 parametrize 的笛卡尔积**：参数化 fixture 与 parametrize 标记叠加时，生成笛卡尔积：
+
+$$
+|\text{最终实例}| = |\text{parametrize\_instances}| \times |\text{fixture\_param\_instances}|
+$$
+
+### Fixture 参数缓存
+
+在同一作用域内，pytest 对同一 fixture 参数化的相同值进行缓存：
+
+$$
+\text{cache}(f, p) = \begin{cases}
+\text{首次调用} \Rightarrow \text{执行 fixture，执行结果存入缓存} \\
+\text{后续调用} \Rightarrow \text{直接返回缓存结果}
+\end{cases}
+$$
+
+这避免了同一测试类中重复创建/销毁相同 fixture。
 
 ## 数据流
 
@@ -105,15 +135,21 @@ pytest 启动
            └── session scope teardown（at session end）
 </pre>
 
+**所有权转移**：
+1. pytest 在收集阶段构建 fixture DAG，为每个 fixture 分配唯一实例 ID
+2. 执行阶段：按拓扑序创建 fixture 实例，实例所有权从 pytest 转移到测试函数
+3. 测试函数完成后，通过 yield 将所有权返还给 fixture teardown
+4. teardown 阶段释放资源
+
 ## 机制
 
-### 参数化 fixture
+### 参数化 Fixture
 
 `@pytest.fixture(params=...)` 生成参数化的 fixture 实例，每个参数值产生独立的 fixture 实例：
 
 测试函数签名中接收该 fixture 时，pytest 自动为每个参数值生成一个独立测试实例（与 parametrize 笛卡尔积展开相同）。
 
-### fixture 依赖与请求重定向
+### Fixture 依赖与请求重定向
 
 Fixture 可接收 `request` 对象访问自身配置：
 
@@ -153,7 +189,7 @@ def reset_global_state():
 
 **执行顺序**：autouse fixture 按标准依赖解析顺序执行，在显式声明依赖的 fixture 之前。
 
-### 内置 fixture 的作用域
+### 内置 Fixture 的作用域
 
 | fixture | 作用域 | 类型 |
 |---------|--------|------|
@@ -165,7 +201,7 @@ def reset_global_state():
 | `request` | function | FixtureRequest |
 | `cache` | session | `pytest_cache` |
 
-### 工厂 fixture 模式
+### 工厂 Fixture 模式
 
 Factory as a Fixture 模式允许在测试中创建多个实例：
 
@@ -188,6 +224,28 @@ $$
 \text{make\_user} \triangleq \lambda f.\ \text{let } c = [] \text{ in } (\lambda name.\ f(name, c),\ \text{cleanup}(c))
 $$
 
+工厂函数返回一个内部函数 `_create`，每次调用创建一个新实例并记录到 `created` 列表。fixture teardown 时遍历 `created` 列表统一清理。
+
+**为何需要工厂模式**：fixture 通常每个测试只注入一次，但测试可能需要在函数体内创建多个同类资源。工厂模式将"实例创建权"从 pytest 转移到测试函数，实现按需多次创建。
+
+### Fixture 作用域的继承覆盖
+
+子类测试类可以覆盖父类的 fixture 声明：
+
+```python
+class Base:
+    @pytest.fixture
+    def base_fixture(self):
+        return "base"
+
+class Derived(Base):
+    @pytest.fixture
+    def base_fixture(self):  # 覆盖父类 fixture
+        return "derived"
+```
+
+**作用域不可覆盖**：fixture 的 `scope` 参数在子类中不可改变，只能通过新的 fixture 定义覆盖整个 fixture 函数。
+
 ## 约束与违反后果
 
 | 约束 | 违反后果 |
@@ -197,6 +255,7 @@ $$
 | Fixture 泄漏跨测试状态 | 未在 yield 后清理，导致测试顺序依赖 |
 | Session scope fixture 使用 function scope 依赖 | 违反作用域层级，pytest 报错 |
 | 重复 yield | 第二次 yield 不执行，且发出警告 |
+| 父类 fixture 被子类覆盖时作用域不一致 | 收集阶段报 FixtureScopeError |
 
 ## 参考存根
 
@@ -252,4 +311,18 @@ def test_write(tmp_path):
 def test_env(monkeypatch):
     monkeypatch.setenv("API_KEY", "test")
     assert os.environ["API_KEY"] == "test"
+
+# request 对象
+@pytest.fixture
+def temp_file(request):
+    fd, path = tempfile.mkstemp()
+    yield path
+    os.unlink(path)
+
+@pytest.fixture
+def sized_file(temp_file, request):
+    size = request.config.getoption("--file-size")
+    with open(temp_file, "wb") as f:
+        f.write(b"x" * size)
+    return temp_file
 ```

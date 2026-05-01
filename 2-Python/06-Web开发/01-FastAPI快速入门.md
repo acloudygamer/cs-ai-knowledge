@@ -26,6 +26,8 @@ $$T_{\text{total}} = T_{\text{validate}} + T_{\text{inject}} + T_{\text{handle}}
 
 $$\text{toposort}(\mathcal{D}) = (d_{i_1}, d_{i_2}, \ldots, d_{i_m})$$
 
+拓扑排序采用 Kahn 算法：维护入度为 0 的节点队列，逐步移除边并更新入度。设图中有 $N$ 个节点、$E$ 条边，算法复杂度 $O(N + E)$。
+
 每个依赖 $d_j$ 的求值结果作为后续依赖的参数传递。这保证了依赖求值顺序无歧义。
 
 **约束**：DAG 中不允许环——若 $d_i$ 依赖 $d_j$ 且 $d_j$ 依赖 $d_i$，则在拓扑排序时无法找到起点，框架抛出循环依赖错误。
@@ -40,6 +42,8 @@ $$r = (\text{method}, \text{path\_pattern}, \text{handler}, \text{dependencies})
 
 路径模式解析为正则表达式。设路径 `/items/{item_id}` 解析为正则 `^/items/(?P<item_id>[^/]+)$`，匹配复杂度为 $O(|\text{path}|)$，与路由总数无关（字典查找）。
 
+FastAPI 在启动时将路由编译为状态机（确定性有限自动机，DFA）。路径匹配过程本质是 DFA 的状态转移：从起始状态 $s_0$ 读取输入字符序列，经由读取的路径段转移至终态 $s_f$。若 $s_f$ 对应某个路由处理器则匹配成功，否则失败。
+
 ### Pydantic 验证的约束满足
 
 Pydantic 模型本质是**约束满足问题（CSP）的实例化**。设字段 $f_i$ 的类型为 $T_i$，约束为 $C_i$（如 `Field(gt=0)`）：
@@ -48,6 +52,8 @@ $$\forall r_i \in \text{request body}: \bigwedge_i (r_i[f_i] \in T_i \wedge C_i(
 
 验证失败时返回 422 Unprocessable Entity，违反约束的字段在响应中明确标注。
 
+**约束传播机制**：Pydantic 的验证器按字段依赖顺序执行。当字段 $f_a$ 依赖字段 $f_b$ 的值时（如 `validator` 访问 `self`），验证构成偏序关系。约束传播在 $O(N)$ 时间内完成，其中 $N$ 为字段数。
+
 ## 数据流
 
 <pre>
@@ -55,9 +61,13 @@ HTTP 请求字节流
     │
     ▼
 ASGI Server (uvicorn)
+    │  ASGI 协议：scope + receive/send 协程接口
+    │  scope 包含：type, method, path, headers, query_string, body
     │
     ▼
-路由匹配（路径 + 方法）── O(1) 字典查找
+路由匹配（路径 + 方法）
+    │  O(1) 字典查找：{method: {path: handler}}
+    │  路径参数通过 DFA 状态机提取
     │
     ├── 命中：提取路径参数（正则捕获组）
     │       路径参数类型强制转换（str → int/float/path）
@@ -69,16 +79,19 @@ Pydantic 验证（请求体 / Query / Path）
     │
     ▼
 依赖注入链（按 DAG 拓扑序求值）
+    │  Kahn 算法：入度为 0 的节点优先求值
     │  认证/数据库会话/配置读取
     │  每个依赖结果缓存，同一请求内不重复求值
     │
     ▼
 业务 Handler（async 函数）
+    │  事件循环：当 await 时让出控制权给其他任务
     │
     ├── 返回 Pydantic Model（自动序列化）
     │
     ▼
 自动 JSON 序列化（orjson / ujson）
+    │  orjson：SIMD 加速的 JSON 编码
     │
     ▼
 HTTP 响应 + OpenAPI 文档自动更新（按需生成）
@@ -88,6 +101,8 @@ HTTP 响应 + OpenAPI 文档自动更新（按需生成）
 - 字节流 → `Request` 对象（解析后持有路径参数、查询参数、请求体）
 - 路径参数 → Python 原语类型（框架自动转换）
 - Pydantic 模型实例 → JSON 字节（序列化后释放模型内存）
+
+**中间形态**：ASGI `scope` dict 在协议层传输，是不可变的协议描述。请求体通过独立的 `receive()` 协程获取，实现流式处理。
 
 ## 机制
 
@@ -102,6 +117,13 @@ HTTP 响应 + OpenAPI 文档自动更新（按需生成）
 ### 依赖注入：横切关注点的可测试分离
 
 依赖注入将认证（JWT 验证）、数据库会话（SQLAlchemy Session）、配置读取等横切关注点从业务 Handler 中剥离。`Depends()` 声明依赖关系而非直接调用——这使 Handler 不依赖全局状态，测试时可注入 Mock 对象。
+
+**Kahn 算法执行流程**：
+1. 计算所有节点的入度
+2. 将入度为 0 的节点入队
+3. 弹出队首节点，输出，遍历其下游节点并减入度
+4. 若下游节点入度变为 0，则入队
+5. 重复直到队列为空
 
 **关键约束**：依赖函数在首次调用时求值，结果在同一请求生命周期内缓存。这意味着：
 - 认证中间件只需执行一次 JWT 验证
@@ -128,13 +150,15 @@ FastAPI 通过参数位置和类型注解自动区分两者，无需额外路由
 
 FastAPI 的 Handler 支持 `async def` 和普通 `def`。`async def` 的并发基于 Python 的事件循环——当 `await` 一个协程时，事件循环可切换到其他就绪任务。`def` 的并发基于线程池（`run_in_executor`），每请求一个线程。
 
+**事件循环的状态机模型**：事件循环维护一个就绪任务队列和等待中的 I/O 对象集合。循环反复：检查 I/O 就绪状态 → 切换对应任务到就绪队列 → 选取任务执行。状态转移由 I/O 多路复用（epoll/select/kqueue）驱动。
+
 **约束**：在 `async def` 中执行同步阻塞操作（如 `time.sleep`）会阻塞整个事件循环，必须使用 `await asyncio.sleep()` 或将同步操作放到线程池。
 
 ## 参考存根
 
 ```python
 from fastapi import FastAPI, Path, Query, HTTPException, Depends, Header
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, validator
 from typing import Annotated
 
 app = FastAPI()
@@ -142,14 +166,31 @@ app = FastAPI()
 class Item(BaseModel):
     name: str
     price: float = Field(gt=0, description="价格必须大于0")
+    @validator('name')
+    def name_not_empty(cls, v):
+        if not v.strip():
+            raise ValueError('名称不能为空')
+        return v
 
 @app.post("/items/")
 async def create_item(item: Item):
     return item
 
 @app.get("/items/{item_id}")
-async def get_item(item_id: Annotated[int, Path(gt=0, description="项目ID必须为正整数")]):
+async def get_item(
+    item_id: Annotated[int, Path(gt=0, description="项目ID必须为正整数")]
+):
     if item_id < 1:
         raise HTTPException(status_code=400, detail="Invalid ID")
     return {"item_id": item_id}
+
+# 依赖注入示例：JWT 认证
+def verify_token(authorization: Annotated[str, Header()]):
+    if not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Invalid token")
+    return authorization
+
+@app.get("/protected")
+async def protected(token: str = Depends(verify_token)):
+    return {"token": token}
 ```

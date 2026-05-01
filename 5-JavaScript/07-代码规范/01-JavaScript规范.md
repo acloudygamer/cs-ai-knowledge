@@ -37,12 +37,21 @@ $$
 
 #### ESLint 规则图论
 
-每条 ESLint 规则定义一个**代码模式 → 违规判定**的谓词 $R_i$。整个规则集构成有向图：
+每条 ESLint 规则定义一个**代码模式 → 违规判定**的谓词 $R_i$。整个规则集构成一个**缺陷检测有向图** $G = (V, E)$：
 
-- 节点：代码位置（函数、语句、表达式）
-- 边：规则 $R_i$ 判定某节点违规
+- **节点** $V$：代码位置抽象（函数入口、语句块、表达式子树）
+- **边** $E \subseteq V \times \Sigma \times V$：规则 $R_i$ 在位置 $u$ 观察到模式 $\sigma$ 时，指向下一检查位置 $v$
+- **路径接受**：「某节点 $v$ 存在从起始节点到它的路径且该路径上所有规则均未触发」$\iff$ 代码通过所有相关检查
 
-Flat Config 将规则按文件 glob 模式分区，避免全局规则膨胀。设模式集合为 $P$，规则分配函数 $A: R \rightarrow \mathcal{P}(P)$。
+单条规则的语义是路径的**前缀约束**：若 $R_i$ 在位置 $v$ 触发，则该节点本身被标记为**违规终止节点**。设规则集为 $\mathcal{R} = \{R_1, \dots, R_m\}$，代码位置集为 $V$，则违规判定为：
+
+$$
+\text{violation}(v) \iff \exists i \in [1,m] : R_i(v) = \text{true}
+$$
+
+Flat Config 将规则按文件 glob 模式分区，避免全局规则膨胀。设模式集合为 $P$，规则分配函数 $A: \mathcal{R} \rightarrow \mathcal{P}(P)$，文件 $f$ 匹配的规则子集为 $\mathcal{R}_f = \{R_i \mid \exists p \in P : p \in A(R_i) \land \text{match}(f, p)\}$。这保证了 TypeScript 文件不执行纯 JS 规则，JS 文件不执行 TS 专属规则。
+
+**归约终点**：规则图的遍历本质是**模式匹配的有穷自动机**——规则谓词是状态转移条件，文件路径是初始状态，违规节点是接受状态。
 
 ---
 
@@ -176,12 +185,24 @@ const result = await process(orders);
 
 **违反约束的后果**：串行执行导致性能劣化，O(n) 顺序等待替代 O(1) 并行。
 
-### 错误作为返回值
+### 错误作为返回值（Result 单子）
 
-JavaScript 的错误处理本质是**单子模式（Either/Result）的隐式应用**：
+JavaScript 的错误处理可形式化为 **Result 单子**（Haskell 的 `Either` 类型）的隐式应用。设错误类型为 $E$，成功值为 $T$：
+
+$$
+\text{Result}_{T,E} ::= \text{Ok}(t: T) \mid \text{Err}(e: E)
+$$
+
+单子 bind 操作 $\bind$ 链式组合多个可能失败的操作：
+
+$$
+(\text{Ok}(t) \bind f) = f(t) \qquad (\text{Err}(e) \bind f) = \text{Err}(e)
+$$
+
+Promise 的 `.then()` 链和 async/await 的线性书写都是该单子的语法糖。`try-catch` 的问题在于它**截断了错误传播**，将所有异常（可恢复的业务错误 + 不可恢复的系统错误）混为同一种控制流。
 
 ```javascript
-// 错误对象传递元数据
+// 错误对象传递元数据（Result 单子的 E 分支）
 class AppError extends Error {
   constructor(message, statusCode = 500, code = 'INTERNAL_ERROR') {
     super(message);
@@ -191,9 +212,9 @@ class AppError extends Error {
 }
 ```
 
-**机制**：已知业务错误（用户不存在、权限不足）使用错误对象传递元数据；未知系统错误（内存溢出、网络中断）需要隔离记录后降级。滥用 `try-catch` 吞掉错误会导致静默失败。
+**约束**：已知业务错误（用户不存在、权限不足）使用错误对象传递元数据，属**可恢复错误**，应通过 Result 单子传播；未知系统错误（内存溢出、网络中断）属**不可恢复错误**，需隔离记录后降级。
 
-**违反约束的后果**：错误信息丢失，故障定位困难。
+**违反约束的后果**：滥用 `try-catch` 吞掉错误将导致 `Err` 分支被静默丢弃，故障定位所需的调用栈和错误码全部丢失。设错误传播率为 $P_{\text{prop}}$，被吞没率为 $P_{\text{swallow}}$，则 $P_{\text{prop}} + P_{\text{swallow}} = 1$，而 $P_{\text{swallow}} \to 1$ 意味着故障可观测性趋近于零。
 
 ---
 

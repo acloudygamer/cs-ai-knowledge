@@ -40,8 +40,15 @@ CGO 允许 Go 程序调用 C 代码，通过 FFI（外部函数接口）实现 G
 ```
 
 **所有权传递的数学约束**：
+
 - 若 C 分配内存传给 Go：Go 无法 GC 该内存（C 分配不由 Go 追踪）
 - 若 Go 分配内存传给 C：Go GC 可能回收该内存（C 持有的只是指针值）
+
+**所有权不匹配的数学表示**：
+
+设 $M_c$ 为 C 分配的内存，$M_g$ 为 Go 分配的内存：
+$$M_c \notin \text{Go GC 追踪} \implies \text{Go 可能误判为垃圾}$$
+$$M_g \text{ 传给 C 后} \implies \text{Go GC 可能回收（若 C 未被追踪）}$$
 
 ### 字符串转换的数据流
 
@@ -121,7 +128,9 @@ Go goroutine 恢复执行
 4. 即使 C 函数执行很快，切换开销也无法被调度器并行掩盖
 
 **阻塞 P 的数学影响**：
-若 GOMAXPROCS=8，其中 1 个 P 在 CGO 调用中阻塞，则有效调度容量降为 7/8 = 87.5%。
+
+若 GOMAXPROCS=8，其中 1 个 P 在 CGO 调用中阻塞，则有效调度容量降为 7/8 = 87.5%：
+$$\text{有效容量} = \frac{N_{P} - N_{blocked}}{N_{P}}$$
 
 ### 回调函数的约束
 
@@ -161,7 +170,13 @@ runtime.KeepAlive(p)  // 确保 p 指向的内存在此调用前不被 GC
 ```
 
 **KeepAlive 的数学语义**：
+
 $$KeepAlive(x) \implies GC \text{ 必须认为 } x \text{ 仍然可达，直到 } KeepAlive \text{ 返回}$$
+
+**KeepAlive 的约束**：
+
+KeepAlive 调用点必须在所有使用该指针的代码之后：
+$$\forall \text{use}(p): \text{KeepAlive}(p) \text{ 在 use 之后}$$
 
 ## 参考存根
 
@@ -249,3 +264,10 @@ import "C"
 - 使用 SIMD 指令（通过汇编或 C 包装）
 
 **约束**：CGO 不能调用 C++（需要 name mangling），不能直接使用 C++ 类（需要 C 包装）。
+
+**CGO 的不可归约性**：
+
+CGO 调用无法被完全归约到 Go 的调度模型中，因为：
+$$T_{cgo} = T_{go2c} + T_{c\_exec} + T_{c2go}$$
+
+其中 $T_{c\_exec}$ 是纯 C 代码执行，Go 调度器无法感知其内部状态。

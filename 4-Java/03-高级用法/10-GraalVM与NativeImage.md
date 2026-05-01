@@ -69,7 +69,9 @@ $$
 \text{Memory}_{\text{image}} = \text{预初始化对象} + \text{类元数据} + \text{GC元数据}
 $$
 
-### 子strateVM组件
+**约束**：镜像堆中的对象在构建时被"冻结"——它们的地址在运行时不改变，这允许Native Image省略传统的对象头部（对象指针直接指向数据而非头部）。
+
+### SubstrateVM组件
 
 Substrate VM是极简运行时，仅包含：
 
@@ -133,6 +135,8 @@ public Object loadPlugin(String className) {
 }
 ```
 
+**违反约束的后果**：若Class.forName()加载的类未在配置文件中注册，构建时该类不会被包含在可执行文件中，运行时会抛出 `ClassNotFoundException`。
+
 ### 运行时类加载限制
 
 即使注册了动态类，`Class.forName()`也只能加载：
@@ -167,6 +171,8 @@ JVM的内存占用包含：JVM堆、元空间、JIT编译缓存、线程栈（1M
 | 内存占用 | 256MB | 32MB | ~8x |
 | 首次响应 | 800ms（含JIT） | 12ms | ~67x |
 | 峰值性能 | 最优（JIT优化后） | 略低（AOT优化有限） | ~5-10%差距 |
+
+**关键约束**：Native Image的峰值性能通常略低于JIT编译的代码——因为JIT可以利用运行时profiling数据进行激进优化（如内联、虚调用去虚化），而AOT只能做静态分析。
 
 ---
 
@@ -256,7 +262,7 @@ if (version.contains("GraalVM")) {
 ## 版本选择
 
 | 场景 | 推荐版本 |
-|------|----------|
+|------|---------|
 | 生产环境 | GraalVM CE 22.x + Java 17 |
 | 新项目（Native优先） | GraalVM CE 23.x + Java 21 |
 | Spring Boot 3.x | GraalVM 22+ required |

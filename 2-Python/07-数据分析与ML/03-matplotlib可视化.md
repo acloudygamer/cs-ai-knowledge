@@ -123,6 +123,29 @@ Figure
 
 `zorder` 为整数，值越大越在上层。相同 `zorder` 按添加顺序渲染。patch（背景）在最底层，确保不被数据 Artist 覆盖。
 
+### 布局系统对比（Python 3.14+ matplotlib 3.8+）
+
+matplotlib 提供三种布局系统，用于自动计算 Axes 在 Figure 中的位置：
+
+| 布局系统 | 约束描述 | 适用场景 |
+|----------|----------|----------|
+| `subplots_adjust` | 手动指定 left/right/top/bottom/width/height | 精确控制 |
+| `constrained_layout` | 约束传播算法，自动避免元素重叠 | 推荐默认 |
+| `layout_engine='tight'` | `bbox_inches='tight'` 的程序化版本 | 快速保存 |
+
+**constrained_layout 工作原理**：matplotlib 构建约束图（constraint graph），节点为各元素的包围盒（Axes、Colorbar、Legend、Title 等），边为共存约束（spacing、alignment、margin）。求解器（通常基于 GridHelper）计算满足所有约束的最小布局。当两个 Axes 的标签可能重叠时，约束会自动推开。
+
+**subplot2grid 的数学模型**：在 $G \times G$ 网格中占据特定位置：
+
+$$x_{\text{start}} = \frac{\text{col}}{G} \times (1 - \text{left} - \text{right}) + \text{left}$$
+$$y_{\text{start}} = \frac{G - 1 - \text{row}}{G} \times (1 - \text{top} - \text{bottom}) + \text{bottom}$$
+
+每个 subplot 的位置由 `(row, col)` 和 `rowspan`、`colspan` 决定，所有 subplot 共享同一网格。
+
+**约束违反后果**：
+- `constrained_layout` 未开启时，多子图可能出现标签重叠、标题被裁剪等问题
+- `bbox_inches='tight'` 在动态数据（如下一刻度范围更新）场景下可能导致每次保存的图形尺寸不一致
+
 ### 渲染后端体系
 
 matplotlib 后端分为两类：
@@ -169,7 +192,7 @@ matplotlib 的全局配置通过 `rcParams` 字典管理：
 
 ```python
 plt.rcParams['lines.linewidth'] = 2
-plt.rc.style.use('seaborn-v0_8-darkgrid')  # 预设样式
+plt.style.use('seaborn-v0_8-darkgrid')  # 预设样式
 ```
 
 rcParams 影响所有后续渲染，适合在脚本开头一次性配置。样式文件（.mplstyle）可打包为可复用配置。
@@ -179,6 +202,7 @@ rcParams 影响所有后续渲染，适合在脚本开头一次性配置。样�
 ```python
 import matplotlib.pyplot as plt
 import matplotlib.ticker as mticker
+import matplotlib.constrained_layout as cl
 import numpy as np
 
 # 坐标变换链
@@ -186,6 +210,16 @@ fig, ax = plt.subplots()
 ax.plot([0, 1], [0, 1])
 # 获取数据坐标到像素坐标的变换矩阵
 M = ax.transData.get_matrix()  # 3x3 仿射矩阵
+
+# constrained_layout（Python 3.14+ / matplotlib 3.8+）
+fig, axs = plt.subplots(2, 2, layout="constrained")
+# 自动避免 colorbar、title、legend 重叠
+
+# subplot2grid 网格布局
+fig = plt.figure()
+ax1 = plt.subplot2grid((2, 3), (0, 0), colspan=2)
+ax2 = plt.subplot2grid((2, 3), (0, 2))
+ax3 = plt.subplot2grid((2, 3), (1, 0), colspan=3)
 
 # 自定义刻度格式化
 ax.xaxis.set_major_formatter(mticker.FuncFormatter(

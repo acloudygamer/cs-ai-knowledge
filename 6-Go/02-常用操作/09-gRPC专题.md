@@ -93,6 +93,8 @@ Stream 1 (GETList RPC)          Stream 2 (GetUser RPC)
 
 **队首阻塞的残余**：HTTP/2 在 TCP 层仍受队首阻塞影响——TCP 保证有序交付，一个丢包会阻塞所有 stream。HTTP/3 (QUIC) 通过 UDP + stream 级别重传解决此问题。
 
+了解了 gRPC 的传输层基础后，可以根据以下决策树选择通信协议：
+
 ### gRPC vs REST 决策树
 
 ```

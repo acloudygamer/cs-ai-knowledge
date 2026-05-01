@@ -26,6 +26,11 @@ $$T = O(2^{\text{costFactor}}) = O(2^{10}) \approx 1000 \text{ 次 Blowfish 加�
 
 **自适应含义**：随着硬件提升，可增加 cost factor 保持破解难度。
 
+**自适应安全的不变量**：
+$$\text{破解时间} = O(2^{\text{costFactor}} / \text{hashrate})$$
+
+当破解时间低于可接受阈值时，增加 cost factor。
+
 ### RBAC 的权限图论建模
 
 RBAC（基于角色的访问控制）可建模为 **二分图**：
@@ -42,6 +47,8 @@ User 集合 U ──── 分配关系 ──── Role 集合 R
 $$\text{hasPermission}(u, p) = \exists r \in R: (u,r) \in \text{assignments} \land (r,p) \in \text{permissions}$$
 
 RBAC 相比 ACL 的优势：**层次化授权**，权限变更只需修改角色，而非每个用户。
+
+**可达性检测的算法复杂度**：设用户-角色边数为 $E_{ur}$，角色-权限边数为 $E_{rp}$，检测复杂度为 $O(E_{ur} \cdot E_{rp})$（最坏情况遍历所有角色）。
 
 ### OAuth 2.0 + PKCE 的形式化安全分析
 
@@ -125,7 +132,7 @@ OAuth 2.0 Authorization Code + PKCE 流程
     │ ─── Authorization Request ──────────▶│                        │
     │      + code_challenge, code_method    │                        │
     │                                      │ ◀── 登录界面 ───────────│
-    │                                      │ ──── 授权确认 ─────────▶│
+    │                                      │ ──── 授权确认 ───────── ▶│
     │◀─── Redirect (code) ────────────────│                        │
     │                                      │                        │
     │ ─── Token Request ─────────────────▶│                        │
@@ -178,6 +185,9 @@ Signature: HMAC-SHA256(Header.Payload, secret)
 无状态认证的数学价值：
 - 验证复杂度：$O(1)$（只需签名验证，无需查库）
 - 空间复杂度：分布式的，无需 Session 存储
+
+**JWT 的安全性约束**：
+$$\text{若 } \text{exp} < \text{now} \Rightarrow \text{Token 已过期，拒绝}$$
 
 ### CSRF 防护的数学原理
 
@@ -357,3 +367,19 @@ AspectJ 切面拦截
 - 过滤器链：URL 级别授权（粗粒度）
 - 方法级：方法级别授权（细粒度）
 - 两者可同时使用，叠加生效
+
+### 过滤器链的数学模型
+
+Spring Security 过滤器链可归约为**函数复合（Function Composition）**：
+
+$$F = f_1 \circ f_2 \circ \cdots \circ f_n$$
+
+每个过滤器 $f_i$ 是一个函数：$\text{Request} \rightarrow \text{Request} \cup \{\text{rejected}\}$。
+
+链的执行语义：
+1. 顺序执行每个过滤器的 `doFilter()`
+2. 若过滤器拒绝请求，后续过滤器不再执行
+3. 若所有过滤器通过，请求到达 DispatcherServlet
+
+**过滤器的拒绝语义**：
+$$\forall i: f_i(\text{request}) = \text{rejected} \Rightarrow \text{后续过滤器不执行}$$

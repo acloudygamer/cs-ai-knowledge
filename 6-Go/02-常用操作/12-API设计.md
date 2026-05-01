@@ -74,7 +74,7 @@ $$N_{pages} = \left\lceil \frac{N_{total}}{page\_size} \right\rceil$$
 游标分页（无数据变更问题）：
 
 时刻 T0（cursor="rec_80"）：
-  首页: 0-20, last_cursor="rec_80"
+  首页（无需游标）: 返回 rec_0-19, last_cursor="rec_80"  ← 首页正常查询
   第2页: WHERE id < "rec_80" → 返回 rec_60-79, last_cursor="rec_60"
 
 时刻 T1（用户持有 cursor="rec_80"，此时新增记录）：

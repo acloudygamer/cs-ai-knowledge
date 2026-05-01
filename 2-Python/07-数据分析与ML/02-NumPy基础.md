@@ -49,10 +49,20 @@ $A \in \mathbb{R}^{m \times k}$，$B \in \mathbb{R}^{k \times n}$，$C = A @ B$�
 
 | 范数 | 定义 | 应用 |
 |------|------|------|
-| L1 | $\|x\|_1 = \sum_i |x_i\|$ | 稀疏性度量 |
+| L1 | $\|x\|_1 = \sum_i |x_i|$ | 稀疏性度量 |
 | L2 | $\|x\|_2 = \sqrt{\sum_i x_i^2}$ | 欧氏距离 |
 | Frobenius | $\|A\|_F = \sqrt{\sum_{i,j} A_{ij}^2}$ | 矩阵大小度量 |
-| Spectral | $\\|A\\|_2 = \sigma_{\max}(A)$ | 矩阵条件数 |
+| Spectral | $\|A\|_2 = \sigma_{\max}(A)$ | 矩阵条件数 |
+
+### Array API 标准（Python 3.14+ / NumPy 2.0+）
+
+NumPy 2.0 实现了 **Array API 标准**（PEP 749），定义了一套跨数组库（NumPy、CuPy、JAX、Pandas、Pytorch 等）的统一 API：
+
+- `np.linalg.matmul(A, B)` 替代 `A @ B`（更明确的函数语义）
+- `np.linalg.norm(x, axis=...)` 统一向量/矩阵范数计算
+- `np.bool`、`np.int32`、`np.float64` 等类型别名重新导出
+
+核心保证：**Array API 兼容代码在任意支持该标准的库上行为一致**。这使得纯 Python 编写的数值代码可以无缝切换后端（CPU NumPy → GPU CuPy → TPU JAX）。
 
 ## 数据流
 
@@ -125,7 +135,7 @@ for (i = 0; i < n; i++) {
 
 dtype 提升规则：最小精度满足 $\max(a_{\text{dtype}}, b_{\text{dtype}})$，int + float → float，float32 + float64 → float64。
 
-### 随机数生成器的演进
+### 随机数生成器的演进（Python 3.14+）
 
 NumPy 1.17 引入 `Generator` 替代全局 `np.random`：
 
@@ -150,6 +160,21 @@ rng.random()  # 线程安全（内部使用 PCG64）
 
 **条件数**：$\kappa(A) = \|A\| \cdot \|A^{-1}\|$，条件数越大，方程对扰动越敏感。
 
+### Array API 兼容层（Python 3.14+ / NumPy 2.0+）
+
+Array API 通过 `np.linalg.matmul` 提供与 `A @ B` 等价的函数接口，但额外保证：
+
+```python
+# Array API 风格——跨库兼容
+import numpy as np
+x = np.arange(10).reshape(2, 5)
+w = np.arange(10, 20).reshape(5, 4)
+y = np.linalg.matmul(x, w)   # 等价于 x @ w，但明确声明为矩阵乘
+# 在 CuPy 中：y = cupy.linalg.matmul(x, w) — 完全一致的行为
+```
+
+**约束**：Array API 标准仅覆盖 `numpy.array_api` 子模块（`import numpy.array_api as nxp`）。主 `numpy` 命名空间不保证 API 兼容性严格对标标准——标准库的便利性（如 `@` 操作符）与跨库兼容性（`np.linalg.matmul`）可按需选用。
+
 ## 参考存根
 
 ```python
@@ -169,6 +194,12 @@ print(np.shares_memory(arr, v))  # True — 同一底层数据
 a = np.array([[1, 2, 3], [4, 5, 6]])  # (2,3)
 b = np.array([10, 20, 30])             # (3,)
 c = a + b  # b 广播为 (1,3) 然后逐元素加
+
+# Array API（Python 3.14+）
+import numpy.array_api as nxp
+x = nxp.asarray([[1, 2], [3, 4]])
+y = nxp.asarray([[5, 6], [7, 8]])
+z = nxp.linalg.matmul(x, y)  # 跨库一致接口
 
 # 矩阵乘法 vs 元素乘法
 A = np.array([[1, 2], [3, 4]])

@@ -103,6 +103,9 @@ $$|W \cap ISR| \geq W$$
 
 **Fencing 机制**：每个 Write 请求携带 `epoch`（任期号）。旧 Leader 收到更高 epoch 的 Write 请求时自动失效。
 
+**Fencing 的数学不变量**：
+$$\text{valid}(write) \iff \text{epoch}_{\text{write}} \geq \text{epoch}_{\text{current\_leader}}$$
+
 ---
 
 ## 数据流
@@ -186,6 +189,8 @@ Kafka 使用 **sendfile()** 系统调用实现零拷贝：
 
 数据直接从 Page Cache 传到 socket 缓冲区，无需经过用户态。Linux 的 `transferTo()` 方法实现此优化，可将吞吐提升 2-3 倍。
 
+**零拷贝的数学约束**：sendfile() 要求数据在 Page Cache 中连续。若数据已被换出或分散在多处，零拷贝可能退化为普通拷贝。
+
 ### 分区策略与消息顺序保证
 
 Kafka 只保证 **单个分区内消息有序**，跨分区无顺序保证。
@@ -251,6 +256,9 @@ Kafka 3.x+ 使用 KRaft（基于 Raft）替代 ZK：
 
 数学保证：多数票决确保唯一 Leader
 ```
+
+**Raft 的安全性不变量**：
+$$\text{Leader} \Rightarrow \text{已提交日志条目复制到多数节点}$$
 
 ---
 

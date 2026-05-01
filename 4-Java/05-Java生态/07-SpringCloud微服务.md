@@ -37,12 +37,26 @@ HALF_OPEN（试探）：
     失败数 > failureThreshold → 触发 transition → OPEN
 ```
 
+**状态机的形式化定义**：
+$$M = (S, s_0, E, \delta, F)$$
+
+其中：
+- $S = \{\text{CLOSED}, \text{OPEN}, \text{HALF\_OPEN}\}$ 是状态集
+- $s_0 = \text{CLOSED}$ 是初始状态
+- $E = \{\text{failure}, \text{success}, \text{timeout}\}$ 是事件集
+- $\delta: S \times E \rightarrow S$ 是转换函数
+- $F \subseteq S$ 是终态集（本题中无终态）
+
 **CLOSED 状态的失败率计算**（滑动窗口）：
 $$p_{\text{failure}} = \frac{\text{failures in window}}{\text{requests in window}}$$
 
 设滑动窗口大小为 $W$，失败阈值为 $\theta$：
 - 若 $p_{\text{failure}} > \theta$ → OPEN
 - 若 $p_{\text{failure}} \leq \theta$ → 保持 CLOSED
+
+**HALF_OPEN 状态的转换不变量**：
+$$\text{OPEN} \xrightarrow{\text{timeout}} \text{HALF\_OPEN} \xrightarrow{\text{success} \geq N_s} \text{CLOSED}$$
+$$\text{OPEN} \xrightarrow{\text{timeout}} \text{HALF\_OPEN} \xrightarrow{\text{failure} \geq N_f} \text{OPEN}$$
 
 ### 服务注册的 AP vs CP 分析
 
@@ -58,6 +72,9 @@ $$p_{\text{failure}} = \frac{\text{failures in window}}{\text{requests in window
 | Consul | CP | 优先一致，使用 Raft 协议 |
 
 **选择依据**：服务注册对 **可用性** 要求更高——即使网络波动，也要能注册新服务实例，否则新实例无法被调用。Nacos 默认 AP 是合理选择。
+
+**CAP 不可能三角的数学描述**：
+$$\forall \text{系统}: \text{CAP} \text{ 中最多同时满足两个}$$
 
 ### 负载均衡的加权随机算法
 
@@ -165,6 +182,8 @@ InvocationHandler.invoke() → MethodHandler.invoke()
 - 保护上游：不让上游线程阻塞在不可用的下游
 
 **半开状态**（HALF_OPEN）是试探性恢复：允许少量请求通过，若成功率足够高则恢复正常。
+
+**归约视角**：断路器可归约为**分布式系统中的故障检测器（Failure Detector）**——通过统计失败率判断下游是否故障，决定是否切断调用。
 
 ### 配置中心的广播语义
 
@@ -299,6 +318,10 @@ class UserClientFallback implements UserClient {
 
 **阻塞问题**：若协调者在阶段2崩溃，参与者将永远锁定资源。
 
+**2PC 的安全不变量**：
+$$\text{若任一参与者提交，则所有参与者最终必须提交}$$
+$$\text{若任一参与者回滚，则所有参与者最终必须回滚}$$
+
 ### Saga 模式的最终一致性
 
 Saga 模式将分布式事务分解为一系列本地事务：
@@ -321,3 +344,5 @@ Saga = T1 / T2 / T3 / ... / Tn
 | 性能 | 低 | 高 |
 
 Saga 适用于对一致性要求不高、可接受最终一致的场景（如订单 → 支付 → 物流）。
+
+**Saga 的不可能性**：Saga 不能保证原子性，只能保证最终一致性。若补偿事务也失败，需要人工干预或死信队列处理。

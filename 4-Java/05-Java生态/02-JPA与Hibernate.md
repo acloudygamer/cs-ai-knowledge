@@ -29,6 +29,8 @@ Hibernate 默认在 Session 关闭时清空缓存，故一级缓存的生命周�
 
 **优化方向**：通过合理设计查询顺序，最大化缓存命中率。
 
+**缓存污染问题**：若大量查询不命中，缓存中的实体可能从未被复用，导致内存浪费。
+
 ### 乐观锁的冲突检测概率
 
 乐观锁通过版本号字段实现冲突检测。设：
@@ -56,6 +58,8 @@ $$p \approx 1 - \frac{1}{n}$$
 
 其中 $f_i$ 为第 $i$ 个主对象的关联字段数。
 
+**归约视角**：N+1 问题可归约为**笛卡尔积爆炸**与**网络往返次数最小化**的权衡。JOIN FETCH 将 N+1 次往返压缩为 1 次，但返回数据的行数为 $\prod_{i=1}^{N} (1 + f_i)$，存在数据膨胀。
+
 ### 脏检查的变更集计算复杂度
 
 Hibernate 在 flush 时计算变更集。设 Entity 有 $n$ 个字段：
@@ -66,6 +70,8 @@ Hibernate 在 flush 时计算变更集。设 Entity 有 $n$ 个字段：
 脏检查的数学复杂度：
 $$T_{\text{dirty-check}} = O(n \cdot m)$$
 其中 $n$ 为 Entity 字段数，$m$ 为当前 Persistence Context 中的 Entity 数量。
+
+**优化**：Hibernate 仅比较"脏字段"（通过 dirty flag 追踪），实际复杂度为 $O(d \cdot m)$，其中 $d$ 为平均脏字段数，通常 $d \ll n$。
 
 ---
 
@@ -146,6 +152,19 @@ persistenceContext
 - 同一性保证：`findById(k)` 在同一 Persistence Context 内返回同一 Java 对象引用
 - 集合代理：@OneToMany 等返回 Hibernate 集合代理（PersistentBag 等），延迟加载
 
+### 同一性保证的数学不变式
+
+设 Persistence Context 为 $PC$，实体主键为 $k$，则同一性不变量（Identity Invariant）为：
+$$\forall k, \forall e_1, e_2 \in PC: e_1.id = e_2.id = k \implies e_1 \equiv e_2$$
+
+其中 $\equiv$ 表示 Java 引用相等（identity）。
+
+**物理意义**：同一主键在同一 Persistence Context 内永远指向同一 Java 对象引用。
+
+**违反同一性不变量的后果**：若两条 `findById(k)` 返回不同引用，则 Persistence Context 的缓存语义被破坏，可能导致：
+- 同一事务内对同一实体的修改被覆盖（last-write-wins 而非 all-write-wins）
+- 脏检查不完整
+
 ### 二级缓存的隔离级别语义
 
 二级缓存存储的是 Entity 的 **快照（Snapshot）**，而非 Entity 实例本身。这确保了：
@@ -215,8 +234,6 @@ $$N_{\text{jdbc-calls}} = \lceil N / \text{batch\_size} \rceil$$
 设 Persistence Context 为 $PC$，实体主键为 $k$，则同一性保证为：
 $$\forall k, \forall e_1, e_2 \in PC: e_1.id = e_2.id = k \implies e_1 = e_2$$
 
-**物理意义**：同一主键在同一 Persistence Context 内永远指向同一 Java 对象引用。
-
 **与数据库同一性的区别**：
 - Java 同一性：`e1 == e2`（同一引用）
 - 数据库同一性：主键相同
@@ -229,6 +246,15 @@ Hibernate 的事务隔离级别模型：
 - **事务隔离**：通过版本号或悲观锁实现
 
 $$T_{\text{hibernate}} = T_{\text{业务逻辑}} \times T_{\text{脏检查}} \times T_{\text{SQL执行}}$$
+
+### 脏检查机制的归约模型
+
+脏检查可归约为**影子页（Shadow Page）机制**的变体：
+- 每次 Entity 加载时保存"影子快照"
+- flush 时比较当前值与快照
+- 生成增量 UPDATE
+
+**与 MVCC 的区别**：Hibernate 的快照在 Persistence Context 内部实现，是 Session 级别的快照隔离，而非数据库级别的 MVCC。
 
 ---
 

@@ -13,17 +13,26 @@ Context 接口定义了四个方法，分别对应截止时间、取消信号、
 
 **Context 的数学本质是有向无环图（DAG）**：
 - 根 Context：$C_0$（`Background` 或 `TODO`）
-- 子 Context：$C_i = With\_X(C_{parent}, \dots)$
+- 子 Context：$C_i = \text{With\_X}(C_{parent}, \dots)$
 - 每个 Context 节点携带：
   - Deadline $D$（截止时间，可能为空）
   - Done channel $Ch_{done}$（关闭时发出信号）
   - Values $V$（键值对 map）
 
 **继承语义**：
-$$Deadline(C_i) = Deadline(C_{parent}) \text{ 或 } With\_Deadline \text{ 设置的新 deadline}$$
-$$Done(C_i) \supseteq Done(C_{parent})$$
 
-**归约终点**：Context 树是**不可变的**，每次 WithX 都创建新节点，父节点保持不变，这保证了并发安全。
+$$Deadline(C_i) = \begin{cases} D_{new} & \text{若 } \text{With\_Deadline} \\ Deadline(C_{parent}) & \text{否则} \end{cases}$$
+
+$$Done(C_i) = \begin{cases} Ch_{new} & \text{若 } \text{With\_Cancel/Timeout} \\ Done(C_{parent}) & \text{否则} \end{cases}$$
+
+**Context 树的不变性**：
+
+Context 树是**不可变的**，每次 WithX 都创建新节点，父节点保持不变：
+$$\forall C_i: \text{parent}(C_i) \text{ 在创建后永不改变}$$
+
+这保证了并发安全——无锁访问。
+
+**归约终点**：Context 树是**不可变的 DAG**，每次 WithX 操作创建新节点，父节点保持不变。
 
 ### 数据流
 
@@ -85,8 +94,16 @@ ctx, cancel := context.WithCancel(parentCtx)
 ### 机制
 
 **级联取消的数学语义**：
+
 $$\text{cancel}(C_i) \implies \forall C_j \in \text{descendants}(C_i): Done(C_j) \text{ 关闭}$$
+
 这由 Context 树的父子关系保证。
+
+**cancel 的幂等性**：
+
+$$\forall C: \text{cancel}(C) \implies \text{cancel}(C) = \text{cancel}(C)$$
+
+多次调用 cancel() 的效果等价于一次调用。
 
 ## WithTimeout
 
@@ -96,12 +113,18 @@ $$\text{cancel}(C_i) \implies \forall C_j \in \text{descendants}(C_i): Done(C_j)
 ### 数学模型
 
 **Timeout 计算**：
+
 $$T_{deadline} = T_{now} + T_{timeout}$$
 $$T_{remaining} = T_{deadline} - T_{now}$$
 
 当 $T_{remaining} \leq 0$ 时，自动调用 cancel。
 
 **超时精度**：由于调度延迟，实际超时可能略晚于设定值。对于需要精确超时的场景，应使用 `WithDeadline` 而非 `WithTimeout`。
+
+**超时触发的数学约束**：
+
+设 $T_{start}$ 为 WithTimeout 调用时刻，$T_{deadline} = T_{start} + T_{timeout}$：
+$$\forall t > T_{deadline}: Done(ch) \text{ 已关闭}$$
 
 ## WithValue
 
@@ -117,6 +140,7 @@ $$T_{remaining} = T_{deadline} - T_{now}$$
 **约束条件**：
 - Value 查找是 O(depth) 的，树过深时可能影响性能
 - 不应存储大量数据到 Context（应只存元数据）
+- key 必须是不可变的（否则相等性判断可能失效）
 
 ### 数据流
 
@@ -149,11 +173,19 @@ ctx.Err() 返回 context.Canceled 或 context.DeadlineExceeded。
 - `context.DeadlineExceeded`：时间耗尽（超时或截止时间到达）
 
 **错误判定的数学形式**：
+
 $$Err(ctx) = \begin{cases}
 \text{Canceled} & \text{if } cancel \text{ called} \\
 \text{DeadlineExceeded} & \text{if } T_{now} > Deadline(ctx) \\
 \text{nil} & \text{otherwise}
 \end{cases}$$
+
+**Deadline vs Timeout 的区别**：
+
+| 类型 | 触发条件 | 精度 |
+|------|---------|------|
+| WithDeadline | 绝对时间点 | 取决于调度器 |
+| WithTimeout | 相对时间长度 | 更低（取决于测量误差）|
 
 ## 最佳实践
 
@@ -177,8 +209,17 @@ Context 应该作为方法参数传递，而非存储在结构体中。因为 Co
 子 Context 的超时应该短于父 Context，避免子任务超时后父任务仍在运行。
 
 **约束条件**：
+
 $$T_{deadline}(C_{child}) \leq T_{deadline}(C_{parent})$$
+
 若子任务超时但父任务继续，可能导致资源泄漏或不一致状态。
+
+**资源泄漏的场景**：
+
+若子任务超时后继续运行（父任务未取消）：
+1. 子任务可能继续占用数据库连接
+2. 子任务可能继续写入共享资源
+3. 子任务的结果可能被忽略但仍在计算
 
 ### 不要传递 nil Context
 
@@ -254,3 +295,14 @@ Client                   Server
 - 由条件2，取消操作的幂等性保证了并发安全的取消语义
 
 **推论**：使用 `WithTimeout` 时，应确保子任务的超时时间短于父任务。
+
+**Context 的公平性**：
+
+Context 取消不保证 goroutine 的公平调度。取消只是关闭 Done channel，goroutine 是否立即响应取决于调度器。
+
+**死锁风险的形式化**：
+
+若以下条件同时满足，可能死锁：
+$$\exists G_1, G_2: \text{G1 持有 R1 等待 R2} \land \text{G2 持有 R2 等待 R1} \land \text{取消信号到达 G1/G2}$$
+
+即死锁发生在资源依赖环与 Context 取消的交叉点。
