@@ -78,17 +78,16 @@ Java 8（Lambda/Stream）→ Java 11（HttpClient）→ Java 17（密封类）�
 
 ## Java生态
 
-- [Spring入门](./05-Java生态/01-Spring入门.md)
-- [SpringBoot深度](./05-Java生态/02-SpringBoot深度.md)
-- [JPA与Hibernate](./05-Java生态/03-JPA与Hibernate.md)
-- [Redis](./05-Java生态/04-Redis.md)
-- [Kafka](./05-Java生态/05-Kafka.md)
-- [Docker与K8s](./05-Java生态/06-Docker与K8s.md)
-- [MyBatis](./05-Java生态/07-MyBatis.md)
-- [SpringCloud微服务](./05-Java生态/08-SpringCloud微服务.md)
-- [SpringSecurity](./05-Java生态/09-SpringSecurity.md)
-- [Elasticsearch与MongoDB](./05-Java生态/10-Elasticsearch与MongoDB.md)
-- [监控与链路追踪](./05-Java生态/11-监控与链路追踪.md)
+- [Spring框架](./05-Java生态/01-Spring框架.md)
+- [JPA与Hibernate](./05-Java生态/02-JPA与Hibernate.md)
+- [Redis](./05-Java生态/03-Redis.md)
+- [Kafka](./05-Java生态/04-Kafka.md)
+- [Docker与K8s](./05-Java生态/05-Docker与K8s.md)
+- [MyBatis](./05-Java生态/06-MyBatis.md)
+- [SpringCloud微服务](./05-Java生态/07-SpringCloud微服务.md)
+- [SpringSecurity](./05-Java生态/08-SpringSecurity.md)
+- [Elasticsearch与MongoDB](./05-Java生态/09-Elasticsearch与MongoDB.md)
+- [监控与链路追踪](./05-Java生态/10-监控与链路追踪.md)
 
 ## 设计模式
 
