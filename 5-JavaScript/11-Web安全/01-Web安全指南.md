@@ -34,7 +34,17 @@ XSS 本质是**语法级别的上下文混淆**。设用户输入为字符串 $u
 - 输入过滤的完备性：设过滤函数 $F$ 将危险模式映射为无害表示，$F$ 的检测率 $\eta \in [0, 1]$。攻击者通过多态变形（大小写混淆、URL 编码、Unicode 混淆）降低 $\eta$。
 - CSP 覆盖率：设 CSP 声明的 script-src 白名单为 $W$，攻击者可控脚本源 $S_a$，若 $S_a \cap W = \emptyset$ 则 CSP 完全阻断。
 
-**归约终点**：XSS 归结为上下文敏感转义问题——相同字符串在不同上下文（HTML 内容、属性值、JavaScript 字符串）中需要不同的转义规则。
+**攻击者收益函数**：设攻击成功收益为 $V_a$（窃取数据价值），攻击成本为 $C_a$（构造payload的努力）。理性攻击者仅当 $P_{\text{success}} \times V_a > C_a$ 时发起攻击。
+
+**多态变形的数学描述**：设原始攻击向量为 $v_0$，攻击者应用的变形操作集合为 $T = \{\text{upper},\ \text{lower},\ \text{urlEncode},\ \text{unicodeEscape}, \dots\}$。变形后的向量为：
+
+$$
+v' = t_1 \circ t_2 \circ \cdots \circ t_k(v_0), \quad t_i \in T
+$$
+
+过滤器若仅能检测 $v_0$ 而非 $v'$，则 $\eta \approx 0$ 对变形后的向量。
+
+**归约终点**：XSS归结为上下文敏感转义问题——相同字符串在不同上下文（HTML 内容、属性值、JavaScript 字符串）中需要不同的转义规则。
 
 ### 数据流
 
@@ -80,6 +90,16 @@ $$
 
 **DOM 型 XSS 的特殊性**：存储型和反射型 XSS 的恶意输入都会经过服务端，但 DOM 型 XSS 的数据流完全在客户端——攻击载荷通过 URL 传入，JavaScript 直接从 `document.location` 或 `document.referrer` 读取并写入 `innerHTML`、`document.write()` 或通过 `eval()` 执行。服务端的所有过滤和 CSP 对 DOM 型 XSS 无效，因为服务端根本没有见到这段脚本。
 
+**现代 CSP 绕过向量**：
+
+| 绕过方式 | 条件 | 原理 |
+|---------|------|------|
+| `unsafe-eval` | 存在 | 允许 `eval`、`setTimeout(string)` 等 |
+| `strict-dynamic` + 已有脚本 | 已有脚本被攻破 | `strict-dynamic` 允许已加载脚本加载的脚本 |
+| `nonce-*` 预测 | nonce 可预测 | 若 nonce 基于时间或简单计数器生成 |
+| JSONP | 存在 JSONP 端点 | JSONP 响应可被滥用于脚本执行 |
+| 第三方 CDN | CDN 被攻破 | 即使白名单为 CDN 域名，CDN 上的恶意脚本也会执行 |
+
 **违反约束的后果**：
 
 - 纯前端转义可被数据流分析绕过（如 `<img src=x onerror="...">` 触发 onerror 属性执行）。
@@ -108,6 +128,14 @@ V(\text{request}, c_u) = \text{accept} \quad \text{且} \quad \text{request.orig
 $$
 
 服务端若不验证请求来源，仅依赖 cookie 身份，则伪造请求会被接受。SameSite Cookie 提供 cookie 级别的保护：Strict 模式要求浏览器只在同站请求时附加 cookie，Lax 模式允许导航请求附加。
+
+**攻击成功率的形式化**：设用户访问恶意页面的概率为 $P_{\text{visit}}$，用户触发攻击请求的概率为 $P_{\text{trigger}}$，服务端无防护的概率为 $P_{\text{vuln}}$。则攻击成功率：
+
+$$
+P_{\text{csrf}} = P_{\text{visit}} \times P_{\text{trigger}} \times P_{\text{vuln}} \times (1 - P_{\text{samesite}})
+$$
+
+其中 $P_{\text{samesite}}$ 为 SameSite Cookie 的保护效果。
 
 **归约终点**：CSRF 归结为**自动凭证 vs 手动凭证的不对称性**——cookie 自动发送，但验证令牌需要显式提供。
 
@@ -147,6 +175,12 @@ CSRF 的根本原因是**HTTP 请求的请求来源（Origin/Referer）可被浏
 
 **CSRF Token 的机制**：服务端为每个用户会话生成不可预测的随机令牌 $t_u$，将该令牌嵌入表单的隐藏字段（`<input type="hidden" name="csrf_token" value="$t_u">`）或响应头（`X-CSRF-Token`）。提交时浏览器自动发送 cookie，但 CSRF Token 需要由页面本身的代码读取并附加到请求头。攻击者由于同源策略限制，无法读取包含目标站令牌的页面内容，因此无法伪造携带有效令牌的请求。
 
+**Referer/Origin 验证的局限性**：
+
+- Referer 头可被部分浏览器或代理**静默丢弃**
+- 若页面存在**开放重定向**，攻击者可通过重定向将 Origin 污染为可信域名
+- 某些隐私浏览器插件可能剥离 Referer 头
+
 **违反约束的后果**：
 
 - 若 SameSite 设置为 None 且无其他防护，CSRF 攻击完全可行。
@@ -178,6 +212,8 @@ $$
 Q'(x) = \text{`SELECT * FROM users WHERE name = ?`} \quad \text{（数据库引擎强制 } x \in \text{字面值空间）}
 $$
 
+**注入攻击的检测复杂度**：设输入空间 $U$ 为所有可能输入的集合，危险输入子集 $I \subset U$。过滤器 $F$ 的目标是识别 $I$。若攻击者采用生成式变形（从已知危险输入生成新变形），则 $I$ 的势可能无限，检测器需要持续更新。
+
 **归约终点**：注入攻击归结为**解释器边界突破**，防护的核心是确保用户输入永远不被解释为代码。
 
 ### 数据流
@@ -188,7 +224,7 @@ $$
      ▼
 [拼接进 SQL / NoSQL / OS 命令]
      │
-     ▼
+ ▼
 解析器按语法规则解析 u ──▶ 若 u 含语法结构则执行相应操作
      │
      ▼
@@ -222,11 +258,17 @@ $$
 
 **命令注入**：若将用户输入拼入 `exec()`、`eval()`、`system()` 等函数，攻击者可通过 `; command`、`$(command)`、反引号等语法注入 OS 命令。命令注入的危害无上限——攻击者可在服务器上执行任意操作。
 
+**ORM 的注入风险**：
+
+- ORM 的 `findOne({username: input})` 若 `input` 是字符串则安全，但若前端发送 `{username: {$ne: null}}` 则可能被直接作为查询对象处理（取决于 ORM 实现）
+- ORM 的原生查询方法（如 Sequelize 的 `sequelize.query()`）可能绕过 ORM 的参数化机制
+- 存储过程若动态构建 SQL，同样可能受注入影响
+
 **违反约束的后果**：
 
-- ORM 的 `findOne({username: input})` 若 `input` 是字符串则安全，但若前端发送 `{username: {$ne: null}}` 则可能被直接作为查询对象处理（取决于 ORM 实现）。
-- ORM 的原生查询方法（如 Sequelize 的 `sequelize.query()`）可能绕过 ORM 的参数化机制。
-- 存储过程若动态构建 SQL，同样可能受注入影响。
+- SQL 注入可导致数据泄露（`UNION` 提取其他表数据）、数据篡改（`UPDATE` 修改数据）、数据破坏（`DROP TABLE`）
+- NoSQL 注入可绕过认证（恒真条件）、提取敏感数据
+- 命令注入可导致服务器完全沦陷，攻击者可植入后门、横向移动
 
 ---
 
@@ -254,6 +296,14 @@ $$
 
 bcrypt 的工作因子（cost）还影响内存消耗：bcrypt 的内部结构要求约 4KB 内存访问模式，这使得它对 GPU 并行化和 ASIC 攻击具有一定抵抗力。
 
+**攻击者成本模型**：设攻击者希望破解 $N$ 个密码，每个密码的安全强度为 $S$ bits（熵）。总搜索空间为 $2^S$，若攻击者有算力 $R$ hashes/sec，则：
+
+$$
+T_{\text{crack}} = \frac{2^S}{R \times N} \quad \text{（平均时间）}
+$$
+
+若 $T_{\text{crack}}$ 超过密码过期时间或安全阈值，则认为密码存储方案安全。
+
 **归约终点**：密码存储归结为**计算硬化的单向函数**，使得正向验证容易，逆向计算代价极高。
 
 ### 数据流
@@ -272,7 +322,7 @@ bcrypt 的工作因子（cost）还影响内存消耗：bcrypt 的内部结构�
      ▼
 取出 salt ──▶ 计算 hash' = bcrypt(input, salt)
      │
-     ▼
+ ▼
 constant-time 比较 hash' === stored_hash
 </pre>
 
@@ -297,7 +347,13 @@ constant-time 比较 hash' === stored_hash
 - bcrypt：固定内存消耗（约 4KB），主要依赖时间成本（rounds 参数）。
 - Argon2：提供 time cost、memory cost 和 parallelism 三个维度，memory-hard 特性使其对 ASIC 攻击抵抗力更强（Argon2d 适合密码存储，Argon2i 适合密钥派生）。
 
-**constant-time 比较**：比较两个哈希值必须使用 constant-time 算法（如 `crypto.timingSafeEqual`），否则攻击者可通过时序分析推断哈希前缀，从而逐步推断完整哈希值。
+**constant-time 的比较的数学本质**：时序攻击利用比较操作在第一个不匹配字节就提前返回的特性。Constant-time 比较使用固定时间算法：
+
+$$
+\text{compare}(a, b) = \bigoplus_{i=0}^{n-1} (a_i \oplus b_i)
+$$
+
+若任何字节不同，XOR 结果非零，但比较仍继续执行完所有字节，因此时间与输入无关。
 
 **违反约束的后果**：
 
@@ -326,6 +382,11 @@ JWT 由三部分组成：Header $. Payload $. Signature，记作 $J = \text{Base
 - 密钥熵：$K$ 的安全等级需 $\geq 128$ bits，密钥过短使暴力破解可行。
 
 Access Token 短期化减少泄露窗口：设泄露概率 $P_{\text{leak}}$ 随时间增长，Refresh Token 独立存储用于轮换，Access Token 过期后需用 Refresh Token 换新。
+
+**JWT 的算法混淆攻击形式化**：设验证代码接受算法集合 $A_{\text{allowed}}$，攻击者将令牌头的 `alg` 字段设为 $a_{\text{attack}}$。
+
+- 若 $a_{\text{attack}} = \text{none}$，签名部分为空，伪造令牌直接通过验证
+- 若 $a_{\text{attack}} = \text{HS256}$ 且验证代码使用 RSA 公钥 $(n, e)$ 进行 HMAC 验证，攻击者可用公钥作为 HMAC 密钥伪造签名
 
 **归约终点**：JWT 安全归结为**签名算法的不可篡改性**和**密钥的保密性**。
 
@@ -360,7 +421,7 @@ Access Token 短期化减少泄露窗口：设泄露概率 $P_{\text{leak}}$ 随
 
 **JWT 的三重约束**：
 
-1. **签名验证**：服务端用密鑰 $K$ 重新计算 $\text{Sign}(\text{Base64URL}(h).\text{Base64URL}(p), K)$，与令牌中的 signature 比较。若不一致则拒绝。
+1. **签名验证**：服务端用密钥 $K$ 重新计算 $\text{Sign}(\text{Base64URL}(h).\text{Base64URL}(p), K)$，与令牌中的 signature 比较。若不一致则拒绝。
 2. **过期验证**：`exp` 声明若已过当前时间戳，则拒绝。
 3. **算法白名单**：验证时明确指定允许的算法列表（如 `['HS256']`），**拒绝响应中指定的算法**（`alg` 头），防止 alg 头被篡改。
 
@@ -371,6 +432,7 @@ Access Token 短期化减少泄露窗口：设泄露概率 $P_{\text{leak}}$ 随
 - Access Token 若存放在 `localStorage`，任何 XSS 漏洞都可读取。
 - httpOnly Cookie 防止 JS 读取，但可能被 CSRF 滥用。
 - 内存存储（如 Redux 状态）防止 XSS 直接读取，但页面刷新后丢失。
+- Secure Storage（iOS Keychain、Android Keystore）提供硬件级保护，但需要平台特定实现。
 
 **Refresh Token 的设计目的**：Access Token 短期化使泄露窗口有限；Refresh Token 长期有效但仅用于换发 Access Token，且换发时服务端可验证 Refresh Token 的有效性并记录于撤销列表（若实现轮换）。
 
@@ -400,6 +462,12 @@ $$
 若攻击者持有无效证书，浏览器校验失败（证书链不信任或域名不匹配），TLS 连接终止。
 
 安全头的数学本质是**服务端声明浏览器应强制执行的安全策略**。HSTS（Strict-Transport-Security）要求浏览器在 `max-age` 时间内仅通过 HTTPS 访问，防止协议降级攻击。
+
+**证书链验证的数学约束**：
+
+- 信任链：证书 $c$ 的有效性需满足 $\exists$ 证书链 $c_0 \to c_1 \to \cdots \to c_n = c$ 使得 $c_0$ 在浏览器根证书库中，且 $\forall i: \text{sign}(c_{i+1}, c_i)$ 成立
+- 域名匹配：$\text{domain}(c) \supseteq \text{requested\_domain}$
+- 时间有效性：$t_{\text{now}} \in [\text{NotBefore}, \text{NotAfter}]$
 
 **归约终点**：HTTPS 安全归结为**密钥交换的数学困难性**和**证书链的信任验证**。
 
@@ -449,6 +517,7 @@ HTTP 请求
 | X-Frame-Options | 防止点击劫持 | `DENY` / `SAMEORIGIN` |
 | X-Content-Type-Options | 防止 MIME 嗅探 | `nosniff` |
 | Referrer-Policy | 控制 Referer 头泄露 | `strict-origin-when-cross-origin` |
+| Permissions-Policy | 限制 API 能力 | `geolocation=()` |
 
 **违反约束的后果**：
 
@@ -476,6 +545,18 @@ $$
 $$
 
 当 `Access-Control-Allow-Credentials: true` 时，`Access-Control-Allow-Origin` **不能**为 `*`，必须指定具体域名。
+
+**credentials 时不允许 `*` 的数学证明**：
+
+$$
+\begin{aligned}
+&\text{若 } \text{ACAO} = * \land \text{ACAC} = \text{true} \\
+&\implies \forall O_r, \text{响应可被读取} \\
+&\implies \exists M, O_r \notin W: \text{响应被 M 读取} \quad \text{（矛盾）}
+\end{aligned}
+$$
+
+即存在恶意页面 M，使得请求的 origin 不在白名单中，但响应仍可被 M 的脚本读取——这是不允许的。
 
 **归约终点**：CORS 安全归结为**服务端白名单验证**，浏览器作为执行点强制该策略。
 
@@ -507,7 +588,7 @@ $$
 
 ### 机制
 
-**简单请求的定义（8条全部满足才无需 Preflight）**：
+**简单请求的定义（全部满足才无需 Preflight）**：
 
 1. 方法：GET、POST、HEAD
 2. Content-Type：`application/x-www-form-urlencoded`、`multipart/form-data`、`text/plain` 之一
@@ -518,21 +599,16 @@ $$
 7. 未使用佩章住务端推送
 8. 未使用 RTCDataChannel
 
-**`credentials: true` 时不允许 `*` 的数学约束**：若 `Access-Control-Allow-Origin: *` 且 `Access-Control-Allow-Credentials: true`，则任意跨域请求都可携带目标站点的 cookie，攻击者可在任意域名的页面上发起跨域请求并获取响应数据。这将完全破坏同源策略的安全边界。数学上：
+**CORS 不能防止的攻击**：CORS 只控制跨域**读取响应**，不防止跨域**发送请求**（CSRF）。CSRF 攻击的请求同样会被发送，服务器也会执行，但响应数据被浏览器拦截（因为 origin 不在白名单）。CSRF 的防护需要 CSRF Token、SameSite Cookie 等机制。
 
-$$
-(\text{ACAO} = * ) \land (\text{ACAC} = \text{true}) \implies \exists M, O_r \notin W: \text{响应被 M 读取}
-$$
-
-即存在恶意页面 M，使得请求的 origin 不在白名单中，但响应仍可被 M 的脚本读取——这是不允许的。
-
-**CORS 不能防止的攻击**：CORS 只控制跨域读取响应，不防止跨域发送请求（CSRF）。CSRF 攻击的请求同样会被发送，服务器也会执行，但响应数据被浏览器拦截（因为 origin 不在白名单）。CSRF 的防护需要 CSRF Token、SameSite Cookie 等机制。
+**Preflight 结果缓存**：浏览器可缓存 Preflight 结果，通过 `Access-Control-Max-Age` 响应头指定缓存时间（秒）。这避免了对同一端点的重复 Preflight 请求。
 
 **违反约束的后果**：
 
 - `Access-Control-Allow-Origin: *` 在有敏感数据的 API 上等同于关闭同源保护（但仍受 CORS 限制，仅同源页面能读取响应）。
 - 若 `Access-Control-Expose-Headers` 未正确配置，客户端脚本只能访问默认的简单响应头，其他自定义头被浏览器屏蔽。
 - 错误配置 CORS（如允许所有来源）不会直接导致 CSRF，但会使其他安全配置更难理解。
+- 若 `Vary: Origin` 未设置，缓存可能返回错误来源的响应。
 
 ---
 
@@ -554,6 +630,15 @@ d[k] & \text{otherwise}
 $$
 
 $C = 2^{|S|}$ 种字段命名变体（camelCase、PascalCase、snake_case、全大写等），完整的敏感字段检测需要覆盖所有命名变体。
+
+**命名变体的组合数学**：设敏感字段名为 `password`，则可能的变体包括：
+
+- 大小写变体：`password`, `PASSWORD`, `Password`
+- 分隔符变体：`user_password`, `userPassword`, `user-password`, `userPwd`
+- 缩写变体：`pwd`, `passwd`, `pass`
+- 组合变体：`user_pwd`, `UserPassword123`
+
+若每种模式有 3 种变体，$n$ 个敏感字段的变体总数约为 $3^n$。
 
 **归约终点**：敏感数据处理归结为**模式匹配与替换**，核心是建立完整的敏感字段词库。
 
@@ -625,6 +710,18 @@ R(d) ──▶ 脱敏后写入
 
 纵深防御要求 $V = V_{\text{type}} \land V_{\text{format}} \land V_{\text{range}}$，任一层失败则拒绝输入。
 
+**白名单 vs 黑名单的集合论描述**：
+
+$$
+V_{\text{whitelist}}(x) = \text{true} \iff x \in A_{\text{allowed}}
+$$
+
+$$
+V_{\text{blacklist}}(x) = \text{true} \iff x \notin B_{\text{forbidden}}
+$$
+
+白名单 $|A_{\text{allowed}}|$ 通常远小于全域 $|U|$，但验证结果**可证明安全**；黑名单 $|B_{\text{forbidden}}|$ 随攻击演化持续增长，但验证结果**无法排除未知威胁**。
+
 **归约终点**：输入验证归结为**集合成员测试**，核心是定义清晰的合法输入集合。
 
 ### 数据流
@@ -649,13 +746,7 @@ R(d) ──▶ 脱敏后写入
 
 **为什么验证必须在服务端执行**：客户端验证可被攻击者绕过（直接构造 HTTP 请求绕过浏览器）。客户端验证仅用于提升用户体验（实时反馈），真正的安全验证必须在服务端执行。攻击者可以用 `curl` 或自定义脚本直接构造请求，绕过所有客户端验证。
 
-**白名单优先于黑名单**：黑名单验证试图拦截已知的危险输入模式，但攻击者可不断发明新的绕过方式。白名单验证明确定义合法输入集合，任何不在集合中的输入都被拒绝：
-
-$$
-V_{\text{whitelist}}(x) = \text{true} \iff x \in \text{AllowedSet}
-$$
-
-Blacklist 需要持续更新以应对新发现的危险输入；Whitelist 天然覆盖已知合法输入，无需维护攻击模式库。
+**白名单优先于黑名单**：黑名单验证试图拦截已知的危险输入模式，但攻击者可不断发明新的绕过方式。白名单验证明确定义合法输入集合，任何不在集合中的输入都被拒绝。Blacklist 需要持续更新以应对新发现的危险输入；Whitelist 天然覆盖已知合法输入，无需维护攻击模式库。
 
 **类型验证的重要性**：JavaScript 是弱类型语言，`typeof` 可能产生意外结果：
 
@@ -665,7 +756,7 @@ typeof null   // "object"
 "123" === 123 // false，类型不一致
 ```
 
-对于 API 输入，应使用 schema validation（如 Joi/Zod/ Yup）进行严格的类型和格式验证。
+对于 API 输入，应使用 schema validation（如 Joi/Zod/Yup）进行严格的类型和格式验证。
 
 **违反约束的后果**：
 
@@ -692,11 +783,24 @@ $$
 
 若 $C(t) > N$ 则触发限流。精确滑动窗口算法维护每个请求的时间戳，在 $[t-W, t]$ 区间内计数，内存复杂度 $O(|T|)$。
 
-**令牌桶算法**（空间换时间）：以恒定速率 $r$ 向桶中添加令牌，桶容量为 $C_{\max}$。每个请求消耗一个令牌，令牌耗尽时拒绝请求。允许突发流量（最多 $C_{\max}$ 个请求同时通过），同时限制长期平均速率：
+**令牌桶算法的数学模型**：
+
+- 桶容量 $C_{\max}$：允许的最大突发量
+- 令牌填充速率 $r$：每单位时间补充的令牌数
+- 令牌消耗 $c$：每个请求消耗的令牌数（通常 $c=1$）
+
+在时间 $t$ 时，桶中令牌数：
 
 $$
-\text{平均速率} \leq r, \quad \text{突发上限} = C_{\max}
+B(t) = \min\left(C_{\max},\ B(t_0) + r \cdot (t - t_0) - \text{consumed}(t_0, t)\right)
 $$
+
+**漏桶算法（Leaky Bucket）**：
+
+- 桶容量 $C_{\max}$：最大排队请求数
+- 漏出速率 $r$：每单位时间处理的请求数
+
+当桶满时，新请求被丢弃。漏桶提供**均匀输出速率**，适合流量整形。
 
 **归约终点**：速率限制归结为**计数器的时间窗口约束**，核心是实现精确的滑动窗口计数或令牌桶控制。
 
@@ -731,6 +835,8 @@ $$
 
 - 固定窗口：每个固定时间窗口独立计数。优点是实现简单；缺点是在窗口边界可能出现 2 倍突发（窗口末尾和下一个窗口开头同时涌入请求）。
 - 滑动窗口：通过维护每个请求的时间戳实现精确计数，消除了固定窗口的边界突发问题，但内存消耗更高。
+- 滑动日志：精确记录每个请求时间戳，内存 $O(N)$。
+- 滑动计数器：固定窗口计数器加权平均，内存 $O(1)$ 但有误差。
 
 **限流维度的选择**：
 

@@ -124,6 +124,11 @@ $$
 响应返回（从内到外）
 </pre>
 
+**洋葱模型的数据变换**：
+- 请求进入时：每个中间件依次处理，可修改 request 对象
+- 调用 next() 时：控制权传递给下一个中间件
+- 返回时：每个中间件的收尾逻辑按相反顺序执行，可修改 response 对象
+
 ## 机制
 
 **洋葱模型的设计约束**：
@@ -132,8 +137,9 @@ $$
 - 错误处理中间件必须注册在链末端（通常用 `app.use(err, req, res, next)` 签名）
 
 **违反约束的后果**：
-- 忘记调用 `next()` → 请求挂起，永不返回响应
+- 忘记调用 `next()` → 请求挂起，永不返回响应（连接超时）
 - 在 `next()` 后继续写入响应 → 可能被后续中间件覆盖
+- 中间件抛异常但未通过 next 传递 → 成为未捕获异常
 
 ---
 
@@ -169,6 +175,14 @@ Client ◀── HTTP/1.1 101 Switching Protocols + Accept ◀── Server
 之后：全双工帧交换，无请求-响应约束
 ```
 
+**帧类型**：
+- Opcode 0x0：continuation frame
+- Opcode 0x1：text frame
+- Opcode 0x2：binary frame
+- Opcode 0x8：close frame
+- Opcode 0x9：ping frame
+- Opcode 0xA：pong frame
+
 ## 机制
 
 **为什么需要 Mask**：WebSocket 从客户端发送到服务器的帧必须掩码（Mask=1），防止代理缓存攻击。攻击者可以控制 WebSocket 帧内容，通过代理时修改缓存。
@@ -181,6 +195,7 @@ $$
 **违反约束的后果**：
 - 服务端收到 Mask=0 的客户端帧 → 协议错误，关闭连接
 - 代理缓存污染：恶意 WebSocket 消息可通过中间代理时修改响应
+- 发送大数据帧未分片 → 可能触发协议错误或内存问题
 
 ---
 
@@ -208,7 +223,14 @@ TCP Connection
 |  Stream 3:              [HEADERS] ──▶ [DATA] ──▶ ...            |
 +---------------------------------------------------------------+
   帧交错传输，但流 ID 标识每个帧属于哪个流
-```
+</pre>
+
+**帧类型**：
+- HEADERS (0x1)：携带请求/响应头部
+- DATA (0x0)：携带请求/响应体
+- SETTINGS (0x4)：连接参数（如窗口大小）
+- WINDOW_UPDATE (0x8)：流控制窗口更新
+- RST_STREAM (0x3)：取消流
 
 ## 机制
 
@@ -216,44 +238,60 @@ TCP Connection
 
 **流依赖**：Streams 可以声明对其他流的依赖（dependency），父流优先于子流获取带宽。这解决了关键请求被不重要请求阻塞的问题。
 
+**HPACK 头部压缩**：HTTP/2 使用 HPACK 而非 gzip 压缩头部，通过静态表、动态表和哈夫曼编码大幅减少头部体积。
+
 **违反约束的后果**：
 - 接收窗口耗尽后继续发送 DATA → 协议错误，连接关闭
 - 流 ID 复用冲突 → 旧流的帧可能被新流错误处理
+- 发送超过 SETTINGS_MAX_FRAME_SIZE 的帧 → 协议错误
 
 ---
 
+## HTTP 缓存
+
 ## 定义
 
-HTTP 缓存通过 Header 协商控制资源生命周期。
+HTTP 缓存通过 Header 协商控制资源生命周期：**强缓存**（Cache-Control/Expires）直接使用本地副本，无需服务器确认；**协商缓存**（ETag/Last-Modified）每次仍需服务器验证。
 
 ## 数学模型
 
-**缓存新鲜度**：设资源在 $t_{fetch}$ 时获取，Cache-Control: max-age=$A$，则新鲜度截止时间为 $t_{fresh} = t_{fetch} + A$。在 $t_{fresh}$ 之前，资源被认为是新鲜的，直接使用缓存。
+**缓存新鲜度**：设资源在 $t_{fetch}$ 时获取，Cache-Control: max-age=$A$，则新鲜度截止时间为 $t_{fresh} = t_{fetch} + A$。
 
 $$
 freshness(t) = \begin{cases}
-\text{true} & \text{if } t < t_{fetch} + A \\
+\text{true} & t < t_{fetch} + A \\
 \text{false} & \text{otherwise}
 \end{cases}
 $$
 
-**ETag 验证**：ETag 是资源的版本标识符。验证时比较本地 ETag 与服务端 ETag：
+**ETag 验证**：比较客户端和服务端的 ETag：
 $$
 match = (ETag_{client} == ETag_{server})
 $$
 
+**缓存命中率的数学期望**：设请求到达服从泊松过程，缓存项有效期为 $T_{cache}$，资源更新间隔为 $T_{update}$。则：
+$$
+P(\text{hit}) \approx \min(1, \frac{T_{cache}}{T_{update}})
+$$
+
 ## 机制
 
-**强缓存 vs 协商缓存**：
-- 强缓存（Cache-Control: max-age）：在新鲜度内完全不使用网络
-- 协商缓存（ETag/Last-Modified）：每次请求仍需验证，服务端返回 304 表示未变化
+**强缓存的约束**：
+- `Cache-Control: max-age=N`：缓存有效期为 N 秒
+- `Expires` 字段：绝对过期时间，与 max-age 二选一
+- 强缓存命中时，浏览器完全不发送请求
+
+**协商缓存的约束**：
+- `ETag`：资源版本标识符，服务端生成，通常为内容哈希
+- `Last-Modified`：资源最后修改时间，精度到秒
+- 验证时服务端返回 304 Not Modified 表示缓存仍有效
 
 **Cache-Control 指令约束**：
-- `max-age=N`：缓存有效期为 N 秒
 - `no-cache`：每次使用前必须验证（仍会缓存，但使用前需 revalidate）
 - `no-store`：禁止缓存
 - `private`：只能被浏览器缓存，不能被 CDN 缓存
 
 **违反约束的后果**：
-- 强缓存资源更新后，浏览器因缓存未过期而不获取新版本 → 解决方法：版本化 URL（文件名含 hash）
+- 强缓存资源更新后，浏览器因缓存未过期而不获取新版本
 - 缓存未设置过期时间且数据源已更新 → 缓存与数据源不一致，产生脏读
+- CDN 缓存 private 资源 → 可能泄露给其他用户

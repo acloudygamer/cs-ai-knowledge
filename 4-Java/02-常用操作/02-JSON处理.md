@@ -101,6 +101,14 @@ RuntimeClass → [Factory₁: T₁?] → [Factory₂: T₂?] → ... → [Reflec
 
 **`TypeToken` 捕获泛型的原理**：通过匿名内部类继承 `TypeToken<T>` 的超类，JVM 在类加载时将泛型参数签名注入到 `TypeToken` 的 `Type` 字段。这利用了"泛型擦除后保留签名在 Class 对象"这一 JVM 特性。
 
+```java
+// TypeToken 的类型捕获机制
+// 匿名内部类继承 TypeToken<List<Person>>
+Type type = new TypeToken<List<Person>>(){}.getType();
+// JVM 在加载这个匿名类时，通过 superclass 的 Signature 属性
+// 提取到泛型参数 List<Person>，存储在 TypeToken.type 字段中
+```
+
 ### 循环引用处理的数学本质
 
 循环引用构成对象图中的环。序列化器必须处理两种环：
@@ -111,6 +119,20 @@ RuntimeClass → [Factory₁: T₁?] → [Factory₂: T₂?] → ... → [Reflec
 Jackson 的 `@JsonIdentityInfo` 将对象图的有向边转化为**生成树 + 回边标记**：每个节点首次出现时输出完整内容并记录 oid；后续出现只输出 `"$ref": "oid"`。
 
 **违反约束后果**：若循环引用未标注且序列化器未检测，将导致 StackOverflowError（递归无限深入）。
+
+### 循环引用的对象图展开
+
+设对象图中存在环 $C = (v_1 \to v_2 \to \cdots \to v_k \to v_1)$。Jackson 的处理算法：
+
+1. **首次访问**：输出完整对象内容，并记录 $\text{oid}(v_i)$
+2. **后续访问**：输出 `{"$ref": "oid_of_vi"}`
+3. **回边检测**：通过 IdentityHashMap 跟踪已访问对象
+
+这将原始有环图转化为**生成树 + 回边标记**的 DAG。设环中节点数为 $k$，输出边数：
+
+$$|E'| = |E| - k + 1$$
+
+因为每个环节省了 $k-1$ 条边的内容输出（替换为一条回边引用）。
 
 ### 性能约束与优化策略
 

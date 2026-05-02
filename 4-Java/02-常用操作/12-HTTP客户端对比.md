@@ -6,7 +6,7 @@ JDK HttpClient、OkHttp、WebClient、RestTemplate 的核心差异在于**连接
 
 ## 数学模型
 
-**连接池利用率**：
+### 连接池利用率
 
 设并发请求数为 $R$，连接池大小为 $C$，平均请求处理时间为 $T_{req}$，平均 I/O 阻塞时间为 $T_{io}$，则：
 
@@ -22,7 +22,7 @@ JDK HttpClient、OkHttp、WebClient、RestTemplate 的核心差异在于**连接
   $$\text{吞吐量} = \frac{C}{T_{io}}$$
   连接数固定为 $C$，吞吐量与 $R$ 解耦，$C$ 通常为 CPU 核数的 2-4 倍
 
-**连接复用率**：
+### 连接复用率
 
 HTTP/1.1 keep-alive：同一连接可发送多个请求，但必须 **串行等待**（上一个响应完成才能发下一个）。
 
@@ -39,7 +39,7 @@ OkHttp 默认最大并发流为 100，HTTP/2 server push 使连接复用率进�
 JDK HttpClient:
 HttpClient.newBuilder()
     │
-    ├─ HttpClient.newHttpClient()
+    ├─ HttpClient.newHTTPClient()
     │       └─ ConnectionPool (手动配置)
     │
     └─ sendAsync(req) → CompletableFuture<HttpResponse>
@@ -77,7 +77,8 @@ RestTemplate()
          无连接池（默认），或手动配置 ConnectionPool
 </pre>
 
-**HTTP/2 协商流程**：
+### HTTP/2 协商流程
+
 ```
 客户端发送 HTTP/1.1 请求（ALPN 扩展）
         │
@@ -93,32 +94,72 @@ TLS 握手时协商使用 HTTP/2
 
 ## 机制
 
-**为什么需要连接池**：
+### 为什么需要连接池
 
 TCP 三次握手 + TLS 握手开销约为 2-4 个 RTT（30-100ms）。连接池通过保持长连接复用，避免重复握手。连接池命中时：
 $$\text{延迟节省} = 2 \times RTT_{\text{handshake}} + TLS_{\text{overhead}}$$
 
-**各客户端的连接池模型**：
+### 各客户端的连接池模型
 
 - **JDK HttpClient**：`ConnectionPool` 需要手动配置，生命周期由应用管理。同一 `HttpClient` 实例的连接被所有请求复用。
 - **OkHttp**：内置连接池，默认 5 个连接、5 分钟空闲清理。通过 `ConnectionPool` 类可配置。
 - **WebClient**：Netty 的 `EventLoopGroup` 维护内部连接池，对应用透明。
 - **RestTemplate**：无内置连接池，`SimpleClientHttpRequestFactory` 每次请求新建连接，高并发下性能差。
 
-**虚拟线程的调度机制**：
+### 虚拟线程的调度机制
 
 虚拟线程（Java 21+ 正式生产可用）不绑定固定 OS 线程，而是由 **Carrier Thread**（平台线程）承载：
+
 - 虚拟线程调用阻塞 I/O → Carrier Thread 挂起该虚拟线程，继续调度其他虚拟线程
 - I/O 完成 → 虚拟线程加入可运行队列，等待 Carrier Thread 调度
 - 虚拟线程与 OS 线程的比例可达 1:1 到 1000:1
 
-**约束条件**：
+### 虚拟线程的挂起与恢复
+
+虚拟线程的挂起不依赖操作系统阻塞机制，而是通过 `Continuation` 实现：
+
+```java
+// 虚拟线程调度原理
+ContinuationScope scope = ...
+Continuation cont = new Continuation(scope, () -> {
+    // 虚拟线程执行体
+    blockingCall();  // 调用阻塞 I/O
+    // 挂起点
+});
+
+// 虚拟线程运行
+while (!cont.isDone()) {
+    cont.run();  // 继续执行直到挂起点
+    // Carrier Thread 可调度其他虚拟线程
+}
+```
+
+`Continuation.yield()` 使虚拟线程在挂起点释放 Carrier Thread，而不是阻塞 OS 线程。
+
+### WebClient 的背压机制
+
+WebClient 基于 Reactor，当下游处理速度慢于上游发送速度时，背压（backpressure）沿链传播：
+
+```pre
+Flux.interval(Duration.ofMillis(1))  // 生产：每秒1000个元素
+    .flatMap(i -> externalService.call(i))  // 处理：可能更慢
+    .subscribe();  // 若不设置背压，可能导致内存积压
+```
+
+背压传播路径：
+$$\text{consumer.slow} \xrightarrow{request(n)} \text{operator} \xrightarrow{request(n)} \text{producer}$$
+
+若消费者 request 数量有限，生产者速度自动降级。
+
+### 约束条件
+
 - JDK HttpClient 默认 HTTP/2，若服务器不支持会自动降级（需要配置）
 - OkHttp 的连接池自动清理依赖后台线程，JVM 退出时可能未及时清理
 - WebClient 的 `block()` 方法在响应式链中会阻塞当前线程（反模式）
 - RestTemplate 已在 Spring 6.1 中标记为 `@Deprecated`
 
-**违反约束的后果**：
+### 违反约束的后果
+
 - 连接池泄漏（未关闭 Response body）→ 连接的流控窗口耗尽，新请求无法复用该连接
 - `WebClient` 链中调用 `.block()` → 可能死锁（event loop 线程被阻塞等待自己处理的结果）
 - OkHttp 异步 Callback 中抛出未捕获异常 → 请求"静默失败"，无重试无告警

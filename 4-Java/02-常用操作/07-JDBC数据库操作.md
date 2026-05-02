@@ -135,23 +135,50 @@ $$\text{Query} = Plan(p_1, p_2, ..., p_n)$$
 
 **关键约束**：执行计划由 SQL 骨架决定，与参数值无关。这使得大量相似查询（仅参数不同）可以复用编译结果，减少 CPU 开销。
 
-### 连接池的连接复用原理
+### 预编译的执行计划缓存
 
-HikariCP 声称"太空舱设计"：连接池不包装 JDBC Connection 为代理对象：
+数据库为每个 SQL 骨架维护执行计划缓存。计划的选择取决于：
 
-```java
-// 传统设计（包装）
-PooledConnection extends Connection {
-    private final Connection delegate;
-    // 每个方法调用 delegate.method()
-}
+1. **统计信息**：表大小、索引选择性、列基数
+2. **查询结构**：WHERE 子句、JOIN 顺序、聚合方式
+3. **参数范围**：某些数据库会根据参数值选择不同计划（参数嗅探）
 
-// HikariCP 设计（无代理）
-Connection actual = new MySQLConnection(...);
-pooledConnection = actual;  // 直接返回原始 Connection
+```pre>
+SELECT * FROM users WHERE id = ?
+    │
+    ├── 第一次执行: id=1 → 选择 index lookup (id 有索引)
+    │
+    └── 后续执行: id=ANY → 仍使用缓存的 index lookup 计划
 ```
 
-这种设计减少了方法调用的栈深度，提升性能。但要求 Connection 的 `close()` 不真正关闭连接，而是归还到池。
+**约束**：若表数据分布大幅变化（如大量插入/删除），缓存的计划可能不再最优。某些数据库支持计划重编译。
+
+### 连接池的连接复用原理
+
+HikariCP 采用"太空舱设计"——但"太空舱"的精确含义是**薄代理模式**，而非无代理：
+
+```java
+// 传统设计（重量代理）：PooledConnection 包装 Connection + Statement + ResultSet
+PooledConnection extends Connection {
+    private final Connection delegate;
+    private final Statement delegateStatement;
+    // 每个方法调用 delegate.method()，增加栈深度
+}
+
+// HikariCP 设计（薄代理）：仅 ProxyConnection 包装 Connection
+// Statement/ResultSet 直接由数据库驱动返回，不经过池
+class ProxyConnection implements Connection {
+    private final Connection delegate;  // 真实数据库连接
+    private PoolEntry poolEntry;       // 指向池条目的引用
+
+    public void close() {
+        poolEntry.recycle();  // 归还到池，不关闭底层连接
+    }
+    // 其他方法直接委托给 delegate
+}
+```
+
+**关键区别**：HikariCP 的 ProxyConnection **确实**包装了 Connection（用于拦截 `close()` 实现池化归还），但它**不包装** Statement 和 ResultSet——这两个对象由数据库驱动直接创建，不经过连接池。这种设计减少了字节码 instrumentation 的开销，同时保证了连接级别的资源管理（close 拦截）和语句级别的零开销（直连驱动）。
 
 ### 事务隔离的锁机制
 
@@ -166,6 +193,30 @@ pooledConnection = actual;  // 直接返回原始 Connection
 **违反约束的后果**：
 - 低隔离级别：脏读、不可重复读、幻读导致业务逻辑错误
 - 高隔离级别：锁竞争加剧，吞吐量下降，死锁概率增加
+
+### 连接池泄漏的检测机制
+
+HikariCP 通过 `leakDetectionThreshold` 检测连接泄漏：
+
+```java
+// 伪代码
+ConnectionProxy {
+    long checkoutTime = System.nanoTime();
+
+    public void close() {
+        if (leakDetectionThreshold > 0 &&
+            System.nanoTime() - checkoutTime > leakDetectionThreshold) {
+            // 记录泄漏警告，包含当前堆栈
+            log.warn("Connection leak detected");
+        }
+        // 归还到池
+    }
+}
+```
+
+设泄漏检测阈值为 $T_{leak}$，连接借出时间为 $t_{checkout}$，则泄漏判定：
+
+$$\text{leak} \iff (t_{now} - t_{checkout}) > T_{leak}$$
 
 ## 参考存根
 

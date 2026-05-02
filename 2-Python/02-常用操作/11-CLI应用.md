@@ -2,22 +2,28 @@
 
 ## 定义
 
-CLI 应用是从标准输入接收命令行参数字符串，将其解析、验证并映射为函数调用的程序。CLI 解析的本质是一个**字符串到类型的偏函数** $P: \Sigma^* \rightharpoonup D$，其中 $\Sigma^*$ 是字节串集合，$D$ 是目标数据类型集合，$P$ 在非法输入时**无定义**（导致错误退出而非静默接受错误数据）。这个偏函数的定义域并非全 $\Sigma^*$，因此对任何 CLI 解析器，存在合法的 argv 使 $P$ 无定义——这是 CLI 区别于配置文件解析的核心特征。
+CLI 应用是从标准输入接收命令行参数字符串，将其解析、验证并映射为函数调用的程序。CLI 解析的本质是一个**字符串到类型的偏函数** $P: \Sigma^* \rightharpoonup D$，其中 $\Sigma^*$ 是字节串集合，$D$ 是目标数据类型集合，$P$ 在非法输入时**无定义**（导致错误退出而非静默接受错误数据）。
 
 ## 数学模型
+
+### 参数解析的偏函数模型
 
 设参数规范为类型化元组 $S = (a_1: T_1, a_2: T_2, \dots, a_n: T_n)$，其中 $T_i$ 是类型约束（`str`、`int`、`float`、枚举等）。解析函数 $P$ 的语义为：
 
 $$P(\text{argv}) = \begin{cases} (v_1, \dots, v_n) & \text{若每个 } v_i \in T_i \\ \text{error} & \text{否则} \end{cases}$$
 
-**FST 归约**：参数解析可形式化为有限状态转换器 $M = (Q, \Sigma, \delta, q_0, F)$：
+**关键不变量**：对任何 CLI 解析器，存在合法的 argv 使 $P$ 无定义——这是 CLI 区别于配置文件解析的核心特征：CLI 在非法输入时**错误退出**，配置文件解析器通常有**默认值填充策略**。
+
+### FST 归约
+
+参数解析可形式化为有限状态转换器 $M = (Q, \Sigma, \delta, q_0, F)$：
 - $Q$ 是解析阶段集合（如"位置参数模式"、"可选参数模式"、"子命令解析"）
 - $\Sigma$ 是 token 集合（`"foo"`, `"--bar"`, `"42"` 等）
 - $\delta: Q \times \Sigma \to Q$ 是确定性转移函数，由参数语法定义驱动
 - $q_0$ 是初始状态（位置参数解析）
 - $F \subseteq Q$ 是接受状态集合（解析完成）
 
-以 `prog.py input -v` 为例：状态机在位置参数模式下消费 `"input"` → 遇到 `"-"` 前缀触发转移 → 进入可选参数模式 → `"input"` 被解析为可选参数而非位置参数。**这说明 $\delta$ 的设计与参数顺序紧密耦合**，是 argparse "位置参数必须在可选参数前" 这一约束的数学本质。
+**FST 视角下的 argparse**：状态转移 $\delta$ 由参数定义顺序固定。若将 `add_argument("input")` 放在 `add_argument("-v")` 之后，则 `"input"` 进入可选参数模式——这与函数参数顺序在 Python 中的语义完全不同，违反直觉。
 
 **归约终点**：$P$ 可进一步归约为硬件层面的原子指令（CAS），但在软件层，CLI 解析的不可约概念是**确定性状态转移 + 类型验证**的组合。
 
@@ -32,8 +38,7 @@ shell 展开 wildcards / ~ / $VAR          argv 数组（字节串列表）
         │                                    ▼
         │                              参数解析器
         │                              (argparse/click/typer)
-        │                                    │
-        ▼                                    ▼
+        ▼                                    │
   环境变量展开后的实际值                  Namespace / Context
         │                                    │
         └────────────────────────────────────┘
@@ -59,9 +64,9 @@ shell 展开 wildcards / ~ / $VAR          argv 数组（字节串列表）
 
 `argparse.ArgumentParser` 维护一个解析状态机：位置参数优先解析，遇到 `-` 前缀时切换到可选参数模式。`parse_args()` 执行的动作是将 token 序列通过确定性状态机按顺序消费，最终构建 Namespace 对象。
 
-**FST 视角下的 argparse**：状态转移 $\delta$ 由参数定义顺序固定。若将 `add_argument("input")` 放在 `add_argument("-v")` 之后，则 `"input"` 进入可选参数模式——这与函数参数顺序在 Python 中的语义完全不同，违反直觉。
+**关键约束**：位置参数的顺序必须唯一确定，因为解析器按顺序消费位置参数 tokens。若位置参数后出现可选参数，则该位置参数解析结束。这导致 `prog.py input -v` 中 `-v` 被解析为可选参数而非文件名。
 
-关键约束：位置参数的顺序必须唯一确定，因为解析器按顺序消费位置参数 tokens。若位置参数后出现可选参数，则该位置参数解析结束——这导致 `prog.py input -v` 中 `-v` 被解析为可选参数而非文件名（除非使用 `parser.parse_args(["input", "-v"])`）。
+**违反约束的后果**：若将 `add_argument("input")` 放在 `add_argument("-v")` 之后，则 `prog input -v` 中 `"input"` 进入可选参数模式，`"-v"` 被解析为位置参数——这与直观预期完全相反。
 
 ### click 的装饰器语义
 
@@ -82,20 +87,15 @@ cmd = Command(callback=remove)
 
 **context 传递机制**：click 通过 `click.Context` 对象在调用链间传递状态。子命令的 `ctx.parent` 指向父级上下文，允许子命令访问全局选项。`ctx.obj` 用于存储任意自定义数据，实现命令间共享状态。
 
-**装饰器语义的数学本质**：`@click.command()` 不改变原函数的类型签名——原函数的类型注解在装饰前就被 `click` 的 `ParamType` 读取用于类型推断。装饰后，`Command.callback` 持有原函数引用，`invoke` 注入解析后的 `ctx.params`。这意味着装饰器是**纯包装，不改变计算语义**。
-
-子命令的数学本质：**不相交联合类型**的参数空间。`prog add` 和 `prog remove` 的参数集合不相交，解析器通过子命令名称选择解析路径。
+**装饰器语义的数学本质**：`@click.command()` 不改变原函数的类型签名——原函数的类型注解在装饰前就被 `click` 的 `ParamType` 读取用于类型推断。装饰后，`Command.callback` 持有原函数引用，`invoke` 注入解析后的 `ctx.params`。装饰器是**纯包装，不改变计算语义**。
 
 ### typer 的类型推断
 
-typer 在 argparse/click 基础上增加了一层基于 `inspect` 的类型推断：读取函数签名中**未注解参数的默认值**作为常量，构建对应的 click 参数。这将参数规范减少为零——函数签名本身就是 CLI 接口定义。
+typer 在 argparse/click 基础上增加了一层基于 `inspect` 的类型推断：读取函数签名中**未注解参数的默认值**作为常量，构建对应的 click 参数。
 
-**设计范式转变**：argparse 和 click 仍属于**声明式**——程序员显式声明参数名称、类型、默认值。typer 引入的是**推导式**——参数规范从函数签名自动生成，类型即约束。这意味着：
+**设计范式转变**：argparse 和 click 仍属于**声明式**——程序员显式声明参数名称、类型、默认值。typer 引入的是**推导式**——参数规范从函数签名自动生成，类型即约束。
 
-- typer 的 `def create(name: str, age: int = 18)` 实际上等价于 click 的 `add_option('--name', type=str, default=??? )`，但 typer 无需为 `name` 显式指定 `--name`，因为 `name: str` 中的参数名直接作为选项名。
-- typer 的类型推断层本质上是 `inspect.signature` → `click.Option/Argument` 的**编译时元编程**映射。
-
-**约束**：typer 推断仅支持 Python 3.10+ 的内置类型（`str`、`int`、`float`、`bool`）和标准库类型；自定义类型需要 `click.ParamType` 或显式 `click.Argument/Option` 包装。
+**约束**：typer 推断仅支持 Python 3.10+ 的内置类型（`str`、`int`、`float`、`bool`）和标准库类型；自定义类型需要 `click.ParamType` 或显式 `typer.Argument()` / `typer.Option()` 注解。
 
 ### 类型安全的边界
 
@@ -111,16 +111,6 @@ CLI 参数解析的**核心不变量**：所有通过 `parse_args` 得到的值�
 | 需要类型提示完整的 IDE 支持 | typer | LSP 可直接读取函数签名 |
 | 需要自定义参数解析逻辑 | argparse | 完整控制 `parse_args` 行为 |
 | 需要与现有 click 生态集成 | click | 生态丰富，第三方装饰器兼容 |
-
-### 违反约束
-
-**argparse 位置参数顺序陷阱**：位置参数必须在可选参数之前定义。若顺序颠倒，`prog.py input -v` 中 `"input"` 会被解析为可选参数值。修复：始终先定义位置参数，再定义可选参数。
-
-**typer 推断导致歧义**：当函数有多个 `str` 类型参数时，typer 无法区分哪些应作为位置参数（`Argument`）、哪些应作为选项（`Option`）。此时 typer 的默认行为可能与预期不符。修复：显式使用 `typer.Argument()` 或 `typer.Option()` 注解。
-
-**typer 自定义类型限制**：typer 不支持推断自定义类型（如 `pydantic.BaseModel`），强制使用会抛出 `TypeError`。修复：使用 `click.ParamType` 显式包装或回退到 click。
-
-**argparse/click/typer 均依赖运行时类型检查**：偏函数 $P$ 在非法输入时无定义，但最终表现为程序以错误码退出——这意味着**静默失败是不可能的**，CLI 永远不会在类型错误时继续执行（这与配置文件解析器不同，配置文件解析器通常有默认值填充策略）。
 
 ## 参考存根
 

@@ -2,7 +2,7 @@
 
 ## 定义
 
-CI/CD 是软件交付流水线的两个阶段：CI（持续集成）将代码变更自动构建、测试并验证；CD（持续交付/部署）将验证后的产物自动部署到目标环境。GitHub Actions 通过声明式工作流文件（YAML）在云端_runner_（虚拟机容器）中执行，与 Git 事件（push、PR）绑定实现自动化。
+CI/CD 是软件交付流水线的两个阶段：CI（持续集成）将代码变更自动构建、测试并验证；CD（持续交付/部署）将验证后的产物自动部署到目标环境。GitHub Actions 通过声明式工作流文件（YAML）在云端 runner（虚拟机容器）中执行，与 Git 事件（push、PR）绑定实现自动化。
 
 ## 数学模型
 
@@ -15,6 +15,8 @@ $$\text{Workflow} = (J, E),\ J = \{\text{job}_i\},\ E \subseteq J \times J$$
 并行 jobs 满足 $j_a \nrightarrow j_b \land j_b \nrightarrow j_a$；串行 jobs 满足偏序关系。Job 内各 step 按声明顺序执行。
 
 **DAG 的拓扑排序**：工作流调度器对 DAG 进行拓扑排序，确定 jobs 的执行顺序。拓扑排序结果不唯一，但必须满足所有偏序约束。
+
+**并行度的数学约束**：设 DAG 中无依赖的 jobs 集合为 $U$（即 $\forall j \in U, \nexists i \in J: i \to j$ 或所有前驱已完成）。则最大并行度为 $|U|$——同一时刻最多可运行 $|U|$ 个 job。
 
 ### 缓存命中率
 
@@ -33,6 +35,8 @@ $$\text{key} = \text{prefix} + \text{hash}(\text{dependencies-files})$$
 | 精确版本 | `${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}` | 高（依赖不变时完全命中） |
 | 回退匹配 | `${{ runner.os }}-pip-` | 中（依赖变化但 OS 相同时部分命中） |
 | 锁文件 | `${{ runner.os }}-poetry-${{ hashFiles('**/poetry.lock') }}` | 高（锁文件变化才失效） |
+
+**回退匹配（restore-keys）的语义**：当精确 key 未命中时，restore-keys 按前缀匹配恢复缓存。例如 key `pip-A1B2C3` 的 restore-keys 为 `pip-` 和 `pip-A`，若存在 `pip-A1B2` 则命中恢复。这允许同一 OS 下依赖小幅更新时复用已有缓存层。
 
 ### 覆盖率门禁
 
@@ -57,7 +61,11 @@ strategy:
 
 产生 $2 \times 2 = 4$ 个并行 job 实例，每个消耗独立虚拟机实例和配额。
 
-**资源消耗的数学约束**：总资源消耗为 $O(\prod |dim_i|)$。若维度过多，job 数量指数增长可能导致配额耗尽。
+**资源消耗的数学约束**：总资源消耗为 $O(\prod |dim_i|)$。若维度过多，job 数量指数增长可能导致配额耗尽。设 $d$ 个维度，每个维度平均 $|v|$ 个值，则 job 总数：
+
+$$N_{jobs} = \prod_{i=1}^{d} |v_i|$$
+
+若 $d=4$、每个维度 3 个值，$N_{jobs} = 81$，可能耗尽 GitHub Actions 并发配额。
 
 ## 数据流
 

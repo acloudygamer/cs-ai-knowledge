@@ -2,17 +2,17 @@
 
 > **版本基准**: Node24+ES2024 (stable) | Node26+ES2026 (latest)
 
-**本质断言**：JavaScript 代码规范是通过**命名空间隔离**与**不可变数据流**使代码意图可预期、可审查、可替换的约束系统。
-
----
-
 ## 定义
 
 JavaScript 代码规范的本质是一套**视觉类型系统 + 格式化收敛协议 + 错误处理契约**的三元约束体系。在动态类型语言中，规范替代了编译期类型检查的部分功能——通过命名约定强制区分语义角色，通过格式化工具消除无意义审美分歧，通过错误类约定确立故障传播语义。
 
-### 数学模型
+规范的核心价值在于**降低认知负荷**：代码审查时，读者无需猜测某个标识符的来源或性质，命名约定即是最小化的内联文档。
 
-#### 命名空间隔离度
+---
+
+## 数学模型
+
+### 命名空间隔离度
 
 命名规范的本质是**在词法作用域树上建立可视性边界**。设标识符集合为 $I$，命名空间层级为 $L = \{\text{UPPER\_SNAKE}, \text{PascalCase}, \text{camelCase}, \text{\_prefix}\}$，标识符 $i \in I$ 的约束为：
 
@@ -27,7 +27,7 @@ $$
 
 违反约束时，读者无法从命名推断出该标识符的语义角色，导致认知负荷增加。设混用概率为 $P_{\text{mix}}$，团队规模为 $n$，则混用期望 $E_{\text{mix}} = 1 - (1 - P_{\text{mix}})^n$ 随人数增长趋近于 1。
 
-#### 代码风格熵
+### 代码风格熵
 
 Prettier 等格式化工具的目标是**降低代码风格的分叉数**。设风格选项集合为 $S$（缩进宽度、引号类型、分号策略等），$n$ 为代码库文件数，全局一致的风格空间大小为 $|S|$。若每人使用不同风格，风格空间为 $|S|^n$；格式化后降为 $|S|$。信息熵减少量：
 
@@ -35,7 +35,7 @@ $$
 \Delta H = \log_2(|S|^n) - \log_2(|S|) = (n-1)\log_2|S|
 $$
 
-#### ESLint 规则图论
+### ESLint 规则图论
 
 每条 ESLint 规则定义一个**代码模式 → 违规判定**的谓词 $R_i$。整个规则集构成一个**缺陷检测有向图** $G = (V, E)$：
 
@@ -49,7 +49,7 @@ $$
 \text{violation}(v) \iff \exists i \in [1,m] : R_i(v) = \text{true}
 $$
 
-Flat Config 将规则按文件 glob 模式分区，避免全局规则膨胀。设模式集合为 $P$，规则分配函数 $A: \mathcal{R} \rightarrow \mathcal{P}(P)$，文件 $f$ 匹配的规则子集为 $\mathcal{R}_f = \{R_i \mid \exists p \in P : p \in A(R_i) \land \text{match}(f, p)\}$。这保证了 TypeScript 文件不执行纯 JS 规则，JS 文件不执行 TS 专属规则。
+Flat Config 将规则按文件 glob 模式分区，避免全局规则膨胀。设模式集合为 $P$，规则分配函数 $A: \mathcal{R} \rightarrow \mathcal{P}(P)$，文件 $f$ 匹配的规则子集为 $\mathcal{R}_f = \{R_i \mid \exists p \in P : p \in A(R_i) \land \text{match}(f, p)\}$。
 
 **归约终点**：规则图的遍历本质是**模式匹配的有穷自动机**——规则谓词是状态转移条件，文件路径是初始状态，违规节点是接受状态。
 
@@ -235,23 +235,12 @@ class AppError extends Error {
 
 ```javascript
 // 命名规范
-const MAX_RETRY = 3;              // 常量
-const userName = 'Alice';          // 变量
-function getUserById(id) {}        // 函数
-class UserService {}               // 类
-function UserProfile() {}          // 组件（函数式）
-const _privateField = 'hidden';    // 私有约定
-```
-
-```javascript
-// Prettier 配置
-{
-  "semi": true,
-  "singleQuote": true,
-  "printWidth": 100,
-  "tabWidth": 2,
-  "trailingComma": "es5"
-}
+const MAX_RETRY = 3;
+const userName = 'Alice';
+function getUserById(id) {}
+class UserService {}
+function UserProfile() {}
+const _privateField = 'hidden';
 ```
 
 ```javascript
@@ -269,20 +258,6 @@ const config = [
     rules: { '@typescript-eslint/no-unused-vars': 'error' }
   }
 ];
-```
-
-```javascript
-// 错误类定义
-class AppError extends Error {
-  constructor(message, statusCode = 500, code = 'INTERNAL_ERROR') {
-    super(message);
-    this.statusCode = statusCode;
-    this.code = code;
-  }
-}
-
-// 使用
-throw new AppError('User not found', 404, 'USER_NOT_FOUND');
 ```
 
 ```javascript
@@ -304,22 +279,4 @@ const [user, orders] = await Promise.all([
 export { Button } from './Button';
 export { Input } from './Input';
 export { Modal } from './Modal';
-```
-
-```javascript
-// 导入顺序规范
-// 1. 外部模块
-import express from 'express';
-import React from 'react';
-
-// 2. 别名内部模块
-import { userService } from '@/services';
-import { utils } from '@/utils';
-
-// 3. 相对导入
-import { Button } from './Button';
-import { Input } from './Input';
-
-// 4. 类型导入
-import type { User } from './types';
 ```

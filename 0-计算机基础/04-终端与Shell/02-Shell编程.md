@@ -17,7 +17,7 @@ T_{\text{fork}} = O(1) \quad \text{（仅复制父进程的页表，不复制堆
 $$
 
 父进程的堆、栈在物理内存中保持单一副本，直到任一进程尝试写入时才触发页面复制（COW）。因此 `fork` 的实际开销是：
-- 复制父进程的页表项（约 $O(\text{addr space})$，但现代实现为 $O(1)$ 因为页表是分层结构）
+- 复制父进程的页表项（约 $O(\text{addr_space})$，但现代实现为 $O(1)$ 因为页表是分层结构）
 - 设置子进程的 CPU 寄存器上下文
 
 $$
@@ -30,6 +30,29 @@ $$
 $$
 T_{\text{program}} = T_{\text{fork}} + T_{\text{exec}} + T_{\text{用户代码}}
 $$
+
+**vfork() 的约束条件**：
+
+`vfork()` 是 `fork()` 的变体，设计用于优化 fork+exec 场景：
+
+$$
+T_{\text{vfork}} < T_{\text{fork}} \quad \text{（父子共享地址空间，无 COW 开销）}
+$$
+
+**约束边界**（违反会导致未定义行为）：
+- vfork() 后子进程必须立即调用 exec 系列函数
+- 在 exec 之前，子进程不能修改任何内存（栈、堆、全局变量）
+- 在 exec 之前调用 `return` 或 `exit()` 会终止整个进程树
+
+```c
+// vfork 的安全用法
+if (vfork() == 0) {
+    // 子进程：只允许 exec
+    execlp("cmd", "cmd", NULL);
+    _exit(127);  // exec 失败时必须用 _exit
+}
+// 父进程继续执行
+```
 
 ### 管道容量与原子性约束
 
@@ -58,6 +81,43 @@ $$
 \text{若 } \exists \text{写端未关闭} \land \text{读取方无其他数据源} \Rightarrow \text{read() 无限阻塞}
 $$
 
+### SIGPIPE 传播模型
+
+当管道读端关闭时，写端继续写入会导致 SIGPIPE 信号：
+
+$$
+\text{SIGPIPE}(c_{\text{write}}) =
+\begin{cases}
+\text{SIGPIPE} & \text{读端已关闭} \land \text{写端仍写入} \\
+\text{EPIPE} & \text{write() 返回 -1，errno=EPIPE} \\
+\text{继续} & \text{写端忽略 SIGPIPE}
+\end{cases}
+$$
+
+**管道中 SIGPIPE 的传播路径**：
+```
+cmd1 ──pipe──► cmd2
+  │              │
+  │              ▼
+  │         cmd2 退出（关闭读端）
+  │              │
+  │              │
+  └──────────────┘
+       │
+       ▼
+  cmd1 继续写入 pipe[1]
+       │
+       ▼
+  内核发送 SIGPIPE 给 cmd1
+       │
+       ├── cmd1 忽略 SIGPIPE → write() 返回 -1，errno=EPIPE
+       └── cmd1 不忽略 SIGPIPE → cmd1 终止
+```
+
+**Shell 处理 SIGPIPE 的默认策略**：
+- Shell 内部设置的 SIGPIPE 处理器为 `SIG_DFL`（默认终止）
+- 因此管道中的 cmd1 如果不处理 SIGPIPE，会在 cmd2 退出后被 SIGPIPE 终止
+
 ### 作业状态机
 
 Shell 维护一个 **有穷状态自动机** 追踪每个作业的生命周期：
@@ -66,14 +126,14 @@ Shell 维护一个 **有穷状态自动机** 追踪每个作业的生命周期�
                     ┌──────────────────────────────────────────┐
                     │                                          │
     ┌───────────────►│         [运行中 (Running)]              │
-    │                │    属于前台进程组，可读/写终端            │
-    │   Ctrl+Z       │                                          │
+    │                │    属于前台或后台进程组                    │
+    │   Ctrl+Z       │    可读写终端（前台）/ 暂停（后台）        │
     │   (SIGTSTP)    └──────────┬───────────────────────────────┘
     │                │           │
     │                │   bg      │  fg
     │                ▼           ▼
-    │         [已停止 (Stopped)]     [运行中 (Running)]
-    │              (SIGTSTP 暂停)   (属于后台进程组)
+    │         [已停止 (Stopped)]     [运行中 (前台)]
+    │              (SIGTSTP 暂停)   (拥有终端控制权)
     │                │           │
     │                │           │ exit()
     │                │           ▼
@@ -99,8 +159,13 @@ Shell 维护一个 **有穷状态自动机** 追踪每个作业的生命周期�
 
 系统中僵尸进程的数量上限为 PID 上限（默认 32768）。若所有 PID 被僵尸占用：
 $$
-\nexists \pid: \text{fork()} \ \text{成功}
+\nexists \pid: \text{fork()} \ \text{成功} \Rightarrow \text{errno} = \text{EAGAIN}
 $$
+
+**PID 耗尽的后果**：
+- 新 fork() 调用返回 -1，errno = EAGAIN
+- 已有的僵尸进程必须被 wait() 回收才能释放 PID
+- 若父进程已退出，僵尸被 init(pid=1) 收养，init 会自动 wait() 回收
 
 ### 文件描述符重定向的偏序关系
 
@@ -176,6 +241,22 @@ Shell: waitpid(pid_cmd1) + waitpid(pid_cmd2)
 **数据所有权转移**：
 cmd1 的输出字节流所有权：cmd1（生产者） → kernel pipe buffer（临时持有） → cmd2（消费者）。Shell 作为协调者，仅负责建立连接，不参与数据传输。
 
+**SIGPIPE 在管道中的传播流**：
+```
+cmd1 ──pipe[1]──► pipe buffer ──pipe[0]──► cmd2
+  │                                            │
+  │                                            ▼
+  │                                       cmd2 exit()
+  │                                            │
+  └────────────────────────────────────────────┘
+                       │
+                       ▼
+              内核检测到读端关闭
+                       │
+                       ▼
+              cmd1 write() → SIGPIPE 或 EPIPE
+```
+
 ## 机制
 
 ### fork+exec 的 COW 语义与内存隔离
@@ -196,6 +277,21 @@ $$
 - 父子共享代码段：代码段通常为只读，无 COW 开销
 - 多线程中调用 fork()：仅复制当前线程的栈，其他线程在子进程中陷入"幽灵状态"（不活跃但占用资源）
 
+**多线程中 fork 的危险**：
+
+```c
+// 危险模式
+pthread_create(&tid, NULL, worker, NULL);
+if (fork() == 0) {
+    // 子进程：只有主线程的栈被复制
+    // worker 线程的 pthread_t 仍然有效，但线程函数已消失
+    // 调用任何 pthread 函数可能导致未定义行为
+    exec("new_program", ...);
+}
+```
+
+解决方案：在 fork 之后立即 exec，避免在子进程中调用任何 pthread 函数。
+
 ### 环境变量的继承与作用域隔离
 
 `export` 的本质是将 Shell 进程的变量写入其 `envp[]` 列表，该列表在 `fork+exec` 时被完整复制给子进程：
@@ -205,7 +301,8 @@ $$
         │
         ├── HOME=/home/user     (export 已声明 → 进入 envp)
         ├── PATH=/usr/bin:/bin  (export 已声明 → 进入 envp)
-        └── VAR="local"         (未 export → 不进入 envp)
+        ├── VAR="local"         (未 export → 不进入 envp)
+        └── SHELL_SESSION=1      (Shell 内部变量)
         │
         ▼ fork()
 子 Shell 进程环境（envp[] 的完整副本）
@@ -218,6 +315,7 @@ $$
 - `export` 仅影响当前 Shell 进程及其 fork 的子进程
 - 子进程修改自己的 envp[] 不影响父进程
 - SSH 会话断开时设置的环境变量会丢失（因为 SSH 进程退出）
+- 子进程调用 `setenv()` 修改的环境变量不影响父进程
 
 ### I/O 重定向的 fd 顺序陷阱
 
@@ -229,6 +327,13 @@ $$
 - 如果交换顺序：`2>&1` 先将 stderr 指向 terminal（stdout 的旧位置），然后 `>file` 将 stdout 指向 file，stderr 仍留在 terminal
 
 **违反后果**：日志文件只记录 stdout，stderr 仍输出到终端，敏感错误信息可能泄露。
+
+**更隐蔽的错误 `cmd >file1 2>&1 >file2`**：
+```bash
+# 意图：stdout → file1, stderr → file2
+# 实际：stdout → file2, stderr → file1
+# 原因：2>&1 在 >file2 之前执行
+```
 
 ### 管道中的原子性边界与部分写入
 
@@ -273,11 +378,13 @@ Shell 中的 `(cmd)` 和 `{ cmd; }` 有截然不同的语义：
 - 环境变量修改不影响父 Shell
 - 默认继承父 Shell 的 fd（除非显式重定向）
 - 退出码是 cmd 的退出码
+- 变量修改（如 `x=2`）在子 Shell 退出后消失
 
 **命令组 `{ cmd; }`**：
 - 不 fork，在当前 Shell 执行
 - 环境变量修改**影响当前 Shell**
 - 可访问当前 Shell 的所有变量
+- 是同步执行（等待完成后才返回）
 
 ```bash
 x=1
@@ -287,6 +394,12 @@ echo $x      # 输出 1
 { x=3; }     # 当前 Shell：x 变为 3
 echo $x      # 输出 3
 ```
+
+**子 Shell 的资源隔离语义**：
+$$
+\text{子 Shell} \Rightarrow \text{fork()} \Rightarrow \text{独立进程空间}
+$$
+子 Shell 的崩溃、无限循环、exit() 调用都不影响父 Shell。但这也意味着子 Shell 的资源消耗（内存、FD）独立计算。
 
 ### 命令替换的反向引用语义
 
@@ -307,16 +420,47 @@ x='echo $x'  # x 是字符串 "echo $x"
 eval $x      # eval 会再次展开，此时 $x 被求值
 ```
 
+**命令替换的嵌套规则**：
+- `$(echo $(echo a))` 是合法的，嵌套命令替换从内向外展开
+- 命令替换创建子 Shell 执行，变量作用域隔离
+
+### 后台作业与 nohup 的协同
+
+`cmd &` 创建后台作业，但终端断开时会收到 SIGHUP：
+
+$$
+\text{SIGHUP 传播条件} \Leftarrow \text{终端关闭} \land \text{进程仍持有控制终端}
+$$
+
+**nohup 的防护机制**：
+```bash
+nohup cmd &   # 忽略 SIGHUP，cmd 在后台运行
+```
+
+nohup 的实现原理：
+1. 忽略 SIGHUP 信号（`signal(SIGHUP, SIG_IGN)`）
+2. 若 stdin 是终端，将其重定向到 `/dev/null`
+3. 若 stdout/stderr 未重定向，将其重定向到 `nohup.out`
+
+**disown vs nohup**：
+- `nohup` 在命令启动时必须使用
+- `disown` 对已在运行的进程生效（从作业表中移除）
+- `disown -h` 仅标记不过 SIGHUP，但不从作业表移除
+
 ## 参考存根
 
 ```c
 #include <unistd.h>
 #include <sys/wait.h>
 #include <fcntl.h>
+#include <signal.h>
 
 // 最简管道创建
 int pipefd[2];
 pipe(pipefd);  // pipefd[0]=read, pipefd[1]=write
+
+// SIGPIPE 处理（避免写端关闭时进程被终止）
+signal(SIGPIPE, SIG_IGN);
 
 if (fork() == 0) {
     // 子进程：重定向 stdout 到管道写端
@@ -335,7 +479,15 @@ execlp("cmd2", "cmd2", NULL);
 
 // wait 回收（防止僵尸）
 int status;
-waitpid(-1, &status, 0);  // -1 表示等待任意子进程
+while (waitpid(-1, &status, 0) > 0) {
+    // 回收所有已终止的子进程
+}
+```
+
+```bash
+# 后台作业 + nohup 组合
+nohup long_running_task > output.log 2>&1 &
+disown  # 从作业表移除，但保留进程
 ```
 
 ---
@@ -355,3 +507,8 @@ $$
 - $F = \{\text{Idle}\}$
 
 该自动机的**可达状态**是有限的（最多 $|Q|$ 个），因此 Shell 的作业控制问题可被完全形式化验证。
+
+**归约终点的物理意义**：
+- 作业状态机归约为**进程生命周期的状态追踪**
+- fork/exec 归约为**进程树的构建操作**
+- 管道归约为**进程间通信的有界 FIFO**

@@ -86,7 +86,6 @@ $$
 若引用相同（`changed = false`），Redux 认为状态未变，React-Redux 的 `useSelector` 跳过重渲染。
 
 **Immer 的 Copy-on-Write 语义**：RTK 允许 `state.push()` 这样的可变语法，但 Immer 在底层实现：
-
 1. 首次修改 `draftState` 时，启动事务，记录所有修改路径
 2. 事务提交时，基于修改路径构造新对象——**只有被修改的分支是新对象**，未修改的分支复用旧引用
 
@@ -156,6 +155,11 @@ $$
 3. `reducer` 接收 `(prevState, action)` → 返回 `newState`（新对象引用）
 4. `newState` 替换 `store._state`，Store 同步通知所有 subscriber
 
+**所有权流转**：
+- action 对象由 dispatch 调用方持有，穿越中间件链时可被修改
+- reducer 接收 prevState 的只读引用，返回 newState 的所有权给 Store
+- subscriber 回调不持有状态所有权，仅被通知引用变化
+
 **中间件的异步扩展**：异步 action（如 API 调用）不直接 dispatch 原始 action，而是在中间件中注册 promise 或 callback，在异步完成后 dispatch 真正符合 reducer 签名的 action。这本质上是将**副作用隔离在 reducer 之外**。
 
 ---
@@ -172,7 +176,10 @@ Redux 要求 reducer **不修改原状态，而是返回新对象**。这是有�
 
 **约束**：reducer 必须是纯函数——无副作用、相同输入产生相同输出。
 
-**违反后果**：若 reducer 直接修改 `state.prop = value`，状态引用不变，`subscribe` 不会触发回调，UI 无法更新，且 DevTools 记录为空（RTK 用 `Object.freeze` 检测 mutation）。
+**违反约束的后果**：
+- 若 reducer 直接修改 `state.prop = value`，状态引用不变，`subscribe` 不会触发回调，UI 无法更新
+- DevTools 记录为空（RTK 用 `Object.freeze` 检测 mutation），时间旅行调试失效
+- 在 React 18 Concurrent Rendering 下，mutating state 可能导致渲染不一致或 TE9Suspense boundary 行为异常
 
 ### 中间件的 AOP 本质
 
@@ -182,6 +189,8 @@ Redux 要求 reducer **不修改原状态，而是返回新对象**。这是有�
 - `redux-thunk`：允许 action 是函数（在函数内延迟真正的 action dispatch）
 - `redux-saga`：用 generator 描述复杂的异步工作流
 - `redux-logger`：记录每个 action 前后的状态快照
+
+**约束**：中间件必须调用 `next(action)` 传递控制权，否则 dispatch 链路中断。中间件不应抛出同步异常，应捕获并处理。
 
 ### Redux Toolkit 的 Immer 底层
 
@@ -200,6 +209,10 @@ reducers: {
 // → { ...draft, items: [...draft.items, payload] }
 ```
 
+**约束**：在 reducer 中不得同时读写外部闭包变量（闭包陷阱），Immer 的 draft 只能通过返回值以外的方式修改。
+
+**违反后果**：若返回非 undefined 值（return draft 以外的内容），Immer 认为你返回了完全替换的新状态，忽略所有 draft 上的修改。
+
 ### combineReducers 的状态树分裂
 
 `combineReducers` 将根 reducer 函数 $R: S \times A \to S$ 分解为子 reducer 的直积：
@@ -208,7 +221,11 @@ $$
 R(s, a) = \left( r_1(s_1, a), r_2(s_2, a), \ldots, r_n(s_n, a) \right)
 $$
 
-其中 $s = (s_1, s_2, \ldots, s_n)$ 是状态树的分裂。**关键约束**：每个子 reducer 接收完整的 action，必须忽略不关心的 action 并返回原状态。
+其中 $s = (s_1, s_2, \ldots, s_n)$ 是状态树的分裂。
+
+**关键约束**：每个子 reducer 接收完整的 action，必须忽略不关心的 action 并返回原状态。若子 reducer 对某个 action 返回 `undefined`，该分支状态丢失。
+
+**违反后果**：若子 reducer 返回 `undefined`，`combineReducers` 抛出 `Invalid argument passed to reducer` 异常。
 
 ---
 

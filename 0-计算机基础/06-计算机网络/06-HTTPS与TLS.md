@@ -244,6 +244,35 @@ GCM模式同时完成加密和完整性保护，比先加密再MAC的组合方�
 - 密钥必须保密
 - 关联数据会被认证但不加密
 
+### GCM模式的数学原理
+
+GCM（Galois/Counter Mode）由两部分组成：CTR模式的加密和GHASH的认证：
+
+$$
+c = \text{AES-CTR}(k, n, p) \quad \text{（加密部分）}
+$$
+
+$$
+t = \text{GHASH}(H, a, c) \oplus \text{MSB}_{128}(n \cdot H) \quad \text{（认证部分）}
+$$
+
+其中 $H = \text{AES}(k, 0^{128})$ 是哈希密钥，$a$ 是关联数据，$n$ 是计数器。
+
+**GHASH的数学性质**：GHASH是有限域 $GF(2^{128})$ 上的乘法运算，满足：
+$$
+\text{GHASH}(H, a || c) = a \cdot H^{m+1} + c \cdot H + \cdots
+$$
+
+这保证了认证标签的唯一性和不可伪造性。
+
+**AEAD的安全性证明思路**：
+
+AEAD的安全目标包括：
+1. **机密性**：密文不泄露明文信息（IND-CPA安全）
+2. **完整性**：无法构造有效密文+标签对（INT-CTXT安全）
+
+GCM在nonce唯一的前提下可证明是IND-CPA和INT-CTXT安全的。nonce重用会导致认证失效（攻击者可构造有效标签）。
+
 ### 0-RTT重连的风险
 
 使用PSK（预共享密钥）恢复会话，客户端在ClientHello中直接发送加密数据。存在重放攻击风险——攻击者可以截获并重放0-RTT数据。应用层需要做幂等性设计来缓解。

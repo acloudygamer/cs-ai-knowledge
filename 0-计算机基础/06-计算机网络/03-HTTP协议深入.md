@@ -219,9 +219,36 @@ HTTP/3基于QUIC协议，QUIC在用户态实现自己的可靠传输和拥塞控
 
 **QUIC的连接迁移（Connection Migration）**：QUIC使用Connection ID（CID）标识连接，而非IP地址+端口四元组。当客户端从WiFi切换到4G时，IP地址变化，但CID不变，连接可以无缝迁移。这是通过客户端发送NEW_CONNECTION_ID帧实现的，新地址上重新建立加密上下文。
 
+**连接迁移的数学形式化**：
+
+$$
+\text{连接标识} = \text{CID} \quad \text{（而非 } (\text{SrcIP}, \text{SrcPort}, \text{DstIP}, \text{DstPort}) \text{）}
+$$
+
+迁移发生时，连接状态（拥塞窗口、丢包记录、流级状态）在新地址上保持不变。这避免了TCP连接在IP变化时必须重建的问题。
+
 **0-RTT握手的数据安全性**：HTTP/3支持0-RTT，客户端可以在握手完成前发送数据（类似TLS 1.3的0-RTT）。这存在重放攻击风险——攻击者可以截获并重放0-RTT数据。缓解措施：
 - 客户端发送的数据必须与应用层幂等性设计配合
 - 服务器可限制0-RTT数据的大小
+
+### HTTP语义与传输分离的约束
+
+HTTP设计刻意将应用语义（方法、状态码、头部）与传输细节（TCP、持久连接、分块）分离。这使得HTTP可以独立于传输层运行——例如HTTP/3运行在QUIC上，HTTP仍然感知不到。
+
+**为什么HTTP能被不同传输层承载**：HTTP的消息格式是自包含的（Self-Contained），即每个请求/响应包含服务器处理所需的所有信息。这允许HTTP在不同传输层上运行：
+
+| 传输层 | 可靠性保证 | 队头阻塞 | 连接迁移 |
+|--------|-----------|----------|----------|
+| TCP | 端到端可靠、有序 | TCP层阻塞所有HTTP流 | 无（IP+Port绑定） |
+| QUIC | 流级可靠（各流独立） | 仅阻塞对应流 | 有（CID不变） |
+| SPDY | TCP可靠 | TCP层阻塞所有流 | 无 |
+
+**自包含性**的数学约束：HTTP请求 $R$ 必须包含所有目标处理所需信息：
+$$
+R = (\text{Method}, \text{URI}, \text{Headers}, \text{Body}) \quad \text{且} \quad \forall \text{中间盒} \, M: M(\text{Headers}) \text{可访问但不影响处理}
+$$
+
+这意味着中间盒可以读取HTTP头部（如Load Balancer读取X-Forward-For），但不能破坏HTTP语义的完整性。
 
 ### 缓存机制的双层设计
 

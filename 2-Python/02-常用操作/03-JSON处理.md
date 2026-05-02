@@ -18,7 +18,7 @@ $$\delta: Q \times \Sigma \rightarrow Q$$
 
 ### 解析复杂度
 
-设 JSON 文本长度为 $n$，标准库 `json.loads` 的最坏情况时间复杂度为 $O(n)$（单次扫描），但存在针对特定恶意输入的攻击变种（如重复嵌套 `[`/`{` 导致栈溢出）。空间复杂度为 $O(d)$，其中 $d$ 为嵌套深度（调用栈深度）。
+设 JSON 文本长度为 $n$，标准库 `json.loads` 的最坏情况时间复杂度为 $O(n)$（单次扫描），但存在针对特定恶意输入的攻击变种（如重复嵌套 `[`/`{` 导致栈溢出）。
 
 **正则表达式 DoS 攻击的数学模型**：
 设模式为 $(a+)+b$，输入为 $a^n c$（$n$ 个 a 后跟 c）。NFA 回溯探索所有可能的 $a+$ 分组方式：
@@ -26,6 +26,8 @@ $$\delta: Q \times \Sigma \rightarrow Q$$
 $$T(n) = 2^n$$
 
 这是指数级探索，源于重叠的量词分支。
+
+**ijson 流式解析的约束**：ijson 增量式解析将内存复杂度从 $O(n)$ 降至 $O(d)$，其中 $d$ 为当前嵌套深度（调用栈深度）。这是以时间换空间：每次 yield 需要维护解析器状态。
 
 ### 序列化内存占用
 
@@ -55,11 +57,11 @@ Python 对象                    JSON 文本                    字节序列
    |  遇到 } → dict_end           |                           |
    |<============================|                           |
 
-ownership: Python dict ←→ dict 引用
-           Python list ←→ list 引用
-           字符串/数值/布尔 → 值拷贝（不可变）
-           None → null
-           Python float → JSON number（精度可能丢失）
+所有权: Python dict ←→ dict 引用
+        Python list ←→ list 引用
+        字符串/数值/布尔 → 值拷贝（不可变）
+        None → null
+        Python float → JSON number（精度可能丢失）
 </pre>
 
 **形态变换**：
@@ -71,17 +73,23 @@ ownership: Python dict ←→ dict 引用
 - Python `True/False` → JSON `true/false`
 - Python `None` → JSON `null`
 
+**精度损失的具体量化**：IEEE 754 双精度浮点数有效精度为 15-17 位十进制数字。当 JSON number 超出此范围时，解析结果与原始值存在偏差。
+
 ## 机制
 
 ### 字符串转义与 Unicode 处理
 
-JSON 规范要求字符串中的控制字符（U+0000 至 U+001F）必须转义为 `\uXXXX` 序列。`ensure_ascii=False` 时，中文字符（U+4E00 以上）可以直接 UTF-8 编码输出而不转义为 `\uXXXX`，既减少字节数又提高可读性。**约束**：若序列化目标系统只支持 ASCII，则必须 `ensure_ascii=True`，所有非 ASCII 字符转为 `\uXXXX`。
+JSON 规范要求字符串中的控制字符（U+0000 至 U+001F）必须转义为 `\uXXXX` 序列。`ensure_ascii=False` 时，中文字符（U+4E00 以上）可以直接 UTF-8 编码输出而不转义为 `\uXXXX`，既减少字节数又提高可读性。
+
+**约束**：若序列化目标系统只支持 ASCII，则必须 `ensure_ascii=True`，所有非 ASCII 字符转为 `\uXXXX`。
 
 **Python 3.14 增量**：`json.dumps()` 新增 `escape_char` 参数，允许自定义转义字符（默认 `\u`）。
 
 ### 自定义编码器的约束
 
-`json.JSONEncoder` 的 `default` 方法在遇到未知类型时被调用，用于返回该类型的可序列化形式。**约束**：该方法必须返回 JSON 原生类型（dict/list/str/int/float/bool/None），否则无限递归直到 `TypeError`。
+`json.JSONEncoder` 的 `default` 方法在遇到未知类型时被调用，用于返回该类型的可序列化形式。
+
+**约束**：该方法必须返回 JSON 原生类型（dict/list/str/int/float/bool/None），否则无限递归直到 `TypeError`。
 
 **JSON 序列化器的结构**：
 ```python
@@ -89,12 +97,12 @@ class JSONEncoder:
     def __init__(self, *, skipkeys=False, ensure_ascii=True,
                  check_circular=True, allow_nan=True, ...):
         ...
-    
+
     def default(self, o):
         # 子类重写：处理未知类型
         raise TypeError(f"Object of type {type(o).__name__} "
                         f"is not JSON serializable")
-    
+
     def encode(self, o):
         # 执行序列化，返回 JSON 字符串
         ...
@@ -112,7 +120,7 @@ class JSONEncoder:
 
 ### 循环引用的处理
 
-Python 对象图可能有循环引用（如 `a["self"] = a"`），而 JSON 本身不支持循环。`json.dumps` 默认抛出 `ValueError: Circular reference` 而非无限递归。处理循环引用需自定义序列化器维护一个 "已经序列化对象"的集合。
+Python 对象图可能有循环引用（如 `a["self"] = a"`），而 JSON 本身不支持循环。`json.dumps` 默认抛出 `ValueError: Circular reference` 而非无限递归。
 
 **循环检测算法**：
 ```python
@@ -137,9 +145,13 @@ def detect_cycle(obj, path=None):
     return False
 ```
 
+**约束边界**：循环检测的时间复杂度为 $O(V+E)$（图遍历），空间复杂度为 $O(D)$（当前路径深度）。对于大对象图，这可能成为性能瓶颈。
+
 ### ijson 的流式解析
 
-`ijson` 提供增量式 JSON 解析，内部实现是一个生成器，逐yield 解析出的事件（`start_map`, `end_map`, `map_key`, `number_value` 等）。这避免了将整个 JSON 文本一次性解析为 Python 对象，适合 GB 级别的 JSON 文件。**约束**：流式解析只能自顶向下顺序访问，不支持随机访问（因为需要保持状态机上下文）。
+`ijson` 提供增量式 JSON 解析，内部实现是一个生成器，逐 yield 解析出的事件（`start_map`, `end_map`, `map_key`, `number_value` 等）。这避免了将整个 JSON 文本一次性解析为 Python 对象，适合 GB 级别的 JSON 文件。
+
+**约束**：流式解析只能自顶向下顺序访问，不支持随机访问（因为需要保持状态机上下文）。
 
 **ijson 内部状态机**：
 ```

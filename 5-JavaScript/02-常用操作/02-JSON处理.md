@@ -18,29 +18,31 @@ $$
 
 其中 $K$ 为对象键数量，$l_k$ 为键长度，$|v_k|$ 为值长度（字符串值按引号内字符计）。
 
-**JSON.stringify 特殊值处理**：
+### V8 解析器的深度约束
 
-| 输入类型 | 对象属性行为 | 数组元素行为 | 单独参数行为 |
-|----------|-------------|-------------|-------------|
-| `undefined` | 跳过（不输出） | 输出 `null` | 输出 `undefined` |
-| `Symbol` | 跳过 | 输出 `null` | 输出 `undefined` |
-| `Function` | 跳过 | 输出 `null` | 输出 `undefined` |
-| `BigInt` | 抛出 `TypeError` | 抛出 `TypeError` | 抛出 `TypeError` |
-| 循环引用 | 抛出 `TypeError` | 抛出 `TypeError` | 抛出 `TypeError` |
+V8 的 JSON 解析器采用**递归下降解析器**，其最大嵌套深度受 V8 堆栈大小约束：
 
-### structuredClone 的能力边界
+$$
+D_{max} \approx \frac{Stack_{limit}}{Frame_{size}} \approx \frac{1\text{MB}}{64\text{ Bytes}} \approx 16000
+$$
 
-`structuredClone(value)` 使用**结构化克隆算法**（Structured Clone Algorithm），直接复制对象图而不经过字符串序列化。
+但 V8 对 JSON.parse 的硬性限制约为 **1000 层嵌套**（精确值因 V8 版本而异），超出后抛出 `SyntaxError: JSON.parse: too deep`。
 
-**可复制类型**：
-- 所有原生类型（除 `Symbol`）
-- `Object`（包括 `Map`/`Set`/`Date`/`RegExp`/`ArrayBuffer`/`TypedArray`/`Blob`/`File`）
-- 嵌套对象图
+**违反约束的后果**：当 JSON 嵌套超过 $D_{max}$ 时，解析器抛出 `SyntaxError`，输入字符串被完全拒绝，没有任何部分结果返回。这与部分解析（如流式解析器）不同——JSON.parse 是全量解析，要么全部成功，要么全部失败。
 
-**不可复制类型**（抛出 `DataCloneError`）：
-- `Function`（闭包无法序列化）
-- DOM 节点（宿主对象具有循环引用）
-- 闭包引用的外层变量
+### 循环引用检测算法
+
+`JSON.stringify` 通过**深度优先搜索 + 对象身份哈希表**检测循环引用：
+
+$$
+Detect_{circular}(obj, visited) = \begin{cases}
+true & obj \in visited \\
+false & obj \notin visited \land typeof\ obj \neq object \\
+Detect_{circular}(child, visited \cup \{obj\}) & otherwise
+\end{cases}
+$$
+
+其中 $visited$ 是一个记录对象身份的哈希集合。关键约束：循环检测基于**引用身份**而非**结构等价**，因此 `{a: 1}` 两次出现不会触发循环，只有同一对象的重复引用才触发。
 
 ### JSON Merge Patch（RFC 7386）
 
@@ -62,22 +64,26 @@ $$
 
 **语义歧义**：无法用 Merge Patch 表示"将值设为 `null`"的意图，因为 `null` 被解释为删除操作。
 
+**归约终点**：Merge Patch 的操作可归结为集合操作——键的添加、删除、替换，对应于对象键集合上的差集、并集运算。
+
 ## 数据流
 
 ```
 JSON.parse 流程：
-字符串 → 词法分析（token 化）→ 解析器（递归下降）→ 对象构建
-          ↓
-    语法错误 → 抛出 SyntaxError
+字符串 → 词法分析（Scanner 将字符串分解为 token）→ 解析器（递归下降）
+          ↓                                            ↓
+    非法字符 → SyntaxError                    语法错误 → SyntaxError
+                                                    ↓
+                                            对象/数组构建 → 返回值
 
 JSON.stringify 流程：
 对象遍历（DFS）→ 字符串拼接 → 输出字符串
           ↓
-    循环引用检测 → 跳过函数/Symbol/undefined 属性
+    循环引用检测（对象身份哈希）→ 跳过函数/Symbol/undefined 属性
     键值收集 → JSON 字符串构造 → 可选 replacer 过滤 → 可选 space 格式化
 
 structuredClone 流程：
-输入值 → 结构化克隆算法 → 目标内存区域 → 输出副本
+输入值 → 结构化克隆算法（深度遍历 + 目标内存写入）→ 输出副本
           ↓
     不可克隆类型 → 抛出 DataCloneError
 
@@ -98,18 +104,18 @@ target + source → 遍历 source 键
 
 ### JSON.parse 的安全边界
 
-`JSON.parse` 在 V8 引擎中由 **Scanner-Lexer-Parser** 三阶段实现：
+`JSON.parse` 在 V8 引擎中由 **Scanner-Lexer-Parser 三阶段实现**：
 
-1. **Scanner（词法分析）**：将输入字符串分解为 token 序列
-2. **Lexer（语义分析）**：将 token 转换为中间表示
+1. **Scanner（词法分析）**：将输入字符串分解为 token 序列（字符串/数字/布尔/空/左括号/右括号等）
+2. **Lexer（语义分析）**：将 token 转换为中间表示（数字的二进制值、字符串的 UTF-16 序列）
 3. **Parser（解析）**：递归下降解析，输出 AST，再构建对象图
 
 **解析器约束**：
-- V8 默认嵌套深度限制约 10000 层，超出后抛出 `SyntaxError`
+- V8 默认嵌套深度限制约 1000 层，超出后抛出 `SyntaxError`
 - JSON 语法严格：不允许尾随逗号、不支持注释、不支持单引号字符串
 - 解析器不进行 schema 验证，合法 JSON 但不符合业务预期的数据会静默通过
 
-**安全风险**：解析不可信 JSON 可能触发 ReDoS（正则表达式 denial of service）或内存耗尽。生产环境应使用 `reviver` 函数进行 schema 验证。
+**安全风险**：解析不可信 JSON 可能触发 ReDoS（通过超长字符串使正则表达式灾难性回溯）或内存耗尽（超深嵌套耗尽堆栈）。生产环境应使用 `reviver` 函数进行 schema 验证。
 
 ### JSON.stringify 的遍历语义
 
@@ -139,6 +145,16 @@ $$
 - 对象属性：跳过该属性（不输出）
 - 数组元素：输出 `null`
 
+**JSON.stringify 特殊值处理**：
+
+| 输入类型 | 对象属性行为 | 数组元素行为 | 单独参数行为 |
+|----------|-------------|-------------|-------------|
+| `undefined` | 跳过（不输出） | 输出 `null` | 输出 `undefined` |
+| `Symbol` | 跳过 | 输出 `null` | 输出 `undefined` |
+| `Function` | 跳过 | 输出 `null` | 输出 `undefined` |
+| `BigInt` | 抛出 `TypeError` | 抛出 `TypeError` | 抛出 `TypeError` |
+| 循环引用 | 抛出 `TypeError` | 抛出 `TypeError` | 抛出 `TypeError` |
+
 ### structuredClone 与 JSON 深拷贝的本质差异
 
 **JSON 深拷贝路径**：
@@ -156,10 +172,11 @@ $$
 | 维度 | JSON 深拷贝 | structuredClone |
 |------|-------------|-----------------|
 | 类型支持 | 原始类型 + 普通对象/数组 | 所有可序列化类型（含 Map/Set/Date/TypedArray）|
-| 循环引用 | 不支持（抛异常）| 支持（深度遍历）|
+| 循环引用 | 不支持（抛异常）| 支持（深度遍历维护对象映射）|
 | 精度问题 | 超过 `Number.MAX_SAFE_INTEGER` 的整数可能丢失精度 | 无精度问题 |
 | 性能 | 需遍历两遍（序列化+反序列化）| 单次深度遍历 |
 | 内存 | 需在内存中同时存在输入、字符串、输出 | 可原地构造 |
+| 函数 | 不支持 | 不支持 |
 
 **约束**：`structuredClone` 不执行 getter/setter，仅复制值语义。
 
@@ -189,6 +206,8 @@ source & otherwise
 $$
 
 **数组处理**：深合并不递归合并数组，而是替换（`source[k]` 覆盖 `target[k]`）。
+
+**归约终点**：浅合并归结为有限集合的并运算；深合并归结为递归的键集合合并。
 
 ## 参考存根
 

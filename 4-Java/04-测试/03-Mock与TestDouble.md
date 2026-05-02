@@ -9,6 +9,20 @@ $$T(U | D) \perp T(S)$$
 
 测试结果与真实服务的实现细节解耦。
 
+**依赖反转的形式化**：
+
+<pre>
+正常依赖（紧耦合）           依赖反转（测试）
+A → B                       A → I (接口)
+                            D → I (Mock实现)
+</pre>
+
+$$
+\forall u \in U, \forall s \in S: u \xrightarrow{\text{call}} s \iff u \xrightarrow{\text{call}} d, d \in D
+$$
+
+其中 $D$ 实现了与 $S$ 相同的接口 $I$。
+
 ---
 
 ## 数学模型
@@ -34,6 +48,14 @@ Mock 的行为验证可建模为**有向多重图**：
 - atLeast 失败：调用次数低于下界
 - inOrder 失败：拓扑约束被违反（调用序列不满足偏序）
 
+**偏序约束的形式化**：
+
+$$
+\text{inOrder}((e_1, e_2, \ldots, e_n)) \iff \forall i < j: e_i \xrightarrow{*} e_j
+$$
+
+其中 $\xrightarrow{*}$ 表示可达关系（传递闭包）。
+
 ### Stub 链式返回的状态机模型
 
 链式 `thenReturn()` 对应状态转移：
@@ -51,6 +73,8 @@ $$\text{output}(S_i) = v_n \quad \text{for } i \geq n$$
 
 最后预设值作为稳态输出。
 
+**归约终点**：Stub 的链式返回本质上是一个 **确定有限自动机（DFA）**，状态转移由方法调用触发，输出由当前状态决定。
+
 ### Mockito 默认值的语义选择
 
 | 返回类型 | 默认值 | 语义依据 |
@@ -62,6 +86,8 @@ $$\text{output}(S_i) = v_n \quad \text{for } i \geq n$$
 | Optional | Optional.empty() | Option类型的安全表示 |
 
 **设计原则**：提供"可预测的空行为"，而非随机值或抛出异常。
+
+**幺元选择的经济学解释**：幺元（identity element）使得运算在缺少显式值时仍可预测地执行。例如 `int` 返回 `0` 使得算术表达式 `sum(mock.getX(), 5)` 不会因默认值而崩溃。
 
 ---
 
@@ -105,6 +131,32 @@ $$\text{output}(S_i) = v_n \quad \text{for } i \geq n$$
                 ├── 是 → 反射注入
                 └── 否 → 跳过该字段
 ```
+
+**决策的数学表达**：
+
+$$
+\text{InjectionStrategy}(c, M) = \begin{cases}
+\text{Constructor} & \text{if } \forall p \in \text{params}(c): p \in M \\
+\text{Field} & \text{otherwise}
+\end{cases}
+$$
+
+### InvocationContainer 的内部结构
+
+<pre>
+InvocationContainer
+      │
+      ├──> MockObject ↔ List<Invocation>
+      │         │
+      │         ├──> 已匹配的调用记录
+      │         └──> 验证状态
+      │
+      └──> Stubbing ↔ List<Stubbing>
+                │
+                └──> (Method, args) → returnValue
+</pre>
+
+**关键不变量**：每次方法调用后，容器检查是否有对应的 stubbing；若有，返回预设值并记录该 stubbing 已被使用。
 
 ---
 
@@ -153,6 +205,8 @@ doReturn(true).when(emailService).sendEmail(any());
 
 **约束**：对有副作用的真实方法使用 `doReturn().when()`，否则可能产生环境污染。
 
+**危险发生的机制**：当 `when().thenReturn()` 被调用时，Mockito 需要在调用点注册 stubbing。而这个调用本身会触发真实的方法执行（以获取返回值类型信息）。对于有副作用的方法，这就是"污染"。
+
 ### 参数匹配器的冲突约束
 
 **约束**：精确值预设与通配符预设不能混用
@@ -168,6 +222,14 @@ when(repo.findById(2L)).thenReturn(null);          // 另一个精确值
 
 **原因**：Mockito 按声明顺序匹配，精确值声明在前会被通配符覆盖。
 
+**形式化约束**：
+
+$$
+\forall s_1, s_2 \in \text{Stubbing}: s_1.\text{pattern} \preceq s_2.\text{pattern} \implies s_1 \text{ 必须在 } s_2 \text{ 之前声明}
+$$
+
+其中 $\preceq$ 表示"比...更具体"。
+
 ### verifyNoMoreInteractions() 的门禁语义
 
 `verifyNoMoreInteractions()` 作为最终门禁，确保测试后无意外调用：
@@ -175,6 +237,14 @@ when(repo.findById(2L)).thenReturn(null);          // 另一个精确值
 $$\forall m \in \text{MockMethods}: \text{callCount}(m) = \text{verifiedCount}(m)$$
 
 若存在未验证的调用，测试失败。这防止"漏验证"——测试只验证了关心的调用，但没有检查是否有多余调用。
+
+**漏验证的几何解释**：
+
+<pre>
+实际调用序列: [A, B, A, C]
+验证的调用:   [A, B]    ← 漏验证了第二个 A 和 C
+未验证的调用: [A, C]    ← 这部分没有被检查
+</pre>
 
 ---
 
@@ -214,6 +284,12 @@ private UserService userService;
 **注入约束**：
 - 构造器注入优先于字段注入
 - 若构造器参数全为 Mock，则创建新实例；否则使用反射注入字段
+
+**Spring 测试上下文的所有权模型**：
+
+1. `@MockBean` 替换上下文中原有 Bean
+2. 替换后的 Mock 在整个测试类生命周期内有效
+3. 测试类结束时，Spring 恢复原 Bean（或在 `@DirtiesContext` 时重建上下文）
 
 ---
 

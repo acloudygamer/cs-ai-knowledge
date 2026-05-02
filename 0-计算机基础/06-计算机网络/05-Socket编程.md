@@ -263,6 +263,41 @@ epoll使用红黑树管理fd，调用只在fd改变时更新内核态数据结�
 
 **ET模式约束**：必须循环读取直到EAGAIN，否则剩余数据不再通知。
 
+### LT vs ET的数学模型
+
+设读事件就绪条件为 $R$，缓冲区有数据的数学表示：
+
+$$
+R \iff \text{buffered\_bytes} > 0
+$$
+
+**水平触发（LT）**的语义：
+$$
+\forall t: R(t) \Rightarrow \text{epoll\_wait返回} \quad \text{（条件满足期间持续通知）}
+$$
+
+**边缘触发（ET）**的语义：
+$$
+\forall t: (R(t) \land \lnot R(t - \Delta)) \Rightarrow \text{epoll\_wait返回} \quad \text{（状态变化时通知）}
+$$
+
+**ET模式的完整性约束**：在ET模式下，若应用层未能在一次通知内处理完所有就绪数据，剩余数据不会被再次通知，导致"饥饿"（Starvation）。这要求：
+
+$$
+\sum_{i} \text{read}_i \geq \text{buffered\_bytes} \quad \text{（直到EAGAIN）}
+$$
+
+若违反此约束，剩余数据将"丢失"于应用层的感知之外（数据在内核缓冲区，但应用层不会再收到通知）。
+
+**LT vs ET的编程模型差异**：
+
+| 维度 | LT（水平触发） | ET（边缘触发） |
+|------|--------------|--------------|
+| 通知次数 | 条件满足期间多次 | 仅状态变化时一次 |
+| 编程复杂度 | 低（可分批处理） | 高（必须一次性处理） |
+| CPU效率 | 可能多次返回同一fd | 仅返回一次 |
+| 适用场景 | 普通Socket | 高性能网络框架（nginx） |
+
 ### SO_REUSEADDR与SO_REUSEPORT
 
 `SO_REUSEADDR` 允许bind处于TIME_WAIT状态的端口，绕过2MSL等待。这是服务器快速重启的关键。

@@ -10,14 +10,15 @@ Mock 和 Fake 是测试替身（Test Double）的两种形式。Mock 是**可编
 
 ### Mock 的状态机
 
-Mock 维护内部状态 $(c, H, R)$：
+Mock 维护内部状态 $(c, H, R, S)$：
 
-- $c$：调用计数器（per method）
-- $H$：历史调用记录（参数序列）
-- $R$：配置返回值或副作用函数
+- $c$：调用计数器（per method），整数
+- $H$：历史调用记录（参数序列），CallList 结构
+- $R$：配置返回值映射 $\{method \mapsto v\}$
+- $S$：side_effect 序列或函数
 
 $$
-\text{mock.method}(args) \rightarrow (c+1,\ H \cup \{args\},\ R(\text{call}_n))
+\text{mock.method}(args) \rightarrow (c+1,\ H \cup \{\text{call}(args)\},\ R,\ S)
 $$
 
 每次调用返回 `side_effect` 序列的第 $n$ 个元素，或调用 `side_effect` 函数。
@@ -26,9 +27,25 @@ $$
 
 | 操作 | 前置状态 | 后置状态 |
 |------|----------|----------|
-| `mock.method(1)` | $(c, H, R)$ | $(c+1, H \cup \{(1)\}, R)$ |
-| `mock.method.return_value = 42` | $(c, H, R)$ | $(c, H, R \cup \{method \mapsto 42\})$ |
-| `mock.method.assert_called_once()` | $(1, H, R)$ | 通过；若 $c \neq 1$ 则抛出 `AssertionError` |
+| `mock.method(1)` | $(c, H, R, S)$ | $(c+1, H \cup \{(1)\}, R, S)$ |
+| `mock.method.return_value = 42` | $(c, H, R, S)$ | $(c, H, R \cup \{method \mapsto 42\}, S)$ |
+| `mock.method.assert_called_once()` | $(1, H, R, S)$ | 通过；若 $c \neq 1$ 则抛出 `AssertionError` |
+
+### CallList 的结构
+
+`mock.call_args_list` 是 `CallList` 类型，本质是一个只追加的调用记录序列：
+
+$$
+H = \langle \text{call}(args_1),\ \text{call}(args_2),\ \dots,\ \text{call}(args_n) \rangle
+$$
+
+每个 `call` 元组包含位置参数和关键字参数：
+
+$$
+\text{call}(args) = ((args_1, \dots, args_k),\ \{k_1: v_1, \dots\})
+$$
+
+`assert_called_with(*args, **kwargs)` 验证 $H[-1] = \text{call}(args, kwargs)$，即**仅验证最后一次调用**。
 
 ### side_effect 的数学语义
 
@@ -152,9 +169,38 @@ def test_good(mock_get):
     ...
 ```
 
-### autospec 与接口一致性保证
+### wraps 的状态委托
 
-`autospec` 通过反射从真实对象复制接口签名到 Mock，防止 API 不匹配导致的假阳性：
+`wraps` 参数将 Mock 包装在真实对象外，同时记录所有调用：
+
+$$
+\text{wraps}(obj) \triangleq \lambda method, args.\ \text{let } r = obj.method(args) \text{ in } (\text{record}(method, args),\ r)
+$$
+
+```python
+real_obj = RealClass()
+mock = Mock(wraps=real_obj)
+mock.method(1, 2)       # 调用真实 real_obj.method(1, 2)
+mock.method.assert_called_once_with(1, 2)  # 通过
+```
+
+**约束**：`wraps` 仅委托方法调用，不代理属性访问。属性访问仍返回 Mock，需用 `mock._wrapped` 访问真实对象。
+
+### spec 与 autospec 的接口一致性
+
+`spec` 和 `autospec` 解决 Mock 与真实对象接口不一致的问题：
+
+**spec**（静态）：指定一个类/模块作为 Mock 的接口模板，Mock 拒绝实现该类中不存在的属性：
+
+```python
+class Foo:
+    def method(self, x): ...
+
+mock = Mock(spec=Foo)
+mock.other_method()  # AttributeError: Mock object has no attribute 'other_method'
+```
+
+**autospec**（动态反射）：通过反射从真实对象复制接口签名，防止 API 不匹配导致的假阳性：
 
 ```python
 @patch("mymodule.requests.get", autospec=True)
@@ -165,6 +211,14 @@ def test_api(mock_get):
 ```
 
 **autospec 的约束**：它只能复制可反射的属性（函数签名、类属性）。对于动态生成的属性，可能需要 `create=True` 手动创建。
+
+**spec vs autospec 的区别**：
+
+| 属性 | spec | autospec |
+|------|------|----------|
+| 接口来源 | 指定的类/模块 | 被 patch 的原始对象 |
+| 签名检查 | 无 | 有 |
+| 动态属性 | 拒绝 | 拒绝 |
 
 ### MagicMock 的魔法方法
 
@@ -179,6 +233,18 @@ for x in mock_list:  # 能正常迭代
 
 **默认行为**：`__len__` 返回整数，`__str__` 返回 "MagicMock"，`__bool__` 返回 True，`__hash__` 返回基于对象 id 的哈希。
 
+### PropertyMock 的委托机制
+
+`PropertyMock` 模拟 Python 的 `@property`，其调用语义与普通 Mock 不同：
+
+```python
+mock = MagicMock()
+mock.__len__ = PropertyMock(return_value=10)
+len(mock)  # 返回 10，而非 MagicMock 对象
+```
+
+访问 `mock.attr` 时，若 `attr` 在 `PropertyMock` 中注册，则调用该 PropertyMock；否则返回子 Mock。
+
 ### Mock 验证的语义陷阱
 
 Mock 的 `assert_called_once_with` 验证的是**最后一次调用**是否匹配，而非**唯一调用**。若某方法被调用多次，只有最后一次参数会被验证：
@@ -192,6 +258,16 @@ mock.assert_called_once_with(3)  # 通过
 ```
 
 若需验证特定调用，使用 `mock.assert_called_with(*args, **kwargs)`（验证最近一次）或检查 `mock.call_args_list`。
+
+**调用顺序验证**：当测试依赖调用顺序时，应显式检查 `call_args_list`：
+
+```python
+assert mock.call_args_list == [
+    ((1,), {}),
+    ((2,), {}),
+    ((3,), {}),
+]
+```
 
 ### Fake 的设计原则
 
@@ -216,6 +292,8 @@ class FakeUserRepository:
 - **行为可预测**：无随机性，每次调用结果可重现
 - **状态隔离**：每个测试独立重置，无跨测试污染
 
+**Fake vs Spy 的选择**：当替代逻辑易于简化和预测时用 Fake（如内存数据库）；当需要保留真实行为仅记录交互时用 Spy。
+
 ## 约束与违反后果
 
 | 约束 | 违反后果 |
@@ -226,11 +304,12 @@ class FakeUserRepository:
 | Fake 状态跨测试泄露 | 测试 B 继承了测试 A 的副作用，导致测试顺序依赖 |
 | Mock 验证调用顺序 | 若顺序错误但参数正确，可能误判通过 |
 | Patch 与被测模块导入顺序 | 若被测模块在被 patch 前已导入，则 patch 无效（已绑定旧引用） |
+| spec/autospec 与实现不一致 | 当真实 API 变更但 spec 未更新时，spec 可能拒绝合法调用或接受非法调用 |
 
 ## 参考存根
 
 ```python
-from unittest.mock import Mock, MagicMock, patch, autospec
+from unittest.mock import Mock, MagicMock, patch, autospec, PropertyMock, Spy
 
 # 基础 Mock
 mock = Mock()
@@ -285,8 +364,18 @@ def test_api_strict(mock_get):
     # 强制参数匹配，否则 TypeError
     ...
 
+# wraps
+real_obj = RealClass()
+mock = Mock(wraps=real_obj)
+mock.method(1, 2)
+mock.method.assert_called_once_with(1, 2)
+
+# PropertyMock
+mock = MagicMock()
+mock.__len__ = PropertyMock(return_value=10)
+assert len(mock) == 10
+
 # Spy（保留真实行为）
-from unittest.mock import Spy
 real_obj = RealClass()
 spy = Spy(real_obj)
 # spy.method() 调用真实逻辑，同时记录调用

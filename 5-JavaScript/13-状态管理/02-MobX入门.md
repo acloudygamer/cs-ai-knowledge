@@ -37,6 +37,8 @@ $$
 
 **DAG 的维护**：每次依赖读取时动态建立边，每次 Reaction 销毁时清除相关边。若检测到环（Computed 循环依赖），MobX 抛出异常。
 
+**环检测的数学约束**：DAG 必须满足 $\forall v \in V,$ 不存在从 $v$ 到 $v$ 的路径。设检测算法为 $O(|V| + |E|)$，每次赋值触发环检测。
+
 ### Computed 的惰性求值与缓存
 
 Computed 属性遵循**Lazy Evaluation**原则：
@@ -132,10 +134,12 @@ Observable 对象（Proxy 包装）
 4. Computed → 自动缓存的惰性求值结果
 5. autorun/reaction → 副作用函数，注册到 DAG
 
-**所有权**：
-- Observable 状态由 MobX 运行时持有 Proxy 引用
-- Computed 结果缓存归 MobX 管理
-- autorun/reaction 的回调函数由调用方持有
+**所有权流转**：
+- Observable 状态由 MobX 运行时持有 Proxy 引用，调用方持有原始对象引用
+- Computed 结果缓存归 MobX 管理，调用方持有结果值的引用
+- autorun/reaction 的回调函数由调用方持有，调用方负责调用 disposer
+
+**依赖追踪的物理约束**：Proxy 的 get/set trap 只在**直接访问** `obj.prop` 时生效。若将值存入局部变量再操作（`const name = store.name; name.toUpperCase()`），依赖追踪失败——因为后续访问的是局部变量而非 Observable 属性。
 
 ---
 
@@ -158,8 +162,6 @@ Observable 对象（Proxy 包装）
   → 标记它们为 dirty，调度异步通知
   → 不需要调用 setState，不需 dispatch action
 ```
-
-**关键约束**：Proxy 的 get/set 拦截只在**直接访问** `obj.prop` 时生效。若将值存入局部变量再操作（`const name = store.name; name.toUpperCase()`），依赖追踪失败——因为后续访问的是局部变量而非 Observable 属性。
 
 ### autorun vs reaction
 
@@ -200,13 +202,13 @@ class ObservedComponent extends React.Component {
 
 ### 违反约束的后果
 
-**在 Observable 外部修改其值**：若绕过 Proxy 直接修改（如 `Object.assign(store, { x: 1 })`），MobX 无法感知变化，不会触发任何更新。
+**在 Observable 外部修改其值**：若绕过 Proxy 直接修改（如 `Object.assign(store, { x: 1 })`），MobX 无法感知变化，不会触发任何更新。这是因为 Proxy 只拦截通过 Proxy 对象本身的访问。
 
-**在 autorun/reaction 中修改 Observable 而不在 runInAction 内**：MobX 会报错（`[MobX] Since strict-mode is enabled, you should not mutate MobX state outside an action`），除非配置 `configure({ enforceActions: false })`。
+**在 autorun/reaction 中修改 Observable 而不在 runInAction 内**：MobX 会报错（`[MobX] Since strict-mode is enabled, you should not mutate MobX state outside an action`），除非配置 `configure({ enforceActions: false })`。这是因为批量通知需要事务边界来合并多次修改为单次通知。
 
-**解构 Observable 对象**：解构出的变量丧失响应式，因为它们是原始值的副本而非 Proxy 的引用。
+**解构 Observable 对象**：解构出的变量丧失响应式，因为它们是原始值的副本而非 Proxy 的引用。这违反了 Proxy 的代理边界。
 
-**循环依赖**：Computed 之间或 Computed 与 Reaction 之间若形成循环（通过 Observable 间接传递），MobX 的 DAG 检测到环后抛出异常。
+**循环依赖**：Computed 之间或 Computed 与 Reaction 之间若形成循环（通过 Observable 间接传递），MobX 的 DAG 检测到环后抛出异常 `Cycle detected`。数学上，DAG 必须无环，环检测失败意味着系统无法保证求值顺序。
 
 ### 装饰器语法的本质
 

@@ -25,9 +25,22 @@ $$
 
 重写后的断言失败时，格式化器捕获原始表达式的 AST 节点，在失败上下文中重新求值各子表达式，从而报告 `a = 1, b = 2, a + b = 4` 而非仅 `AssertionError`。
 
+**AST 重写的字节码级原理**：Python 解释器执行 `assert expr` 时，编译为以下字节码序列：
+
+```
+LOAD_FAST <expr result>        ; 将 expr 求值结果压栈
+POP_JUMP_IF_TRUE      L_pass  ; 为 True 则跳转
+LOAD_GLOBAL           'AssertionError'
+CALL_FUNCTION         0       ; 加载 AssertionError()
+RAISE_VARARGS         1       ; 抛出
+L_pass:
+```
+
+pytest 的 AST 重写将上述序列替换为函数调用 `pytest.assertion.assertion_path(repr(expr), {locals})`，该函数在失败时重新解析源码字符串并逐节点求值。
+
 **归约终点**：断言重写的代价归结为**AST 遍历 + 节点重写 + 源码保留**。AST 遍历本身是 $O(N)$ 的，重写节点数为测试文件中的 assert 语句总数 $K$，总复杂度 $O(N + K)$。
 
-### 浮点比较
+### 浮点比较的失效条件
 
 IEEE 754 二进制浮点不满足结合律：`0.1 + 0.2 \neq 0.3`。pytest.approx 实现相对误差比较：
 
@@ -37,9 +50,17 @@ $$
 
 默认 $\epsilon = 10^{-7}$（相对误差）。对于 $0.1 + 0.2 \approx 0.3$，误差在容差范围内。
 
-**零点附近的失效**：相对误差在 $a = b = 0$ 时退化为 $|0 - 0| \leq \epsilon \cdot 0 = 0$，这恒成立。因此 `pytest.approx(0.0)` 无法验证零点，应使用绝对误差 `abs=0.0001`。
+**相对误差的退化点**：当 $a = b = 0$ 时，上式退化为：
 
-### Fixture 作用域的嵌套格结构
+$$
+|0 - 0| \leq \epsilon \cdot 0 \iff 0 \leq 0
+$$
+
+这恒成立。因此 `pytest.approx(0.0)` 无法验证零点，应使用绝对误差 `abs=0.0001`。
+
+更一般地，当 $|a| + |b| \ll \epsilon$ 时，容差范围趋近于 0，相对误差比较失效。
+
+### Fixture 作用域的格结构
 
 Fixture 作用域构成嵌套格（lattice）：
 
@@ -60,6 +81,7 @@ $$
 **格的性质**：
 - 存在上界（session）和下界（function）
 - 任意两个作用域有唯一最小上界（lub）和最大下界（glb）
+- 偏序关系由生命周期包含关系严格保序
 
 ### Fixture DAG 的拓扑排序
 
@@ -87,6 +109,16 @@ $$
 
 **re-raise 的语义**：当 `raises` 块内抛出的异常被匹配后，该异常被压制（不向外传播）。但若异常在 `raises` 块外传播（例如异常从 `raises` 上下文管理器本身抛出），该异常不会被压制，会正常向上传播。这保证了 `pytest.raises` 不会意外吞掉非预期异常。
 
+### Hook 调用的有向无环图结构
+
+pytest 的插件 Hook 系统构成有向无环图（而非线性链）：
+
+$$
+H = (V, E),\quad V = \{\text{hook implementations}\},\quad (h_i, h_j) \in E \iff h_i \text{ 在 } h_j \text{ 之前执行}
+$$
+
+Hook 的调用顺序由注册顺序决定：`pytest_plugins` 变量 → conftest.py（按路径字母顺序）→ 命令行 `--p` 参数。每个 Hook 规范点允许多个插件实现并行注册。
+
 ## 数据流
 
 <pre>
@@ -98,22 +130,23 @@ pytest 启动
     │      ├── 对每个测试模块执行 AST 重写（assert 增强）
     │      ├── 解析 conftest.py 中的 fixture 定义 → fixture 注册表
     │      ├── fixture DAG 拓扑排序（检测循环依赖）
-    │      └── 注册插件 hooks（setup / teardown）
+    │      ├── 加载插件 hooks（pytest_plugins → conftest → --p）
+    │      └── 注册 pytest_generate_tests 钩子（用于参数化扩展）
     │
     ├── 依赖解析
     │      └── fixture DAG 拓扑排序
     │
     └── 执行阶段（Execution）
            │
-           ├── session scope fixtures（once）
-           ├── module scope fixtures（per .py）
-           ├── class scope fixtures（per TestClass）
+           ├── pytest_runtest_setup（session fixtures）
+           ├── pytest_runtest_setup（module fixtures）
+           ├── pytest_runtest_setup（class fixtures）
            │
            ├── setup_method() ──→ test_X() ──→ teardown_method()
            │
-           ├── class scope fixtures teardown
-           ├── module scope fixtures teardown
-           └── session scope fixtures teardown
+           ├── pytest_runtest_teardown（class fixtures）
+           ├── pytest_runtest_teardown（module fixtures）
+           └── pytest_runtest_teardown（session fixtures）
 </pre>
 
 **所有权转移**：
@@ -133,6 +166,8 @@ pytest 在收集阶段调用 `pytest.assertion.rewrite` 遍历模块 AST，找�
 **关键约束**：AST 重写要求测试模块可被 Python 解析器成功解析。若测试文件存在 `SyntaxError`，pytest 无法加载该模块，但会在报告前尝试给出具体位置。
 
 **Python assert 字节码行为**：原始 `assert expr` 编译为 `POP_JUMP_IF_TRUE` + `LOAD_ASSERTION_ERROR` + `RAISE_VARARGS`。前者检查expr结果为False时跳转到AssertionError加载，后者触发异常。pytest 的重写将 `assert expr` 替换为函数调用，绕过了这个机制。
+
+**数值稳定性问题**：当比较浮点数时，AST 重写会保留子表达式 `0.1 + 0.2` 和 `0.3`，在失败上下文中重新求值。由于 IEEE 754 浮点运算的精度误差，重新求值的结果可能与原始求值结果存在机器精度级别的差异。pytest.approx 通过显式容差比较规避此问题。
 
 ### pytest.raises 的声明式语义
 
@@ -201,6 +236,28 @@ pytest 的核心是极简的 hook 调度器。插件（无论是内置的还是�
 
 **数据流**：hook 调用形成树形结构（而非线性链），每个 hook 点允许多个插件注册，同步执行。插件注册顺序：`pytest_plugins` 变量 → conftest.py → 命令行 `--p` 参数。
 
+### 内置 Fixture 的资源类型
+
+| fixture | 作用域 | 资源类型 | 清理行为 |
+|---------|--------|----------|----------|
+| `tmp_path` | function | `pathlib.Path`（临时目录） | `rmtree` 递归删除 |
+| `tmpdir` | function | `py.path.local`（已废弃） | 目录删除 |
+| `monkeypatch` | function | `MonkeyPatch` 上下文 | 退出时自动还原所有补丁 |
+| `capfd` | function | (stdout_fd, stderr_fd) | 还原文件描述符 |
+| `caplog` | function | 日志捕获 handler | 移除 handler |
+| `cache` | session | `pytest_cache/.cache` | 不清理（持久化） |
+| `capsys` | function | `CapturedStdout/Stderr` | 还原 sys.stdin/out/err |
+
+**monkeypatch 的数学语义**：monkeypatch 在进入时记录原绑定，在退出时还原。设 $M$ 为被补丁的模块命名空间，$k$ 为被补丁的属性，$v_{\text{old}}$ 为原值：
+
+$$
+\text{monkeypatch.setattr}(M, k, v_{\text{new}}) \iff (v_{\text{old}} = M[k];\ M[k] = v_{\text{new}})
+$$
+
+$$
+\text{monkeypatch.__exit\_\_} \implies M[k] = v_{\text{old}}
+$$
+
 ## 约束与违反后果
 
 | 约束 | 违反后果 |
@@ -211,6 +268,8 @@ pytest 的核心是极简的 hook 调度器。插件（无论是内置的还是�
 | 浮点比较使用默认容差过严 | `abs=0` 导致 0.1+0.2 不等于 0.3（默认 rel=1e-7 对零点附近无效） |
 | 异常压制 | pytest.raises 内部 try/except 压制异常 → 测试假阳性通过 |
 | conftest.py 中 import 顺序 | 后导入的 conftest.py 会覆盖先导入的同名 fixture（按文件路径字母顺序） |
+| monkeypatch 在 fixture 外使用 | 补丁可能影响后续不相关的测试（应始终在 function scope 内使用） |
+| tmp_path 路径跨平台 | Windows 和 Unix 路径分隔符不同，硬编码路径在 CI 中失败 |
 
 ## 参考存根
 

@@ -1,8 +1,12 @@
 # Race Condition 模式与修复
 
+> **版本关系**：Go 1.24（stable）→ Go 1.26（<latest>）。race detector 工具增强，检测更准确。
+
 ## 定义
 
 Race condition 是多个 goroutine 并发访问共享资源，访问顺序影响结果的问题。Go 通过 `go test -race` 检测，修复模式包括互斥锁、原子操作、channel 和 sync.Once。其本质是**违反 happens-before 关系**——两个内存访问没有可靠的先后顺序保证。
+
+**归约终点**：并发安全问题的本质是建立可靠的 happens-before 关系，所有同步原语都是建立这种关系的工具。
 
 ## 数学模型
 
@@ -27,8 +31,6 @@ Go 中的保证：
 
 形式化：
 $$\text{data\_race}(op_1, op_2) \iff \text{同一地址} \land \text{并发} \land \neg(op_1 \text{ hb } op_2 \lor op_2 \text{ hb } op_1)$$
-
-**归约终点**：并发安全问题的本质是建立可靠的 happens-before 关系，所有同步原语都是建立这种关系的工具。
 
 ### race detector 的检测原理
 
@@ -115,13 +117,13 @@ goroutine A                           goroutine B
   │                                      │
   │── if !initialized ──────────────────►│── if !initialized
   │                                      │
-  │── instance = &Data{}                 │
+  │── instance = &Data{}                │
   │                                      │── instance = &Data{} ← 重复创建
   │                                      │
   └── 使用 instance                      └── 使用 instance
          │                                      │
          └─── 潜在问题：两个 goroutine 都创建了对象
-                某些情况下（如 once 标志未同步）可能导致资源泄漏或状态不一致
+               某些情况下（如 once 标志未同步）可能导致资源泄漏或状态不一致
 </pre>
 
 ### sync.Map 的实现数据流

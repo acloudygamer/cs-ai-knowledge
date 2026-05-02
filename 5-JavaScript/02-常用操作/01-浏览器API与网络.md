@@ -10,6 +10,16 @@
 
 **fetch 与 XMLHttpRequest 的本质差异**：两者都将 HTTP 请求分解为"构建请求→发送→等待响应→处理结果"，但 `fetch` 基于 Promise 模型，支持流式响应体；XMLHttpRequest 基于事件回调。
 
+**fetch 的事件循环集成**：
+
+`fetch()` 返回一个 Promise，该 Promise 的 resolve 发生在**微任务队列**而非宏任务队列：
+
+$$
+fetch(url) \Rightarrow Promise \xrightarrow{microtask} Response \xrightarrow{await} data
+$$
+
+这意味着 `fetch` 的响应通过微任务传递，而 `setTimeout` 的回调通过宏任务传递——两者在事件循环中的队列层级不同，导致 `fetch` 的响应时机早于同优先级的定时器回调。
+
 **并发限制约束（HTTP/1.1 队首阻塞）**：
 
 浏览器对同一域名的 TCP 并发连接数存在上界约束：
@@ -23,13 +33,32 @@ $$
 
 当 $n$ 个并发请求超过 $C_{max}$ 时，超出请求进入 FIFO 等待队列，产生**队首阻塞**（Head-of-Line Blocking）。HTTP/2 通过多路复用（Multiplexing）消除此约束：同一 TCP 连接上可并行传输多个请求-响应对。
 
-**WebSocket 双向通道状态机**：
+**HTTP/2 多路复用数学模型**：
+
+HTTP/2 _connection_ 上的并发 streams 数量通常无硬性上限（受流量控制窗口约束），但单连接的吞吐量受限于：
+
+$$
+Throughput_{http2} \leq \frac{Window_{initial}}{RTT} \times Window_{max}
+$$
+
+其中 $Window_{initial}$ 通常为 256KB（HTTP/2 默认），$RTT$ 为往返时延，$Window_{max}$ 为最大流量控制窗口。
+
+### WebSocket 双向通道状态机
 
 WebSocket 连接生命周期对应有限状态自动机：
 
 ```
 CONNECTING → OPEN → CLOSING → CLOSED
 ```
+
+状态转移语义：
+
+| 当前状态 | 事件 | 下一状态 | 触发条件 |
+|----------|------|----------|----------|
+| CONNECTING | TCP 握手完成 | OPEN | 服务器返回 101 Upgrade |
+| OPEN | 收到 Close 帧 | CLOSING | 对端发起关闭握手 |
+| OPEN | TCP 连接断开 | CLOSED | 网络故障或对端崩溃 |
+| CLOSING | Close 握手完成 | CLOSED | 收到对端 Ack |
 
 消息帧格式（RFC 6455）：
 
@@ -74,51 +103,53 @@ $$
 
 ```
 XMLHttpRequest 流程：
-用户代码 → open() → setRequestHeader → send() → 宏任务队列等待
+用户代码 → open() → setRequestHeader → send() → 浏览器定时器模块独立计时
                                               ↓
                                       XMLHttpRequest 引擎（浏览器内核）
                                               ↓
-                           readyState 变化 → onreadystatechange 回调
+                           readyState 变化 → onreadystatechange 回调（宏任务）
                                               ↓
                                       用户代码处理 responseText
 
 fetch 流程：
-用户代码 → fetch(url) → Promise.pending
+用户代码 → fetch(url) → Promise.pending（微任务队列前状态）
                           ↓
-                    HTTP 请求（Web APIs 层）
+                    HTTP 请求（Web APIs 层，浏览器内核网络模块）
                           ↓
-                    微任务队列 resolve(Response)
+                    响应头接收 → Promise resolve（微任务）
                           ↓
-用户代码 → res.json() → 读取 Response 流 → 解析 JSON → Promise.resolve(data)
+                    res.json() → 读取 Response 流（若未消费）→ 解析 JSON → 微任务 resolve
 
 WebSocket 流程：
-new WebSocket(url) → TCP 握手（HTTP Upgrade）→ 连接建立
+new WebSocket(url) → TCP 握手（HTTP Upgrade）→ 连接建立（状态机 → OPEN）
 客户端 ←─────────────────────────────→ 服务器
-     send() → 帧编码 → TCP 发送              TCP 接收 → 帧解码 → onmessage
-     close() → 握手关闭
+     send() → 帧编码（mask 置位）→ TCP 发送   TCP 接收 → 帧解码 → onmessage（宏任务）
+     close() → Close 帧 → 握手关闭 → CLOSING → CLOSED
 
 Service Worker 生命周期：
-注册 register(sw.js) → 安装（install 事件）→ 激活（activate 事件）
+register(sw.js) → 下载 SW 脚本 → 安装（install 事件，可拒绝）→ 激活（activate 事件）
                                         ↓
-                               fetch 拦截（浏览器内核 → SW 消息队列）
+                               fetch 拦截（主线程 → SW 消息队列 → SW 上下文）
                                         ↓
-                               e.respondWith(caches.match || fetch)
+                               e.respondWith() 同步返回或 Promise 异步 resolve
+                                        ↓
+                               若无 e.respondWith() → 继续网络请求（默认行为）
 
 IndexedDB 流程：
-openDB(name, ver) → versionchange 事务 → onupgradeneeded
+openDB(name, ver) → versionchange 事务（唯一可创建 object store 的时机）
          ↓
 db.transaction(store, mode) → 获取对象存储 → CRUD 操作
          ↓
-事务自动提交（或 abort）
+事务自动提交（或显式 abort）
 
 Web Workers 流程：
-主线程 → new Worker(script) → Worker 线程创建
+主线程 → new Worker(script) → 加载脚本 → Worker 线程创建
          ↓
-postMessage({ data }) → 结构化克隆 → 线程间消息队列
+postMessage({ data }) → 结构化克隆算法序列化 → 线程间消息队列
          ↓
-Worker 线程 self.onmessage → 处理 → postMessage(result)
+Worker 线程 self.onmessage → 反序列化 → 处理逻辑 → postMessage(result)
          ↓
-主线程 onmessage 回调
+结构化克隆 → 主线程消息队列 → onmessage 回调（宏任务）
 ```
 
 ## 机制
@@ -138,25 +169,18 @@ fetch 的核心优势在于**可组合性**：
 - 默认不发送 cookie（需 `credentials: 'include'`）
 - 网络错误不自动 reject（只有 4xx/5xx 才 reject），需检查 `res.ok`
 
+**fetch 不 reject 网络错误的约束来源**：fetch 的设计遵循 HTTP 语义——4xx/5xx 是合法的服务端响应而非异常。若将网络断开也作为 rejection，会导致同样的 4xx 在不同网络条件下表现不一致。正确做法是检查 `res.ok`。
+
 ### WebSocket 的心跳保活机制
 
 TCP 连接空闲时，中间路由器或 NAT 设备可能超时关闭连接（超时时间通常 60-120 秒）。WebSocket 无内置心跳，需应用层实现：
-
-```javascript
-// 典型心跳实现
-const heartbeat = setInterval(() => {
-  if (ws.readyState === WebSocket.OPEN) {
-    ws.send(JSON.stringify({ type: 'ping', timestamp: Date.now() }));
-  }
-}, 30000);
-
-ws.onclose = () => clearInterval(heartbeat);
-```
 
 **约束分析**：
 - 心跳间隔 $T_{heartbeat}$ 必须满足：$T_{heartbeat} < T_{router\_timeout} - T_{margin}$
 - 过短的心跳间隔增加带宽消耗（每 30s 一次往返是常见配置）
 - 检测网络断开需要同时处理 `onclose` 和发送失败
+
+**违反约束的后果**：若 $T_{heartbeat} \geq T_{router\_timeout}$，NAT 映射失效，服务器收不到心跳，服务器端或客户端可能已断开连接但对端不知情，导致僵尸连接占用资源。
 
 ### Service Worker 的请求拦截模型
 
@@ -165,12 +189,14 @@ Service Worker 运行于浏览器内核之外的独立线程（**不共享主线
 **fetch 事件分发语义**：
 
 ```
-请求发起 → SW 消息队列 → fetch 事件触发
+请求发起 → SW 消息队列 → fetch 事件分发到 SW 上下文
                 ↓
-     e.respondWith() 同步调用 → 返回 Response 或 Promise
+     e.respondWith() 同步调用 → 返回 Response 或 Promise<Response>
                 ↓
-     若无 e.respondWith() → 继续网络请求（默认行为）
+     若无 e.respondWith() → 继续网络请求（浏览器内核继续处理）
 ```
+
+**关键约束**：若 `e.respondWith()` 返回的 Promise reject 且无任何处理，浏览器不会将错误传播到主线程——请求直接以网络错误结束。
 
 **缓存策略的数学定义**：
 
@@ -200,6 +226,8 @@ $$
 
 读取时看到的是事务开始时刻的数据快照，不受并发写事务影响。
 
+**违反约束的后果**：若在 `onupgradeneeded` 之外尝试创建 object store 或索引，抛出 `InvalidStateError`。
+
 ### Web Workers 的线程隔离模型
 
 Web Workers 运行在独立线程，**内存地址空间完全隔离**（不共享堆内存）。主线程与 Worker 通过 `postMessage` 传递数据，数据被**结构化克隆算法**（Structured Clone Algorithm）复制：
@@ -219,6 +247,8 @@ Web Workers 运行在独立线程，**内存地址空间完全隔离**（不共�
 ```javascript
 w.postMessage({ buf: new ArrayBuffer(1024) }, [buf]); // buf 在主线程变为无效
 ```
+
+所有权转移的数学语义：设原线程持有对象 $O$ 的所有权，则转移后 $O$ 的所有权归目标线程，原线程无法再访问。
 
 ### Cache API 的缓存语义
 

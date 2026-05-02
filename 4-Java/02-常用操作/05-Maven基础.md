@@ -176,6 +176,36 @@ A → B → C
 
 **检测算法**：深度优先搜索（DFS）+ 回溯标记，复杂度 $O(|V| + |E|)$。
 
+### 依赖解析的冲突解决实例
+
+考虑以下依赖图：
+
+```
+项目 A
+  ├── B:1.0
+  └── C:2.0
+       └── B:2.0
+```
+
+从 A 到 B 的路径：
+- A → B:1.0（长度 1）
+- A → C:2.0 → B:2.0（长度 2）
+
+按最近路径优先原则，选择 B:1.0。若 A 的 dependencyManagement 声明了 B:3.0，则优先使用 dependencyManagement 的版本。
+
+### 传递依赖的版本覆盖
+
+传递依赖的版本覆盖规则：
+
+1. 若直接在当前 POM 声明 → 使用当前 POM 的版本（无论 dependencyManagement 是否存在）
+2. 否则，若在 dependencyManagement 中声明 → 使用 dependencyManagement 的版本
+3. 否则，选择路径最近的传递依赖版本
+4. 若存在等长路径，选择 POM 中声明顺序靠前的
+
+这形成了一个优先级序列：
+
+$$\text{direct} > \text{dependencyManagement} > \text{transitive (nearest)}$$
+
 ## 参考存根
 
 ```xml

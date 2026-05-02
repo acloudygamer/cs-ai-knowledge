@@ -6,6 +6,17 @@ JUnit 5是Java生态的第三代测试框架，由三个模块组成：`JUnit Pl
 
 **架构哲学**：Platform负责"发现什么"和"如何执行"，Jupiter提供"如何编写测试"，Vintage负责向后兼容。关注点分离使框架核心保持稳定，扩展模型保持开放。
 
+**SPI 解耦的数学意义**：通过接口继承 hierarchy，JUnit 5 将"测试定义"与"测试执行"解耦为正交维度：
+
+```
+TestEngine 接口
+    ↑
+    | 实现
+JUnit Jupiter TestEngine ←→ 第三方引擎（kotest, Spek, etc.）
+```
+
+这允许 $N$ 种测试定义 $\times$ $M$ 种执行器自由组合，而非 $N \times 1$ 的紧耦合。
+
 ---
 
 ## 数学模型
@@ -41,6 +52,14 @@ JUnit 5的测试生命周期可建模为有限状态自动机：
 - 每个测试方法独立经历 `READY_FOR_TEST → TEST_EXECUTING → TEST_COMPLETED`
 - `@AfterEach` 在 `TEST_COMPLETED` 后执行，保证即使测试失败也清理
 
+**形式化约束**：
+
+| 约束 | 数学表达 |
+|------|----------|
+| `@BeforeAll` 单次执行 | $\forall m \in \text{@BeforeAll}: |\text{call}(m)| = 1$ |
+| `@BeforeEach` 每次执行 | $\forall m \in \text{@BeforeEach}, \forall t \in \text{Tests}: |\text{call}(m, t)| = 1$ |
+| 测试后清理保证 | $\text{TestComplete} \implies \Diamond \text{@AfterEach}$ |
+
 ### 实例数量的数学关系
 
 | 模式 | 实例数公式 | 适用场景 |
@@ -57,6 +76,16 @@ $$
 $$
 
 按声明顺序执行，先声明的扩展的`beforeEach`先执行，后声明的扩展的`afterEach`先执行（栈式弹出）。
+
+### assertAll 的逻辑语义
+
+`assertAll` 强制执行组内所有断言，不受短路影响：
+
+$$
+\text{assertAll}([a_1, a_2, \ldots, a_n]) = \bigwedge_{i=1}^{n} a_i
+$$
+
+所有断言的逻辑与——任一断言失败，整个组失败，但**所有断言都会被执行并报告**。
 
 ---
 
@@ -93,6 +122,33 @@ $$
 4. `@AfterEach` 释放/验证该次测试的状态变更
 5. `@AfterAll` 释放整个测试类的资源
 
+### TestEngine 的发现-执行流水线
+
+<pre>
+Classpath 扫描
+      │
+      ▼
+TestEngine.discover() → DiscoverySelector
+      │
+      ▼
+Launcher.execute() → ExecutionListener
+      │
+      ├──> beforeAll()
+      ├──> beforeEach()
+      ├──> execute()
+      │         │
+      │         ▼
+      │    DynamicTest 实例化
+      │
+      ├──> afterEach()
+      └──> afterAll()
+</pre>
+
+**关键接口**：
+- `TestEngine`：发现并执行测试
+- `DiscoverySelector`：定位要执行的测试
+- `ExecutionListener`：接收执行事件回调
+
 ### 动态测试的生成模型
 
 `@TestFactory` 将测试生成建模为从配置空间到测试用例空间的映射：
@@ -102,6 +158,27 @@ $$
 $$
 
 每个 `DynamicTest` 是独立的测试实例，有自己的显示名和执行逻辑。
+
+### ExtensionContext 的注册表模型
+
+<pre>
+ExtensionContext
+      │
+      ├──> putStore(namespace, key, value)
+      │         │
+      │         ▼
+      │    NamespacedStore
+      │         │
+      │         ├──> namespace: "com.example.extension-a"
+      │         └──> key: "shared-state" → Object
+      │
+      └──> getStore(namespace)
+            │
+            ▼
+         NamespacedStore.get(key)
+</pre>
+
+**归约终点**：ExtensionContext 本质上是一个 **namespace-keyed map**，允许扩展在保持隔离的同时共享数据。
 
 ---
 
@@ -120,20 +197,6 @@ $$
 - 约束：测试方法间不得污染共享实例的状态
 
 **选择不当的后果**：PER_CLASS 下若测试间存在状态污染，会导致难以复现的间歇性失败，且失败模式随测试执行顺序变化。
-
-### assertAll 的逻辑语义
-
-`assertAll` 强制执行组内所有断言，不受短路影响：
-
-$$
-\text{assertAll}([a_1, a_2, \ldots, a_n]) = \bigwedge_{i=1}^{n} a_i
-$$
-
-所有断言的逻辑与——任一断言失败，整个组失败，但**所有断言都会被执行并报告**。
-
-**与普通断言的区别**：
-- 普通断言：短路执行，第一个失败终止后续断言
-- `assertAll`：完全执行，收集所有失败后统一报告
 
 ### assertTimeout vs assertTimeoutPreemptively 的本质差异
 
@@ -156,23 +219,26 @@ $$
 | 参数来源 | 运行时动态生成 | 编译时或配置指定 |
 | 使用场景 | 外部配置/数据库加载测试场景 | 数据驱动测试 |
 
-### 扩展模型：注册表模式
+### 条件执行的语义
 
-JUnit 5 的扩展通过 `ExtensionContext` 实现，这是一个**注册表模式**：
+`@EnabledIf` / `@DisabledIf` 基于条件表达式控制测试是否执行：
 
-```java
-public interface ExtensionContext {
-    // 存储扩展共享的数据
-    void putStore(String namespace, String key, Object value);
-    Object getStore(String namespace, String key);
+$$
+\text{ExecutionCondition}(t) = \begin{cases}
+\text{ENABLED} & \text{if } \phi(t) = \text{true} \\
+\text{DISABLED} & \text{if } \phi(t) = \text{false}
+\end{cases}
+$$
 
-    // 获取测试的元信息
-    Optional<AnnotatedElement> getElement();
-    Optional<DynamicGraph> getDynamicGraph();
-}
-```
+**典型条件**：操作系统、环境变量、系统属性、是否有孙某测试运行。
 
-**扩展间数据共享**：通过 `Store` API 在扩展间传递数据，遵循命名空间隔离。
+### 标签（Tag）的过滤语义
+
+`@Tag` 允许在测试级别打标签，执行时过滤：
+
+$$
+\text{TestFilter}(T, \text{includeTags}, \text{excludeTags}) = \{ t \in T \mid \text{tag}(t) \in \text{includeTags} \land \text{tag}(t) \cap \text{excludeTags} = \emptyset \}
+$$
 
 ---
 

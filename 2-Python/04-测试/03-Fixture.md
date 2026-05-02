@@ -27,6 +27,7 @@ $$
 **格的性质**：
 - 存在上界（session）和下界（function）
 - 任意两个作用域有唯一最小上界（lub）和最大下界（glb）
+- 格的偏序关系严格遵循生命周期包含关系
 
 ### Fixture DAG 与拓扑排序
 
@@ -39,6 +40,8 @@ $$
 pytest 在收集阶段对 DAG 做拓扑排序，保证依赖在被注入前已完成初始化。
 
 **拓扑排序的数学定义**：对 DAG $(V, E)$ 的拓扑排序是顶点序列 $v_1, v_2, \dots, v_n$ 使得对每条边 $(v_i, v_j) \in E$ 都有 $i < j$。
+
+**拓扑序不唯一**：若 DAG 有多条合法拓扑序，pytest 采用的是依赖深度优先遍历（DFS）的后序遍历结果。
 
 ### yield 的资源清理语义
 
@@ -98,6 +101,22 @@ $$
 
 这避免了同一测试类中重复创建/销毁相同 fixture。
 
+**缓存的生命周期**：缓存与 fixture 的作用域绑定——session scope fixture 的缓存在整个会话期间有效；function scope fixture 的缓存在每次测试后释放。
+
+### 工厂 Fixture 的状态机
+
+Factory as a Fixture 模式的状态机语义：
+
+$$
+\text{FactoryFixture} = (S,\ C,\ \alpha),\quad S = \text{已创建实例集合},\ C = \text{cleanup 函数}
+$$
+
+$$
+\alpha(name) \rightarrow (obj,\ S \cup \{obj\})
+$$
+
+工厂在 setup 阶段初始化空的已创建集合 $S$ 和 cleanup 函数 $C$；每次调用工厂函数时创建一个新实例并追加到 $S$；teardown 阶段遍历 $S$ 执行 $C$。
+
 ## 数据流
 
 <pre>
@@ -121,6 +140,8 @@ pytest 启动
     └── 执行阶段
            │
            ├── session scope fixtures（once at session start）
+           │      │
+           │      └── 缓存结果供后续复用
            │
            ├── module scope fixtures（once per .py enter）
            │
@@ -168,10 +189,12 @@ def temp_file_of_size(request):
 ```
 
 **request 对象的属性**：
-- `request.node`：当前测试节点
+- `request.node`：当前测试节点（TestCase 或 Function）
 - `request.function`：测试函数对象
 - `request.param`：当前参数化值
 - `request.config`：pytest 配置对象
+- `request.fspath`：测试文件路径
+- `request.fixturenames`：当前测试可用的 fixture 名称列表
 
 ### autouse 的隐式注入
 
@@ -246,6 +269,18 @@ class Derived(Base):
 
 **作用域不可覆盖**：fixture 的 `scope` 参数在子类中不可改变，只能通过新的 fixture 定义覆盖整个 fixture 函数。
 
+### Fixture 的缓存机制
+
+在同一作用域内，fixture 实例按 (fixture_name, param) 缓存：
+
+$$
+\text{fixture\_cache}[(f\_name, param\_value)] = \text{cached\_instance}
+$$
+
+重复请求同一 fixture 时，pytest 直接返回缓存实例，而非重新执行 fixture 函数。这保证了同一作用域内 fixture 的单例语义。
+
+**跨测试的状态泄漏风险**：若 fixture 缓存了可变状态（如数据库连接），不同测试修改该状态后，后续测试会看到被修改的状态。解决方案：使用 function scope 而非 session scope，或在 teardown 中显式重置状态。
+
 ## 约束与违反后果
 
 | 约束 | 违反后果 |
@@ -256,6 +291,7 @@ class Derived(Base):
 | Session scope fixture 使用 function scope 依赖 | 违反作用域层级，pytest 报错 |
 | 重复 yield | 第二次 yield 不执行，且发出警告 |
 | 父类 fixture 被子类覆盖时作用域不一致 | 收集阶段报 FixtureScopeError |
+| autouse fixture 之间存在隐式依赖 | 未声明的依赖顺序导致不可预测的执行顺序 |
 
 ## 参考存根
 

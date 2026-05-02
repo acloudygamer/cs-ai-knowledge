@@ -1,12 +1,17 @@
 # Context 专题
 
+> **版本关系**：Go 1.24（stable）→ Go 1.26（<latest>）。Context 核心接口不变，错误处理在 Go 1.26 略有增强。
+
 ## 定义
 
 context 是 Go 中传递请求作用域的截止时间、取消信号和共享值的标准接口——其本质是携带截止时间链和取消信号链的上下文容器。
 
+**归约终点**：Context 树是**不可变的有向无环图（DAG）**，每次 WithX 操作创建新节点，父节点保持不变，这保证了并发安全——无锁访问。
+
 ## Context 接口
 
 ### 定义
+
 Context 接口定义了四个方法，分别对应截止时间、取消信号、取消原因和请求级共享值。
 
 ### 数学模型
@@ -31,8 +36,6 @@ Context 树是**不可变的**，每次 WithX 都创建新节点，父节点保�
 $$\forall C_i: \text{parent}(C_i) \text{ 在创建后永不改变}$$
 
 这保证了并发安全——无锁访问。
-
-**归约终点**：Context 树是**不可变的 DAG**，每次 WithX 操作创建新节点，父节点保持不变。
 
 ### 数据流
 
@@ -69,6 +72,7 @@ background (根 Context)
 ## WithCancel
 
 ### 定义
+
 创建一个可手动取消的 Context，调用 `cancel()` 时 Done() channel 关闭。
 
 ### 数据流
@@ -108,6 +112,7 @@ $$\forall C: \text{cancel}(C) \implies \text{cancel}(C) = \text{cancel}(C)$$
 ## WithTimeout
 
 ### 定义
+
 创建带超时时间的 Context，超时自动取消——常用于 HTTP 请求、数据库查询等有明确时间限制的场景。
 
 ### 数学模型
@@ -129,6 +134,7 @@ $$\forall t > T_{deadline}: Done(ch) \text{ 已关闭}$$
 ## WithValue
 
 ### 定义
+
 在 Context 中存储键值对，用于在 goroutine 之间传递请求级别的元数据（如 requestID、userID）。
 
 ### 机制
@@ -164,6 +170,7 @@ func processRequest(ctx context.Context) {
 ## 错误处理
 
 ### 定义
+
 ctx.Err() 返回 context.Canceled 或 context.DeadlineExceeded。
 
 ### 数学模型
@@ -192,6 +199,7 @@ $$Err(ctx) = \begin{cases}
 ### Context 作为第一个参数
 
 ### 机制
+
 将 Context 作为函数的第一个参数是 Go 的惯用约定，使调用者可以控制超时和取消。
 
 **为什么作为第一个参数**：Context 语义上类似于"请求元数据"，与方法参数平起平坐比藏在结构体里更显式。
@@ -199,6 +207,7 @@ $$Err(ctx) = \begin{cases}
 ### 不要在结构体中存储 Context
 
 ### 机制
+
 Context 应该作为方法参数传递，而非存储在结构体中。因为 Context 代表请求的生命周期，存储在结构体中可能导致请求结束后 Context 被误用。
 
 **违反约束的后果**：使用已取消或过期的 Context 可能导致静默失败（操作正常返回但实际未生效）。
@@ -206,6 +215,7 @@ Context 应该作为方法参数传递，而非存储在结构体中。因为 Co
 ### 及时取消 Context
 
 ### 机制
+
 子 Context 的超时应该短于父 Context，避免子任务超时后父任务仍在运行。
 
 **约束条件**：
@@ -224,6 +234,7 @@ $$T_{deadline}(C_{child}) \leq T_{deadline}(C_{parent})$$
 ### 不要传递 nil Context
 
 ### 机制
+
 nil Context 的行为未定义，可能导致死锁。应始终使用 `context.Background()` 或 `context.TODO()`。
 
 ## 常见模式

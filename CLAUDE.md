@@ -166,6 +166,32 @@ SendMessage `[DISPATCH]` 时附带说明：`请先阅读 .claude/agents/<role>.m
 
 ## Team 清理
 
+### 标准流程
+
 完成团队工作后，执行 `TeamDelete` 清理团队。
 
-如果 TeamDelete 失败（`Already leading`），直接创建新 team 继续工作，不阻塞等待。
+### 异常处理（成员未全部关闭）
+
+当 TeamDelete 失败（`Already leading` 或 `Cannot cleanup team with X active member(s)`）时，执行以下循环：
+
+1. **读取活跃成员列表**（TeamDelete 错误消息中会列出）
+2. **批量发送 shutdown**：对每个活跃成员发送 `SendMessage {type: "shutdown_request"}`
+3. **等待响应**：最多等待 60 秒（成员陆续响应）
+4. **再次尝试 TeamDelete**
+5. **循环**：若仍失败，重复步骤 1-4
+6. **兜底**：循环 3 次后仍失败，直接创建新 team 继续工作，不阻塞等待
+
+### 强制清理循环伪代码
+
+```
+尝试 TeamDelete
+若失败：
+  获取活跃成员列表（错误消息中提取）
+  对每个成员发送 shutdown_request
+  等待 30 秒
+  再次尝试 TeamDelete
+  若仍失败且循环次数 < 3：跳至"获取活跃成员列表"
+  若循环次数 >= 3：直接创建新 team，不阻塞
+```
+
+> **注意**：等待成员响应时，保持 session 可用，接受来自成员的 shutdown_approved 消息后自动进入下一轮。

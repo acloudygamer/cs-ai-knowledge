@@ -1,6 +1,6 @@
 # 现代Java特性
 
-> **版本关系**：Java 21 LTS（基础）→ Java 25
+> **版本关系**：Java 21 LTS（stable）→ Java 25（latest）
 
 ## 定义
 
@@ -323,7 +323,7 @@ if (obj instanceof Point(_, int y)) {
 
 ---
 
-## Java 25+ 新特性
+## Java 25 新特性
 
 ### Instance Main Methods
 

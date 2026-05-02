@@ -136,6 +136,22 @@ Gatherer.of(
 
 这将自定义中间操作形式化为状态转换自动机，允许框架管理并行化和短路。
 
+### Gatherer 四元组的数学形式化
+
+Gatherer 的 integrator 函数定义了状态机的一次转移：
+
+$$\delta: S \times I \to S \times (O \cup \{\bot\})$$
+
+其中 $\bot$ 表示跳过（不向下游输出）。状态机从初始状态 $s_0$ 开始，对每个输入 $i \in I$ 执行：
+
+$$(s_{k+1}, o_k) = \delta(s_k, i_k)$$
+
+若 $o_k = \bot$，则该元素被过滤；否则 $o_k$ 传递给下游。
+
+并行合并函数 $C$ 必须是**结合的**和**交换的**，确保多个 partition 的结果可以以任意顺序合并：
+
+$$\forall a,b,c: C(C(a,b),c) = C(a,C(b,c))$$
+
 ### Stream 的引用透明性约束
 
 Stream 操作必须是**无副作用**的函数：

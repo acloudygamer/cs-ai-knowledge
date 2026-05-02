@@ -65,6 +65,15 @@ store.name = 'Alice';
 
 这与 MobX 的 `runInAction` 提供相同的批量语义，但 Pinia 是**语言级**的（通过 Vue 的 scheduler），无需显式包装。
 
+**数学表述**：设同步块内进行 $n$ 次赋值，Vue 的 scheduler 将 $n$ 次更新合并为 $1$ 次：
+
+$$
+T_{\text{DOM}} = \begin{cases}
+n & \text{无批量} \\
+1 & \text{有批量}
+\end{cases}
+$$
+
 ---
 
 ## 数据流
@@ -110,7 +119,10 @@ Pinia 内部注册 Store（pinia._s.set('counter', store)）
 - `computed(fn)` → 惰性求值的计算属性，依赖变化时自动失效缓存
 - `storeToRefs(store)` → 将 state/getters 转为 ref，actions 保持原始函数
 
-**所有权**：Store 实例由 Pinia 持有（注册在 `pinia._s` map 中），组件通过 `useXxxStore()` 获取引用，多个组件调用同一 Store 返回**相同实例**（单例）。
+**所有权流转**：
+- Store 实例由 Pinia 持有（注册在 `pinia._s` map 中）
+- 组件通过 `useXxxStore()` 获取引用，多个组件调用同一 Store 返回**相同实例**（单例）
+- 组件解构出的 ref 与 Store 共享状态所有权，修改 ref 即修改 Store
 
 ---
 
@@ -133,7 +145,7 @@ Pinia 的 state 是 `ref`，getters 是 `computed`，actions 是普通函数。�
 
 这与 MobX 的自动依赖追踪**本质上相同**，但 Pinia 直接复用 Vue 3 的基础设施，无需自建 DAG。
 
-**关键优势**：Pinia 开发者无需关心"何时订阅/取消订阅"——Vue 的响应式系统自动处理，且在组件卸载时自动清理相关依赖。
+**关键优势**：Pinia 开发者无需关心"何时订阅/何时取消订阅"——Vue 的响应式系统自动处理，且在组件卸载时自动清理相关依赖。
 
 ### setup 风格 vs 选项式
 
@@ -162,6 +174,8 @@ const useCounterStore = defineStore('counter', {
 
 两种风格底层实现相同：Pinia 将选项式转换为 setup 函数。setup 风格更适合 TypeScript 类型推导。
 
+**约束**：选项式中的 `this` 指向 store 实例，而非 setup 函数作用域。
+
 ### 插件系统的 AOP 本质
 
 Pinia 插件是一个**函数接收（store, pinia）参数**，在 Store 创建时注入逻辑：
@@ -185,6 +199,8 @@ const persistPlugin = (context) => {
 - `store.$subscribe(callback)`：状态变化时调用，返回 unregister 函数
 - `store.$onAction(callback)`：action 调用前后调用
 
+**约束**：插件在 `pinia.use()` 注册，所有插件按注册顺序执行。插件应返回 `store` 的扩展对象以添加新属性。
+
 ### 批量操作的事务语义
 
 `store.$patch()` 可批量应用状态变更：
@@ -194,6 +210,10 @@ store.$patch({ count: 1, name: 'Alice' });
 ```
 
 这与 MobX 的 `runInAction` 类似，提供**原子性批量更新**语义。与 MobX 不同的是，Pinia 不需要 `runInAction` 包装——因为 Vue 的响应式更新本身就是批量的（`queueMicrotask` 队列）。
+
+**约束**：$patch$ 的函数形式（`$patch(state => state.count++)`）内部修改会被合并为一次通知。
+
+**违反后果**：若在 $patch$ 函数形式外手动修改状态后再调用 $patch$，两次修改会被分别通知，可能导致组件执行两次更新。
 
 ---
 
