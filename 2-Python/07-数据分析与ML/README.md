@@ -2,9 +2,7 @@
 
 ## 目录
 
-- [pandas 基础](01-pandas基础.md)
-- [NumPy 基础](02-NumPy基础.md)
-- [matplotlib 可视化](03-matplotlib可视化.md)
+- [01-数据分析基础](01-数据分析基础.md)
 
 ## 概述
 
