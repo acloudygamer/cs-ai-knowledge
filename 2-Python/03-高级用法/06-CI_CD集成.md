@@ -10,23 +10,23 @@ CI/CD 是软件交付流水线的两个阶段：CI（持续集成）将代码变
 
 工作流是有向无环图（DAG），节点为 jobs，边为 `needs` 依赖：
 
-$$\text{Workflow} = (J, E),\ J = \{\text{job}_i\},\ E \subseteq J \times J$$
+$\text{Workflow} = (J, E),\ J = \{\text{job}_i\},\ E \subseteq J \times J$
 
-并行 jobs 满足 $j_a \nrightarrow j_b \land j_b \nrightarrow j_a$；串行 jobs 满足偏序关系。Job 内各 step 按声明顺序执行。
+并行 jobs 满足 $j_a \nrightarrow j_b \land j_b \nrightarrow j_a$ ；串行 jobs 满足偏序关系。Job 内各 step 按声明顺序执行。
 
 **DAG 的拓扑排序**：工作流调度器对 DAG 进行拓扑排序，确定 jobs 的执行顺序。拓扑排序结果不唯一，但必须满足所有偏序约束。
 
-**并行度的数学约束**：设 DAG 中无依赖的 jobs 集合为 $U$（即 $\forall j \in U, \nexists i \in J: i \to j$ 或所有前驱已完成）。则最大并行度为 $|U|$——同一时刻最多可运行 $|U|$ 个 job。
+**并行度的数学约束**：设 DAG 中无依赖的 jobs 集合为 $U$ （即 $\forall j \in U, \nexists i \in J: i \to j$ 或所有前驱已完成）。则最大并行度为 $|U|$——同一时刻最多可运行 $|U|$ 个 job。
 
 ### 缓存命中率
 
 CI 缓存的目的是减少重复依赖下载。缓存 key 的设计直接影响命中率：
 
-$$\text{hit} \iff \text{cache-key}_\text{generated} = \text{cache-key}_\text{stored}$$
+$\text{hit} \iff \text{cache-key}_\text{generated} = \text{cache-key}_\text{stored}$
 
 Key 生成公式（GitHub Actions 缓存 action）：
 
-$$\text{key} = \text{prefix} + \text{hash}(\text{dependencies-files})$$
+$\text{key} = \text{prefix} + \text{hash}(\text{dependencies-files})$
 
 常见的缓存 key 策略：
 
@@ -42,7 +42,7 @@ $$\text{key} = \text{prefix} + \text{hash}(\text{dependencies-files})$$
 
 覆盖率检查在 CI 中作为质量门禁：
 
-$$\text{gate}(coverage, threshold) = \begin{cases} \text{pass} & coverage \geq threshold \\ \text{fail} & coverage < threshold \end{cases}$$
+$\text{gate}(coverage, threshold) = \begin{cases} \text{pass} & coverage \geq threshold \\ \text{fail} & coverage < threshold \end{cases}$
 
 `--cov-fail-under=80` 表示覆盖率低于 80% 时 CI 任务失败。
 
@@ -50,7 +50,7 @@ $$\text{gate}(coverage, threshold) = \begin{cases} \text{pass} & coverage \geq t
 
 Matrix 是笛卡尔积展开：
 
-$$\text{jobs} = |python-version| \times |os| \times |custom-vars|$$
+$\text{jobs} = |python-version| \times |os| \times |custom-vars|$
 
 ```yaml
 strategy:
@@ -61,11 +61,11 @@ strategy:
 
 产生 $2 \times 2 = 4$ 个并行 job 实例，每个消耗独立虚拟机实例和配额。
 
-**资源消耗的数学约束**：总资源消耗为 $O(\prod |dim_i|)$。若维度过多，job 数量指数增长可能导致配额耗尽。设 $d$ 个维度，每个维度平均 $|v|$ 个值，则 job 总数：
+**资源消耗的数学约束**：总资源消耗为 $O(\prod |dim_i|)$ 。若维度过多，job 数量指数增长可能导致配额耗尽。设 $d$ 个维度，每个维度平均 $|v|$ 个值，则 job 总数：
 
-$$N_{jobs} = \prod_{i=1}^{d} |v_i|$$
+$N_{jobs} = \prod_{i=1}^{d} |v_i|$
 
-若 $d=4$、每个维度 3 个值，$N_{jobs} = 81$，可能耗尽 GitHub Actions 并发配额。
+若 $d=4$ 、每个维度 3 个值， $N_{jobs} = 81$ ，可能耗尽 GitHub Actions 并发配额。
 
 ## 数据流
 
@@ -180,7 +180,7 @@ CMD ["python", "src/main.py"]
 
 tox 的 `envlist` 定义测试环境矩阵：
 
-$$\text{envlist} = \{\text{py312}, \text{py313}, \text{py314}, \text{lint}, \text{type}\}$$
+$\text{envlist} = \{\text{py312}, \text{py313}, \text{py314}, \text{lint}, \text{type}\}$
 
 每个环境在独立 virtualenv 中执行，隔离依赖。`isolated_build = True` 让 tox 为每个环境创建独立构建。
 

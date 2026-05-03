@@ -16,17 +16,17 @@ Java 21 以来的现代语言特性本质上是一套"让类型系统承担更�
 
 Record 是不可变数据聚合类型，本质是**编译器合成的名义类型（Nominal Type）**——JVM 层面对外呈现为 `final` 类，自动生成 `equals`、`hashCode`、`toString`、规范化构造器及组件访问器。
 
-Record 的核心语义是**积类型**（product type）：$R(c_1: T_1, c_2: T_2, ..., c_n: T_n)$ 的实例是各组件的笛卡尔积。
+Record 的核心语义是**积类型**（product type）： $R(c_1: T_1, c_2: T_2, ..., c_n: T_n)$ 的实例是各组件的笛卡尔积。
 
 ### 数学模型
 
-**组件访问器**：设 Record 类型 $R$ 有组件 $(c_1: T_1, c_2: T_2, \dots, c_n: T_n)$，访问器语义：
+**组件访问器**：设 Record 类型 $R$ 有组件 $(c_1: T_1, c_2: T_2, \dots, c_n: T_n)$ ，访问器语义：
 
-$$\text{accessor}_i \triangleq \lambda x: R \cdot x.c_i : T_i$$
+$\text{accessor}_i \triangleq \lambda x: R \cdot x.c_i : T_i$
 
 **equals 的形式化**：
 
-$$o_1 \equals_R o_2 \iff R\text{.class.isInstance}(o_1) \land R\text{.class.isInstance}(o_2) \land \bigwedge_{j=1}^{n} o_1.c_j \equals_{T_j} o_2.c_j$$
+$o_1 \equals_R o_2 \iff R\text{.class.isInstance}(o_1) \land R\text{.class.isInstance}(o_2) \land \bigwedge_{j=1}^{n} o_1.c_j \equals_{T_j} o_2.c_j$
 
 **归约终点**：Record 的 `equals` 实现归结为**逐组件值比较**，其语义与手工编写 `Objects.equals` 一致，但编译器保证构造器参数与组件一一对应。
 
@@ -80,17 +80,17 @@ String format(Object obj) {
 
 密封类是通过 `permits` 子句声明有限继承层次，并配合编译器穷尽性检查实现**类型级有限集合语义**的类型构造。
 
-从集合论视角，sealed 接口 $S$ 的 `permits $C_1, C_2, ..., C_n$` 定义了一个**有限类型族**：$S$ 的所有实例必须是 $C_i$ 的某种子类型。
+从集合论视角，sealed 接口 $S$ 的 `permits $C_1, C_2, ..., C_n 定义了一个**有限类型族**：$S$ 的所有实例必须是 $C_i$ 的某种子类型。
 
 ### 数学模型
 
-设密封族 $S$ 的直接子类集合为 $P = \{C_1, C_2, \dots, C_n\}$，每个子类 $C_i$ 的密封状态：
+设密封族 $S$ 的直接子类集合为 $P = \{C_1, C_2, \dots, C_n\}$ ，每个子类 $C_i$ 的密封状态：
 
-$$\text{sealedStatus}(C_i) \in \{\text{sealed}, \text{non-sealed}, \text{final}\}$$
+$\text{sealedStatus}(C_i) \in \{\text{sealed}, \text{non-sealed}, \text{final}\}$
 
 **穷尽性要求**：任何覆盖 $S$ 的 `switch` 表达式必须满足：
 
-$$\bigcup_{i} \text{covered}(case_i) = \bigcup_{C \in P} \text{leafTypes}(C)$$
+$\bigcup_{i} \text{covered}(case_i) = \bigcup_{C \in P} \text{leafTypes}(C)$
 
 **违反穷尽性**：编译错误——编译器无法证明所有可能情况都被处理。
 
@@ -132,15 +132,15 @@ sealed interface Shape permits Circle, Rectangle {}
 
 **类型测试模式** $P :: T$ 对值 $v$ 的匹配语义：
 
-$$v \models P :: T \iff v \neq \text{null} \land T\text{.isInstance}(v)$$
+$v \models P :: T \iff v \neq \text{null} \land T\text{.isInstance}(v)$
 
 **模式变量的类型细化**（Flow-Sensitive Typing）：
 
-$$\Gamma, (v : \text{Object}) \vdash \text{instanceof}(v, T, x) : \Gamma, (x : T)$$
+$\Gamma, (v : \text{Object}) \vdash \text{instanceof}(v, T, x) : \Gamma, (x : T)$
 
 **Guarded Patterns**：`when` 子句引入额外布尔约束：
 
-$$v \models P :: T \land \phi \iff v \models P :: T \land \phi[v / \text{pattern-var}]$$
+$v \models P :: T \land \phi \iff v \models P :: T \land \phi[v / \text{pattern-var}]$
 
 ### Record Patterns（嵌套解构）
 
@@ -211,22 +211,22 @@ int result = switch (day) {
 
 ### 数学模型
 
-设虚拟线程集合 $VT = \{v_1, v_2, \dots, v_m\}$，载体线程集合 $PT = \{p_1, p_2, \dots, p_n\}$，其中 $m \gg n$。
+设虚拟线程集合 $VT = \{v_1, v_2, \dots, v_m\}$ ，载体线程集合 $PT = \{p_1, p_2, \dots, p_n\}$ ，其中 $m \gg n$ 。
 
 **调度状态机**：
 
-$$s(v_i) \in \{\text{RUNNING}, \text{RUNNABLE}, \text{WAITING}, \text{TERMINATED}\}$$
+$s(v_i) \in \{\text{RUNNING}, \text{RUNNABLE}, \text{WAITING}, \text{TERMINATED}\}$
 
-$$\text{RUNNING} \xrightarrow{\text{park/阻塞}} \text{WAITING} \xrightarrow{\text{unpark}} \text{RUNNABLE} \xrightarrow{\text{调度}} \text{RUNNING}$$
+$\text{RUNNING} \xrightarrow{\text{park/阻塞}} \text{WAITING} \xrightarrow{\text{unpark}} \text{RUNNABLE} \xrightarrow{\text{调度}} \text{RUNNING}$
 
-**关键不变量**：同一时刻每个载体线程 $p_j$ 最多承载一个虚拟线程执行。$p_j$ 阻塞时，其承载的 $v_i$ 被移出到等待队列。
+**关键不变量**：同一时刻每个载体线程 $p_j$ 最多承载一个虚拟线程执行。 $p_j$ 阻塞时，其承载的 $v_i$ 被移出到等待队列。
 
 **内存模型**：
 
 | 线程类型 | 栈内存 | 总内存复杂度 |
 |----------|--------|--------------|
 | 传统线程 | $N \times 1\,\text{MB}$ | $O(N)$ |
-| 虚拟线程 | $N \times \text{按需增长（~256KB-2MB）}$ | $O(N)$，但常数小 |
+| 虚拟线程 | $N \times \text{按需增长（~256KB-2MB）}$ | $O(N)$ ，但常数小 |
 
 ### 数据流
 
@@ -281,11 +281,11 @@ Scoped Value 将数据绑定到词法作用域（lexical scope），数据在载
 
 `ThreadLocal` 的资源占用：
 
-$$\text{Memory}_{TL} = N_{\text{VT}} \times \text{value\_size}$$
+$\text{Memory}_{TL} = N_{\text{VT}} \times \text{value\_size}$
 
 `ScopedValue` 的资源占用：
 
-$$\text{Memory}_{SV} = \text{value\_size} + N_{\text{transitions}} \times O(1)$$
+$\text{Memory}_{SV} = \text{value\_size} + N_{\text{transitions}} \times O(1)$
 
 每个虚拟线程不再持有独立副本，而是通过载体线程的调用栈帧隐式传递。
 
@@ -360,7 +360,7 @@ if (obj instanceof int i) {
 
 标准化 HKDF（HMAC-based Extract-and-Expand Key Derivation Function）：
 
-$$\text{output} = \text{HKDF-Extract}(salt, ikm) \oplus \text{HKDF-Expand}(prk, info, L)$$
+$\text{output} = \text{HKDF-Extract}(salt, ikm) \oplus \text{HKDF-Expand}(prk, info, L)$
 
 ```java
 var params = HKDFParameter.builder()

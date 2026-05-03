@@ -14,13 +14,13 @@ TCP是面向连接的可靠字节流传输协议，通过序号、确认、超�
 
 ### TCP序号空间
 
-设初始序号为 $ISN$，数据字节编号从 $ISN$ 开始。确认号 $ACK$ 表示期望收到的下一个字节序号：
+设初始序号为 $ISN$ ，数据字节编号从 $ISN$ 开始。确认号 $ACK$ 表示期望收到的下一个字节序号：
 
 $$
 ACK_n = \text{收到字节} \in [ISN, ISN + \text{数据长度}) \Rightarrow ACK_n = ISN + \text{累计接收字节数}
 $$
 
-序号回绕（wraparound）的防护：TCP序号是32位，$2^{32}$ 字节后回绕。TCP通过时间戳选项（PAWS）防护在高速网络中的序号回绕问题。
+序号回绕（wraparound）的防护：TCP序号是32位， $2^{32}$ 字节后回绕。TCP通过时间戳选项（PAWS）防护在高速网络中的序号回绕问题。
 
 **时间戳选项的防护原理**：设接收方记录每个包的到达时间戳，收到数据包时检查：
 
@@ -48,18 +48,18 @@ $$
 W(t) = \min(cwnd(t), rwnd(t))
 $$
 
-其中 $cwnd$ 是拥塞窗口，$rwnd$ 是接收方通告窗口。
+其中 $cwnd$ 是拥塞窗口， $rwnd$ 是接收方通告窗口。
 
 ### 拥塞窗口增长模型
 
-慢启动阶段（$cwnd < \text{ssthresh}$）：
+慢启动阶段（ $cwnd < \text{ssthresh}$ ）：
 
 $$
 cwnd_{n+1} = cwnd_n + \text{MSS} \quad \text{每ACK}
 \Rightarrow cwnd \approx 2^n \cdot \text{MSS} \quad \text{每RTT}
 $$
 
-拥塞避免阶段（$cwnd \geq \text{ssthresh}$）：
+拥塞避免阶段（ $cwnd \geq \text{ssthresh}$ ）：
 
 $$
 cwnd_{n+1} = cwnd_n + \text{MSS} \cdot \frac{\text{MSS}}{cwnd_n} \quad \text{每ACK}
@@ -82,7 +82,7 @@ $$
 
 要充分利用高BDP网络，需要大窗口（Window Scaling）。
 
-**Window Scaling扩展**：原始窗口字段只有16位，最大65535字节。通过SYN/ACK选项可扩展至最大1024倍（$2^{16} \times 2^{14}$）。
+**Window Scaling扩展**：原始窗口字段只有16位，最大65535字节。通过SYN/ACK选项可扩展至最大1024倍（ $2^{16} \times 2^{14}$ ）。
 
 $$
 rwnd_{\max} = 65535 \times 2^{14} \approx 1 \text{ GB}
@@ -90,7 +90,7 @@ $$
 
 ### UDP数据报可靠性
 
-UDP本身不提供可靠性，丢包率 $p$ 下，$n$ 次传输后至少成功一次的概率：
+UDP本身不提供可靠性，丢包率 $p$ 下， $n$ 次传输后至少成功一次的概率：
 
 $$
 P(\text{success}) = 1 - (1-p)^n
@@ -222,7 +222,7 @@ IP包: TCP段作为payload
 
 **为什么三次握手是必要的**：TCP连接实质是双方序列号空间的同步。第三次握手让双方确认对方能接收自己的初始序列号。第三次握手还承载了第一次握手数据的确认——如果只有两次握手，服务器无法确认客户端收到了服务器的ISN。
 
-**三次握手的数学约束**：设客户端ISN为 $x$，服务器ISN为 $y$。连接建立后，双方需要确认：
+**三次握手的数学约束**：设客户端ISN为 $x$ ，服务器ISN为 $y$ 。连接建立后，双方需要确认：
 - 客户端知道服务器能收到自己的数据：服务器 ACK x+1 到达客户端
 - 服务器知道客户端能收到自己的数据：客户端 ACK y+1 到达服务器
 

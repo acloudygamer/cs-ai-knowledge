@@ -36,7 +36,7 @@ $$
 P(\text{collision after } k \text{ objects}) \approx \frac{k(k-1)}{2^{161}}
 $$
 
-对于 $k = 10^9$ 个对象（大量），碰撞概率约为 $10^{-31}$。
+对于 $k = 10^9$ 个对象（大量），碰撞概率约为 $10^{-31}$ 。
 
 ### 版本图结构
 
@@ -46,7 +46,7 @@ Git 仓库是**有向无环图（DAG）**：
 - 根节点：无 parent 的提交（初始提交）
 - HEAD：指向当前分支最新提交的指针
 
-**DAG 的数学性质**：设 $C$ 是提交集合，$parent: C \to C^k$ 是 parent 指针函数。Git 的历史是 $parent$ 函数生成的偏序关系。
+**DAG 的数学性质**：设 $C$ 是提交集合， $parent: C \to C^k$ 是 parent 指针函数。Git 的历史是 $parent$ 函数生成的偏序关系。
 
 ## 数据流
 

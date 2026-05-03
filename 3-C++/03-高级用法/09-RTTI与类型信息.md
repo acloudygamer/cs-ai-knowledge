@@ -35,9 +35,9 @@ $$
 \text{is\_safe\_cast}(p, B) = \exists H \in \text{hierarchy}(B) : \text{typeid}(p) \equiv H
 $$
 
-即：沿着对象的实际类型向上遍历，直到遇见目标类型或根节点。设继承深度为 $d$，最坏情况 $O(d)$。
+即：沿着对象的实际类型向上遍历，直到遇见目标类型或根节点。设继承深度为 $d$ ，最坏情况 $O(d)$ 。
 
-**多重继承的复杂度**：设类 $C$ 继承自 $B_1, B_2, \dots, B_m$，每个基类都有自己的 vptr。对 $C*$ 做 dynamic_cast 到 $B_i*$，需要知道 $C$ 的 vptr 在对象布局中的偏移 $offset_i$：
+**多重继承的复杂度**：设类 $C$ 继承自 $B_1, B_2, \dots, B_m$ ，每个基类都有自己的 vptr。对 $C*$ 做 dynamic_cast 到 $B_i*$ ，需要知道 $C$ 的 vptr 在对象布局中的偏移 $offset_i$ ：
 
 $$
 \text{real\_address} = p + offset_i
@@ -57,8 +57,8 @@ $$
 
 type_info 的哈希值用于 unordered_map 等容器。哈希函数 $h(\text{typeid})$ 满足：
 
-- $h(T_1) = h(T_2) \Rightarrow T_1 \equiv T_2$（完美哈希）
-- 但不保证逆否：$T_1 \equiv T_2 \not\Rightarrow h(T_1) = h(T_2)$（允许哈希碰撞，碰撞时用 name() 二次确认）
+- $h(T_1) = h(T_2) \Rightarrow T_1 \equiv T_2$ （完美哈希）
+- 但不保证逆否： $T_1 \equiv T_2 \not\Rightarrow h(T_1) = h(T_2)$ （允许哈希碰撞，碰撞时用 name() 二次确认）
 
 **完美哈希的构造**：type_info 的 name() 返回的是修饰后的类型名，编译器确保唯一性。因此 name() 可以作为二次确认的依据。
 

@@ -44,7 +44,7 @@ $$
 \rho = \frac{\lambda}{\mu \cdot c}
 $$
 
-其中 $\lambda$ 是请求到达率，$\mu$ 是每个线程的服务率，$c$ 是线程池大小。当 $\rho \to 1$ 时，队列延迟趋向无穷大。
+其中 $\lambda$ 是请求到达率， $\mu$ 是每个线程的服务率，$c$ 是线程池大小。当 $\rho \to 1$ 时，队列延迟趋向无穷大。
 
 ```bash
 UV_THREADPOOL_SIZE=8 node app.js  # 必须在启动前设置
@@ -345,7 +345,7 @@ epoll/kqueue/IOCP 是操作系统级别的 I/O 多路复用机制：
 |------|------------|
 | epoll_create | $O(1)$ |
 | epoll_ctl (添加/修改/删除) | $O(\log n)$ |
-| epoll_wait | $O(1)$（返回就绪的文件描述符数量） |
+| epoll_wait | $O(1)$ （返回就绪的文件描述符数量） |
 
 ### libuv 线程池机制
 

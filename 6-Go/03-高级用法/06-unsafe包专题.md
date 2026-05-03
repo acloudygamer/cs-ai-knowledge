@@ -38,7 +38,7 @@ uintptr：纯整数，不持有 GC 根，GC 不知道它引用了哪个对象
 **悬挂指针的概率模型**：
 
 设 $P_{gc}(t)$ 为 $t$ 时刻发生 GC 的概率：
-$$P_{悬挂} = P(\text{uintptr 指向已释放对象}) = \sum_{t} P_{gc}(t) \cdot P_{\text{对象已死|gc}}(t)$$
+$P_{悬挂} = P(\text{uintptr 指向已释放对象}) = \sum_{t} P_{gc}(t) \cdot P_{\text{对象已死|gc}}(t)$
 
 ## 数据流
 
@@ -144,9 +144,9 @@ uintptr 问题：
 
 **违反约束的数学后果**：
 
-设 $addr_{original}$ 为对象原始地址，$addr_{moved}$ 为 GC 后新地址：
-$$addr_{uintptr} = addr_{original}$$
-$$addr_{moved} \neq addr_{original} \implies addr_{uintptr} \text{ 指向已释放内存}$$
+设 $addr_{original}$ 为对象原始地址， $addr_{moved}$ 为 GC 后新地址：
+$addr_{uintptr} = addr_{original}$
+$addr_{moved} \neq addr_{original} \implies addr_{uintptr} \text{ 指向已释放内存}$
 
 ### 结构体字段偏移的运行时确定性
 
@@ -162,7 +162,7 @@ Go 编译器为每个 struct 类型生成**编译期固定的偏移表**。`unsa
 
 **结构体大小公式**：
 
-$$Size(T) = \sum_{i} (Align(Field_i) - 1 + Size(Field_i)) \approx \sum_{i} Size(Field_i) + Padding_i$$
+$Size(T) = \sum_{i} (Align(Field_i) - 1 + Size(Field_i)) \approx \sum_{i} Size(Field_i) + Padding_i$
 
 这保证了任意字段的地址都是该字段大小或结构体对齐的倍数。
 
@@ -181,8 +181,8 @@ $$Size(T) = \sum_{i} (Align(Field_i) - 1 + Size(Field_i)) \approx \sum_{i} Size(
 
 **padding 的计算**：
 
-设字段 $i$ 的起始偏移为 $offset_i$，大小为 $size_i$，对齐为 $align_i$：
-$$offset_i = \lceil offset_{i-1} + size_{i-1} \rceil_{align_i}$$
+设字段 $i$ 的起始偏移为 $offset_i$ ，大小为 $size_i$ ，对齐为 $align_i$ ：
+$offset_i = \lceil offset_{i-1} + size_{i-1} \rceil_{align_i}$
 
 ## 参考存根
 
@@ -230,7 +230,7 @@ _ = unsafe.Alignof(User{})  // 8
 **安全操作的数学保证**：
 
 `*T → unsafe.Pointer → *T2` 是安全的，因为：
-$$\text{unsafe.Pointer 持有 GC 根} \implies \text{对象在 GC 期间保持可达}$$
+$\text{unsafe.Pointer 持有 GC 根} \implies \text{对象在 GC 期间保持可达}$
 
 ### 跨平台兼容
 
@@ -255,7 +255,7 @@ Go 1 承诺：
 - 但结构体布局可能在不同版本间变化
 
 使用 `unsafe` 访问结构体字段意味着：
-$$V_{go升级} \implies \text{必须重新编译并测试}$$
+$V_{go升级} \implies \text{必须重新编译并测试}$
 
 ## 性能与安全权衡
 
@@ -280,7 +280,7 @@ $$V_{go升级} \implies \text{必须重新编译并测试}$$
 
 **形式化安全性**：
 
-设程序使用 `unsafe` 的操作集合为 $U$：
-$$安全 \iff \forall u \in U: u \text{ 满足 unsafe 的约束}$$
+设程序使用 `unsafe` 的操作集合为 $U$ ：
+$安全 \iff \forall u \in U: u \text{ 满足 unsafe 的约束}$
 
 违反任一约束即导致未定义行为。

@@ -8,7 +8,7 @@
 
 ### 数学模型
 
-设应用启动阶段的有效工作时间为 $T_{\text{useful}}$，JVM启动开销为 $T_{\text{jvm}}$，JIT编译时间为 $T_{\text{jit}}$：
+设应用启动阶段的有效工作时间为 $T_{\text{useful}}$ ，JVM启动开销为 $T_{\text{jvm}}$ ，JIT编译时间为 $T_{\text{jit}}$ ：
 
 $$
 \text{JVM总启动时间} = T_{\text{jvm}} + T_{\text{jit}} + T_{\text{useful}}

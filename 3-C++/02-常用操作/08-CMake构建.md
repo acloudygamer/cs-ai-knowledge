@@ -8,10 +8,10 @@ CMake 是**声明式构建配置语言**，通过 `CMakeLists.txt` 描述构建�
 
 **构建依赖图**：
 
-构建系统本质上是一个 **DAG（有向无环图）**。设节点集合 $T$ 为 Target，边集合 $E \subseteq T \times T$ 表示依赖关系（$(A, B) \in E$ 表示 A 依赖 B，即 B 必须先于 A 构建）。
+构建系统本质上是一个 **DAG（有向无环图）**。设节点集合 $T$ 为 Target，边集合 $E \subseteq T \times T$ 表示依赖关系（ $(A, B) \in E$ 表示 A 依赖 B，即 B 必须先于 A 构建）。
 
 **拓扑排序约束**：
-$$\forall (A, B) \in E: \text{build_order}(B) < \text{build_order}(A)$$
+$\forall (A, B) \in E: \text{build_order}(B) < \text{build_order}(A)$
 
 CMake 通过 `add_dependencies`、`target_link_libraries` 等命令向图中插入节点和边。
 
@@ -41,17 +41,17 @@ if 仍有边剩余: 报告循环依赖
 **生成器表达式的条件求值**：
 
 生成器表达式是配置感知的字符串模板，形式化为：
-$$E = \$\langle \text{<}type\text{:}cond\text{>}:value\rangle$$
+$E = \$\langle \text{<}type\text{:}cond\text{>}:value\rangle$
 
 **求值函数**：
-$$\text{eval}(E, C) = \begin{cases} value & \text{if } \text{cond} \in C \\ \text{empty} & \text{otherwise} \end{cases}$$
+$\text{eval}(E, C) = \begin{cases} value & \text{if } \text{cond} \in C \\ \text{empty} & \text{otherwise} \end{cases}$
 
 其中 $C$ 是配置集合（`Debug`, `Release`, `RelWithDebInfo` 等）。多条件链式展开：
-$$\text{eval}(\$<CONFIG:Debug>:debug_lib, \{Debug\}) = \text{"debug_lib"}$$
+$\text{eval}(\$<CONFIG:Debug>:debug_lib, \{Debug\}) = \text{"debug_lib"}$
 
 **生成器表达式的完备性**：
 
-设配置集合 $C = \{c_1, c_2, ..., c_n\}$。生成器表达式可构造如下逻辑：
+设配置集合 $C = \{c_1, c_2, ..., c_n\}$ 。生成器表达式可构造如下逻辑：
 
 | 表达式 | 语义 |
 |--------|------|
@@ -62,7 +62,7 @@ $$\text{eval}(\$<CONFIG:Debug>:debug_lib, \{Debug\}) = \text{"debug_lib"}$$
 
 **PUBLIC/PRIVATE/INTERFACE 依赖传递**：
 
-设 $D_T$ 为 Target $T$ 的直接依赖集，$P_T$ 为传播依赖集（影响其他 Target 的）。
+设 $D_T$ 为 Target $T$ 的直接依赖集， $P_T$ 为传播依赖集（影响其他 Target 的）。
 
 | 传递性 | 含义 | 公式 |
 |--------|------|------|
@@ -168,11 +168,11 @@ find_package(Boost 1.70 REQUIRED COMPONENTS filesystem)
 
 **find_package 搜索路径的形式化**：
 
-设搜索根目录集合 $R$，包名为 $P$。模块模式搜索：
-$$S_{\text{module}} = \{ p \in R \mid \exists \text{ Find}P\text{.cmake} \}$$
+设搜索根目录集合 $R$ ，包名为 $P$ 。模块模式搜索：
+$S_{\text{module}} = \{ p \in R \mid \exists \text{ Find}P\text{.cmake} \}$
 
 配置模式搜索：
-$$S_{\text{config}} = \{ p \in R \mid \exists P\text{Config.cmake} \lor \exists p/P\text{Config.cmake} \}$$
+$S_{\text{config}} = \{ p \in R \mid \exists P\text{Config.cmake} \lor \exists p/P\text{Config.cmake} \}$
 
 **target_* 命令的属性传播**：
 
@@ -207,7 +207,7 @@ CMake 的本质是**依赖图的拓扑排序 + 属性传播**。构建过程可�
 4. **生成阶段**：按拓扑序为每个 Target 生成构建规则
 
 关键操作：
-$$P_T^{\text{PUBLIC}} = \bigcup_{B \in D_T^{\text{PUBLIC}}} P_B^{\text{PUBLIC}} \cup D_T^{\text{PUBLIC}}$$
+$P_T^{\text{PUBLIC}} = \bigcup_{B \in D_T^{\text{PUBLIC}}} P_B^{\text{PUBLIC}} \cup D_T^{\text{PUBLIC}}$
 
 即 PUBLIC 依赖的传递闭包。
 

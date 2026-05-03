@@ -10,41 +10,41 @@ Django 是一个遵循"batteries included"原则的 MTV（Model-Template-View）
 
 ### 请求处理队列模型
 
-Django 请求处理可建模为 M/G/1 队列系统。设请求到达率为 $\lambda$（请求/秒），服务时间分布为 $G$（处理时长分布），则：
+Django 请求处理可建模为 M/G/1 队列系统。设请求到达率为 $\lambda$ （请求/秒），服务时间分布为 $G$ （处理时长分布），则：
 
 **Little 定律**：系统中平均请求数
-$$L = \lambda W$$
+$L = \lambda W$
 其中 $W$ 是平均响应时间。
 
-稳态下，服务利用率 $\rho = \lambda \mathbb{E}[S]$（$\mathbb{E}[S]$ 为平均服务时间），当 $\rho \to 1$ 时响应时间急剧增长（Django 请求堆积）。这解释了为何 Django 应用需关注：
-- 数据库查询的 $\mathbb{E}[S]$（慢查询拖慢整个请求）
-- 中间件链的 $N_{\text{mw}}$（每个中间件增加 $\mathbb{E}[S]$）
-- 连接池大小 $K$（当 $\rho > 0.7$ 时应扩容）
+稳态下，服务利用率 $\rho = \lambda \mathbb{E}[S]$ （ $\mathbb{E}[S]$ 为平均服务时间），当 $\rho \to 1$ 时响应时间急剧增长（Django 请求堆积）。这解释了为何 Django 应用需关注：
+- 数据库查询的 $\mathbb{E}[S]$ （慢查询拖慢整个请求）
+- 中间件链的 $N_{\text{mw}}$ （每个中间件增加 $\mathbb{E}[S]$ ）
+- 连接池大小 $K$ （当 $\rho > 0.7$ 时应扩容）
 
 **队列饱和分析**：M/G/1 队列的平均响应时间公式：
-$$W = \frac{\lambda \mathbb{E}[S^2]}{2(1-\rho)} + \mathbb{E}[S]$$
+$W = \frac{\lambda \mathbb{E}[S^2]}{2(1-\rho)} + \mathbb{E}[S]$
 
-其中 $\mathbb{E}[S^2]$ 是服务时间的二阶矩。当 $\rho \to 1$ 时，分母 $1-\rho \to 0$，响应时间 $W \to \infty$——这是队列饱和的数学表述。
+其中 $\mathbb{E}[S^2]$ 是服务时间的二阶矩。当 $\rho \to 1$ 时，分母 $1-\rho \to 0$ ，响应时间 $W \to \infty$——这是队列饱和的数学表述。
 
 ### ORM 查询代价的形式化分析
 
 Django ORM 查询代价由三部分构成：解析代价 + 网络代价 + 计算代价。
 
-设查询计划为有向无环图（DAG），节点 $i$ 的代价为 $c_i$：
+设查询计划为有向无环图（DAG），节点 $i$ 的代价为 $c_i$ ：
 
-$$T_{\text{total}} = \sum_{i \in \text{DAG}} c_i + \underbrace{(n_{\text{query}} - 1) \cdot t_{\text{rtt}}}_{\text{网络往返代价}}$$
+$T_{\text{total}} = \sum_{i \in \text{DAG}} c_i + \underbrace{(n_{\text{query}} - 1) \cdot t_{\text{rtt}}}_{\text{网络往返代价}}$
 
 其中 $t_{\text{rtt}}$ 是数据库往返延迟（约 0.5-5ms，同一机房）。
 
 **N+1 问题**：若未使用 `select_related`/`prefetch_related`，遍历 $N$ 条结果的关联字段触发 $N$ 次额外查询，总代价：
-$$T_{\text{N+1}} = T_{\text{initial}} + N \cdot T_{\text{related}}$$
+$T_{\text{N+1}} = T_{\text{initial}} + N \cdot T_{\text{related}}$
 
-预加载后降至 $T_{\text{prefetch}} = T_{\text{initial}} + T_{\text{related}}$（常数次往返，与 $N$ 无关）。
+预加载后降至 $T_{\text{prefetch}} = T_{\text{initial}} + T_{\text{related}}$ （常数次往返，与 $N$ 无关）。
 
-**JOIN 复杂度**：设关联深度为 $d$，每层最多 $m_i$ 个关联模型，最坏 JOIN 数：
-$$N_{\text{JOIN}} \le \prod_{i=0}^{d} (1 + m_i) - 1$$
+**JOIN 复杂度**：设关联深度为 $d$ ，每层最多 $m_i$ 个关联模型，最坏 JOIN 数：
+$N_{\text{JOIN}} \le \prod_{i=0}^{d} (1 + m_i) - 1$
 
-对于单层 $m$ 个外键：$N_{\text{JOIN}} \le m$。这就是为何深度嵌套的 `select_related` 会生成臃肿 SQL。
+对于单层 $m$ 个外键： $N_{\text{JOIN}} \le m$ 。这就是为何深度嵌套的 `select_related` 会生成臃肿 SQL。
 
 ### URL 模式匹配
 
@@ -52,9 +52,9 @@ Django URL 分派使用正则匹配，路径表达式编译为以下优先序列
 
 | 模式类型 | 匹配顺序 | 匹配复杂度 |
 |----------|----------|------------|
-| 精确路径 | 最先 | $O(1)$（字典查找） |
-| 路径转换器 | 其次 | $O(P)$（前缀树，P=路径段数） |
-| 正则捕获组 | 最后 | $O(R)$（线性扫描，R=路由数） |
+| 精确路径 | 最先 | $O(1)$ （字典查找） |
+| 路径转换器 | 其次 | $O(P)$ （前缀树，P=路径段数） |
+| 正则捕获组 | 最后 | $O(R)$ （线性扫描，R=路由数） |
 
 匹配算法从 URLconf 列表头部扫描，**首次匹配即停止**，不进行最优匹配。因此更具体的路径必须放在更宽泛的路径之前。
 
@@ -62,9 +62,9 @@ Django URL 分派使用正则匹配，路径表达式编译为以下优先序列
 
 ### 中间件的格代数
 
-Django 中间件链构成一个**格（lattice）结构**。设中间件集合 $M = \{M_1, M_2, \ldots, M_n\}$，定义偏序关系：
+Django 中间件链构成一个**格（lattice）结构**。设中间件集合 $M = \{M_1, M_2, \ldots, M_n\}$ ，定义偏序关系：
 
-$$M_i \prec M_j \iff i < j \text{（在 settings.py 中的注册顺序）}$$
+$M_i \prec M_j \iff i < j \text{（在 settings.py 中的注册顺序）}$
 
 `process_request` 沿此偏序向下传播，`process_response` 逆序向上返回。这个结构形成一个**有界格**——顶为最末注册的中间件，底为最先注册的中间件。
 
@@ -210,7 +210,7 @@ Middleware1.process_response
 
 **为什么这样设计**：洋葱模型确保中间件可以"包裹"整个请求处理过程——请求阶段从外到内，响应阶段从内到外。这使得中间件可以统一处理进入和离开的请求，例如日志中间件记录请求进入时间，在响应阶段计算总耗时。
 
-**短路语义的形式化**：若 $M_i.\text{process\_request}$ 返回非 None，则执行序列在 $M_i$ 处截断，跳到所有已注册中间件的 `process_response`（从 $M_i$ 向上逆序）。这与短路求值（$A \land B$ 中 $A$ 为 False 则不求 $B$）完全对应。
+**短路语义的形式化**：若 $M_i.\text{process\_request}$ 返回非 None，则执行序列在 $M_i$ 处截断，跳到所有已注册中间件的 `process_response`（从 $M_i$ 向上逆序）。这与短路求值（ $A \land B$ 中 $A$ 为 False 则不求 $B$）完全对应。
 
 **违反约束的后果**：若 `process_request` 返回 HttpResponse 后忘记调用 `process_response`，响应不会正确返回给客户端（因为中间件的响应处理链未执行）。这是中间件开发的常见错误。
 

@@ -20,7 +20,7 @@ $$
 \end{aligned}
 $$
 
-解析器对每个非终结符维护一个递归调用栈帧，栈深度等于 JSON 嵌套层数 $D$。解析复杂度 $O(N)$，其中 $N$ 是 JSON 文本字节数（每个字节只被处理一次）。
+解析器对每个非终结符维护一个递归调用栈帧，栈深度等于 JSON 嵌套层数 $D$ 。解析复杂度 $O(N)$ ，其中 $N$ 是 JSON 文本字节数（每个字节只被处理一次）。
 
 ### nlohmann/json的ADL序列化查找
 
@@ -36,7 +36,7 @@ namespace adl_serializer {
 
 ADL 使得为任意用户类型提供 `to_json/from_json` 特化时，无需显式声明依赖——只需在类型所在命名空间内定义或特化。
 
-**查找路径的数学描述**：对类型 `T`，编译器构造候选函数集合 $S(T)$：
+**查找路径的数学描述**：对类型 `T`，编译器构造候选函数集合 $S(T)$ ：
 
 $$
 S(T) = \{ f \mid f \in (\text{T}\text{的命名空间}) \cup (\text{T}\text{的模板实参的命名空间}) \}
@@ -88,7 +88,7 @@ $$
 \text{validate}(v, \text{schema}) = \bigwedge_{i} p_i(v, \text{schema}_i)
 $$
 
-其中 $p_i$ 可以是：类型检查（$v.\text{type} == \text{schema.type}$）、值域检查（$v > \text{minimum}$）、枚举约束（$v \in \text{enum}$）、格式约束（正则表达式匹配）。任何 $p_i$ 为假则整体验证失败。
+其中 $p_i$ 可以是：类型检查（ $v.\text{type} == \text{schema.type}$ ）、值域检查（$v > \text{minimum}$）、枚举约束（$v \in \text{enum}$）、格式约束（正则表达式匹配）。任何 $p_i$ 为假则整体验证失败。
 
 ## 机制
 
@@ -117,11 +117,11 @@ patch & \text{否则（直接替换）}
 \end{cases}
 $$
 
-其中 `recursive_merge` 的语义：对于 `patch` 中的每个键值对 $(k, v)$，若 $v$ 为 `null` 则从 `target` 删除 $k$，否则用 $v$ 覆盖 `target[k]`（若 $target[k]$ 也是 object 且 $v$ 是 object，则递归合并）。
+其中 `recursive_merge` 的语义：对于 `patch` 中的每个键值对 $(k, v)$ ，若 $v$ 为 `null` 则从 `target` 删除 $k$ ，否则用 $v$ 覆盖 `target[k]`（若 $target[k]$ 也是 object 且 $v$ 是 object，则递归合并）。
 
 ### JSON 的数值精度问题
 
-JSON 标准不限定数值的精度。C++ `double`（IEEE 754 双精度）有 53 位尾数精度（约 15-16 位十进制有效数字）。大于 $2^{53}$（9007199254740992）的整数经 JSON 往返后可能丢失精度：
+JSON 标准不限定数值的精度。C++ `double`（IEEE 754 双精度）有 53 位尾数精度（约 15-16 位十进制有效数字）。大于 $2^{53}$ （9007199254740992）的整数经 JSON 往返后可能丢失精度：
 
 $$
 \text{精度损失} = \left| x - \text{round}\left(\frac{x}{2^{53-x.\text{exponent}}}\right) \times 2^{53-x.\text{exponent}} \right|

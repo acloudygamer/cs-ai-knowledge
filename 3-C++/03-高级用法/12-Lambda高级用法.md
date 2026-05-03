@@ -21,7 +21,7 @@ Lambda 的核心价值：**将函数作为一等公民（first-class citizen）�
 
 ### 闭包的状态空间
 
-设外部变量集合 $V = \{v_1, v_2, \dots, v_n\}$，捕获方式集合 $C = \{\text{by-value}, \text{by-ref}, \text{by-move}\}$。
+设外部变量集合 $V = \{v_1, v_2, \dots, v_n\}$ ，捕获方式集合 $C = \{\text{by-value}, \text{by-ref}, \text{by-move}\}$ 。
 
 闭包对象 $L$ 的状态是 $V$ 中变量的一个子集 $S \subseteq V$ 在捕获时刻的快照：
 
@@ -29,7 +29,7 @@ $$
 L.\text{state} = \{(v, \text{copy}(v)) \mid v \in S\} \cup \{(v, \&v) \mid v \in S \land \text{c-ref}(v)\}
 $$
 
-其中 $\text{copy}(v)$ 是值拷贝，$\&v$ 是引用，$\text{c-ref}(v)$ 表示按引用捕获。
+其中 $\text{copy}(v)$ 是值拷贝， $\&v$ 是引用，$\text{c-ref}(v)$ 表示按引用捕获。
 
 **捕获的代数语义**：
 

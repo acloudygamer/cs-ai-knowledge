@@ -18,7 +18,7 @@ DOM（Document Object Model）是浏览器将 HTML/XML 文档抽象为**树形�
 | `querySelector` | $\mathcal{O}(n)$ | CSS 选择器解析 + 匹配 |
 | `querySelectorAll` | $\mathcal{O}(n)$ | 返回 Static NodeList，全量匹配 |
 
-**`getElementById` 的 $\mathcal{O}(1)$ 复杂度来源**：浏览器在解析 HTML 时构建 `id` 属性到 Element 的**哈希表**（HashMap）。设哈希表负载因子为 $\alpha = \frac{n}{m}$（$n$ 为元素数，$m$ 为桶数），查找过程仅需一次哈希计算和一次链表/红黑树探查，平均时间复杂度为 $\mathcal{O}(1 + \alpha)$。浏览器通常将 $\alpha$ 控制在 0.75 以下。
+**`getElementById` 的 $\mathcal{O}(1)$ 复杂度来源**：浏览器在解析 HTML 时构建 `id` 属性到 Element 的**哈希表**（HashMap）。设哈希表负载因子为 $\alpha = \frac{n}{m}$ （ $n$ 为元素数，$m$ 为桶数），查找过程仅需一次哈希计算和一次链表/红黑树探查，平均时间复杂度为 $\mathcal{O}(1 + \alpha)$。浏览器通常将 $\alpha$ 控制在 0.75 以下。
 
 **选择器匹配的代价分解**：
 
@@ -27,7 +27,7 @@ $$
 C_{query}(n, s) = C_{parse}(s) + C_{match}(n, s)
 $$
 
-其中 $C_{parse}(s)$ 是 CSS 选择器解析代价（$s$ 为选择器长度），$C_{match}(n, s)$ 是对 $n$ 个 DOM 节点匹配选择器的代价。浏览器通常对常见选择器（如 tag、class、id）有快速路径优化。
+其中 $C_{parse}(s)$ 是 CSS 选择器解析代价（ $s$ 为选择器长度），$C_{match}(n, s)$ 是对 $n$ 个 DOM 节点匹配选择器的代价。浏览器通常对常见选择器（如 tag、class、id）有快速路径优化。
 
 ### DOM 树操作成本
 
@@ -45,7 +45,7 @@ $$
 
 将 $k$ 个节点批量插入 DOM 时：
 
-- **逐个 `appendChild`**：$k$ 次插入 × 每次触发布局树更新 = $k \times C_{layout}$
+- **逐个 `appendChild`**： $k$ 次插入 × 每次触发布局树更新 = $k \times C_{layout}$
 - **DocumentFragment**：`DocumentFragment` 本身不属于活跃 DOM 树，追加节点不触发更新；一次性追加后仅触发 **1 次**布局树更新
 
 $$
@@ -67,7 +67,7 @@ getBoundingClientRect()
 getComputedStyle()
 ```
 
-**触发条件的形式化**：设 DOM 修改操作序列为 $M = [m_1, m_2, ..., m_k]$，读取操作序列为 $R = [r_1, r_2, ..., r_l]$。若存在 $i < j$ 使得 $m_i$ 修改了元素 $e$ 且 $r_j$ 读取 $e$ 的几何属性，则 $r_j$ 触发强制同步重排。
+**触发条件的形式化**：设 DOM 修改操作序列为 $M = [m_1, m_2, ..., m_k]$ ，读取操作序列为 $R = [r_1, r_2, ..., r_l]$ 。若存在 $i < j$ 使得 $m_i$ 修改了元素 $e$ 且 $r_j$ 读取 $e$ 的几何属性，则 $r_j$ 触发强制同步重排。
 
 **避免策略**：批量读取（一次性读取所有需读的属性）后再批量写入，保证 $R$ 集合中所有读取操作在 $M$ 完成之后且在下一次 $M$ 之前执行。
 
@@ -83,13 +83,13 @@ getComputedStyle()
 
 ### Observer 模式的复杂度
 
-传统轮询：$\mathcal{O}(n)$ 扫描 + $\mathcal{O}(1)$ 触发（无论是否变化）。
+传统轮询： $\mathcal{O}(n)$ 扫描 + $\mathcal{O}(1)$ 触发（无论是否变化）。
 
-Observer 模式：$\mathcal{O}(1)$ 回调触发，仅在实际变化时唤醒主线程。
+Observer 模式： $\mathcal{O}(1)$ 回调触发，仅在实际变化时唤醒主线程。
 
 **Observer 模式的形式化定义**：
 
-设观察目标集合为 $O$，观察者集合为 $V$，观察者 $v \in V$ 的触发条件为 $C_v(o), o \in O$。Observer 模式保证：
+设观察目标集合为 $O$ ，观察者集合为 $V$ ，观察者 $v \in V$ 的触发条件为 $C_v(o), o \in O$ 。Observer 模式保证：
 
 $$
 \forall v \in V, \forall o \in O: C_v(o) \rightarrow callback_v(o)
@@ -263,7 +263,7 @@ navigator.clipboard.readText() → 读取系统剪贴板
 
 ### requestAnimationFrame 与渲染同步
 
-`requestAnimationFrame` 的回调在浏览器下一帧渲染前执行，与屏幕刷新率同步（通常 60fps，即每 $\approx 16.67ms$）。
+`requestAnimationFrame` 的回调在浏览器下一帧渲染前执行，与屏幕刷新率同步（通常 60fps，即每 $\approx 16.67ms$ ）。
 
 **高精度时间戳**：
 
@@ -327,7 +327,7 @@ $$
 ratio = \frac{Area(B_{target} \cap B_{root})}{Area(B_{target})}
 $$
 
-当 $ratio \geq threshold$（0 到 1 之间的值）时触发回调。
+当 $ratio \geq threshold$ （0 到 1 之间的值）时触发回调。
 
 **threshold 的交叉触发**：
 

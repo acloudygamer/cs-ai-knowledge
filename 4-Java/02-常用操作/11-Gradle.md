@@ -8,20 +8,20 @@ Gradle 构建逻辑由**有向无环图（DAG）**驱动，每个 Task 节点代
 
 ### 任务 DAG 的拓扑排序
 
-设任务集合 $T = \{t_1, t_2, \ldots, t_n\}$，依赖关系构成偏序集合 $(T, \prec)$，其中 $t_a \prec t_b$ 表示 $t_b$ 依赖 $t_a$ 的输出。拓扑排序保证：
-$$\forall (t_a, t_b) \in \prec: \text{position}(t_a) < \text{position}(t_b)$$
+设任务集合 $T = \{t_1, t_2, \ldots, t_n\}$ ，依赖关系构成偏序集合 $(T, \prec)$ ，其中 $t_a \prec t_b$ 表示 $t_b$ 依赖 $t_a$ 的输出。拓扑排序保证：
+$\forall (t_a, t_b) \in \prec: \text{position}(t_a) < \text{position}(t_b)$
 
 并行执行度上界：
-$$\text{maxParallelism} = \min(|T|, \text{CPU\_cores})$$
+$\text{maxParallelism} = \min(|T|, \text{CPU\_cores})$
 
 实际上由于任务间存在文件锁、端口占用等资源竞争，实际并行度可能低于上界。
 
 ### 增量构建的指纹算法
 
-设任务 $t$ 的输入指纹为 $F_{in}(t) = \text{hash}(\text{content\_hash}(f_1), \text{content\_hash}(f_2), \ldots)$，输出指纹为 $F_{out}(t) = \text{hash}(\text{content\_hash}(o_1), \text{content\_hash}(o_2), \ldots)$。
+设任务 $t$ 的输入指纹为 $F_{in}(t) = \text{hash}(\text{content\_hash}(f_1), \text{content\_hash}(f_2), \ldots)$ ，输出指纹为 $F_{out}(t) = \text{hash}(\text{content\_hash}(o_1), \text{content\_hash}(o_2), \ldots)$ 。
 
 任务跳过条件：
-$$F_{in}(t) = F_{in}^{\text{cached}} \land F_{out}(t) = F_{out}^{\text{cached}} \land \text{cacheValid}(t)$$
+$F_{in}(t) = F_{in}^{\text{cached}} \land F_{out}(t) = F_{out}^{\text{cached}} \land \text{cacheValid}(t)$
 
 若任一条件不满足，任务重新执行。
 
@@ -29,7 +29,7 @@ $$F_{in}(t) = F_{in}^{\text{cached}} \land F_{out}(t) = F_{out}^{\text{cached}} 
 
 `cacheValid(t)` 是任务缓存有效性的附加约束，由 Gradle 的构建缓存（Build Cache）决定：
 
-$$\text{cacheValid}(t) = \text{buildCacheEnabled} \land \text{outputLocationsValid}(t)$$
+$\text{cacheValid}(t) = \text{buildCacheEnabled} \land \text{outputLocationsValid}(t)$
 
 其中 `outputLocationsValid(t)` 检查输出目标位置是否满足以下全部条件：
 
@@ -38,14 +38,14 @@ $$\text{cacheValid}(t) = \text{buildCacheEnabled} \land \text{outputLocationsVal
 3. **输出完整性**：任务的全部输出文件均已就位（无部分写入）
 
 **远程构建缓存的场景**：当 `buildCacheEnabled=true` 且配置了远程缓存时，`cacheValid(t)` 还需满足：
-$$\text{remoteCacheHit}(t) = \text{true} \land \text{artifactUpToDate}(t)$$
+$\text{remoteCacheHit}(t) = \text{true} \land \text{artifactUpToDate}(t)$
 
 即 Gradle 从远程缓存下载产物后，会验证下载文件的 SHA-256 校验和与元数据中记录的值是否一致：
 
-$$\text{verify}(artifact) = \text{SHA256}(\text{artifact}) \stackrel{?}{=} \text{meta.expectedHash}$$
+$\text{verify}(artifact) = \text{SHA256}(\text{artifact}) \stackrel{?}{=} \text{meta.expectedHash}$
 
 指纹碰撞概率（SHA-256）：
-$$P(\text{collision}) \approx 2^{-256} \approx 10^{-77}$$
+$P(\text{collision}) \approx 2^{-256} \approx 10^{-77}$
 
 ### 依赖解析的版本冲突解决
 
@@ -155,7 +155,7 @@ Gradle Wrapper 的校验和验证采用 SHA-256 哈希链机制，确保下载�
    sha256sum gradle-8.5-bin.zip
    ```
 3. 将计算结果与 `distributionSha256Sum` 比对：
-   $$\text{verify} = \begin{cases} \text{pass} & \text{SHA256}(\text{downloaded}) = \text{expected} \\ \text{fail} & \text{otherwise} \end{cases}$$
+   $\text{verify} = \begin{cases} \text{pass} & \text{SHA256}(\text{downloaded}) = \text{expected} \\ \text{fail} & \text{otherwise} \end{cases}$
 4. 校验失败时抛出异常，拒绝解压和使用该发行版
 
 **校验和更新的原子性**：Gradle 升级时，校验和由官方在发布时写入 `gradle-wrapper.properties`。若校验和不匹配，说明下载被劫持（中间人攻击）或 CDN 被污染。Gradle 8.0+ 原生支持此字段；旧版本可通过 `wrapper` 任务自动添加校验和。

@@ -10,24 +10,24 @@ JSON 处理是 JSON 文本与 Python 对象之间的双向转换过程：序列�
 
 JSON 文本可视为一个有限状态自动机，状态集合 $Q$ 包含初始、键（after `{`）、值、字符串、数值、布尔/空等状态。状态转移由下一个字符决定：
 
-$$\delta: Q \times \Sigma \rightarrow Q$$
+$\delta: Q \times \Sigma \rightarrow Q$
 
-其中 $\Sigma$ 是 Unicode 字符集。接受状态集 $F = \{\text{string\_end}, \text{number\_end}, \text{true\_end}, \text{false\_end}, \text{null\_end}, \text{array\_end}, \text{object\_end}\}$。
+其中 $\Sigma$ 是 Unicode 字符集。接受状态集 $F = \{\text{string\_end}, \text{number\_end}, \text{true\_end}, \text{false\_end}, \text{null\_end}, \text{array\_end}, \text{object\_end}\}$ 。
 
 **归约终点**：JSON 状态机可归约为正则文法（Chomsky 3型），与上下文无关文法（JSON 本身是 LALR 可解析）不同——这解释了为何自引用结构无法直接序列化。
 
 ### 解析复杂度
 
-设 JSON 文本长度为 $n$，标准库 `json.loads` 的最坏情况时间复杂度为 $O(n)$（单次扫描），但存在针对特定恶意输入的攻击变种（如重复嵌套 `[`/`{` 导致栈溢出）。
+设 JSON 文本长度为 $n$ ，标准库 `json.loads` 的最坏情况时间复杂度为 $O(n)$ （单次扫描），但存在针对特定恶意输入的攻击变种（如重复嵌套 `[`/`{` 导致栈溢出）。
 
 **正则表达式 DoS 攻击的数学模型**：
-设模式为 $(a+)+b$，输入为 $a^n c$（$n$ 个 a 后跟 c）。NFA 回溯探索所有可能的 $a+$ 分组方式：
+设模式为 $(a+)+b$ ，输入为 $a^n c$ （ $n$ 个 a 后跟 c）。NFA 回溯探索所有可能的 $a+$ 分组方式：
 
-$$T(n) = 2^n$$
+$T(n) = 2^n$
 
 这是指数级探索，源于重叠的量词分支。
 
-**ijson 流式解析的约束**：ijson 增量式解析将内存复杂度从 $O(n)$ 降至 $O(d)$，其中 $d$ 为当前嵌套深度（调用栈深度）。这是以时间换空间：每次 yield 需要维护解析器状态。
+**ijson 流式解析的约束**：ijson 增量式解析将内存复杂度从 $O(n)$ 降至 $O(d)$ ，其中 $d$ 为当前嵌套深度（调用栈深度）。这是以时间换空间：每次 yield 需要维护解析器状态。
 
 ### 序列化内存占用
 
@@ -145,7 +145,7 @@ def detect_cycle(obj, path=None):
     return False
 ```
 
-**约束边界**：循环检测的时间复杂度为 $O(V+E)$（图遍历），空间复杂度为 $O(D)$（当前路径深度）。对于大对象图，这可能成为性能瓶颈。
+**约束边界**：循环检测的时间复杂度为 $O(V+E)$ （图遍历），空间复杂度为 $O(D)$ （当前路径深度）。对于大对象图，这可能成为性能瓶颈。
 
 ### ijson 的流式解析
 

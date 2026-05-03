@@ -46,17 +46,17 @@ $$
 
 ### 前向保密（PFS）的数学定义
 
-每次会话使用临时DH密钥（ECDHE），私钥泄露不影响历史会话。设会话密钥为 $K_s$，ECDHE私钥为 $x$，公钥为 $X=x \cdot G$：
+每次会话使用临时DH密钥（ECDHE），私钥泄露不影响历史会话。设会话密钥为 $K_s$ ，ECDHE私钥为 $x$ ，公钥为 $X=x \cdot G$ ：
 
 $$
 K_s = x \cdot Y_{\text{server}} = x \cdot (y \cdot G) = (xy) \cdot G
 $$
 
-私钥 $x$ 仅存在于会话存续期间，会话结束后丢弃。即使长期私钥泄露，攻击者无法恢复历史会话密钥，因为 $K_s$ 依赖于临时DH私钥 $x$。
+私钥 $x$ 仅存在于会话存续期间，会话结束后丢弃。即使长期私钥泄露，攻击者无法恢复历史会话密钥，因为 $K_s$ 依赖于临时DH私钥 $x$ 。
 
 ### 证书验证的数学约束
 
-证书链 $\text{Cert}_0 \rightarrow \text{Cert}_1 \rightarrow \cdots \rightarrow \text{Cert}_n$（根CA）有效当且仅当：
+证书链 $\text{Cert}_0 \rightarrow \text{Cert}_1 \rightarrow \cdots \rightarrow \text{Cert}_n$ （根CA）有效当且仅当：
 
 $$
 \forall i: \text{VerifySig}(\text{Cert}_i, \text{Cert}_{i+1}.pubkey) = \text{true} \land \text{Cert}_n \in \text{TrustStore}
@@ -64,8 +64,8 @@ $$
 
 **证书验证的完整流程**：
 
-1. 检查证书有效期：$\text{NotBefore} \leq \text{now} \leq \text{NotAfter}$
-2. 检查域名匹配：$\text{CN} = \text{hostname} \lor \text{SAN包含hostname}$
+1. 检查证书有效期： $\text{NotBefore} \leq \text{now} \leq \text{NotAfter}$
+2. 检查域名匹配： $\text{CN} = \text{hostname} \lor \text{SAN包含hostname}$
 3. 验证证书签名链：逐级向上直到信任锚
 4. 检查证书吊销状态：OCSP响应或CRL
 
@@ -78,14 +78,14 @@ $$
 $$
 
 其中：
-- $k$：密钥
-- $n$：nonce（每次加密唯一）
-- $a$：关联数据（不加密但需认证）
-- $p$：明文
-- $c$：密文
-- $t$：认证标签
+- $k$ ：密钥
+- $n$ ：nonce（每次加密唯一）
+- $a$ ：关联数据（不加密但需认证）
+- $p$ ：明文
+- $c$ ：密文
+- $t$ ：认证标签
 
-解密验证：$\text{AEAD}^{-1}(k, n, a, c, t) \rightarrow p$ 或 $\perp$（失败）
+解密验证： $\text{AEAD}^{-1}(k, n, a, c, t) \rightarrow p$ 或 $\perp$（失败）
 
 ## 数据流
 
@@ -256,7 +256,7 @@ $$
 t = \text{GHASH}(H, a, c) \oplus \text{MSB}_{128}(n \cdot H) \quad \text{（认证部分）}
 $$
 
-其中 $H = \text{AES}(k, 0^{128})$ 是哈希密钥，$a$ 是关联数据，$n$ 是计数器。
+其中 $H = \text{AES}(k, 0^{128})$ 是哈希密钥， $a$ 是关联数据，$n$ 是计数器。
 
 **GHASH的数学性质**：GHASH是有限域 $GF(2^{128})$ 上的乘法运算，满足：
 $$
@@ -292,7 +292,7 @@ $$
 K_s = x \cdot Y_{\text{server}} \quad x \text{ 在会话结束后丢弃}
 $$
 
-攻击者获得长期私钥后，只能得到 $Y_{\text{server}}$，无法得到 $x$（离散对数难题），因此无法计算 $K_s$。
+攻击者获得长期私钥后，只能得到 $Y_{\text{server}}$ ，无法得到 $x$ （离散对数难题），因此无法计算 $K_s$ 。
 
 ### HSTS防降级攻击
 
@@ -337,13 +337,13 @@ $$
 Q = x \cdot G
 $$
 
-已知基点 $G$ 和结果 $Q$，求 $x$ 在计算上不可行。ECDHE双方各选择随机私钥 $x$（客户端）和 $y$（服务器），交换公钥 $X = x \cdot G$ 和 $Y = y \cdot G$，然后计算共享密钥：
+已知基点 $G$ 和结果 $Q$ ，求 $x$ 在计算上不可行。ECDHE双方各选择随机私钥 $x$ （客户端）和 $y$ （服务器），交换公钥 $X = x \cdot G$ 和 $Y = y \cdot G$ ，然后计算共享密钥：
 
 $$
 K = x \cdot Y = x \cdot (y \cdot G) = (xy) \cdot G = y \cdot X
 $$
 
-监听者只知道 $X$ 和 $Y$，无法得到 $xy$（需要离散对数），因此无法计算 $K$。
+监听者只知道 $X$ 和 $Y$ ，无法得到 $xy$ （需要离散对数），因此无法计算 $K$ 。
 
 ### TLS 1.3的5个密码套件
 

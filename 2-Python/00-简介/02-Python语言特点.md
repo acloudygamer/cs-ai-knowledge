@@ -16,13 +16,13 @@ Python 的核心语言特点源于其**引用语义 + 动态类型 + 解释执�
 
 Python 的变量是**命名到对象的单射绑定**：
 
-$$bind: Name \hookrightarrow Object$$
+$bind: Name \hookrightarrow Object$
 
-$$unbind: Name \times Object \rightarrow \emptyset$$
+$unbind: Name \times Object \rightarrow \emptyset$
 
 每个对象 $o$ 是一个五元组：
 
-$$o = (value, \tau, rc, storage, identity)$$
+$o = (value, \tau, rc, storage, identity)$
 
 | 字段 | 语义 | 域 |
 |------|------|-----|
@@ -34,7 +34,7 @@ $$o = (value, \tau, rc, storage, identity)$$
 
 **约束不变量**：
 
-$$rc(o) = |\ \{name \mid bind(name) = o\}\ | + |\ \{ref \mid ref \rightarrow o\}\ |$$
+$rc(o) = |\ \{name \mid bind(name) = o\}\ | + |\ \{ref \mid ref \rightarrow o\}\ |$
 
 即引用计数等于所有命名绑定加上所有引用（指针）之和。
 
@@ -42,8 +42,8 @@ $$rc(o) = |\ \{name \mid bind(name) = o\}\ | + |\ \{ref \mid ref \rightarrow o\}
 
 CPython 的引用计数是**确定性析构**：
 
-$$\text{assign}(v, o): \quad rc(o_{old})\!-\!{=}1; \quad rc(o_{new})\!+\!{=}1$$
-$$\text{destruct}(o): \quad \text{当 } rc(o) = 0 \implies \text{立即调用 } tp\_dealloc(o)$$
+$\text{assign}(v, o): \quad rc(o_{old})\!-\!{=}1; \quad rc(o_{new})\!+\!{=}1$
+$\text{destruct}(o): \quad \text{当 } rc(o) = 0 \implies \text{立即调用 } tp\_dealloc(o)$
 
 这与 tracing GC（如 Java）的**非确定性回收**形成对比：
 
@@ -54,7 +54,7 @@ $$\text{destruct}(o): \quad \text{当 } rc(o) = 0 \implies \text{立即调用 } 
 
 **循环引用的不可达性**：当对象形成循环引用时：
 
-$$o_1 \leftrightarrow o_2 \implies rc(o_1) > 0 \land rc(o_2) > 0 \land \text{无法从根集到达}$$
+$o_1 \leftrightarrow o_2 \implies rc(o_1) > 0 \land rc(o_2) > 0 \land \text{无法从根集到达}$
 
 此时外部无法打破循环，对象永远不会被析构——这是引用计数的固有盲区。
 
@@ -62,15 +62,15 @@ $$o_1 \leftrightarrow o_2 \implies rc(o_1) > 0 \land rc(o_2) > 0 \land \text{无
 
 Python 的类型检查是**运行时断言**，而非编译时约束：
 
-$$\text{typeof}(v) = \tau \quad \text{仅在 } v \text{ 被访问时才检查}$$
+$\text{typeof}(v) = \tau \quad \text{仅在 } v \text{ 被访问时才检查}$
 
 类型注解是**契约约束**，不参与运行时求值（除非显式调用 `typing.get_type_hints()`）：
 
-$$\text{assert isinstance}(x, \text{int}) \iff \text{运行时检查}$$
+$\text{assert isinstance}(x, \text{int}) \iff \text{运行时检查}$
 
 **约束**：动态类型提供了灵活性，但导致类型错误延迟到运行时发现：
 
-$$P(\text{类型错误被捕获}) = \frac{\text{测试覆盖路径数}}{\text{总可能路径数}}$$
+$P(\text{类型错误被捕获}) = \frac{\text{测试覆盖路径数}}{\text{总可能路径数}}$
 
 未覆盖路径上的类型错误将逃逸到生产环境。
 
@@ -78,21 +78,21 @@ $$P(\text{类型错误被捕获}) = \frac{\text{测试覆盖路径数}}{\text{�
 
 Python `dict` 基于**开放地址法的哈希表**：
 
-$$h(key, i) = (hash(key) + i \cdot c) \bmod m$$
+$h(key, i) = (hash(key) + i \cdot c) \bmod m$
 
-其中 $i$ 是探测序列索引，$c$ 是步长（通常为 1 或奇数），$m$ 是哈希表大小（始终为 $2^k$）。
+其中 $i$ 是探测序列索引， $c$ 是步长（通常为 1 或奇数），$m$ 是哈希表大小（始终为 $2^k$）。
 
 **负载因子约束**：
 
-$$\alpha = \frac{n}{m} \quad \text{（n = 已存储键数，m = 表大小）}$$
+$\alpha = \frac{n}{m} \quad \text{（n = 已存储键数，m = 表大小）}$
 
-当 $\alpha > 2/3$ 时，CPython 触发 resize（扩容至 $2m$）。这个阈值保证探测链长度期望 $O(1)$：
+当 $\alpha > 2/3$ 时，CPython 触发 resize（扩容至 $2m$ ）。这个阈值保证探测链长度期望 $O(1)$ ：
 
-$$E[\text{探测长度}] \approx \frac{1}{1-\alpha}$$
+$E[\text{探测长度}] \approx \frac{1}{1-\alpha}$
 
 **哈希冲突解决**：使用伪随机再探测（perturb 机制）：
 
-$$h(key, i) = (hash(key) \cdot 5 + i + 1) \bmod 2^k$$
+$h(key, i) = (hash(key) \cdot 5 + i + 1) \bmod 2^k$
 
 这保证了哈希分布的随机性，减少碰撞聚集。
 
@@ -100,19 +100,19 @@ $$h(key, i) = (hash(key) \cdot 5 + i + 1) \bmod 2^k$$
 
 Python 的类型系统形成格（lattice）：
 
-$$\mathcal{L} = (Type, \preceq, \top, \bot)$$
+$\mathcal{L} = (Type, \preceq, \top, \bot)$
 
-- $\top = object$：所有类的最终基类
-- $\bot$：无公共下界（基本类型如 `int`、`str` 之间无继承关系）
+- $\top = object$ ：所有类的最终基类
+- $\bot$ ：无公共下界（基本类型如 `int`、`str` 之间无继承关系）
 - $t_1 \preceq t_2 \iff t_1$ 是 $t_2$ 的子类
 
-$$t_1 \preceq t_2 \implies \forall o \in t_1: o \in t_2$$
+$t_1 \preceq t_2 \implies \forall o \in t_1: o \in t_2$
 
 ### 分代 GC 的形式化
 
 CPython 的循环垃圾回收器基于**弱代际假设**（weak generational hypothesis）：
 
-$$P(\text{对象存活} > t) = e^{-\lambda t} \quad \text{（指数分布假设）}$$
+$P(\text{对象存活} > t) = e^{-\lambda t} \quad \text{（指数分布假设）}$
 
 大部分对象在创建后迅速死亡（函数返回后局部变量变为垃圾）。分代收集利用这一性质：
 
@@ -124,9 +124,9 @@ $$P(\text{对象存活} > t) = e^{-\lambda t} \quad \text{（指数分布假设�
 
 **收集代价的数学期望**：
 
-$$E[\text{扫描时间}] = \sum_{g=0}^{2} |O_g| \cdot P(\text{对象在 Gen g 存活})$$
+$E[\text{扫描时间}] = \sum_{g=0}^{2} |O_g| \cdot P(\text{对象在 Gen g 存活})$
 
-分代假设保证 $|O_0| \gg |O_2|$ 且 $P(\text{存活}|g=0) \ll P(\text{存活}|g=2)$，从而减少总体扫描量。
+分代假设保证 $|O_0| \gg |O_2|$ 且 $P(\text{存活}|g=0) \ll P(\text{存活}|g=2)$ ，从而减少总体扫描量。
 
 ## 数据流
 
@@ -237,9 +237,9 @@ struct {
 
 **属性查找的代价分解**：
 
-$$\text{attr\_lookup}(obj, name) = \underbrace{O(1)}_{ob\_type \text{ 解引用}} + \underbrace{O(1)}_{dict \text{ 哈希查找}} + \underbrace{O(1)}_{描述符协议}$$
+$\text{attr\_lookup}(obj, name) = \underbrace{O(1)}_{ob\_type \text{ 解引用}} + \underbrace{O(1)}_{dict \text{ 哈希查找}} + \underbrace{O(1)}_{描述符协议}$
 
-总计 $O(1)$ 但带有**三个间接层**：类型指针解引用、字典查找、可能的对象描述符调用。相比之下，C 的 `struct.field` 是编译时偏移计算（$O(1)$ 无间接），Python 的灵活性以间接性换得。
+总计 $O(1)$ 但带有**三个间接层**：类型指针解引用、字典查找、可能的对象描述符调用。相比之下，C 的 `struct.field` 是编译时偏移计算（ $O(1)$ 无间接），Python 的灵活性以间接性换得。
 
 **`__slots__` 的优化原理**：`__slots__` 将对象属性存储在紧凑数组中（而非 `__dict__` 字典），将属性访问从 dict 查找降为编译时偏移计算：
 
@@ -255,7 +255,7 @@ p.x = 10  # 编译时已知偏移: p + offsetof('x')
 
 Python 的参数传递是**传对象引用**（pass-by-object-reference），既非传值也非传引用：
 
-$$\text{call}(f, arg): \quad bind(f.\text{param}, arg) \quad \text{（在 } f \text{ 的局部 namespace 中）}$$
+$\text{call}(f, arg): \quad bind(f.\text{param}, arg) \quad \text{（在 } f \text{ 的局部 namespace 中）}$
 
 **关键语义**：调用者与被调用者共享同一个对象引用，而非副本：
 
@@ -291,13 +291,13 @@ Python dict 的哈希冲突解决使用**伪随机再探测**（与线性探测�
 
 **探测序列的数学性质**：
 
-$$h(key, i) = (hash(key) \cdot 5 + i + 1) \bmod 2^k$$
+$h(key, i) = (hash(key) \cdot 5 + i + 1) \bmod 2^k$
 
-乘以 5（与 2 的幂互质）确保探测序列覆盖几乎所有槽位（循环节为 $2^k$）。这保证了即使发生冲突，也能概率上找到空槽。
+乘以 5（与 2 的幂互质）确保探测序列覆盖几乎所有槽位（循环节为 $2^k$ ）。这保证了即使发生冲突，也能概率上找到空槽。
 
-**最坏情况复杂度**：虽然理论上仍为 $O(m)$（遍历所有槽位），但对于均匀哈希分布，期望探测次数为：
+**最坏情况复杂度**：虽然理论上仍为 $O(m)$ （遍历所有槽位），但对于均匀哈希分布，期望探测次数为：
 
-$$E[\text{探测次数}] = \frac{1}{\alpha} \ln\left(\frac{1}{1-\alpha}\right)$$
+$E[\text{探测次数}] = \frac{1}{\alpha} \ln\left(\frac{1}{1-\alpha}\right)$
 
 当 $\alpha = 2/3$ 时，约 1.85 次探测。
 
@@ -305,7 +305,7 @@ $$E[\text{探测次数}] = \frac{1}{\alpha} \ln\left(\frac{1}{1-\alpha}\right)$$
 
 Python 对短字符串和标识符使用**字符串驻留**（内部池化）以节省内存和加速比较：
 
-$$\text{intern}(s): \quad \text{若 } s \in \text{string\_pool} \implies \text{返回池中对象；否则加入池}$$
+$\text{intern}(s): \quad \text{若 } s \in \text{string\_pool} \implies \text{返回池中对象；否则加入池}$
 
 **自动驻留的条件**（CPython）：
 - 标识符（变量名、函数名）：由编译器/解释器自动驻留
@@ -330,7 +330,7 @@ print(a is c)  # False — 运行时拼接不触发驻留
 
 Python 使用缩进划分代码块，因为**没有显式的 `end` 关键字或花括号**：
 
-$$\text{IndentationError} \iff \text{同一逻辑块的语句缩进不一致（空格 vs Tab）}$$
+$\text{IndentationError} \iff \text{同一逻辑块的语句缩进不一致（空格 vs Tab）}$
 
 **解析器约束**：缩进必须是**一致的空白字符序列**。Python 3 禁止混合空格和 Tab（`TabError`）。解析器将缩进转换为 4 种 token：`INDENT`、`DEDENT`、`MORE`、`LESS`。
 

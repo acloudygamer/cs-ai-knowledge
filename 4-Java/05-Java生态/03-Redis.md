@@ -18,15 +18,15 @@ Redis 是高性能的 **内存键值存储**，本质是通过 **O(1) 哈希表*
 
 Redis 使用 **惰性删除（Lazy Expiration）** + **定期采样删除（Active Expiration）** 的混合策略：
 
-**惰性删除**：每次访问键时检查是否过期，若过期则删除。设键的访问频率服从泊松分布 $\lambda$：
-$$P(k \text{ 次访问}) = \frac{\lambda^k e^{-\lambda}}{k!}$$
+**惰性删除**：每次访问键时检查是否过期，若过期则删除。设键的访问频率服从泊松分布 $\lambda$ ：
+$P(k \text{ 次访问}) = \frac{\lambda^k e^{-\lambda}}{k!}$
 
 冷数据的过期时间可能远晚于到期时间，这是惰性删除的代价。
 
 **定期删除**：每 100ms 随机采样 20 个带有过期时间的键，删除其中已过期的键。采样数 $n=20$ 是时间（10ms）与内存回收效果的权衡——采样过多会影响性能，过少会导致过期键堆积。
 
 **混合策略的数学保证**：
-- 惰性删除：$O(1)$ 时间复杂度，无额外 CPU 开销，但过期键可能长时间存在
+- 惰性删除： $O(1)$ 时间复杂度，无额外 CPU 开销，但过期键可能长时间存在
 - 定期删除：后台任务主动回收，内存回收及时，但消耗 CPU
 
 ### 缓存穿透的布隆过滤器模型
@@ -40,39 +40,39 @@ $$P(k \text{ 次访问}) = \frac{\lambda^k e^{-\lambda}}{k!}$$
 - $p$ = 假阳性率（false positive rate）
 
 布隆过滤器的假阳性率：
-$$p = \left(1 - e^{-kn/m}\right)^k$$
+$p = \left(1 - e^{-kn/m}\right)^k$
 
-给定 $n$ 和期望 $p$，最小 $m$：
-$$m = - \frac{n \ln p}{(\ln 2)^2}$$
+给定 $n$ 和期望 $p$ ，最小 $m$ ：
+$m = - \frac{n \ln p}{(\ln 2)^2}$
 
-对于 10 亿条数据，$p=1\%$ 时，$m \approx 1.28GB$，远小于直接缓存空值。
+对于 10 亿条数据， $p=1\%$ 时，$m \approx 1.28GB$，远小于直接缓存空值。
 
 ### HyperLogLog 的概率模型
 
 HyperLogLog（HLL）是一种概率算法，用于基数估计（cardinality estimation）。设：
-- $m$ = 寄存器数量（Redis 实现中 $m = 2^{10} = 16384$）
+- $m$ = 寄存器数量（Redis 实现中 $m = 2^{10} = 16384$ ）
 - $X_i$ = 第 $i$ 个寄存器的观察最大值（从 0 开始计数）
 - $p$ = 调和平均数的计算因子
 
 HLL 估算公式：
-$$\text{ cardinality} \approx \frac{m^2}{\sum_{i=1}^{m} 2^{-X_i}} = \frac{m^2}{\sum_{i=1}^{m} \frac{1}{2^{X_i}}}$$
+$\text{ cardinality} \approx \frac{m^2}{\sum_{i=1}^{m} 2^{-X_i}} = \frac{m^2}{\sum_{i=1}^{m} \frac{1}{2^{X_i}}}$
 
-Redis 使用 **64 位哈希**，则最大计数值 $X_i \leq 64$。
+Redis 使用 **64 位哈希**，则最大计数值 $X_i \leq 64$ 。
 
-**标准误差**：HLL 的标准误差约为 $\frac{1.04}{\sqrt{m}}$，即约 $\pm 2\%$。
+**标准误差**：HLL 的标准误差约为 $\frac{1.04}{\sqrt{m}}$ ，即约 $\pm 2\%$ 。
 
 给定 $n$ 个唯一元素和 $m$ 个寄存器，误差：
-$$\text{error} = \frac{1.04}{\sqrt{m}} \times 100\% \approx 0.81\%$$
+$\text{error} = \frac{1.04}{\sqrt{m}} \times 100\% \approx 0.81\%$
 
-对于 $m = 16384$，标准误差约为 $\pm 0.81\%$，内存占用固定 12KB，与数据量无关。
+对于 $m = 16384$ ，标准误差约为 $\pm 0.81\%$ ，内存占用固定 12KB，与数据量无关。
 
 ### 限流的令牌桶算法
 
 令牌桶算法用于平滑限流，令牌以固定速率 $\lambda$ 添加到桶中：
 
 设：
-- 桶容量 $C$（最大令牌数）
-- 令牌补充速率 $\lambda$（tokens/秒）
+- 桶容量 $C$ （最大令牌数）
+- 令牌补充速率 $\lambda$ （tokens/秒）
 - 请求消耗 $r$ 个令牌
 
 **漏桶 vs 令牌桶**：
@@ -80,12 +80,12 @@ $$\text{error} = \frac{1.04}{\sqrt{m}} \times 100\% \approx 0.81\%$$
 - 令牌桶：允许突发，只要桶内有令牌
 
 令牌桶的数学描述：
-$$\text{available\_tokens}(t) = \min\left(C,\ \text{available\_tokens}(t_0) + \lambda \cdot (t - t_0) - r\right)$$
+$\text{available\_tokens}(t) = \min\left(C,\ \text{available\_tokens}(t_0) + \lambda \cdot (t - t_0) - r\right)$
 
 滑动窗口限流的精确公式：
-$$R_{\text{window}} = \sum_{i=1}^{n} \mathbb{1}_{\{t_i \in [t_{\text{now}} - W, t_{\text{now}}]\}} \leq \text{limit}$$
+$R_{\text{window}} = \sum_{i=1}^{n} \mathbb{1}_{\{t_i \in [t_{\text{now}} - W, t_{\text{now}}]\}} \leq \text{limit}$
 
-其中 $W$ 为窗口大小，$t_i$ 为第 $i$ 个请求的时间戳。
+其中 $W$ 为窗口大小， $t_i$ 为第 $i$ 个请求的时间戳。
 
 ### 分布式锁的 safety 分析
 

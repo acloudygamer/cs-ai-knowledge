@@ -21,7 +21,7 @@
 
 同一代码格式化多次，输出必须完全相同：
 
-$$F(F(s)) = F(s)$$
+$F(F(s)) = F(s)$
 
 这保证格式化脚本可重复运行，不会产生累积效应。幂等性是格式化工具的**本质约束**，而非可选特性——非幂等的格式化工具在 CI 环境中会导致不可预测的 diff。
 
@@ -32,7 +32,7 @@ $$F(F(s)) = F(s)$$
 
 工具设计在精确率和召回率之间权衡。Ruff 选择高精确率（快且误报少），Pylint 选择高召回率（全面但慢）。
 
-**F1 分数**：$F_1 = 2 \cdot \frac{\text{Precision} \cdot \text{Recall}}{\text{Precision} + \text{Recall}}$，综合衡量工具性能。
+**F1 分数**： $F_1 = 2 \cdot \frac{\text{Precision} \cdot \text{Recall}}{\text{Precision} + \text{Recall}}$ ，综合衡量工具性能。
 
 ### 类型安全（类型检查器）
 

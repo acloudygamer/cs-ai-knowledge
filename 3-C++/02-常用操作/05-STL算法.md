@@ -10,7 +10,7 @@ STL 算法是通过迭代器抽象将**数据序列**与**操作函数**解耦�
 
 **比较排序的复杂度下界**：任何基于比较的排序算法在最坏情况下至少需要 $\Omega(n \log n)$ 次比较操作。
 
-**信息论证明**：$n!$ 种可能的排列需要 $\log_2(n!)$ 位信息来唯一区分。使用比较作为二元决策，每次比较最多产生 1 bit 信息，因此至少需要 $\lceil \log_2(n!) \rceil$ 次比较。
+**信息论证明**： $n!$ 种可能的排列需要 $\log_2(n!)$ 位信息来唯一区分。使用比较作为二元决策，每次比较最多产生 1 bit 信息，因此至少需要 $\lceil \log_2(n!) \rceil$ 次比较。
 
 $$
 \log_2(n!) = \sum_{i=1}^{n} \log_2 i = \Theta(n \log n) \quad \text{（Stirling 近似）}
@@ -29,8 +29,8 @@ $$
 $$
 
 **为什么需要混合**：
-- Quicksort：平均 $O(n \log n)$，但最坏 $O(n^2)$（当轴点选择不当且输入有序时）。
-- Heapsort：保证 $O(n \log n)$，但常数因子大、缓存局部性差。
+- Quicksort：平均 $O(n \log n)$ ，但最坏 $O(n^2)$ （当轴点选择不当且输入有序时）。
+- Heapsort：保证 $O(n \log n)$ ，但常数因子大、缓存局部性差。
 - Introsort 在递归深度超过 $2 \lfloor \log_2 n \rfloor$ 时自动切换到 heapsort，防止 Quicksort 在某些输入下的退化。
 
 ### erase-remove 惯用法的复杂度
@@ -41,10 +41,10 @@ $$
 \text{remove\_if}([l, r), P) \to [l, r')
 $$
 
-其中 $r' = l + |\{ x \in [l, r) \mid P(x) = \text{false} \}|$。
+其中 $r' = l + |\{ x \in [l, r) \mid P(x) = \text{false} \}|$ 。
 
-时间复杂度：$O(n)$（每个元素最多一次移动）。
-空间复杂度：$O(1)$（原地操作）。
+时间复杂度： $O(n)$ （每个元素最多一次移动）。
+空间复杂度： $O(1)$ （原地操作）。
 
 `vec.erase(new_end, vec.end())` 删除 $[new\_end, end)$ 区间的元素，调用析构函数并触发移动。删除 $k$ 个元素的代价：析构 $k$ 个对象 + 移动 $n-k$ 个对象到新位置。
 
@@ -59,21 +59,21 @@ T(\lfloor n/2 \rfloor) + T(\lceil n/2 \rceil) + O(n) & n > 1
 \end{cases}
 $$
 
-展开递归树：第 $i$ 层有 $2^i$ 个子问题，每个子问题处理 $n/2^i$ 规模，总工作量 $2^i \times O(n/2^i) = O(n)$。层数为 $\lceil \log_2 n \rceil + 1$，因此 $T(n) = O(n \log n)$。
+展开递归树：第 $i$ 层有 $2^i$ 个子问题，每个子问题处理 $n/2^i$ 规模，总工作量 $2^i \times O(n/2^i) = O(n)$ 。层数为 $\lceil \log_2 n \rceil + 1$ ，因此 $T(n) = O(n \log n)$ 。
 
 ### 执行策略的并行复杂度（C++17）
 
-对于 $n$ 个元素、$p$ 个处理器的并行执行，理想加速比受 **Amdahl 定律** 约束：
+对于 $n$ 个元素、 $p$ 个处理器的并行执行，理想加速比受 **Amdahl 定律** 约束：
 
 $$
 S(p) = \frac{1}{(1 - f) + \frac{f}{p}}
 $$
 
 其中 $f$ 是可并行化比例。对于 `par` 算法（工作窃取调度）：
-- 可并行部分：$T_{par}(n, p) = \frac{O(n)}{p} + O(\log n)$（$\log n$ 为同步开销）
-- 不可并行部分（串行）：$O(\log n)$
+- 可并行部分： $T_{par}(n, p) = \frac{O(n)}{p} + O(\log n)$ （$\log n$ 为同步开销）
+- 不可并行部分（串行）： $O(\log n)$
 
-`par_unseq` 进一步允许**向量化**（单指令多数据），理论 throughput 提升至 $p \times v$（$v$ 为 SIMD 宽度）。
+`par_unseq` 进一步允许**向量化**（单指令多数据），理论 throughput 提升至 $p \times v$ （ $v$ 为 SIMD 宽度）。
 
 ## 数据流
 
@@ -149,7 +149,7 @@ $$
 \text{upper\_bound}([first, last), val) = \min \{ i \mid A[i] > val \}
 $$
 
-**用途**：相等元素区间为 $[ \text{lower\_bound}(val), \text{upper\_bound}(val) )$。
+**用途**：相等元素区间为 $[ \text{lower\_bound}(val), \text{upper\_bound}(val) )$ 。
 
 ### 执行策略的调度语义
 
@@ -174,9 +174,9 @@ $$
 
 ### nth_element 的部分排序语义
 
-`std::nth_element(first, nth, last)` 保证：经过调用后，`*nth` 是排序后第 $k$ 个元素（$k$ 为 nth 在 [first, last) 中的排名），且所有小于 `*nth` 的元素在它之前，所有大于它的元素在它之后。
+`std::nth_element(first, nth, last)` 保证：经过调用后，`*nth` 是排序后第 $k$ 个元素（ $k$ 为 nth 在 [first, last) 中的排名），且所有小于 `*nth` 的元素在它之前，所有大于它的元素在它之后。
 
-**时间复杂度**：线性 $O(n)$（快速选择算法），而非全排序的 $O(n \log n)$。
+**时间复杂度**：线性 $O(n)$ （快速选择算法），而非全排序的 $O(n \log n)$ 。
 
 **用途**：中位数计算（`nth = first + size/2`）、top-k 问题（分区后对前半部分递归排序）。
 

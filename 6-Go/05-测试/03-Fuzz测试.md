@@ -10,13 +10,13 @@ Fuzz testing（模糊测试）是 Go 1.18 引入的测试范式，其本质是**
 
 ### 覆盖引导的输入生成
 
-设输入空间为 $\mathcal{I}$，代码覆盖空间为 $\mathcal{C}$，覆盖映射：
-$$\text{Cov} : \mathcal{I} \rightarrow \mathcal{P}(B)$$
+设输入空间为 $\mathcal{I}$ ，代码覆盖空间为 $\mathcal{C}$ ，覆盖映射：
+$\text{Cov} : \mathcal{I} \rightarrow \mathcal{P}(B)$
 
-其中 $B$ 是分支集合，$\mathcal{P}(B)$ 是 $B$ 的幂集。
+其中 $B$ 是分支集合， $\mathcal{P}(B)$ 是 $B$ 的幂集。
 
-**Fuzzer 的优化目标**：维护语料库 $C \subseteq \mathcal{I}$，最大化：
-$$|\bigcup_{c \in C} \text{Cov}(c)|$$
+**Fuzzer 的优化目标**：维护语料库 $C \subseteq \mathcal{I}$ ，最大化：
+$|\bigcup_{c \in C} \text{Cov}(c)|$
 
 即最大化覆盖的分支数。由于分支数有限（代码静态确定），该目标可达成，但需要海量迭代。
 
@@ -32,8 +32,8 @@ $$|\bigcup_{c \in C} \text{Cov}(c)|$$
 
 ### 语料库最小化
 
-给定 crash 输入集合 $\text{crashers} = \{c_1, c_2, \ldots, c_n\}$，最小化目标是找到最小的子集 $S \subseteq \text{crashers}$ 使得：
-$$\text{coverage}(S) = \text{coverage}(\text{crashers})$$
+给定 crash 输入集合 $\text{crashers} = \{c_1, c_2, \ldots, c_n\}$ ，最小化目标是找到最小的子集 $S \subseteq \text{crashers}$ 使得：
+$\text{coverage}(S) = \text{coverage}(\text{crashers})$
 
 即最小子集仍能覆盖相同的分支空间。最小化必要性：
 - 未最小化的 crashers 包含冗余输入
@@ -43,10 +43,10 @@ $$\text{coverage}(S) = \text{coverage}(\text{crashers})$$
 
 ### 不变性谓词与 Fuzzing 本质
 
-Fuzzing 测试基于不变性谓词 $P$。设 $f: X \rightarrow Y$ 为被测函数：
+Fuzzing 测试基于不变性谓词 $P$ 。设 $f: X \rightarrow Y$ 为被测函数：
 
 Fuzzer 搜索：
-$$\exists x \in X : \neg P(x, f(x))$$
+$\exists x \in X : \neg P(x, f(x))$
 
 若找到则证明 $f$ 有 bug。
 
@@ -71,8 +71,8 @@ $$\exists x \in X : \neg P(x, f(x))$$
 
 ### 时间-覆盖率权衡
 
-设总 fuzzing 时间为 $T$，覆盖率 $C(T)$ 随 $T$ 增长但逐渐趋于平稳：
-$$\lim_{T \to \infty} C(T) = C_{\max}$$
+设总 fuzzing 时间为 $T$ ，覆盖率 $C(T)$ 随 $T$ 增长但逐渐趋于平稳：
+$\lim_{T \to \infty} C(T) = C_{\max}$
 
 其中 $C_{\max}$ 是代码的可达分支数。实践中 $T = 24\text{h}$ 的覆盖率已足够发现大多数 bug。
 

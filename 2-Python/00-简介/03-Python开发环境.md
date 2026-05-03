@@ -10,7 +10,7 @@ Python 开发环境是**字节码执行 + 包解析 + 符号表管理**的运行
 
 执行 `python script.py` 时，shell 查找 `python` 可执行文件的过程是**首个匹配原则**：
 
-$$\text{python\_path}(python) = \min \{ p_i \in PATH \mid \exists python.exe \in p_i \}$$
+$\text{python\_path}(python) = \min \{ p_i \in PATH \mid \exists python.exe \in p_i \}$
 
 其中 $\min$ 按 $PATH$ 中的顺序定义（从左到右扫描，返回第一个匹配）。
 
@@ -22,9 +22,9 @@ $$\text{python\_path}(python) = \min \{ p_i \in PATH \mid \exists python.exe \in
 
 Python 模块导入可建模为**有序路径搜索**：
 
-$$\text{import}(name) \iff \exists p \in sys.path: \exists file(name, p)$$
+$\text{import}(name) \iff \exists p \in sys.path: \exists file(name, p)$
 
-其中 $file(name, p)$ 表示在路径 $p$ 下存在 $name.py$、$name\backslash\_\_init\_\_.py$ 或 $name.so$（C 扩展）。
+其中 $file(name, p)$ 表示在路径 $p$ 下存在 $name.py$ 、 $name\backslash\_\_init\_\_.py$ 或 $name.so$（C 扩展）。
 
 **sys.path 的标准顺序**（从左到右）：
 
@@ -40,32 +40,32 @@ $$\text{import}(name) \iff \exists p \in sys.path: \exists file(name, p)$$
 
 虚拟环境的隔离效果可形式化为：
 
-$$\forall pkg \in venv_A.\text{site-packages}: \text{import}(pkg) \Rightarrow venv_A.\text{namespace}$$
-$$\forall pkg \in venv_B.\text{site-packages}: \text{import}(pkg) \Rightarrow venv_B.\text{namespace}$$
+$\forall pkg \in venv_A.\text{site-packages}: \text{import}(pkg) \Rightarrow venv_A.\text{namespace}$
+$\forall pkg \in venv_B.\text{site-packages}: \text{import}(pkg) \Rightarrow venv_B.\text{namespace}$
 
 且：
 
-$$\text{venv}_A.\text{site-packages} \cap \text{venv}_B.\text{site-packages} = \emptyset \quad \text{（隔离性）}$$
+$\text{venv}_A.\text{site-packages} \cap \text{venv}_B.\text{site-packages} = \emptyset \quad \text{（隔离性）}$
 
 隔离的本质是 **sys.path 的有序优先**：
 
-$$\text{import}(pkg) \iff \exists p \in \text{sys.path}: p = \text{venv}/Lib/site-packages \land pkg \in p$$
+$\text{import}(pkg) \iff \exists p \in \text{sys.path}: p = \text{venv}/Lib/site-packages \land pkg \in p$
 
 ### pip 依赖解析的约束
 
 pip 使用**贪婪版本匹配 + 回溯求解**策略：
 
-$$\text{selected\_version}(pkg) = \max \{ v \in \text{available\_versions}(pkg) \mid v \succeq \text{constraint} \}$$
+$\text{selected\_version}(pkg) = \max \{ v \in \text{available\_versions}(pkg) \mid v \succeq \text{constraint} \}$
 
 其中 $\succeq$ 是满足语义版本约束的偏序关系。
 
 **依赖冲突的数学描述**：
 
-$$\exists pkg_A, pkg_B: \text{constraint}(pkg_A) \cap \text{constraint}(pkg_B) = \emptyset$$
+$\exists pkg_A, pkg_B: \text{constraint}(pkg_A) \cap \text{constraint}(pkg_B) = \emptyset$
 
 当冲突发生时，pip 尝试回溯：
 
-$$\text{backtrack}(G, conflict) = \begin{cases} \text{重新选择} & \text{若存在未尝试分支} \\ \text{失败} & \text{若所有分支均尝试且失败} \end{cases}$$
+$\text{backtrack}(G, conflict) = \begin{cases} \text{重新选择} & \text{若存在未尝试分支} \\ \text{失败} & \text{若所有分支均尝试且失败} \end{cases}$
 
 **时间复杂度**：最坏情况指数级（依赖版本数指数爆炸），但实际中受版本数量限制，通常可解。
 
@@ -73,11 +73,11 @@ $$\text{backtrack}(G, conflict) = \begin{cases} \text{重新选择} & \text{若�
 
 PYTHONPATH 环境变量是一组由 OS 路径分隔符连接的目录列表：
 
-$$PYTHONPATH = \bigcup_{i=1}^{n} path_i$$
+$PYTHONPATH = \bigcup_{i=1}^{n} path_i$
 
 **导入时的查找代价**：
 
-$$\text{lookup}(name) = \sum_{p \in \text{sys.path}} \begin{cases} 1 & \text{若 } file(name, p) \text{ 存在} \\ 0 & \text{否则} \end{cases}$$
+$\text{lookup}(name) = \sum_{p \in \text{sys.path}} \begin{cases} 1 & \text{若 } file(name, p) \text{ 存在} \\ 0 & \text{否则} \end{cases}$
 
 在 sys.path 靠前位置添加包含同名模块的路径会**遮蔽**后续路径中的同名模块。这与 `PATH` 的遮蔽原则一致。
 
@@ -186,7 +186,7 @@ pip install requests==2.28.0
 
 **缓存命中率建模**：
 
-$$P(\text{命中}) = \frac{|\{\text{已缓存且版本相同}\}|}{|\{\text{请求总数}\}"|}$$
+$P(\text{命中}) = \frac{|\{\text{已缓存且版本相同}\}|}{|\{\text{请求总数}\}"|}$
 
 当依赖树稳定（不频繁变更版本）时，缓存命中率接近 100%；当频繁变更需求时，缓存失效快。
 
@@ -282,7 +282,7 @@ venv/ (虚拟环境根目录)
 
 本目录底座为 `Python 3.12`，前沿为 `Python 3.14`。
 
-$$底座 = Python\;3.12 \quad 前沿 = Python\;3.14 \quad 版本空间 = 底座 \cup 前沿$$
+$底座 = Python\;3.12 \quad 前沿 = Python\;3.14 \quad 版本空间 = 底座 \cup 前沿$
 
 **约束**：Python 3.14 是前沿版本，可能存在不稳定因素。生产环境应使用 Python 3.12 稳定版。
 

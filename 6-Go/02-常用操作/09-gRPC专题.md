@@ -12,17 +12,17 @@ Protobuf 编码是**字段编号 + 类型长度前缀**的二进制格式。字�
 ### 数学模型
 
 **Varint 编码体积**：Varint 使用 7 bits 表示数据，1 bit 表示是否还有更多字节：
-- 对于整数 $V$，编码字节数 $N_{bytes} = \lceil \frac{\log_2(V+1)}{7} \rceil$
+- 对于整数 $V$ ，编码字节数 $N_{bytes} = \lceil \frac{\log_2(V+1)}{7} \rceil$
 - 小值（0-127）只需 1 字节；int32/int64 在 $[0, 2^{31}-1]$ 范围内通常 1-5 字节
 
-**消息编码体积**：对于字符串字段 $V$：
-$$L_{encoded} = 1 + \lceil \log_{128}(|V|+1) \rceil + 1 + |V|$$
+**消息编码体积**：对于字符串字段 $V$ ：
+$L_{encoded} = 1 + \lceil \log_{128}(|V|+1) \rceil + 1 + |V|$
 其中第一项是 tag（字段编号 + wire type），第二项是 Varint 长度前缀，第三项是字符串内容长度，第四项是实际内容。
 
-**压缩比推导**：设 JSON 平均字段名长度 $L_{name}$，字符串内容长度 $|V|$：
-$$R_{compression} = \frac{L_{JSON}}{L_{Protobuf}} = \frac{L_{name} + |V| + 3}{1 + \lceil \log_{128}(|V|+1) \rceil + 1 + |V|}$$
+**压缩比推导**：设 JSON 平均字段名长度 $L_{name}$ ，字符串内容长度 $|V|$ ：
+$R_{compression} = \frac{L_{JSON}}{L_{Protobuf}} = \frac{L_{name} + |V| + 3}{1 + \lceil \log_{128}(|V|+1) \rceil + 1 + |V|}$
 
-实际测量：典型场景 $R \approx 3\!-\!10\times$。
+实际测量：典型场景 $R \approx 3\!-\!10\times$ 。
 
 **归约终点**：Protobuf 的压缩效率来源于**消除冗余的字段名字符串**，用固定长度的字段编号替代，可归结为信息论中的"字典编码"思想。
 
@@ -65,8 +65,8 @@ HTTP/2 的多路复用允许在**单一 TCP 连接**上并发多个请求/响应
 ### 数学模型
 
 **队首阻塞（Head-of-Line Blocking）量化**：
-- HTTP/1.1：请求 $i$ 的响应被请求 $i-1$ 阻塞，假设单请求处理时间 $T_{req}$，$N$ 个请求的最小总时间 $T_{total} \approx N \times T_{req}$（串行）
-- HTTP/2：$N$ 个请求时间重叠，$T_{total} \approx \max(T_{req,1}, T_{req,2}, \dots, T_{req,N})$（并行）
+- HTTP/1.1：请求 $i$ 的响应被请求 $i-1$ 阻塞，假设单请求处理时间 $T_{req}$ ， $N$ 个请求的最小总时间 $T_{total} \approx N \times T_{req}$（串行）
+- HTTP/2： $N$ 个请求时间重叠，$T_{total} \approx \max(T_{req,1}, T_{req,2}, \dots, T_{req,N})$（并行）
 
 **帧复用开销**：HTTP/2 将消息拆分为多个 DATA 帧交织发送，每帧含 stream ID 标识归属。切换成本仅为解析 9 字节帧头的 O(1) 操作。
 

@@ -8,9 +8,9 @@ Maven 是基于项目对象模型（POM）的构建自动化工具，核心是�
 
 ### 依赖解析的最短路径算法
 
-Maven 使用最近声明优先（Nearest Definition）策略解析版本冲突。设依赖图 $G = (V, E)$，$V$ 为 artifact，$E$ 为依赖关系边。
+Maven 使用最近声明优先（Nearest Definition）策略解析版本冲突。设依赖图 $G = (V, E)$ ， $V$ 为 artifact，$E$ 为依赖关系边。
 
-对于 artifact $a$，其版本 $\text{ver}(a)$ 按以下规则确定：
+对于 artifact $a$ ，其版本 $\text{ver}(a)$ 按以下规则确定：
 
 $$\text{ver}(a) = \begin{cases}
 \text{from\_dependencyManagement}(a) & \text{if defined} \\
@@ -19,9 +19,9 @@ $$\text{ver}(a) = \begin{cases}
 
 其中 $\text{nearest}(a)$ 返回从根节点（当前项目）到 $a$ 的**最短路径**上的最后一个声明版本。若存在等长路径，选择声明顺序靠前的。
 
-**形式化**：设 $P = \{p_1, p_2, ..., p_k\}$ 为所有从根到 $a$ 的路径，$|p_i|$ 为路径长度，$v_i$ 为 $p_i$ 末端的版本。则：
+**形式化**：设 $P = \{p_1, p_2, ..., p_k\}$ 为所有从根到 $a$ 的路径， $|p_i|$ 为路径长度，$v_i$ 为 $p_i$ 末端的版本。则：
 
-$$\text{nearest}(a) = v_j \text{ where } j = \arg\min_i |p_i|$$
+$\text{nearest}(a) = v_j \text{ where } j = \arg\min_i |p_i|$
 
 **归约终点**：依赖冲突解决本质上是图论中的最短路径问题，路径长度定义为边数而非权重。
 
@@ -31,17 +31,17 @@ Maven 生命周期阶段（validate → compile → test → package → install
 
 多模块项目的模块构建顺序由 reactor 决定：
 
-$$O = \text{topological\_sort}(M, D)$$
+$O = \text{topological\_sort}(M, D)$
 
-其中 $M$ 为模块集合，$D$ 为模块间依赖关系（`<module>` 声明）。若存在环形依赖，reactor 失败并报错。
+其中 $M$ 为模块集合， $D$ 为模块间依赖关系（`<module>` 声明）。若存在环形依赖，reactor 失败并报错。
 
 ### 依赖传递的图收缩
 
-传递依赖构成完全依赖图 $G_T$。排除（`exclusion`）操作将图中某些边移除：
+传递依赖构成完全依赖图 $G_T$ 。排除（`exclusion`）操作将图中某些边移除：
 
-$$G_T' = (V, E_T \setminus \{ (u, v) \mid u \in \text{exclusions} \})$$
+$G_T' = (V, E_T \setminus \{ (u, v) \mid u \in \text{exclusions} \})$
 
-收缩后重新计算 $\text{nearest}$，可能导致原本被排除的 artifact 重新被解析（若存在其他路径）。
+收缩后重新计算 $\text{nearest}$ ，可能导致原本被排除的 artifact 重新被解析（若存在其他路径）。
 
 ## 数据流
 
@@ -174,7 +174,7 @@ A → B → C
 
 构建顺序通过拓扑排序确定。若添加 `D → A` 形成环，reactor 抛出 `ProjectCycleException`。
 
-**检测算法**：深度优先搜索（DFS）+ 回溯标记，复杂度 $O(|V| + |E|)$。
+**检测算法**：深度优先搜索（DFS）+ 回溯标记，复杂度 $O(|V| + |E|)$ 。
 
 ### 依赖解析的冲突解决实例
 
@@ -204,7 +204,7 @@ A → B → C
 
 这形成了一个优先级序列：
 
-$$\text{direct} > \text{dependencyManagement} > \text{transitive (nearest)}$$
+$\text{direct} > \text{dependencyManagement} > \text{transitive (nearest)}$
 
 ## 参考存根
 

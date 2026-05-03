@@ -8,8 +8,8 @@ f-string 是在**编译期**将字符串字面量解析为 AST 节点，在**运
 
 ### 格式化偏函数
 
-f-string 格式化是一个偏函数 $F: O \times \Sigma^* \rightharpoonup S$：
-$$F(v, \text{spec}) = v.\__format\_\_(\text{spec})$$
+f-string 格式化是一个偏函数 $F: O \times \Sigma^* \rightharpoonup S$ ：
+$F(v, \text{spec}) = v.\__format\_\_(\text{spec})$
 
 格式规格符的形式语言（EBNF）：
 ```

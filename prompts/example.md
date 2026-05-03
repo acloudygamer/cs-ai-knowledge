@@ -10,14 +10,14 @@
 
 ## 数学模型
 
-设容量序列 $\{c_0, c_1, c_2, \dots\}$，增长因子 $k > 1$（标准库实现通常 $k = 2$ 或 $1.5$）：
-$$c_{i+1} = \max(c_i \times k,\ 1)$$
+设容量序列 $\{c_0, c_1, c_2, \dots\}$ ，增长因子 $k > 1$ （标准库实现通常 $k = 2$ 或 $1.5$ ）：
+$c_{i+1} = \max(c_i \times k,\ 1)$
 
-第 $i$ 次扩容发生时，已有元素数 $n_i = c_i$，移动代价与 $c_i$ 成正比。总移动次数 $T(N)$ 满足：
-$$T(N) = \sum_{i=0}^{\lfloor \log_k N \rfloor} c_i = \sum_{i=0}^{\lfloor \log_k N \rfloor} k^i = \frac{k^{\lfloor \log_k N \rfloor + 1} - 1}{k - 1} \le \frac{kN - 1}{k - 1} = O(N)$$
+第 $i$ 次扩容发生时，已有元素数 $n_i = c_i$ ，移动代价与 $c_i$ 成正比。总移动次数 $T(N)$ 满足：
+$T(N) = \sum_{i=0}^{\lfloor \log_k N \rfloor} c_i = \sum_{i=0}^{\lfloor \log_k N \rfloor} k^i = \frac{k^{\lfloor \log_k N \rfloor + 1} - 1}{k - 1} \le \frac{kN - 1}{k - 1} = O(N)$
 
 均摊到每个插入操作的移动次数：
-$$\frac{T(N)}{N} = O(1)$$
+$\frac{T(N)}{N} = O(1)$
 
 **归约终点**：扩容的代价归结为**内存分配 + 元素搬移 + 内存释放**，三者均受控于堆管理器和元素类型的移动开销。
 
@@ -45,8 +45,8 @@ $$\frac{T(N)}{N} = O(1)$$
 ## 机制
 
 扩容采用指数增长而非固定步长增长的原因：
-- 若每次 `push_back` 都按固定大小扩容（如 `cap += 1`），则 $T(N) = 1 + 2 + \dots + N = O(N^2)$，无法用于动态数组。
-- 指数增长将分配次数从 $O(N)$ 降为 $O(\log N)$，总移动量线性。
+- 若每次 `push_back` 都按固定大小扩容（如 `cap += 1`），则 $T(N) = 1 + 2 + \dots + N = O(N^2)$ ，无法用于动态数组。
+- 指数增长将分配次数从 $O(N)$ 降为 $O(\log N)$ ，总移动量线性。
 
 **约束条件**：
 - 扩容时旧内存中的元素必须满足**移动不抛出异常**（或至少是可移动的），否则回退到拷贝。
@@ -88,15 +88,15 @@ Scaled Dot-Product Attention 是一个可微的键值检索机制：查询向量
 
 ## 数学模型
 
-给定 Query 矩阵 $Q \in \mathbb{R}^{L \times d_k}$，Key 矩阵 $K \in \mathbb{R}^{L \times d_k}$，Value 矩阵 $V \in \mathbb{R}^{L \times d_v}$：
+给定 Query 矩阵 $Q \in \mathbb{R}^{L \times d_k}$ ，Key 矩阵 $K \in \mathbb{R}^{L \times d_k}$ ，Value 矩阵 $V \in \mathbb{R}^{L \times d_v}$ ：
 
-$$\text{Attention}(Q, K, V) = \text{softmax}\left(\frac{QK^T}{\sqrt{d_k}}\right)V$$
+$\text{Attention}(Q, K, V) = \text{softmax}\left(\frac{QK^T}{\sqrt{d_k}}\right)V$
 
 **缩放因子 $\frac{1}{\sqrt{d_k}}$ 的来源**：
-假设 $Q$ 和 $K$ 的行向量各分量 $q_{it}$、$k_{jt}$ 独立同分布，均值为 0、方差为 1。则点积 $q_i \cdot k_j = \sum_{t=1}^{d_k} q_{it} k_{jt}$ 的方差为：
-$$\mathrm{Var}\left( \sum_t q_{it}k_{jt} \right) = \sum_t \mathrm{Var}(q_{it}k_{jt}) = \sum_t \mathrm{Var}(q_{it})\mathrm{Var}(k_{jt}) = d_k \times 1 \times 1 = d_k$$
+假设 $Q$ 和 $K$ 的行向量各分量 $q_{it}$ 、 $k_{jt}$ 独立同分布，均值为 0、方差为 1。则点积 $q_i \cdot k_j = \sum_{t=1}^{d_k} q_{it} k_{jt}$ 的方差为：
+$\mathrm{Var}\left( \sum_t q_{it}k_{jt} \right) = \sum_t \mathrm{Var}(q_{it}k_{jt}) = \sum_t \mathrm{Var}(q_{it})\mathrm{Var}(k_{jt}) = d_k \times 1 \times 1 = d_k$
 
-若不做缩放，Softmax 的输入方差 $\sigma^2 = d_k$。当 $d_k$ 较大（如 512）时，点积值取值于 $[- \sigma\sqrt{2\log L}, +\sigma\sqrt{2\log L}]$ 外，Softmax 输出接近独热分布，梯度几乎为零。除以 $\sqrt{d_k}$ 使方差降回 1，确保梯度正常流动。
+若不做缩放，Softmax 的输入方差 $\sigma^2 = d_k$ 。当 $d_k$ 较大（如 512）时，点积值取值于 $[- \sigma\sqrt{2\log L}, +\sigma\sqrt{2\log L}]$ 外，Softmax 输出接近独热分布，梯度几乎为零。除以 $\sqrt{d_k}$ 使方差降回 1，确保梯度正常流动。
 
 ## 数据流
 
@@ -131,11 +131,11 @@ Q (L, d_k)                K^T (d_k, L)                 V (L, d_v)
 ## 机制
 
 **三个矩阵的物理含义**：
-- $Q$（Query）：当前 token "想寻找什么信息"。
-- $K$（Key）：当前 token "能够提供的信息类型"。
-- $V$（Value）：当前 token "实际携带的内容"。
+- $Q$ （Query）：当前 token "想寻找什么信息"。
+- $K$ （Key）：当前 token "能够提供的信息类型"。
+- $V$ （Value）：当前 token "实际携带的内容"。
 
-`QK^T` 计算所有 query–key 对的内积，相当于在注意力空间中计算匹配分数。Softmax 将分数转为概率分布——对每个 query，它对整个序列的 key 有一个概率权重。最后用这个权重对 V 做加权和：$\text{Output}_i = \sum_j \text{softmax}_j(\frac{Q_i K^T}{\sqrt{d_k}}) V_j$。
+`QK^T` 计算所有 query–key 对的内积，相当于在注意力空间中计算匹配分数。Softmax 将分数转为概率分布——对每个 query，它对整个序列的 key 有一个概率权重。最后用这个权重对 V 做加权和： $\text{Output}_i = \sum_j \text{softmax}_j(\frac{Q_i K^T}{\sqrt{d_k}}) V_j$ 。
 
 **为什么要用点积 + Softmax 而非余弦相似度**：点积在矩阵乘法下高度并行，且可融入缩放因子直接控制方差。Softmax 保证权重非负且和为 1，等价于一种"软性键值检索"。
 
@@ -174,9 +174,9 @@ def attention(Q, K, V):
 
 | 执行单元 | $T_{ctx}$ 典型值 | 内存模型 | 调度权 |
 |----------|------------------|----------|--------|
-| 进程     | $1\!-\!10\,\mu s$（含 TLB 刷新、页表切换） | 独立虚拟地址空间 | 内核抢占式 |
-| 线程     | $0.2\!-\!1\,\mu s$（同进程内，需系统调用） | 共享地址空间，独立栈 | 内核抢占式 |
-| 协程     | $10\!-\!50\,ns$（仅寄存器保存/恢复） | 共享地址空间，共享或独立栈 | **用户态协作式** |
+| 进程     | $1\!-\!10\,\mu s$ （含 TLB 刷新、页表切换） | 独立虚拟地址空间 | 内核抢占式 |
+| 线程     | $0.2\!-\!1\,\mu s$ （同进程内，需系统调用） | 共享地址空间，独立栈 | 内核抢占式 |
+| 协程     | $10\!-\!50\,ns$ （仅寄存器保存/恢复） | 共享地址空间，共享或独立栈 | **用户态协作式** |
 
 **归约终点**：切换代价的本质差异来源于**特权级切换**（用户态↔内核态）和**地址空间切换**（CR3 寄存器重载导致 TLB 失效）。协程不触发任何特权级转换，因此逼近函数调用。
 

@@ -16,9 +16,9 @@ $$
 \text{Template} = \bigcup_{i=0}^{n} (\text{strings}[i] \cup \text{interpolations}[i])
 $$
 
-其中 $|\text{strings}| = |\text{interpolations}| + 1$。每个 `Interpolation` 元组包含 `(value, expression, conversion, format_spec)`。
+其中 $|\text{strings}| = |\text{interpolations}| + 1$ 。每个 `Interpolation` 元组包含 `(value, expression, conversion, format_spec)`。
 
-渲染函数 $f: \text{Template} \rightarrow \text{str}$：
+渲染函数 $f: \text{Template} \rightarrow \text{str}$ ：
 
 $$
 f(T) = \text{concat}(\text{map}(\text{convert}, T))
@@ -43,8 +43,8 @@ $$
 这解决了循环前向引用问题：`class A: def f(self) -> B: ...` 和 `class B: ...` 无需 `"B"` 引号包裹。
 
 **惰性求值的开销分析**：
-- 立即求值：导入时完成所有类型解析，$O(n)$ 复杂度（$n$ 为类型表达式深度）
-- 惰性求值：首次访问时解析，后续访问 $O(1)$（缓存命中）
+- 立即求值：导入时完成所有类型解析， $O(n)$ 复杂度（$n$ 为类型表达式深度）
+- 惰性求值：首次访问时解析，后续访问 $O(1)$ （缓存命中）
 - 对于循环导入场景，惰性求值将解析从导入时延迟到实际使用时
 
 ### 子解释器 GIL 隔离
@@ -57,7 +57,7 @@ $$
 
 线程共享同一 `Interpreter`，因此共享同一 GIL；子解释器各自独立 GIL，允许真正的多核并行。
 
-**子解释器的并行度**：若在 $n$ 个子解释器中运行 $n$ 个 CPU 密集型任务，则有效并行度为 $n$（无 GIL 竞争）。但子解释器间通信需要序列化，存在额外开销。
+**子解释器的并行度**：若在 $n$ 个子解释器中运行 $n$ 个 CPU 密集型任务，则有效并行度为 $n$ （无 GIL 竞争）。但子解释器间通信需要序列化，存在额外开销。
 
 ## 数据流
 
@@ -107,7 +107,7 @@ def safe_render(template: Template) -> str:
 
 **约束**：Python 不内置 `substitute` 方法；需手动遍历 `Template` 对象实现渲染。
 
-**XSS 防护的数学保证**：令 $I$ 为用户输入集合，$h: I \rightarrow H$ 为 HTML 转义函数。设 $t = \text{concat}(...h(i)...)$，则 $t$ 中不包含未转义的 `<`, `>`, `&`, `"`, `'`。这使得 t-string 适合作为 HTML 模板。
+**XSS 防护的数学保证**：令 $I$ 为用户输入集合， $h: I \rightarrow H$ 为 HTML 转义函数。设 $t = \text{concat}(...h(i)...)$，则 $t$ 中不包含未转义的 `<`, `>`, `&`, `"`, `'`。这使得 t-string 适合作为 HTML 模板。
 
 ### 子解释器的并行模型
 
@@ -133,7 +133,7 @@ result = sum(range(10**7))
 
 **约束**：子解释器间通信需通过 `Queue` 或序列化数据，不能直接共享 Python 对象。
 
-**通信开销的量化**：设传递数据大小为 $n$ 字节。跨子解释器传递需要序列化（$O(n)$）→ 进程间传输（$O(n)$）→ 反序列化（$O(n)$）。相对于进程间通信（还需 IPC 机制），子解释器通信开销较低（共享进程空间）。
+**通信开销的量化**：设传递数据大小为 $n$ 字节。跨子解释器传递需要序列化（ $O(n)$ ）→ 进程间传输（$O(n)$）→ 反序列化（$O(n)$）。相对于进程间通信（还需 IPC 机制），子解释器通信开销较低（共享进程空间）。
 
 ### 自由线程模式（Python 3.13+）
 
@@ -172,19 +172,19 @@ def factorial(n, acc=1):
 
 传统解释器每次递归创建新栈帧；尾调用解释器在满足条件时复用当前栈帧。
 
-**尾调用优化的数学保证**：尾调用优化的正确性由尾调用消除定理保证。设函数 $f$ 在尾部调用 $g$：
+**尾调用优化的数学保证**：尾调用优化的正确性由尾调用消除定理保证。设函数 $f$ 在尾部调用 $g$ ：
 
 $$
 f(x) = g(h(x))
 $$
 
-优化后，$f$ 的栈帧被 $g$ 的栈帧替代，等价于：
+优化后， $f$ 的栈帧被 $g$ 的栈帧替代，等价于：
 
 $$
 \text{执行 } g(h(x)) \text{ 而不保留 } f \text{ 的栈帧}
 $$
 
-这将尾递归的空间复杂度从 $O(n)$ 降至 $O(1)$。
+这将尾递归的空间复杂度从 $O(n)$ 降至 $O(1)$ 。
 
 **当前状态**：此特性在 Python 3.14 中**尚未合并进入主分支**，仅为实验性提案。默认构建不包含此功能。
 
@@ -202,11 +202,11 @@ v7 UUID 将时间戳置于高位，允许 MySQL/InnoDB 的自增主键行为，�
 
 **v7 的排序性证明**：v7 UUID 的高位是 Unix Epoch 毫秒时间戳（48 位），低位是 74 位随机数。对于时间上连续生成的 UUID，其高位时间戳单调递增，因此 v7 UUID 在时间上可排序，接近自增主键的插入局部性。
 
-设两次生成的时间戳为 $t_1 < t_2$：
+设两次生成的时间戳为 $t_1 < t_2$ ：
 
-$$\text{UUID}_1 = \text{concat}(t_1, \text{rand}_1), \quad \text{UUID}_2 = \text{concat}(t_2, \text{rand}_2)$$
+$\text{UUID}_1 = \text{concat}(t_1, \text{rand}_1), \quad \text{UUID}_2 = \text{concat}(t_2, \text{rand}_2)$
 
-由于 $t_1 < t_2$ 且高位优先，$\text{UUID}_1 < \text{UUID}_2$。因此 v7 UUID 具有与时间戳同构的排序顺序。
+由于 $t_1 < t_2$ 且高位优先， $\text{UUID}_1 < \text{UUID}_2$ 。因此 v7 UUID 具有与时间戳同构的排序顺序。
 
 ### 性能提升
 
@@ -216,11 +216,11 @@ Python 3.14 在 PyPerformance 基准测试中比 3.13 平均快 9-15%，部分 P
 - 内存分配器改进（obmalloc 优化）
 - 帧堆栈优化（减少函数调用开销）
 
-**Tier 2 编译的收益量化**：设热点代码执行 $k$ 次，每次解释执行开销为 $c_1$，Tier 2 编译后为 $c_2$，编译开销为 $c_{comp}$。Tier 2 产生净收益的条件：
+**Tier 2 编译的收益量化**：设热点代码执行 $k$ 次，每次解释执行开销为 $c_1$ ，Tier 2 编译后为 $c_2$ ，编译开销为 $c_{comp}$ 。Tier 2 产生净收益的条件：
 
-$$k \cdot (c_1 - c_2) > c_{comp}$$
+$k \cdot (c_1 - c_2) > c_{comp}$
 
-当 $c_{comp} \approx 1000 \times c_2$、$c_1 \approx 5 \times c_2$ 时，需要 $k > 250$ 次执行才能覆盖编译成本。
+当 $c_{comp} \approx 1000 \times c_2$ 、 $c_1 \approx 5 \times c_2$ 时，需要 $k > 250$ 次执行才能覆盖编译成本。
 
 ### 违反约束的后果
 

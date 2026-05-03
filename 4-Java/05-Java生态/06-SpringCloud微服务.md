@@ -38,7 +38,7 @@ HALF_OPEN（试探）：
 ```
 
 **状态机的形式化定义**：
-$$M = (S, s_0, E, \delta, F)$$
+$M = (S, s_0, E, \delta, F)$
 
 其中：
 - $S = \{\text{CLOSED}, \text{OPEN}, \text{HALF\_OPEN}\}$ 是状态集
@@ -48,15 +48,15 @@ $$M = (S, s_0, E, \delta, F)$$
 - $F \subseteq S$ 是终态集（本题中无终态）
 
 **CLOSED 状态的失败率计算**（滑动窗口）：
-$$p_{\text{failure}} = \frac{\text{failures in window}}{\text{requests in window}}$$
+$p_{\text{failure}} = \frac{\text{failures in window}}{\text{requests in window}}$
 
-设滑动窗口大小为 $W$，失败阈值为 $\theta$：
+设滑动窗口大小为 $W$ ，失败阈值为 $\theta$ ：
 - 若 $p_{\text{failure}} > \theta$ → OPEN
 - 若 $p_{\text{failure}} \leq \theta$ → 保持 CLOSED
 
 **HALF_OPEN 状态的转换不变量**：
-$$\text{OPEN} \xrightarrow{\text{timeout}} \text{HALF\_OPEN} \xrightarrow{\text{success} \geq N_s} \text{CLOSED}$$
-$$\text{OPEN} \xrightarrow{\text{timeout}} \text{HALF\_OPEN} \xrightarrow{\text{failure} \geq N_f} \text{OPEN}$$
+$\text{OPEN} \xrightarrow{\text{timeout}} \text{HALF\_OPEN} \xrightarrow{\text{success} \geq N_s} \text{CLOSED}$
+$\text{OPEN} \xrightarrow{\text{timeout}} \text{HALF\_OPEN} \xrightarrow{\text{failure} \geq N_f} \text{OPEN}$
 
 ### 服务注册的 AP vs CP 分析
 
@@ -74,11 +74,11 @@ $$\text{OPEN} \xrightarrow{\text{timeout}} \text{HALF\_OPEN} \xrightarrow{\text{
 **选择依据**：服务注册对 **可用性** 要求更高——即使网络波动，也要能注册新服务实例，否则新实例无法被调用。Nacos 默认 AP 是合理选择。
 
 **CAP 不可能三角的数学描述**：
-$$\forall \text{系统}: \text{CAP} \text{ 中最多同时满足两个}$$
+$\forall \text{系统}: \text{CAP} \text{ 中最多同时满足两个}$
 
 ### 负载均衡的加权随机算法
 
-设服务实例集合 $I = \{i_1, i_2, ..., i_n\}$，每个实例有权重 $w_i$：
+设服务实例集合 $I = \{i_1, i_2, ..., i_n\}$ ，每个实例有权重 $w_i$ ：
 
 ```java
 // 加权随机算法
@@ -91,17 +91,17 @@ for (instance : instances) {
 ```
 
 **数学期望**：实例 $i$ 被选中的概率：
-$$P(i) = \frac{w_i}{\sum_{j=1}^{n} w_j}$$
+$P(i) = \frac{w_i}{\sum_{j=1}^{n} w_j}$
 
 ### 分布式链路追踪的采样率模型
 
 全量追踪开销大，通常采用 **采样追踪**：
 
-设请求总量 $N$，采样率 $p$（如 10%），实际追踪数：
-$$N_{\text{traced}} = N \cdot p$$
+设请求总量 $N$ ，采样率 $p$ （如 10%），实际追踪数：
+$N_{\text{traced}} = N \cdot p$
 
 **自适应采样**：高峰期降低采样率，低峰期提高采样率：
-$$p(t) = \min\left(p_{\text{max}}, \frac{p_{\text{base}}}{\text{rate}(t)}\right)$$
+$p(t) = \min\left(p_{\text{max}}, \frac{p_{\text{base}}}{\text{rate}(t)}\right)$
 
 ---
 
@@ -319,8 +319,8 @@ class UserClientFallback implements UserClient {
 **阻塞问题**：若协调者在阶段2崩溃，参与者将永远锁定资源。
 
 **2PC 的安全不变量**：
-$$\text{若任一参与者提交，则所有参与者最终必须提交}$$
-$$\text{若任一参与者回滚，则所有参与者最终必须回滚}$$
+$\text{若任一参与者提交，则所有参与者最终必须提交}$
+$\text{若任一参与者回滚，则所有参与者最终必须回滚}$
 
 ### Saga 模式的最终一致性
 

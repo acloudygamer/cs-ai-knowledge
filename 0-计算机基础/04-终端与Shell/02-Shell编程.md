@@ -17,7 +17,7 @@ T_{\text{fork}} = O(1) \quad \text{（仅复制父进程的页表，不复制堆
 $$
 
 父进程的堆、栈在物理内存中保持单一副本，直到任一进程尝试写入时才触发页面复制（COW）。因此 `fork` 的实际开销是：
-- 复制父进程的页表项（约 $O(\text{addr_space})$，但现代实现为 $O(1)$ 因为页表是分层结构）
+- 复制父进程的页表项（约 $O(\text{addr_space})$ ，但现代实现为 $O(1)$ 因为页表是分层结构）
 - 设置子进程的 CPU 寄存器上下文
 
 $$
@@ -63,9 +63,9 @@ $$
 \text{原子写入} \iff \text{write 的字节数} \leq PIPE\_BUF \ (\text{默认} \ 4096)
 $$
 
-当写入字节数 $> PIPE\_BUF$ 时，`write` 可能被中断，产生部分写入。此时返回值为已写入的字节数（$< nbytes$），调用方需处理短写入（short write）。
+当写入字节数 $> PIPE\_BUF$ 时，`write` 可能被中断，产生部分写入。此时返回值为已写入的字节数（ $< nbytes$ ），调用方需处理短写入（short write）。
 
-对于 $n$ 个命令的管道 $cmd_1 | cmd_2 | \dots | cmd_n$，文件描述符的连接方式为：
+对于 $n$ 个命令的管道 $cmd_1 | cmd_2 | \dots | cmd_n$ ，文件描述符的连接方式为：
 
 $$
 \forall i \in [1, n-1]: \text{stdout}(cmd_i) \xrightarrow{\text{dup2}} \text{stdin}(cmd_{i+1})
@@ -502,7 +502,7 @@ $$
 
 - $Q = \{\text{Idle},\ \text{Running\_fg},\ \text{Running\_bg},\ \text{Stopped},\ \text{Zombie}\}$
 - $\Sigma = \{\text{fork},\ \text{exec},\ \text{exit},\ \text{SIGTSTP},\ \text{SIGCONT},\ \text{SIGINT},\ \text{wait}\}$
-- $\delta: Q \times \Sigma \rightarrow Q$（确定性转移）
+- $\delta: Q \times \Sigma \rightarrow Q$ （确定性转移）
 - $q_0 = \text{Idle}$
 - $F = \{\text{Idle}\}$
 

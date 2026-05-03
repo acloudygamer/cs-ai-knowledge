@@ -17,11 +17,11 @@ Q = (q_{\text{canon}},\ q_{\text{echo}},\ q_{\text{echo\_pend}},\ q_{\text{signa
 $$
 
 其中：
-- $q_{\text{canon}} \in \{\text{Collecting},\ \text{Complete}\}$：canonical 模式的行缓冲状态
-- $q_{\text{echo}} \in \{0, 1\}$：ECHO 模式标志
-- $q_{\text{echo\_pend}} \in \{\text{None},\ \text{Char},\ \text{Erase}\}$：待回显字符类型
-- $B \in \Sigma^{\leq 255}$：当前积累的字节缓冲区
-- $t_{\text{last}}$：最后接收字符的时刻（用于 $TIME$ 超时判定）
+- $q_{\text{canon}} \in \{\text{Collecting},\ \text{Complete}\}$ ：canonical 模式的行缓冲状态
+- $q_{\text{echo}} \in \{0, 1\}$ ：ECHO 模式标志
+- $q_{\text{echo\_pend}} \in \{\text{None},\ \text{Char},\ \text{Erase}\}$ ：待回显字符类型
+- $B \in \Sigma^{\leq 255}$ ：当前积累的字节缓冲区
+- $t_{\text{last}}$ ：最后接收字符的时刻（用于 $TIME$ 超时判定）
 
 **ICANON 模式的交付条件**（排反范式）：
 
@@ -29,7 +29,7 @@ $$
 \text{Deliver}(B) \Leftrightarrow \left(\exists c \in B:\ c = \text{EOL} \lor c = \text{EOF}\right) \lor \left(|B| \geq 512 \land \Delta t_{\text{since\_last}} \geq TIME\right)
 $$
 
-当 $TIME = 0$（默认值）时，超时交付被禁用，行只有在遇到 EOL/EOF 时才交付。
+当 $TIME = 0$ （默认值）时，超时交付被禁用，行只有在遇到 EOL/EOF 时才交付。
 
 **ICANON 模式的字符处理规则**：
 
@@ -41,7 +41,7 @@ $$
 | `\x04` (Ctrl+D) | EOT | 若在行首且 ICANON，开启 EOF | 通知读取方流结束 |
 | `\x7F` (DEL) | 127 | 删除缓冲区最后一个字符 | 仅在 canonical 模式有效 |
 
-**归约终点**：行规程的状态机可归约为 **字节变换函数** $f: \Sigma^{*} \times \Sigma \rightarrow \Sigma^{*} \times \{\text{Deliver}, \text{Collect}, \text{Signal}\}$，其输出取决于 ICANON/ECHO/ISIG/ICRNL 等标志位的配置。
+**归约终点**：行规程的状态机可归约为 **字节变换函数** $f: \Sigma^{*} \times \Sigma \rightarrow \Sigma^{*} \times \{\text{Deliver}, \text{Collect}, \text{Signal}\}$ ，其输出取决于 ICANON/ECHO/ISIG/ICRNL 等标志位的配置。
 
 ### PTY 的语义等价模型
 

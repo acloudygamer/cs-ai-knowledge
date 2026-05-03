@@ -8,15 +8,15 @@ JDBC（Java Database Connectivity）是基于驱动注册的数据库无关抽�
 
 ### SQL 注入的字符串拼接 vs 参数绑定
 
-设攻击者输入为 $I = \text{``} OR '1'='1\text{''}$。
+设攻击者输入为 $I = \text{``} OR '1'='1\text{''}$ 。
 
 字符串拼接模式：
-$$SQL(I) = \text{"SELECT * FROM users WHERE name='" } + I + \text{"'"}$$
-$$= \text{"SELECT * FROM users WHERE name='' OR '1'='1'"}$$
+$SQL(I) = \text{"SELECT * FROM users WHERE name='" } + I + \text{"'"}$
+$= \text{"SELECT * FROM users WHERE name='' OR '1'='1'"}$
 
 参数绑定模式（参数作为字面值）：
-$$SQL(? , I) = \text{"SELECT * FROM users WHERE name=?"} + \text{bind}(?, I)$$
-$$= \text{"SELECT * FROM users WHERE name='' OR '1'='1''"}$$
+$SQL(? , I) = \text{"SELECT * FROM users WHERE name=?"} + \text{bind}(?, I)$
+$= \text{"SELECT * FROM users WHERE name='' OR '1'='1''"}$
 
 拼接后的 SQL 中，`OR '1'='1'` 作为 SQL 结构的一部分被执行；参数绑定后，整个输入作为字面值 `Alice' OR '1'='1` 存储，无法改变查询结构。
 
@@ -41,11 +41,11 @@ HikariCP 连接池可形式化为有界生产者-消费者队列：
     │◀────────────── void ────────────────┤
 ```
 
-设池大小为 $P$，活跃连接数为 $A$，空闲连接数为 $I$，则：
+设池大小为 $P$ ，活跃连接数为 $A$ ，空闲连接数为 $I$ ，则：
 
-$$A + I = P$$
+$A + I = P$
 
-最大并发请求数受 $P$ 限制。若 $A = P$，新请求等待或失败。
+最大并发请求数受 $P$ 限制。若 $A = P$ ，新请求等待或失败。
 
 ### 事务隔离的数学形式化
 
@@ -58,7 +58,7 @@ $$A + I = P$$
 | REPEATABLE_READ | P0 ✗, P1 ✗, P2 ✗ (MySQL: 部分 P2) |
 | SERIALIZABLE | 全部 ✗ |
 
-设事务 $T_1, T_2$ 并发执行，$T_1$ 读取数据 $x$，$T_2$ 修改 $x$ 并提交，$T_1$ 再次读取 $x$：
+设事务 $T_1, T_2$ 并发执行， $T_1$ 读取数据 $x$，$T_2$ 修改 $x$ 并提交，$T_1$ 再次读取 $x$：
 - 若两次结果不同 → Non-repeatable Read (P1)
 
 ## 数据流
@@ -129,9 +129,9 @@ PreparedStatement 执行流：
 1. 第一次 `executeQuery()`：发送 SQL 骨架 → 数据库编译 → 生成执行计划 → 缓存
 2. 后续 `executeQuery()`：发送参数值 → 数据库使用缓存的计划
 
-设参数为 $p_1, p_2, ..., p_n$，执行计划为 $Plan$。参数绑定后：
+设参数为 $p_1, p_2, ..., p_n$ ，执行计划为 $Plan$ 。参数绑定后：
 
-$$\text{Query} = Plan(p_1, p_2, ..., p_n)$$
+$\text{Query} = Plan(p_1, p_2, ..., p_n)$
 
 **关键约束**：执行计划由 SQL 骨架决定，与参数值无关。这使得大量相似查询（仅参数不同）可以复用编译结果，减少 CPU 开销。
 
@@ -214,9 +214,9 @@ ConnectionProxy {
 }
 ```
 
-设泄漏检测阈值为 $T_{leak}$，连接借出时间为 $t_{checkout}$，则泄漏判定：
+设泄漏检测阈值为 $T_{leak}$ ，连接借出时间为 $t_{checkout}$ ，则泄漏判定：
 
-$$\text{leak} \iff (t_{now} - t_{checkout}) > T_{leak}$$
+$\text{leak} \iff (t_{now} - t_{checkout}) > T_{leak}$
 
 ## 参考存根
 
