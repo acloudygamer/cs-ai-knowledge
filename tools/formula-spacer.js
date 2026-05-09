@@ -14,7 +14,7 @@ const fs = require('fs');
 const path = require('path');
 
 // 中文字符 Unicode 范围
-const CHINESE_REGEX = /[一-鿿　-〿＀-￯]/;
+const CHINESE_REGEX = /[一-鿿　-〿！-￯]/;
 
 // 检查一个字符是否为中文（包括中日韩统一表意文字、全角标点）
 function isChinese(char) {
