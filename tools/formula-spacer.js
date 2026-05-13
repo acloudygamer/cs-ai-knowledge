@@ -1,143 +1,75 @@
 #!/usr/bin/env node
-/**
- * 公式两端空格填充脚本
- *
- * 遍历所有 .md 文件，确保 $...$ 和 $$...$$ 公式两端恰好有一个空格。
- * 规则：
- *   - 公式前必须恰好有一个空格
- *   - 公式后必须恰好有一个空格
- *
- * 用法：node formula-spacer.js [目录]
- */
-
 const fs = require('fs');
 const path = require('path');
 
-// 处理行内公式 $...$
-function processInlineFormula(line) {
-  // 匹配 $...$，支持转义 \$
-  const regex = /(?<!\\)\$(?!\$)((?:[^$\\]|\\.)+?)(?<!\\)\$/g;
-  let result = '';
-  let lastIndex = 0;
-  let match;
+function formatText(text) {
+  // 使用 Unicode 私有字符作为占位符，绝对不会和文件内容冲突
+  const BGN = '\uE000';
+  const END = '\uE001';
 
-  while ((match = regex.exec(line)) !== null) {
-    const fullMatch = match[0]; // 如 "$a + b$"
-    const start = match.index;
-    const end = start + fullMatch.length - 1;
+  // 1. 保护代码块：屏蔽 ```多行
 
-    // 公式前面的部分
-    const before = line.substring(lastIndex, start);
-    // 公式后面的部分
-    const after = line.substring(end + 1);
-
-    // 确保前面恰好有一个空格
-    let newBefore = before;
-    if (before.length === 0) {
-      newBefore = ' ';
-    } else if (before[before.length - 1] !== ' ') {
-      newBefore = before + ' ';
-    }
-    // 如果最后一个字符是空格但前面还有空格（多余），保留一个
-    // 否则 newBefore 已经处理好了
-
-    // 确保后面恰好有一个空格
-    let newAfter = after;
-    if (after.length === 0) {
-      newAfter = ' ';
-    } else if (after[0] !== ' ') {
-      newAfter = ' ' + after;
-    }
-
-    result += newBefore + fullMatch + newAfter;
-    lastIndex = end + 1;
-  }
-
-  result += line.substring(lastIndex);
-  return result;
-}
-
-// 处理整行（$$...$$ 块公式）
-function processBlockFormula(line) {
-  // 匹配 $$...$$
-  const regex = /\$\$((?:[^$\\]|\\.)+?)\$\$/g;
-  let result = line;
-  let match;
-  let offset = 0;
-
-  while ((match = regex.exec(line)) !== null) {
-    const fullMatch = match[0];
-    const start = match.index;
-    const end = start + fullMatch.length - 1;
-
-    const before = line.substring(0, start);
-    const after = line.substring(end + 1);
-
-    // 确保前面恰好有一个空格
-    let newBefore = before;
-    if (before.length === 0) {
-      newBefore = ' ';
-    } else if (before[before.length - 1] !== ' ') {
-      newBefore = before + ' ';
-    }
-
-    // 确保后面恰好有一个空格
-    let newAfter = after;
-    if (after.length === 0) {
-      newAfter = ' ';
-    } else if (after[0] !== ' ') {
-      newAfter = ' ' + after;
-    }
-
-    const newLine = newBefore + fullMatch + newAfter;
-    result = result.substring(0, start + offset) + newLine + result.substring(end + 1 + offset);
-    offset += (newLine.length - fullMatch.length);
-    line = result;
-  }
-  return result;
-}
-
-// 遍历目录处理所有 .md 文件
-function walkDir(dir) {
-  const entries = fs.readdirSync(dir, { withFileTypes: true });
-  for (const entry of entries) {
-    const fullPath = path.join(dir, entry.name);
-    if (entry.isDirectory()) {
-      walkDir(fullPath);
-    } else if (entry.isFile() && entry.name.endsWith('.md')) {
-      processFile(fullPath);
-    }
-  }
-}
-
-// 处理单个文件
-function processFile(filePath) {
-  let content = fs.readFileSync(filePath, 'utf-8');
-  const lines = content.split('\n');
-  let modified = false;
-  const newLines = lines.map(line => {
-    const processed = processBlockFormula(processInlineFormula(line));
-    if (processed !== line) modified = true;
-    return processed;
+  const codes = [];
+  text = text.replace(/(`{1,3})[\s\S]*?\1/g, match => {
+    codes.push(match);
+    return `${BGN}C${codes.length - 1}${END}`;
   });
 
-  if (modified) {
-    fs.writeFileSync(filePath, newLines.join('\n'), 'utf-8');
-    console.log(`[patched] ${filePath}`);
+  // 2. 保护并提取公式：严格提取 $...$（避开转义的 \$ 和块公式 $$）
+  const formulas = [];
+  text = text.replace(/(?<!\\|\$)(\$[^$\n]+?\$)(?!\$)/g, match => {
+    formulas.push(match);
+    return `${BGN}F${formulas.length - 1}${END}`;
+  });
+
+  const formulaRegexStr = `${BGN}F\\d+${END}`;
+
+  // 3. 收紧现有空格：如果公式两端原本就有 2 个以上的空格，强制压缩为 1 个
+  text = text.replace(new RegExp(` {2,}(${formulaRegexStr})`, 'g'), ' $1');
+  text = text.replace(new RegExp(`(${formulaRegexStr}) {2,}`, 'g'), '$1 ');
+
+  // 4. 处理【前边界】：如果前面【不是】空白、左括号、引号或 Markdown 特殊符号，则加空格
+  const excludeBefore = `[^\\s\\(\\[\\{<"'“‘（【《*_\\-~]`;
+  text = text.replace(new RegExp(`(${excludeBefore})(${formulaRegexStr})`, 'g'), '$1 $2');
+
+  // 5. 处理【后边界】：如果后面【不是】空白、右括号、标点符号、引号或 Markdown 特殊符号，则加空格
+  const excludeAfter = `[^\\s\\.,;:!\\?\\)\\]\\}>"'”’，。！？；：、）】》*_\\-~]`;
+  text = text.replace(new RegExp(`(${formulaRegexStr})(${excludeAfter})`, 'g'), '$1 $2');
+
+  // 6. 还原公式
+  text = text.replace(/\uE000F(\d+)\uE001/g, (_, i) => formulas[i]);
+
+  // 7. 还原代码块
+  text = text.replace(/\uE000C(\d+)\uE001/g, (_, i) => codes[i]);
+
+  return text;
+}
+
+// 遍历目录或文件
+function processTarget(targetPath) {
+  const stat = fs.statSync(targetPath);
+  
+  if (stat.isDirectory()) {
+    const entries = fs.readdirSync(targetPath, { withFileTypes: true });
+    for (const entry of entries) {
+      processTarget(path.join(targetPath, entry.name));
+    }
+  } else if (stat.isFile() && targetPath.endsWith('.md')) {
+    const oldText = fs.readFileSync(targetPath, 'utf-8');
+    const newText = formatText(oldText);
+    
+    if (oldText !== newText) {
+      fs.writeFileSync(targetPath, newText, 'utf-8');
+      console.log(`[已排版] ${targetPath}`);
+    }
   }
 }
 
-// 主入口
-const targetDir = process.argv[2] || '.';
-
-if (!fs.existsSync(targetDir)) {
-  console.error(`目录不存在: ${targetDir}`);
+// 运行脚本
+const target = process.argv[2] || '.';
+if (!fs.existsSync(target)) {
+  console.error('路径不存在！');
   process.exit(1);
 }
 
-const stat = fs.statSync(targetDir);
-if (stat.isFile()) {
-  processFile(targetDir);
-} else {
-  walkDir(targetDir);
-}
+processTarget(target);
