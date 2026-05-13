@@ -17,7 +17,7 @@ T_{\text{fork}} = O(1) \quad \text{（仅复制父进程的页表，不复制堆
 $$
 
 父进程的堆、栈在物理内存中保持单一副本，直到任一进程尝试写入时才触发页面复制（COW）。因此 `fork` 的实际开销是：
-- 复制父进程的页表项（约 $O(\text{addr_space})$ ，但现代实现为 $O(1)$ 因为页表是分层结构）
+- 复制父进程的页表项（约 $O(\text{addr_space})$ ，但现代实现为 $O(1)$ 因为页表是分层结构） ，但现代实现为 $O(1)$ 因为页表是分层结构） 因为页表是分层结构）
 - 设置子进程的 CPU 寄存器上下文
 
 $$
@@ -63,9 +63,9 @@ $$
 \text{原子写入} \iff \text{write 的字节数} \leq PIPE\_BUF \ (\text{默认} \ 4096)
 $$
 
-当写入字节数 $> PIPE\_BUF$ 时，`write` 可能被中断，产生部分写入。此时返回值为已写入的字节数（ $< nbytes$ ），调用方需处理短写入（short write）。
+当写入字节数 $> PIPE\_BUF$ 时，`write` 可能被中断，产生部分写入。此时返回值为已写入的字节数（ $< nbytes$ ），调用方需处理短写入（short write）。 时，`write` 可能被中断，产生部分写入。此时返回值为已写入的字节数（ $< nbytes$ ），调用方需处理短写入（short write）。 ），调用方需处理短写入（short write）。
 
-对于 $n$ 个命令的管道 $cmd_1 | cmd_2 | \dots | cmd_n$ ，文件描述符的连接方式为：
+对于 $n$ 个命令的管道 $cmd_1 | cmd_2 | \dots | cmd_n$ ，文件描述符的连接方式为： 个命令的管道 $cmd_1 | cmd_2 | \dots | cmd_n$ ，文件描述符的连接方式为： ，文件描述符的连接方式为：
 
 $$
 \forall i \in [1, n-1]: \text{stdout}(cmd_i) \xrightarrow{\text{dup2}} \text{stdin}(cmd_{i+1})
@@ -201,7 +201,7 @@ $$
 [Shell 解析器]
   ├── tokenize: "cmd1" "-a" "-b" "|" "cmd2" ">" "out.txt"
   ├── 检测重定向: ">" → stdout 重定向, "|" → pipe
-  └── 展开: ~ → $HOME, $VAR → 值, 通配符 → 文件列表
+  └── 展开: ~ → $HOME, $ VAR → 值, 通配符 → 文件列表VAR → 值, 通配符 → 文件列表
         │
         ▼
 建立管道：pipe(pipefd)   // pipefd[0]=read端, pipefd[1]=write端
@@ -338,8 +338,8 @@ if (fork() == 0) {
 ### 管道中的原子性边界与部分写入
 
 管道写入的原子性由 `PIPE_BUF` 决定：
-- $\text{write\_size} \leq 4096$ → 全部成功或全部失败（原子）
-- $\text{write\_size} > 4096$ → 可能部分写入，需循环重试
+- $\text{write\_size} \leq 4096$ → 全部成功或全部失败（原子） → 全部成功或全部失败（原子）
+- $\text{write\_size} > 4096$ → 可能部分写入，需循环重试 → 可能部分写入，需循环重试
 
 **部分写入的处理模式**：
 
@@ -416,12 +416,12 @@ $$
 
 **约束**：命令替换在**变量展开之后**处理。这意味着：
 ```bash
-x='echo $x'  # x 是字符串 "echo $x"
-eval $x      # eval 会再次展开，此时 $x 被求值
+x='echo $x'  # x 是字符串 "echo $ x"x"
+eval $x      # eval 会再次展开，此时 $ x 被求值x 被求值
 ```
 
 **命令替换的嵌套规则**：
-- `$(echo $(echo a))` 是合法的，嵌套命令替换从内向外展开
+- ` $(echo $ (echo a))` 是合法的，嵌套命令替换从内向外展开(echo a))` 是合法的，嵌套命令替换从内向外展开
 - 命令替换创建子 Shell 执行，变量作用域隔离
 
 ### 后台作业与 nohup 的协同
@@ -500,13 +500,13 @@ $$
 M = (Q, \Sigma, \delta, q_0, F)
 $$
 
-- $Q = \{\text{Idle},\ \text{Running\_fg},\ \text{Running\_bg},\ \text{Stopped},\ \text{Zombie}\}$
-- $\Sigma = \{\text{fork},\ \text{exec},\ \text{exit},\ \text{SIGTSTP},\ \text{SIGCONT},\ \text{SIGINT},\ \text{wait}\}$
-- $\delta: Q \times \Sigma \rightarrow Q$ （确定性转移）
-- $q_0 = \text{Idle}$
-- $F = \{\text{Idle}\}$
+- $Q = \{\text{Idle},\ \text{Running\_fg},\ \text{Running\_bg},\ \text{Stopped},\ \text{Zombie}\}$ 
+- $\Sigma = \{\text{fork},\ \text{exec},\ \text{exit},\ \text{SIGTSTP},\ \text{SIGCONT},\ \text{SIGINT},\ \text{wait}\}$ 
+- $\delta: Q \times \Sigma \rightarrow Q$ （确定性转移） （确定性转移）
+- $q_0 = \text{Idle}$ 
+- $F = \{\text{Idle}\}$ 
 
-该自动机的**可达状态**是有限的（最多 $|Q|$ 个），因此 Shell 的作业控制问题可被完全形式化验证。
+该自动机的**可达状态**是有限的（最多 $|Q|$ 个），因此 Shell 的作业控制问题可被完全形式化验证。 个），因此 Shell 的作业控制问题可被完全形式化验证。
 
 **归约终点的物理意义**：
 - 作业状态机归约为**进程生命周期的状态追踪**

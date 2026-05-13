@@ -12,19 +12,19 @@ CI/CD 是将代码变更从提交到生产的自动化流水线实践，包括�
 
 ### 流水线执行时间模型
 
-设流水线有 $n$ 个阶段，各阶段执行时间为 $T_i$ ，并发瓶颈导致的等待时间为 $W_j$ ：
+设流水线有 $n$ 个阶段，各阶段执行时间为 $T_i$ ，并发瓶颈导致的等待时间为 $W_j$ ： 个阶段，各阶段执行时间为 $T_i$ ，并发瓶颈导致的等待时间为 $W_j$ ： ，并发瓶颈导致的等待时间为 $W_j$ ： ：
 
 $$
 T_{pipeline} = \sum_{i=1}^{n} T_i + \sum_{j=1}^{m} W_j
 $$
 
-若各阶段可并行化，且测试可拆分为 $p$ 个并行 worker：
+若各阶段可并行化，且测试可拆分为 $p$ 个并行 worker： 个并行 worker：
 
 $$
 T_{parallel} = \sum_{i=1}^{n} T_i + \frac{T_{test}}{p} + \sum_{j \neq test} W_j
 $$
 
-理想情况下， $T_{pipeline} \approx \max(T_i)$ （最慢阶段决定总时间）。
+理想情况下， $T_{pipeline} \approx \max(T_i)$ （最慢阶段决定总时间）。 （最慢阶段决定总时间）。
 
 ### MTTR 与部署频率的关系
 
@@ -38,7 +38,7 @@ $$
 
 ### 构建缓存命中率模型
 
-设依赖项数量为 $n$ ，每次构建的缓存命中概率：
+设依赖项数量为 $n$ ，每次构建的缓存命中概率： ，每次构建的缓存命中概率：
 
 $$
 P_{cache\_hit} = \frac{\text{未变化依赖数}}{\text{总依赖数}}
@@ -134,7 +134,7 @@ $$
 \text{Enabled}(F, U, T) = \text{policy}(F, U) \geq T
 $$
 
-其中 $F$ 是特性名， $U$ 是用户， $T$ 是阈值。
+其中 $F$ 是特性名， $U$ 是用户， $T$ 是阈值。 是特性名， $U$ 是用户， $T$ 是阈值。 是用户， $T$ 是阈值。 是阈值。
 
 ### 构建缓存的依赖图分析
 
@@ -161,7 +161,7 @@ jobs:
         uses: actions/cache@v3
         with:
           path: ~/.npm
-          key: ${{ runner.os }}-npm-${{ hashFiles('**/package-lock.json') }}
+          key: ${{ runner.os }}-npm-$ {{ hashFiles('**/package-lock.json') }}{{ hashFiles('**/package-lock.json') }}
       - run: npm ci && npm test
       - run: docker build -t app:${{ github.sha }} .
 ```

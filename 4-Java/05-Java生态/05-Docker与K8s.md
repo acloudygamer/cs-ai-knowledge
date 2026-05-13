@@ -19,12 +19,12 @@ cgroup v2 的资源约束可建模为不等式组：
 
 | 资源类型 | 约束形式 | 说明 |
 |---------|---------|------|
-| CPU | $\text{CPU}_{\text{quota}} / \text{CPU}_{\text{period}} \leq N$ | 容器最多使用 N 个 CPU |
-| 内存 | $\text{memory.max} = X$ | 超过则 OOM Kill |
-| I/O | $\text{IOPS}_{\text{throttle}} \leq Y$ | 限制磁盘吞吐量 |
+| CPU | $\text{CPU}_{\text{quota}} / \text{CPU}_{\text{period}} \leq N$ | 容器最多使用 N 个 CPU | | 容器最多使用 N 个 CPU |
+| 内存 | $\text{memory.max} = X$ | 超过则 OOM Kill | | 超过则 OOM Kill |
+| I/O | $\text{IOPS}_{\text{throttle}} \leq Y$ | 限制磁盘吞吐量 | | 限制磁盘吞吐量 |
 
-**CPU 权重模型**：cgroup 按权重分配 CPU 时间片。设容器 A 权重 $w_A$ ，容器 B 权重 $w_B$ ，则 CPU 时间片比例为：
-$\frac{T_A}{T_B} = \frac{w_A}{w_B}$
+**CPU 权重模型**：cgroup 按权重分配 CPU 时间片。设容器 A 权重 $w_A$ ，容器 B 权重 $w_B$ ，则 CPU 时间片比例为： ，容器 B 权重 $w_B$ ，则 CPU 时间片比例为： ，则 CPU 时间片比例为：
+ $\frac{T_A}{T_B} = \frac{w_A}{w_B}$ 
 
 权重是相对值，不是绝对值。若只有一个容器，即使权重很低也能使用全部空闲 CPU。
 
@@ -40,14 +40,14 @@ Pod 调度 = 将 Pod 放入最优节点，本质是 **多维装箱问题（Multi
 装箱目标是 **资源利用率最大化**，通常使用 **First Fit Decreasing (FFD)** 或 **Best Fit** 启发式算法。
 
 **优先级函数**（simplified）：
-$Score_i = w_1 \cdot \frac{\text{CPU\_used}}{\text{CPU\_allocatable}} + w_2 \cdot \frac{\text{Mem\_used}}{\text{Mem\_allocatable}}$
+ $Score_i = w_1 \cdot \frac{\text{CPU\_used}}{\text{CPU\_allocatable}} + w_2 \cdot \frac{\text{Mem\_used}}{\text{Mem\_allocatable}}$ 
 
 得分最高的节点被选中调度。
 
 **FFD 算法的不变量**：
-$\text{装箱后的平均利用率} \geq \frac{1}{\text{OPT} + 1} \cdot 100\%$
+ $\text{装箱后的平均利用率} \geq \frac{1}{\text{OPT} + 1} \cdot 100\%$ 
 
-其中 OPT 为最优装箱的箱数。FFD 的近似比为 $\frac{11}{9} \cdot \text{OPT}$ 。
+其中 OPT 为最优装箱的箱数。FFD 的近似比为 $\frac{11}{9} \cdot \text{OPT}$ 。 。
 
 ### Pod QoS 的优先级建模
 
@@ -60,9 +60,9 @@ Kubernetes 为 Pod 分配 QoS 类别：**Guaranteed > Burstable > BestEffort**
 | BestEffort | neither set | 正值（最先被 kill） |
 
 **OOM Score 计算**（Linux 内核）：
-$\text{oom\_score} = \text{base\_score} + \frac{\text{memory\_usage}}{\text{memory\_limit}}$
+ $\text{oom\_score} = \text{base\_score} + \frac{\text{memory\_usage}}{\text{memory\_limit}}$ 
 
-**OOM Kill 的数学保证**：OOM Killer 选择 $\max(\text{oom\_score})$ 的进程杀死。Guaranteed Pod 的 oom_score_adj 为 -999，保证其最后被考虑。
+**OOM Kill 的数学保证**：OOM Killer 选择 $\max(\text{oom\_score})$ 的进程杀死。Guaranteed Pod 的 oom_score_adj 为 -999，保证其最后被考虑。 的进程杀死。Guaranteed Pod 的 oom_score_adj 为 -999，保证其最后被考虑。
 
 ---
 
@@ -188,12 +188,12 @@ spec:
       maxSurge: 1          # 最多超出期望 Pod 数
 ```
 
-设 $N$ = 期望副本数， $S$ = maxSurge， $U$ = maxUnavailable：
+设 $N$ = 期望副本数， $S$ = maxSurge， $U$ = maxUnavailable： = 期望副本数， $S$ = maxSurge， $U$ = maxUnavailable： = maxSurge， $U$ = maxUnavailable： = maxUnavailable：
 
-**最小可用 Pod 数**： $N - U$
-**最大总 Pod 数**： $N + S$
+**最小可用 Pod 数**： $N - U$ 
+**最大总 Pod 数**： $N + S$ 
 
-Rolling Update 过程可建模为状态机，确保任意时刻都有至少 $N-U$ 个 Pod 可用——这是 **始终保持服务可用** 的数学保证。
+Rolling Update 过程可建模为状态机，确保任意时刻都有至少 $N-U$ 个 Pod 可用——这是 **始终保持服务可用** 的数学保证。 个 Pod 可用——这是 **始终保持服务可用** 的数学保证。
 
 ### 污点与容忍的调度控制
 
@@ -209,7 +209,7 @@ Pod:  tolerations 配置容忍
 **NoExecute 污点**：不仅不调度新 Pod，还会驱逐已有 Pod（除非 Pod 有对应容忍）。
 
 **容忍的数学匹配**：
-$\text{match}(t, \text{pod}) = \begin{cases} \text{true} & \text{若 } t \in \text{pod.tolerations} \\ \text{false} & \text{otherwise} \end{cases}$
+ $\text{match}(t, \text{pod}) = \begin{cases} \text{true} & \text{若 } t \in \text{pod.tolerations} \\ \text{false} & \text{otherwise} \end{cases}$ 
 
 ---
 
@@ -299,7 +299,7 @@ echo "536870912" > /sys/fs/cgroup/system.slice/container.scope/memory.max
 ```
 
 **约束满足性**：
-$\text{CPU}_{\text{usage}} \leq \frac{\text{CPU}_{\text{quota}}}{\text{CPU}_{\text{period}}}$
+ $\text{CPU}_{\text{usage}} \leq \frac{\text{CPU}_{\text{quota}}}{\text{CPU}_{\text{period}}}$ 
 
 ### 容器网络模型与主机网络的对比
 

@@ -12,21 +12,21 @@ Flask 是核心极简但扩展生态丰富的 Python WSGI Web 框架，通过松
 
 Flask 上下文管理基于 `werkzeug.local.LocalStack`，其数学模型是**线程/协程隔离的词法作用域**，可归约为线程局部存储（TLS）的变体。
 
-设 $\text{LS}$ 为 LocalStack， $\text{tid}$ 为当前线程/协程 ID， $\text{stack}[\text{tid}]$ 为该 ID 对应的对象栈：
+设 $\text{LS}$ 为 LocalStack， $\text{tid}$ 为当前线程/协程 ID， $\text{stack}[\text{tid}]$ 为该 ID 对应的对象栈： 为 LocalStack， $\text{tid}$ 为当前线程/协程 ID， $\text{stack}[\text{tid}]$ 为该 ID 对应的对象栈： 为当前线程/协程 ID， $\text{stack}[\text{tid}]$ 为该 ID 对应的对象栈： 为该 ID 对应的对象栈：
 
-$\text{LS.push}(x) \triangleq \text{stack}[\text{tid}].\text{append}(x)$
-$\text{LS.pop}() \triangleq \text{stack}[\text{tid}].\text{pop}()$
-$\text{LS.top}() \triangleq \text{stack}[\text{tid}][-1]$
+ $\text{LS.push}(x) \triangleq \text{stack}[\text{tid}].\text{append}(x)$ 
+ $\text{LS.pop}() \triangleq \text{stack}[\text{tid}].\text{pop}()$ 
+ $\text{LS.top}() \triangleq \text{stack}[\text{tid}][-1]$ 
 
-**隔离性**：若 $\text{tid}_1 \neq \text{tid}_2$ ，则 $\text{stack}[\text{tid}_1] \cap \text{stack}[\text{tid}_2] = \emptyset$ 。这保证了不同请求并发执行时，上下文完全隔离。
+**隔离性**：若 $\text{tid}_1 \neq \text{tid}_2$ ，则 $\text{stack}[\text{tid}_1] \cap \text{stack}[\text{tid}_2] = \emptyset$ 。这保证了不同请求并发执行时，上下文完全隔离。 ，则 $\text{stack}[\text{tid}_1] \cap \text{stack}[\text{tid}_2] = \emptyset$ 。这保证了不同请求并发执行时，上下文完全隔离。 。这保证了不同请求并发执行时，上下文完全隔离。
 
 **归约链**：LocalStack → contextvars（Python 3.7+） → threading.local（Python 2+） → OS-managed TLS 寄存器。Flask 的上下文隔离最终归约到操作系统层面的线程局部存储机制，是这一基础原语在 Web 框架中的具体实现。
 
 ### 会话签名（HMAC-SHA256）
 
-Flask session 本质是经密钥签名的 Cookie。设会话数据为 $D$ ，密钥为 $k$ ，时间戳为 $t$ ：
+Flask session 本质是经密钥签名的 Cookie。设会话数据为 $D$ ，密钥为 $k$ ，时间戳为 $t$ ： ，密钥为 $k$ ，时间戳为 $t$ ： ，时间戳为 $t$ ： ：
 
-$\text{session} = \text{base64}(D) \cdot \text{SEP} \cdot \text{base64}(\text{HMAC-SHA256}(k, \text{base64}(D) \cdot t \cdot \text{salt}))$
+ $\text{session} = \text{base64}(D) \cdot \text{SEP} \cdot \text{base64}(\text{HMAC-SHA256}(k, \text{base64}(D) \cdot t \cdot \text{salt}))$ 
 
 服务端验证时，重新计算 HMAC 并与传输值比对：**若不等，则数据被篡改**。
 
@@ -35,8 +35,8 @@ $\text{session} = \text{base64}(D) \cdot \text{SEP} \cdot \text{base64}(\text{HM
 **为什么这样设计**：签名 Cookie 方案使服务端完全无状态——所有会话数据存在客户端，只有一个签名防止篡改。这使得 Flask 应用可以水平扩展，多个实例共享同一签名密钥即可。
 
 安全性取决于：
-- 密钥 $k$ 的熵（应 $\ge 128$ bit 随机数）
-- HMAC-SHA256 的抗碰撞性（ $2^{256}$ 攻击代价）
+- 密钥 $k$ 的熵（应 $\ge 128$ bit 随机数） 的熵（应 $\ge 128$ bit 随机数） bit 随机数）
+- HMAC-SHA256 的抗碰撞性（ $2^{256}$ 攻击代价） 攻击代价）
 
 **约束**：数据以明文存储在 Cookie 中，仅签名防篡改，不加密保密。因此 session 中只能存用户 ID 等引用符，不得存密码或敏感信息。
 
@@ -44,13 +44,13 @@ $\text{session} = \text{base64}(D) \cdot \text{SEP} \cdot \text{base64}(\text{HM
 
 ### 路由匹配复杂度
 
-Flask 按定义顺序线性扫描路由列表。设路由数为 $R$ ，最坏情况匹配复杂度：
+Flask 按定义顺序线性扫描路由列表。设路由数为 $R$ ，最坏情况匹配复杂度： ，最坏情况匹配复杂度：
 
-$T_{\text{match}} = O(R)$
+ $T_{\text{match}} = O(R)$ 
 
-Blueprint 注册后，Werkzeug 的 `Map` 维护一个按路径前缀构建的字典跳表（radix trie），典型路径查找均摊 $O(1)$ ，但 Blueprint 内部仍按注册顺序扫描。
+Blueprint 注册后，Werkzeug 的 `Map` 维护一个按路径前缀构建的字典跳表（radix trie），典型路径查找均摊 $O(1)$ ，但 Blueprint 内部仍按注册顺序扫描。 ，但 Blueprint 内部仍按注册顺序扫描。
 
-**Radix Trie 的结构**：每个节点包含 (prefix, handler, parameters) 三元组。匹配时从根开始，按路径段前缀递减查找，时间复杂度 $O(P)$ 其中 $P$ 为路径段数，与路由总数无关。
+**Radix Trie 的结构**：每个节点包含 (prefix, handler, parameters) 三元组。匹配时从根开始，按路径段前缀递减查找，时间复杂度 $O(P)$ 其中 $P$ 为路径段数，与路由总数无关。 其中 $P$ 为路径段数，与路由总数无关。 为路径段数，与路由总数无关。
 
 **约束**：当路由数超过 100 时，线性扫描的性能损耗开始显著。此时应使用 Blueprint 并确保高频路由在注册时排在前面。
 
@@ -60,13 +60,13 @@ Blueprint 注册后，Werkzeug 的 `Map` 维护一个按路径前缀构建的字
 
 Flask 本身是**同步阻塞 I/O** 模型。单个 worker 在同一时刻只能处理一个请求——其他请求必须排队等待。这意味着：
 
-$T_{\text{response}} = \sum_{i} T_i^{\text{CPU}} + \sum_{j} T_j^{\text{I/O}}$
+ $T_{\text{response}} = \sum_{i} T_i^{\text{CPU}} + \sum_{j} T_j^{\text{I/O}}$ 
 
-其中 $T^{\text{I/O}}$ 包括数据库查询、外部 API 调用等。**若 $T^{\text{I/O}}$ 占比高（如等待数据库），worker 空闲率就高**。这是 Flask + 同步数据库驱动在高 I/O 场景下性能差的原因。
+其中 $T^{\text{I/O}}$ 包括数据库查询、外部 API 调用等。**若 $T^{\text{I/O}}$ 占比高（如等待数据库），worker 空闲率就高**。这是 Flask + 同步数据库驱动在高 I/O 场景下性能差的原因。 包括数据库查询、外部 API 调用等。**若 $T^{\text{I/O}}$ 占比高（如等待数据库），worker 空闲率就高**。这是 Flask + 同步数据库驱动在高 I/O 场景下性能差的原因。 占比高（如等待数据库），worker 空闲率就高**。这是 Flask + 同步数据库驱动在高 I/O 场景下性能差的原因。
 
 **归约**：Flask (同步) → Gunicorn (多 worker) → OS 进程调度 → 时间片轮转。真正的并发来自多 worker 进程，而非 Flask 本身。
 
-**并发度建模**：设 Gunicorn 配置 $N$ 个 worker 进程，每个 worker 处理一个请求。系统并发处理能力为 $N$ 。若请求到达率 $\lambda > N \cdot \mu$ （ $\mu$ 为单 worker 处理率），队列无限增长，响应时间爆炸。
+**并发度建模**：设 Gunicorn 配置 $N$ 个 worker 进程，每个 worker 处理一个请求。系统并发处理能力为 $N$ 。若请求到达率 $\lambda > N \cdot \mu$ （ $\mu$ 为单 worker 处理率），队列无限增长，响应时间爆炸。 个 worker 进程，每个 worker 处理一个请求。系统并发处理能力为 $N$ 。若请求到达率 $\lambda > N \cdot \mu$ （ $\mu$ 为单 worker 处理率），队列无限增长，响应时间爆炸。 。若请求到达率 $\lambda > N \cdot \mu$ （ $\mu$ 为单 worker 处理率），队列无限增长，响应时间爆炸。 （ $\mu$ 为单 worker 处理率），队列无限增长，响应时间爆炸。 为单 worker 处理率），队列无限增长，响应时间爆炸。
 
 **为什么这样设计**：同步模型简化了开发——开发者无需担心竞态条件、锁、事务边界等并发问题。一切请求串行处理，状态在请求内是确定性的。
 

@@ -21,10 +21,10 @@ Spring Boot 的本质是 **约定优于配置** 的自动化框架，通过 `spr
 
 ### 依赖注入的图论建模
 
-将应用视为有向图 $G = (V, E)$ ，其中顶点集 $V$ 表示 Bean，边 $(a, b) \in E$ 表示 Bean $a$ 依赖 Bean $b$ 。IoC 容器的核心职责是 **拓扑排序**：确保所有依赖在被注入前已完成初始化。
+将应用视为有向图 $G = (V, E)$ ，其中顶点集 $V$ 表示 Bean，边 $(a, b) \in E$ 表示 Bean $a$ 依赖 Bean $b$ 。IoC 容器的核心职责是 **拓扑排序**：确保所有依赖在被注入前已完成初始化。 ，其中顶点集 $V$ 表示 Bean，边 $(a, b) \in E$ 表示 Bean $a$ 依赖 Bean $b$ 。IoC 容器的核心职责是 **拓扑排序**：确保所有依赖在被注入前已完成初始化。 表示 Bean，边 $(a, b) \in E$ 表示 Bean $a$ 依赖 Bean $b$ 。IoC 容器的核心职责是 **拓扑排序**：确保所有依赖在被注入前已完成初始化。 表示 Bean $a$ 依赖 Bean $b$ 。IoC 容器的核心职责是 **拓扑排序**：确保所有依赖在被注入前已完成初始化。 依赖 Bean $b$ 。IoC 容器的核心职责是 **拓扑排序**：确保所有依赖在被注入前已完成初始化。 。IoC 容器的核心职责是 **拓扑排序**：确保所有依赖在被注入前已完成初始化。
 
-设 $\text{in-degree}(v)$ 表示节点 $v$ 的入度（依赖数量），则有效注入的必要条件是：
-$\forall (a, b) \in E: \text{init-order}(b) < \text{init-order}(a)$
+设 $\text{in-degree}(v)$ 表示节点 $v$ 的入度（依赖数量），则有效注入的必要条件是： 表示节点 $v$ 的入度（依赖数量），则有效注入的必要条件是： 的入度（依赖数量），则有效注入的必要条件是：
+ $\forall (a, b) \in E: \text{init-order}(b) < \text{init-order}(a)$ 
 
 **循环依赖检测**：若图中存在环（循环依赖），拓扑排序不存在，容器启动失败。
 
@@ -54,17 +54,17 @@ Spring解决setter循环依赖的三级缓存：
 | 作用域 | 实例数量上界 | 线程安全约束 |
 |--------|-------------|-------------|
 | singleton | 1 | 需要外部同步 |
-| prototype | $\infty$ | 每次新建，无共享状态 |
-| request | $\infty$ （按HTTP请求） | 线程局部，非线程安全 |
-| session | $\infty$ （按HTTP会话） | 会话局部，非线程安全 |
+| prototype | $\infty$ | 每次新建，无共享状态 | | 每次新建，无共享状态 |
+| request | $\infty$ （按HTTP请求） | 线程局部，非线程安全 | （按HTTP请求） | 线程局部，非线程安全 |
+| session | $\infty$ （按HTTP会话） | 会话局部，非线程安全 | （按HTTP会话） | 会话局部，非线程安全 |
 | application | 1（ServletContext生命周期） | 需要外部同步 |
-| websocket | $\infty$ （WebSocket生命周期） | 非线程安全 |
+| websocket | $\infty$ （WebSocket生命周期） | 非线程安全 | （WebSocket生命周期） | 非线程安全 |
 
 ### Spring AOP 的切面优先级数学
 
 多个切面同时作用于同一连接点时，执行顺序由优先级决定：
 
-$\text{Order}(A_1) < \text{Order}(A_2) \Rightarrow A_1 \text{ 先于 } A_2 \text{ 执行（around 通知）}$
+ $\text{Order}(A_1) < \text{Order}(A_2) \Rightarrow A_1 \text{ 先于 } A_2 \text{ 执行（around 通知）}$ 
 
 **around 通知的栈模型**：
 ```
@@ -79,17 +79,17 @@ public Object around(ProceedingJoinPoint pjp) {
 
 around 通知形成**嵌套调用栈**，与递归类似：
 
-$R_n \circ R_{n-1} \circ \cdots \circ R_1 \circ T$
+ $R_n \circ R_{n-1} \circ \cdots \circ R_1 \circ T$ 
 
-其中 $R_i$ 为第 $i$ 个 around 通知， $T$ 为目标方法。
+其中 $R_i$ 为第 $i$ 个 around 通知， $T$ 为目标方法。 为第 $i$ 个 around 通知， $T$ 为目标方法。 个 around 通知， $T$ 为目标方法。 为目标方法。
 
 ### 自动配置的贝叶斯条件概率模型
 
-将每个 `@Conditional` 注解视为一个条件事件。设 $C_i$ 为"第 $i$ 个条件满足"事件， $B$ 为"某 AutoConfiguration 注册"事件。Spring Boot 计算后验概率：
+将每个 `@Conditional` 注解视为一个条件事件。设 $C_i$ 为"第 $i$ 个条件满足"事件， $B$ 为"某 AutoConfiguration 注册"事件。Spring Boot 计算后验概率： 为"第 $i$ 个条件满足"事件， $B$ 为"某 AutoConfiguration 注册"事件。Spring Boot 计算后验概率： 个条件满足"事件， $B$ 为"某 AutoConfiguration 注册"事件。Spring Boot 计算后验概率： 为"某 AutoConfiguration 注册"事件。Spring Boot 计算后验概率：
 
-$P(B | C_1, C_2, ..., C_n) = \prod_{i=1}^{n} P(C_i | B)$
+ $P(B | C_1, C_2, ..., C_n) = \prod_{i=1}^{n} P(C_i | B)$ 
 
-实际执行时，Spring 逐条件求值（AND 逻辑），任意一个 $P(C_i) = 0$ 则 $B$ 不注册。
+实际执行时，Spring 逐条件求值（AND 逻辑），任意一个 $P(C_i) = 0$ 则 $B$ 不注册。 则 $B$ 不注册。 不注册。
 
 **归约视角**：自动配置问题可归约为**布尔公式的可满足性（SAT）问题**——所有条件 conjuncts 必须同时为真。
 
@@ -97,12 +97,12 @@ $P(B | C_1, C_2, ..., C_n) = \prod_{i=1}^{n} P(C_i | B)$
 
 Spring ApplicationEvent 可以建模为 **有限状态自动机（FSA）**：
 
-- 状态集 $S = \{\text{NEW}, \text{PUBLISHED}, \text{MULTICASTING}, \text{DELIVERED}\}$
-- 事件 $E = \{\text{publish}, \text{multicast}, \text{deliver}\}$
+- 状态集 $S = \{\text{NEW}, \text{PUBLISHED}, \text{MULTICASTING}, \text{DELIVERED}\}$ 
+- 事件 $E = \{\text{publish}, \text{multicast}, \text{deliver}\}$ 
 - 初始状态：NEW
 - 终止状态：DELIVERED
 
-状态转换函数 $\delta: S \times E \rightarrow S$ ：
+状态转换函数 $\delta: S \times E \rightarrow S$ ： ：
 
 | 当前状态 | 事件 | 下一状态 |
 |---------|------|---------|
@@ -111,7 +111,7 @@ Spring ApplicationEvent 可以建模为 **有限状态自动机（FSA）**：
 | MULTICASTING | deliver | DELIVERED |
 
 **FSA 不变量**：
-$\forall s \in S, \forall e \in E: \delta(s, e) \text{ 是良定义的（无未定义转换）}$
+ $\forall s \in S, \forall e \in E: \delta(s, e) \text{ 是良定义的（无未定义转换）}$ 
 
 `@TransactionalEventListener` 添加了一个 **guard condition**（事务提交后）：只有当发布线程的事务提交成功，才允许状态转换到 MULTICASTING。
 
@@ -124,10 +124,10 @@ $\forall s \in S, \forall e \in E: \delta(s, e) \text{ 是良定义的（无未�
 public class MyAutoConfiguration { ... }
 ```
 
-设配置类集合 $C$ ，偏序关系 $\prec$ ：
-$A \prec B \iff A \text{ 在 } B \text{ 之前加载}$
+设配置类集合 $C$ ，偏序关系 $\prec$ ： ，偏序关系 $\prec$ ： ：
+ $A \prec B \iff A \text{ 在 } B \text{ 之前加载}$ 
 
-若存在环形依赖（ $A \prec B \prec C \prec A$ ），Spring Boot 启动失败。
+若存在环形依赖（ $A \prec B \prec C \prec A$ ），Spring Boot 启动失败。 ），Spring Boot 启动失败。
 
 **约束检测算法**：检测偏序集中的环，等价于在有向图中检测环——可使用 Kahn 算法或 DFS。若拓扑排序后仍有未处理节点，则存在环。
 
@@ -237,12 +237,12 @@ IoC 容器通过将依赖的实例化责任转移，使 `UserService` 只声明"
 
 IoC 容器可归约为**有向无环图（DAG）的拓扑排序问题**：
 
-1. **图构建阶段**：解析 `@Autowired`、`@Inject` 或构造函数参数，建立依赖图 $G = (V, E)$
+1. **图构建阶段**：解析 `@Autowired`、`@Inject` 或构造函数参数，建立依赖图 $G = (V, E)$ 
 2. **拓扑排序阶段**：使用 Kahn 算法或深度优先后序遍历计算初始化顺序
 3. **实例化阶段**：按拓扑序实例化 Bean
 
 **Kahn 算法的不变量**：
-$\text{init-order}(v) = \text{topo-index}(v)$
+ $\text{init-order}(v) = \text{topo-index}(v)$ 
 
 当图中存在环时，Kahn 算法的入度队列最终为空但未处理所有节点——这是 Spring 检测循环依赖的数学原理。
 
@@ -316,8 +316,8 @@ public interface BeanPostProcessor {
 
 `@Conditional` 注解之间存在隐式偏序：Spring Boot 2.x 的 `@EnableAutoConfiguration` 使用 `AutoConfigurationImportSelector`，读取 `META-INF/spring.factories`；Spring Boot 3.x 改为 `META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports`，结构更清晰。
 
-**隐式偏序的数学描述**：设条件集合 $C = \{c_1, c_2, ..., c_n\}$ ，求值顺序构成一个偏序集。偏序关系由条件间的依赖决定：
-$c_i \prec c_j \iff \text{求值 } c_i \text{ 是求值 } c_j \text{ 的前提}$
+**隐式偏序的数学描述**：设条件集合 $C = \{c_1, c_2, ..., c_n\}$ ，求值顺序构成一个偏序集。偏序关系由条件间的依赖决定： ，求值顺序构成一个偏序集。偏序关系由条件间的依赖决定：
+ $c_i \prec c_j \iff \text{求值 } c_i \text{ 是求值 } c_j \text{ 的前提}$ 
 
 ### @ConfigurationProperties 的松散绑定数学本质
 
@@ -326,7 +326,7 @@ Spring Boot 支持三种命名风格自动映射：
 - `app_name` (snake_case)
 - `appName` (camelCase)
 
-设属性名为 $s$ ，字段名为 $f$ ，松散绑定关系 $s \approx f$ 由 `RelaxedDataBinder` 定义：
+设属性名为 $s$ ，字段名为 $f$ ，松散绑定关系 $s \approx f$ 由 `RelaxedDataBinder` 定义： ，字段名为 $f$ ，松散绑定关系 $s \approx f$ 由 `RelaxedDataBinder` 定义： ，松散绑定关系 $s \approx f$ 由 `RelaxedDataBinder` 定义： 由 `RelaxedDataBinder` 定义：
 
 | 风格转换 | 规则 |
 |---------|------|
@@ -336,8 +336,8 @@ Spring Boot 支持三种命名风格自动映射：
 
 **归约视角**：松散绑定本质上是**字符串重写系统的等价类划分**。每种命名风格是同一语义实体的不同表示，通过重写规则映射到规范形式（camelCase）。
 
-**数学定义**：设等价关系 $\sim$ ，则：
-$s \sim f \iff \text{normalize}(s) = \text{normalize}(f)$
+**数学定义**：设等价关系 $\sim$ ，则： ，则：
+ $s \sim f \iff \text{normalize}(s) = \text{normalize}(f)$ 
 
 ### @TransactionalEventListener 的事务边界语义
 
@@ -369,20 +369,20 @@ $s \sim f \iff \text{normalize}(s) = \text{normalize}(f)$
 
 ### 懒加载的代价-收益分析
 
-设应用有 $N$ 个 Bean，其中 $k$ 个是启动时不需要的：
+设应用有 $N$ 个 Bean，其中 $k$ 个是启动时不需要的： 个 Bean，其中 $k$ 个是启动时不需要的： 个是启动时不需要的：
 
 **即时加载**：
-- 启动时间代价： $T_{\text{eager}} = \sum_{i=1}^{N} T_{\text{init}}(i)$
-- 首次请求时间： $T_{\text{first}} = O(1)$
+- 启动时间代价： $T_{\text{eager}} = \sum_{i=1}^{N} T_{\text{init}}(i)$ 
+- 首次请求时间： $T_{\text{first}} = O(1)$ 
 
 **懒加载**：
-- 启动时间代价： $T_{\text{lazy}} = \sum_{i=1}^{N-k} T_{\text{init}}(i)$
-- 首次请求时间： $T_{\text{first}} = \sum_{j \in \text{needed}} T_{\text{init}}(j)$
+- 启动时间代价： $T_{\text{lazy}} = \sum_{i=1}^{N-k} T_{\text{init}}(i)$ 
+- 首次请求时间： $T_{\text{first}} = \sum_{j \in \text{needed}} T_{\text{init}}(j)$ 
 
-若懒加载 Bean 在请求时才初始化，且应用启动后立即接收请求，则 $T_{\text{first}}$ 延迟增加。Spring Boot 2.2+ 的 `spring.main.lazy-initialization=true` 全局启用懒加载，适用于启动速度优先的场景。
+若懒加载 Bean 在请求时才初始化，且应用启动后立即接收请求，则 $T_{\text{first}}$ 延迟增加。Spring Boot 2.2+ 的 `spring.main.lazy-initialization=true` 全局启用懒加载，适用于启动速度优先的场景。 延迟增加。Spring Boot 2.2+ 的 `spring.main.lazy-initialization=true` 全局启用懒加载，适用于启动速度优先的场景。
 
 **收益-代价权衡的不变量**：
-$T_{\text{eager}} - T_{\text{lazy}} = \sum_{j \in \text{lazy}} T_{\text{init}}(j)$
+ $T_{\text{eager}} - T_{\text{lazy}} = \sum_{j \in \text{lazy}} T_{\text{init}}(j)$ 
 
 ### DevTools 的自动重启机制
 
@@ -483,7 +483,7 @@ A() → new B()
 B() → new A()
 ```
 
-**数学本质**：拓扑排序要求 $\text{init-order}(B) < \text{init-order}(A)$ 且 $\text{init-order}(A) < \text{init-order}(B)$ ，矛盾。
+**数学本质**：拓扑排序要求 $\text{init-order}(B) < \text{init-order}(A)$ 且 $\text{init-order}(A) < \text{init-order}(B)$ ，矛盾。 且 $\text{init-order}(A) < \text{init-order}(B)$ ，矛盾。 ，矛盾。
 
 **构造函数的不可变约束**：Java 构造函数必须在其执行完毕前返回对象引用。在此约束下，若构造函数A调用构造函数B，则A的对象引用在B的构造函数执行完毕前无法确定——形成逻辑上的死锁。
 

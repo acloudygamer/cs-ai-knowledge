@@ -14,19 +14,19 @@ HTTP是面向文本的无状态应用层协议，定义客户端与服务器之�
 
 ### HTTP/1.1持久连接复用次数约束
 
-设连接建立后的第 $i$ 个请求响应周期为 $R_i$ ，连接寿命内的总请求数为：
+设连接建立后的第 $i$ 个请求响应周期为 $R_i$ ，连接寿命内的总请求数为： 个请求响应周期为 $R_i$ ，连接寿命内的总请求数为： ，连接寿命内的总请求数为：
 
 $$
 N_{\text{max}} = \max \{ n \mid \sum_{i=1}^{n} T(R_i) \leq T_{\text{keepalive}} \}
 $$
 
-其中 $T(R_i)$ 为第 $i$ 个请求-响应耗时， $T_{\text{keepalive}}$ 为持久连接超时（通常115秒）。
+其中 $T(R_i)$ 为第 $i$ 个请求-响应耗时， $T_{\text{keepalive}}$ 为持久连接超时（通常115秒）。 为第 $i$ 个请求-响应耗时， $T_{\text{keepalive}}$ 为持久连接超时（通常115秒）。 个请求-响应耗时， $T_{\text{keepalive}}$ 为持久连接超时（通常115秒）。 为持久连接超时（通常115秒）。
 
-**约束**：若某请求处理时间过长， $T(R_i) > T_{\text{keepalive}}$ ，则该请求本身就会触发超时。
+**约束**：若某请求处理时间过长， $T(R_i) > T_{\text{keepalive}}$ ，则该请求本身就会触发超时。 ，则该请求本身就会触发超时。
 
 ### HTTP/2多路复用
 
-设连接中并发流数量为 $S$ ：
+设连接中并发流数量为 $S$ ： ：
 
 $$
 S_{\text{max}} = 2^{31} - 1 \quad \text{（Stream ID上限）}
@@ -48,7 +48,7 @@ $$
 \text{fresh} \iff \text{now} < \text{created\_at} + \max\text{-age}
 $$
 
-ETag条件请求：当 $\text{If-None-Match} = \text{ETag}$ 时返回 304 Not Modified，否则返回完整200 OK + body。
+ETag条件请求：当 $\text{If-None-Match} = \text{ETag}$ 时返回 304 Not Modified，否则返回完整200 OK + body。 时返回 304 Not Modified，否则返回完整200 OK + body。
 
 **Last-Modified / If-Modified-Since变体**：
 
@@ -58,13 +58,13 @@ $$
 
 ### 队头阻塞的量化影响
 
-设网络往返时间为 $RTT$ ，单个请求处理时间为 $T_s$ ，在HTTP/1.1下， $N$ 个请求的总时间为：
+设网络往返时间为 $RTT$ ，单个请求处理时间为 $T_s$ ，在HTTP/1.1下， $N$ 个请求的总时间为： ，单个请求处理时间为 $T_s$ ，在HTTP/1.1下， $N$ 个请求的总时间为： ，在HTTP/1.1下， $N$ 个请求的总时间为： 个请求的总时间为：
 
 $$
 T_{\text{总}}(N) = N \cdot (RTT + T_s) \quad \text{（串行）}
 $$
 
-即使 $T_s$ 很小，高 $RTT$ 环境下性能仍会严重劣化。例如 $RTT=100ms$ ，10个请求需要至少1秒。
+即使 $T_s$ 很小，高 $RTT$ 环境下性能仍会严重劣化。例如 $RTT=100ms$ ，10个请求需要至少1秒。 很小，高 $RTT$ 环境下性能仍会严重劣化。例如 $RTT=100ms$ ，10个请求需要至少1秒。 环境下性能仍会严重劣化。例如 $RTT=100ms$ ，10个请求需要至少1秒。 ，10个请求需要至少1秒。
 
 ### HTTP语义的形式化
 
@@ -243,7 +243,7 @@ HTTP设计刻意将应用语义（方法、状态码、头部）与传输细节�
 | QUIC | 流级可靠（各流独立） | 仅阻塞对应流 | 有（CID不变） |
 | SPDY | TCP可靠 | TCP层阻塞所有流 | 无 |
 
-**自包含性**的数学约束：HTTP请求 $R$ 必须包含所有目标处理所需信息：
+**自包含性**的数学约束：HTTP请求 $R$ 必须包含所有目标处理所需信息： 必须包含所有目标处理所需信息：
 $$
 R = (\text{Method}, \text{URI}, \text{Headers}, \text{Body}) \quad \text{且} \quad \forall \text{中间盒} \, M: M(\text{Headers}) \text{可访问但不影响处理}
 $$

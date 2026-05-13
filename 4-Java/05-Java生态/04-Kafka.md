@@ -16,18 +16,18 @@ Kafka 是分布式流处理平台，其本质是 **持久化日志（Immutable L
 
 ### 磁盘顺序写的性能建模
 
-传统磁盘随机写吞吐量： $\sim 0.5\text{-}2\text{ MB/s}$ （受寻道时间限制）
-Kafka 顺序写吞吐量： $\sim 500\text{-}600\text{ MB/s}$ （受磁盘带宽限制）
+传统磁盘随机写吞吐量： $\sim 0.5\text{-}2\text{ MB/s}$ （受寻道时间限制） （受寻道时间限制）
+Kafka 顺序写吞吐量： $\sim 500\text{-}600\text{ MB/s}$ （受磁盘带宽限制） （受磁盘带宽限制）
 
-设寻道时间 $T_{\text{seek}} = 10ms$ ，旋转延迟 $T_{\text{rot}} = 5ms$ ，传输时间 $T_{\text{trans}}$ 可忽略：
-- 随机写：每条消息需要 $T_{\text{seek}} + T_{\text{rot}}$ → 1500 消息/秒
-- 顺序写：初始一次寻道后，传输时间 $T_{\text{trans}} \approx 0$ → 近乎无限吞吐量
+设寻道时间 $T_{\text{seek}} = 10ms$ ，旋转延迟 $T_{\text{rot}} = 5ms$ ，传输时间 $T_{\text{trans}}$ 可忽略： ，旋转延迟 $T_{\text{rot}} = 5ms$ ，传输时间 $T_{\text{trans}}$ 可忽略： ，传输时间 $T_{\text{trans}}$ 可忽略： 可忽略：
+- 随机写：每条消息需要 $T_{\text{seek}} + T_{\text{rot}}$ → 1500 消息/秒 → 1500 消息/秒
+- 顺序写：初始一次寻道后，传输时间 $T_{\text{trans}} \approx 0$ → 近乎无限吞吐量 → 近乎无限吞吐量
 
 Kafka 利用 OS 的 **页缓存（Page Cache）**：写入数据先到页缓存，后台异步刷盘。消费时也先读页缓存，未命中才读磁盘。这实现了"写即返回"的低延迟。
 
 ### 分区再均衡的图论分析
 
-设 Consumer Group 有 $C$ 个消费者，Topic 有 $P$ 个分区。分配关系是 **二分图匹配**：
+设 Consumer Group 有 $C$ 个消费者，Topic 有 $P$ 个分区。分配关系是 **二分图匹配**： 个消费者，Topic 有 $P$ 个分区。分配关系是 **二分图匹配**： 个分区。分配关系是 **二分图匹配**：
 
 ```
 分区集合 Partitions = {P1, P2, ..., Pp}
@@ -59,37 +59,37 @@ Kafka 支持三种消息投递语义，通过 Producer 和 Consumer 配置组合
 
 **exactly-once 的形式化定义**：
 
-设消息 $m$ 被生产两次（由于 Producer 重试），记为 $m_1$ 和 $m_2$ （ $m_1 = m_2$ ）。exactly-once 保证：
+设消息 $m$ 被生产两次（由于 Producer 重试），记为 $m_1$ 和 $m_2$ （ $m_1 = m_2$ ）。exactly-once 保证： 被生产两次（由于 Producer 重试），记为 $m_1$ 和 $m_2$ （ $m_1 = m_2$ ）。exactly-once 保证： 和 $m_2$ （ $m_1 = m_2$ ）。exactly-once 保证： （ $m_1 = m_2$ ）。exactly-once 保证： ）。exactly-once 保证：
 
-$\forall m: \text{Deliver}(m) = 1$
+ $\forall m: \text{Deliver}(m) = 1$ 
 
 即每条消息被 Consumer 处理恰好一次，无论 Producer 发送多少次。
 
 **幂等生产者的数学约束**：
 
 幂等生产者（`enable.idempotence=true`）为每条消息分配唯一 `producer_id + sequence_number`。设：
-- $p$ = producer ID（分配给每个 Producer 实例）
-- $seq$ = 序列号（每条消息递增）
+- $p$ = producer ID（分配给每个 Producer 实例） = producer ID（分配给每个 Producer 实例）
+- $seq$ = 序列号（每条消息递增） = 序列号（每条消息递增）
 
 去重条件：
-$(p, seq) \rightarrow \text{唯一确定一条消息}$
+ $(p, seq) \rightarrow \text{唯一确定一条消息}$ 
 
-若检测到相同 $(p, seq)$ ，Kafka 拒绝重复，返回 -1。
+若检测到相同 $(p, seq)$ ，Kafka 拒绝重复，返回 -1。 ，Kafka 拒绝重复，返回 -1。
 
 ### 分区写入的法定写入多数
 
 Kafka 使用 **WAL（Write-Ahead Log）** + **ISR 复制** 保证持久性。
 
 设：
-- $W$ = 写入成功所需的确认副本数
-- $ISR$ = 当前与 Leader 同步的副本集合
+- $W$ = 写入成功所需的确认副本数 = 写入成功所需的确认副本数
+- $ISR$ = 当前与 Leader 同步的副本集合 = 当前与 Leader 同步的副本集合
 
 写入成功条件：
-$|W \cap ISR| \geq W$
+ $|W \cap ISR| \geq W$ 
 
 常见配置：
-- `acks=1`： $W=1$ （仅 Leader），最快但可能丢数据
-- `acks=all`（或 -1）： $W=|ISR|$ ，最强一致性
+- `acks=1`： $W=1$ （仅 Leader），最快但可能丢数据 （仅 Leader），最快但可能丢数据
+- `acks=all`（或 -1）： $W=|ISR|$ ，最强一致性 ，最强一致性
 
 **脑裂问题与 fencing**：
 
@@ -104,7 +104,7 @@ $|W \cap ISR| \geq W$
 **Fencing 机制**：每个 Write 请求携带 `epoch`（任期号）。旧 Leader 收到更高 epoch 的 Write 请求时自动失效。
 
 **Fencing 的数学不变量**：
-$\text{valid}(write) \iff \text{epoch}_{\text{write}} \geq \text{epoch}_{\text{current\_leader}}$
+ $\text{valid}(write) \iff \text{epoch}_{\text{write}} \geq \text{epoch}_{\text{current\_leader}}$ 
 
 ---
 
@@ -258,7 +258,7 @@ Kafka 3.x+ 使用 KRaft（基于 Raft）替代 ZK：
 ```
 
 **Raft 的安全性不变量**：
-$\text{Leader} \Rightarrow \text{已提交日志条目复制到多数节点}$
+ $\text{Leader} \Rightarrow \text{已提交日志条目复制到多数节点}$ 
 
 ---
 

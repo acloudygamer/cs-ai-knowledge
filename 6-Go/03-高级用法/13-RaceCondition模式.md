@@ -30,7 +30,7 @@ Go 中的保证：
 **Data Race** = 两个操作对同一地址并发读写，且无 happens-before 关系
 
 形式化：
-$\text{data\_race}(op_1, op_2) \iff \text{同一地址} \land \text{并发} \land \neg(op_1 \text{ hb } op_2 \lor op_2 \text{ hb } op_1)$
+ $\text{data\_race}(op_1, op_2) \iff \text{同一地址} \land \text{并发} \land \neg(op_1 \text{ hb } op_2 \lor op_2 \text{ hb } op_1)$ 
 
 ### race detector 的检测原理
 
@@ -102,13 +102,13 @@ Timeline A (with mutex):
 
 **Lost Update 的数学表示**：
 
-设 $inc$ 操作包含 $read \rightarrow compute \rightarrow write$ ：
-$G_1: r_1(x) \rightarrow w_1(x+1)$
-$G_2: r_2(x) \rightarrow w_2(x+1)$
+设 $inc$ 操作包含 $read \rightarrow compute \rightarrow write$ ： 操作包含 $read \rightarrow compute \rightarrow write$ ： ：
+ $G_1: r_1(x) \rightarrow w_1(x+1)$ 
+ $G_2: r_2(x) \rightarrow w_2(x+1)$ 
 
-若 $r_1$ 和 $r_2$ 都读到相同值 $x$ ，则：
-$w_1(x+1) \text{ hb } w_2(x+1) \implies \text{最终值} = x+2$
-$\neg(w_1 \text{ hb } w_2 \lor w_2 \text{ hb } w_1) \implies \text{最终值} = x+1 \text{（丢失一次更新）}$
+若 $r_1$ 和 $r_2$ 都读到相同值 $x$ ，则： 和 $r_2$ 都读到相同值 $x$ ，则： 都读到相同值 $x$ ，则： ，则：
+ $w_1(x+1) \text{ hb } w_2(x+1) \implies \text{最终值} = x+2$ 
+ $\neg(w_1 \text{ hb } w_2 \lor w_2 \text{ hb } w_1) \implies \text{最终值} = x+1 \text{（丢失一次更新）}$ 
 
 ### check-then-act race 的数据流
 
@@ -249,7 +249,7 @@ goroutine A                    goroutine B
 ```
 
 **终止的 happens-before 保证**：
-$quit \ put \ hb \ quit \ get \ hb \ goroutine \ B \ termination$
+ $quit \ put \ hb \ quit \ get \ hb \ goroutine \ B \ termination$ 
 
 ## 高级修复模式
 
@@ -271,7 +271,7 @@ $quit \ put \ hb \ quit \ get \ hb \ goroutine \ B \ termination$
 
 **COW 的数学性质**：
 
-$Read \始终返回 \_snapshot_{lastWrite}$
+ $Read \始终返回 \_snapshot_{lastWrite}$ 
 
 这保证了读取的一致性，但写入成本高。
 
@@ -334,7 +334,7 @@ goroutine A                    goroutine B
 1. **互斥**：资源一次只能被一个 goroutine 持有
 2. **持有并等待**：goroutine 持有资源同时等待其他资源
 3. **不可抢占**：资源不能被强制从 goroutine 手中夺走
-4. **循环等待**：存在 goroutine 的循环等待链 $G_1 \rightarrow G_2 \rightarrow \cdots \rightarrow G_n \rightarrow G_1$
+4. **循环等待**：存在 goroutine 的循环等待链 $G_1 \rightarrow G_2 \rightarrow \cdots \rightarrow G_n \rightarrow G_1$ 
 
 **打破死锁的方法**：
 

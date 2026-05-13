@@ -15,7 +15,7 @@ TestEngine 接口
 JUnit Jupiter TestEngine ←→ 第三方引擎（kotest, Spek, etc.）
 ```
 
-这允许 $N$ 种测试定义 $\times$ $M$ 种执行器自由组合，而非 $N \times 1$ 的紧耦合。
+这允许 $N$ 种测试定义 $\times$ $M$ 种执行器自由组合，而非 $N \times 1$ 的紧耦合。 种测试定义 $\times$ $M$ 种执行器自由组合，而非 $N \times 1$ 的紧耦合。 $M$ 种执行器自由组合，而非 $N \times 1$ 的紧耦合。 种执行器自由组合，而非 $N \times 1$ 的紧耦合。 的紧耦合。
 
 ---
 
@@ -56,16 +56,16 @@ JUnit 5的测试生命周期可建模为有限状态自动机：
 
 | 约束 | 数学表达 |
 |------|----------|
-| `@BeforeAll` 单次执行 | $\forall m \in \text{@BeforeAll}: |\text{call}(m)| = 1$ |
-| `@BeforeEach` 每次执行 | $\forall m \in \text{@BeforeEach}, \forall t \in \text{Tests}: |\text{call}(m, t)| = 1$ |
-| 测试后清理保证 | $\text{TestComplete} \implies \Diamond \text{@AfterEach}$ |
+| `@BeforeAll` 单次执行 | $\forall m \in \text{@BeforeAll}: |\text{call}(m)| = 1$ | |
+| `@BeforeEach` 每次执行 | $\forall m \in \text{@BeforeEach}, \forall t \in \text{Tests}: |\text{call}(m, t)| = 1$ | |
+| 测试后清理保证 | $\text{TestComplete} \implies \Diamond \text{@AfterEach}$ | |
 
 ### 实例数量的数学关系
 
 | 模式 | 实例数公式 | 适用场景 |
 |------|------------|----------|
-| **PER_METHOD** | $N_{\text{instance}} = N_{\text{method}}$ | 测试间完全隔离，无状态共享 |
-| **PER_CLASS** | $N_{\text{instance}} = 1$ | 减少创建开销，适合代价高昂的初始化 |
+| **PER_METHOD** | $N_{\text{instance}} = N_{\text{method}}$ | 测试间完全隔离，无状态共享 | | 测试间完全隔离，无状态共享 |
+| **PER_CLASS** | $N_{\text{instance}} = 1$ | 减少创建开销，适合代价高昂的初始化 | | 减少创建开销，适合代价高昂的初始化 |
 
 ### 扩展调用的偏序关系
 

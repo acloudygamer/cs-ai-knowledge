@@ -10,34 +10,34 @@ Python 是一门由 Guido van Rossum 于 1991 年创立的**解释型、动态�
 
 Python 代码的执行可建模为一个确定性管道函数：
 
-$Exec: SourceCode \xrightarrow{T_{lex}} TokenSequence \xrightarrow{T_{parse}} AST \xrightarrow{T_{compile}} CodeObject \xrightarrow{T_{vm}} HeapObjects$
+ $Exec: SourceCode \xrightarrow{T_{lex}} TokenSequence \xrightarrow{T_{parse}} AST \xrightarrow{T_{compile}} CodeObject \xrightarrow{T_{vm}} HeapObjects$ 
 
 各阶段的复杂度下界：
 
-$T_{lex}(n) = \Theta(n) \quad \text{（词法分析，扫描一遍）}$
-$T_{parse}(n) = \Theta(n) \quad \text{（LL(1) 或 LR 语法分析）}$
-$T_{compile}(n) = \Theta(n) \quad \text{（AST 遍历生成字节码）}$
-$T_{vm}(m) = \Theta(m) \quad \text{（m 条字节码指令）}$
+ $T_{lex}(n) = \Theta(n) \quad \text{（词法分析，扫描一遍）}$ 
+ $T_{parse}(n) = \Theta(n) \quad \text{（LL(1) 或 LR 语法分析）}$ 
+ $T_{compile}(n) = \Theta(n) \quad \text{（AST 遍历生成字节码）}$ 
+ $T_{vm}(m) = \Theta(m) \quad \text{（m 条字节码指令）}$ 
 
 总时间复杂度：
 
-$T_{total}(n, m) = \Theta(n) + \Theta(m)$
+ $T_{total}(n, m) = \Theta(n) + \Theta(m)$ 
 
-**关键约束**：每次运行都完整经历前三个阶段。这与编译型语言（C/C++）的代价模型形成根本对比——后者将编译代价 $T_{compile}(n)$ 作为一次性固定成本摊销到无限次运行：
+**关键约束**：每次运行都完整经历前三个阶段。这与编译型语言（C/C++）的代价模型形成根本对比——后者将编译代价 $T_{compile}(n)$ 作为一次性固定成本摊销到无限次运行： 作为一次性固定成本摊销到无限次运行：
 
-$T_{compiled}(n, N_{runs}) = T_{compile}(n) + N_{runs} \cdot T_{machine\_code}(m)$
+ $T_{compiled}(n, N_{runs}) = T_{compile}(n) + N_{runs} \cdot T_{machine\_code}(m)$ 
 
-当 $N_{runs} \to \infty$ 时， $T_{compile}(n) / N_{runs} \to 0$ ，编译型语言占优。但对于  $N_{runs} = 1$（一次性脚本）或快速原型迭代场景，Python 的解释执行避免了编译等待。
+当 $N_{runs} \to \infty$ 时， $T_{compile}(n) / N_{runs} \to 0$ ，编译型语言占优。但对于  $N_{runs} = 1$（一次性脚本）或快速原型迭代场景，Python 的解释执行避免了编译等待。 时， $T_{compile}(n) / N_{runs} \to 0$ ，编译型语言占优。但对于  $N_{runs} = 1$（一次性脚本）或快速原型迭代场景，Python 的解释执行避免了编译等待。 ，编译型语言占优。但对于  $N_{runs} = 1$ （一次性脚本）或快速原型迭代场景，Python 的解释执行避免了编译等待。（一次性脚本）或快速原型迭代场景，Python 的解释执行避免了编译等待。
 
 ### GIL 的并发约束形式化
 
 CPython 使用全局解释器锁（Global Interpreter Lock, GIL），其存在性由以下不变量刻画：
 
-$\forall t_1, t_2 \in Threads, t_1 \neq t_2: \neg hold(GIL, t_1) \lor \neg hold(GIL, t_2)$
+ $\forall t_1, t_2 \in Threads, t_1 \neq t_2: \neg hold(GIL, t_1) \lor \neg hold(GIL, t_2)$ 
 
 即**同一时刻最多一个线程持有 GIL 并执行 Python 字节码**。持有者身份在时间维度上交替：
 
-$hold(GIL, t, t+\Delta t) \implies \forall t' \in (t, t+\Delta t): executing(t')$
+ $hold(GIL, t, t+\Delta t) \implies \forall t' \in (t, t+\Delta t): executing(t')$ 
 
 GIL 的引入根源于 CPython 的引用计数实现——每个对象的 `rc`（reference count）必须原子地增减，否则并发修改会导致对象提前析构（rc=0）或内存泄漏（rc 永远不为零）。在引入 GIL 之前，引用计数是线程安全的唯一保障；GIL 则进一步保证了整个对象图的一致性遍历（tracing GC）不会与正在进行的引用修改产生数据竞争。
 
@@ -56,9 +56,9 @@ GIL 释放点的字节码级精确描述（CPython 3.12）：
 
 **PEP 703（无 GIL CPython）** 正在探索中，核心思路是将 GIL 的全局锁替换为 per-object 细粒度锁：
 
-$hold(lock_o, t) \iff referencing(o, t)$
+ $hold(lock_o, t) \iff referencing(o, t)$ 
 
-每个对象 $o$ 拥有独立锁，引用计数的增减必须获取该锁。代价：单线程基准性能下降约 10-15%（锁竞争），但 CPU 密集型多线程任务可获得近线性加速（无 GIL 序列化）。
+每个对象 $o$ 拥有独立锁，引用计数的增减必须获取该锁。代价：单线程基准性能下降约 10-15%（锁竞争），但 CPU 密集型多线程任务可获得近线性加速（无 GIL 序列化）。 拥有独立锁，引用计数的增减必须获取该锁。代价：单线程基准性能下降约 10-15%（锁竞争），但 CPU 密集型多线程任务可获得近线性加速（无 GIL 序列化）。
 
 ### CPython 内存分配器层次
 
@@ -84,15 +84,15 @@ CPython 的内存分配并非直接调用系统 `malloc`，而是维护**三级�
 
 **pymalloc 的核心数据结构**：
 
-$Arena = \underbrace{256KB}_{固定大小内存块}$
+ $Arena = \underbrace{256KB}_{固定大小内存块}$ 
 
-$Arena \rightarrow \{Pool_1, Pool_2, ..., Pool_n\}$
+ $Arena \rightarrow \{Pool_1, Pool_2, ..., Pool_n\}$ 
 
-$Pool = \underbrace{4KB}_{固定大小页} \rightarrow \{Block_1, Block_2, ..., Block_{size\_class}\}$
+ $Pool = \underbrace{4KB}_{固定大小页} \rightarrow \{Block_1, Block_2, ..., Block_{size\_class}\}$ 
 
 每个 Pool 管理单一 size class（固定块大小），通过 free list 串联空闲块：
 
-$free\_list \rightarrow block_i \rightarrow block_j \rightarrow ... \rightarrow NULL$
+ $free\_list \rightarrow block_i \rightarrow block_j \rightarrow ... \rightarrow NULL$ 
 
 **约束边界**：pymalloc 的设计假设是**对象的分配和释放模式局部化**（LIFO）。若分配模式是随机的（大量非 LIFO 释放），会导致 Pool 碎片化，pymalloc 退化为系统 malloc。
 
@@ -105,7 +105,7 @@ $free\_list \rightarrow block_i \rightarrow block_j \rightarrow ... \rightarrow 
 
 ### 版本约束
 
-$底座 = Python\;3.12 \quad 前沿 = Python\;3.14 \quad 版本空间 = 底座 \cup 前沿$
+ $底座 = Python\;3.12 \quad 前沿 = Python\;3.14 \quad 版本空间 = 底座 \cup 前沿$ 
 
 - **Python 3.12（稳定底座）**：改进错误消息、协程寄存器对称性修复、`吉字节` 整数优化
 - **Python 3.14（前沿增量）**：实验性 JIT 编译器接口（PEP 749 `pystdin`）、增强的 `asyncio` 调度精度
@@ -192,7 +192,7 @@ Thread A (持有 GIL)              Thread B (等待 GIL)
 Python 的解释执行模型并非历史偶然，而是有明确的设计约束：
 
 **约束 1：启动延迟最小化**
-编译型语言的编译时间 $T_{compile}(n)$ 在大型项目中可达数分钟至数小时（增量编译可改善）。Python 跳过编译步骤， $T_{start} \approx 0$ ，适合交互式 shell、脚本执行、快速原型迭代。
+编译型语言的编译时间 $T_{compile}(n)$ 在大型项目中可达数分钟至数小时（增量编译可改善）。Python 跳过编译步骤， $T_{start} \approx 0$ ，适合交互式 shell、脚本执行、快速原型迭代。 在大型项目中可达数分钟至数小时（增量编译可改善）。Python 跳过编译步骤， $T_{start} \approx 0$ ，适合交互式 shell、脚本执行、快速原型迭代。 ，适合交互式 shell、脚本执行、快速原型迭代。
 
 **约束 2：平台无关字节码**
 `.pyc` 文件是平台无关的字节码，任何安装 CPython 的平台均可运行。这使得 Python 程序可以在不同操作系统间零成本分发（对比 C 的平台特定二进制分发）。

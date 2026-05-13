@@ -14,7 +14,7 @@ JavaScript 代码规范的本质是一套**视觉类型系统 + 格式化收敛�
 
 ### 命名空间隔离度
 
-命名规范的本质是**在词法作用域树上建立可视性边界**。设标识符集合为 $I$ ，命名空间层级为 $L = \{\text{UPPER\_SNAKE}, \text{PascalCase}, \text{camelCase}, \text{\_prefix}\}$ ，标识符 $i \in I$ 的约束为：
+命名规范的本质是**在词法作用域树上建立可视性边界**。设标识符集合为 $I$ ，命名空间层级为 $L = \{\text{UPPER\_SNAKE}, \text{PascalCase}, \text{camelCase}, \text{\_prefix}\}$ ，标识符 $i \in I$ 的约束为： ，命名空间层级为 $L = \{\text{UPPER\_SNAKE}, \text{PascalCase}, \text{camelCase}, \text{\_prefix}\}$ ，标识符 $i \in I$ 的约束为： ，标识符 $i \in I$ 的约束为： 的约束为：
 
 $$
 \text{valid}(i, L) \iff \begin{cases}
@@ -25,11 +25,11 @@ $$
 \end{cases}
 $$
 
-违反约束时，读者无法从命名推断出该标识符的语义角色，导致认知负荷增加。设混用概率为 $P_{\text{mix}}$ ，团队规模为 $n$ ，则混用期望 $E_{\text{mix}} = 1 - (1 - P_{\text{mix}})^n$ 随人数增长趋近于 1。
+违反约束时，读者无法从命名推断出该标识符的语义角色，导致认知负荷增加。设混用概率为 $P_{\text{mix}}$ ，团队规模为 $n$ ，则混用期望 $E_{\text{mix}} = 1 - (1 - P_{\text{mix}})^n$ 随人数增长趋近于 1。 ，团队规模为 $n$ ，则混用期望 $E_{\text{mix}} = 1 - (1 - P_{\text{mix}})^n$ 随人数增长趋近于 1。 ，则混用期望 $E_{\text{mix}} = 1 - (1 - P_{\text{mix}})^n$ 随人数增长趋近于 1。 随人数增长趋近于 1。
 
 ### 代码风格熵
 
-Prettier 等格式化工具的目标是**降低代码风格的分叉数**。设风格选项集合为 $S$ （缩进宽度、引号类型、分号策略等）， $n$ 为代码库文件数，全局一致的风格空间大小为  $|S|$。若每人使用不同风格，风格空间为  $|S|^n$；格式化后降为  $|S|$。信息熵减少量：
+Prettier 等格式化工具的目标是**降低代码风格的分叉数**。设风格选项集合为 $S$ （缩进宽度、引号类型、分号策略等）， $n$ 为代码库文件数，全局一致的风格空间大小为  $|S|$。若每人使用不同风格，风格空间为  $|S|^n$；格式化后降为  $|S|$。信息熵减少量： （缩进宽度、引号类型、分号策略等）， $n$ 为代码库文件数，全局一致的风格空间大小为  $|S|$。若每人使用不同风格，风格空间为  $|S|^n$；格式化后降为  $|S|$。信息熵减少量： 为代码库文件数，全局一致的风格空间大小为  $|S|$ 。若每人使用不同风格，风格空间为  $|S|^n$；格式化后降为  $|S|$。信息熵减少量：。若每人使用不同风格，风格空间为  $|S|^n$ ；格式化后降为  $|S|$。信息熵减少量：；格式化后降为  $|S|$ 。信息熵减少量：。信息熵减少量：
 
 $$
 \Delta H = \log_2(|S|^n) - \log_2(|S|) = (n-1)\log_2|S|
@@ -37,19 +37,19 @@ $$
 
 ### ESLint 规则图论
 
-每条 ESLint 规则定义一个**代码模式 → 违规判定**的谓词 $R_i$ 。整个规则集构成一个**缺陷检测有向图** $G = (V, E)$ ：
+每条 ESLint 规则定义一个**代码模式 → 违规判定**的谓词 $R_i$ 。整个规则集构成一个**缺陷检测有向图** $G = (V, E)$ ： 。整个规则集构成一个**缺陷检测有向图** $G = (V, E)$ ： ：
 
-- **节点** $V$ ：代码位置抽象（函数入口、语句块、表达式子树）
-- **边** $E \subseteq V \times \Sigma \times V$ ：规则 $R_i$ 在位置 $u$ 观察到模式 $\sigma$ 时，指向下一检查位置 $v$
-- **路径接受**：「某节点 $v$ 存在从起始节点到它的路径且该路径上所有规则均未触发」 $\iff$ 代码通过所有相关检查
+- **节点** $V$ ：代码位置抽象（函数入口、语句块、表达式子树） ：代码位置抽象（函数入口、语句块、表达式子树）
+- **边** $E \subseteq V \times \Sigma \times V$ ：规则 $R_i$ 在位置 $u$ 观察到模式 $\sigma$ 时，指向下一检查位置 $v$ ：规则 $R_i$ 在位置 $u$ 观察到模式 $\sigma$ 时，指向下一检查位置 $v$ 在位置 $u$ 观察到模式 $\sigma$ 时，指向下一检查位置 $v$ 观察到模式 $\sigma$ 时，指向下一检查位置 $v$ 时，指向下一检查位置 $v$ 
+- **路径接受**：「某节点 $v$ 存在从起始节点到它的路径且该路径上所有规则均未触发」 $\iff$ 代码通过所有相关检查 存在从起始节点到它的路径且该路径上所有规则均未触发」 $\iff$ 代码通过所有相关检查 代码通过所有相关检查
 
-单条规则的语义是路径的**前缀约束**：若 $R_i$ 在位置 $v$ 触发，则该节点本身被标记为**违规终止节点**。设规则集为 $\mathcal{R} = \{R_1, \dots, R_m\}$ ，代码位置集为 $V$ ，则违规判定为：
+单条规则的语义是路径的**前缀约束**：若 $R_i$ 在位置 $v$ 触发，则该节点本身被标记为**违规终止节点**。设规则集为 $\mathcal{R} = \{R_1, \dots, R_m\}$ ，代码位置集为 $V$ ，则违规判定为： 在位置 $v$ 触发，则该节点本身被标记为**违规终止节点**。设规则集为 $\mathcal{R} = \{R_1, \dots, R_m\}$ ，代码位置集为 $V$ ，则违规判定为： 触发，则该节点本身被标记为**违规终止节点**。设规则集为 $\mathcal{R} = \{R_1, \dots, R_m\}$ ，代码位置集为 $V$ ，则违规判定为： ，代码位置集为 $V$ ，则违规判定为： ，则违规判定为：
 
 $$
 \text{violation}(v) \iff \exists i \in [1,m] : R_i(v) = \text{true}
 $$
 
-Flat Config 将规则按文件 glob 模式分区，避免全局规则膨胀。设模式集合为 $P$ ，规则分配函数 $A: \mathcal{R} \rightarrow \mathcal{P}(P)$ ，文件 $f$ 匹配的规则子集为 $\mathcal{R}_f = \{R_i \mid \exists p \in P : p \in A(R_i) \land \text{match}(f, p)\}$ 。
+Flat Config 将规则按文件 glob 模式分区，避免全局规则膨胀。设模式集合为 $P$ ，规则分配函数 $A: \mathcal{R} \rightarrow \mathcal{P}(P)$ ，文件 $f$ 匹配的规则子集为 $\mathcal{R}_f = \{R_i \mid \exists p \in P : p \in A(R_i) \land \text{match}(f, p)\}$ 。 ，规则分配函数 $A: \mathcal{R} \rightarrow \mathcal{P}(P)$ ，文件 $f$ 匹配的规则子集为 $\mathcal{R}_f = \{R_i \mid \exists p \in P : p \in A(R_i) \land \text{match}(f, p)\}$ 。 ，文件 $f$ 匹配的规则子集为 $\mathcal{R}_f = \{R_i \mid \exists p \in P : p \in A(R_i) \land \text{match}(f, p)\}$ 。 匹配的规则子集为 $\mathcal{R}_f = \{R_i \mid \exists p \in P : p \in A(R_i) \land \text{match}(f, p)\}$ 。 。
 
 **归约终点**：规则图的遍历本质是**模式匹配的有穷自动机**——规则谓词是状态转移条件，文件路径是初始状态，违规节点是接受状态。
 
@@ -187,13 +187,13 @@ const result = await process(orders);
 
 ### 错误作为返回值（Result 单子）
 
-JavaScript 的错误处理可形式化为 **Result 单子**（Haskell 的 `Either` 类型）的隐式应用。设错误类型为 $E$ ，成功值为 $T$ ：
+JavaScript 的错误处理可形式化为 **Result 单子**（Haskell 的 `Either` 类型）的隐式应用。设错误类型为 $E$ ，成功值为 $T$ ： ，成功值为 $T$ ： ：
 
 $$
 \text{Result}_{T,E} ::= \text{Ok}(t: T) \mid \text{Err}(e: E)
 $$
 
-单子 bind 操作 $\bind$ 链式组合多个可能失败的操作：
+单子 bind 操作 $\bind$ 链式组合多个可能失败的操作： 链式组合多个可能失败的操作：
 
 $$
 (\text{Ok}(t) \bind f) = f(t) \qquad (\text{Err}(e) \bind f) = \text{Err}(e)
@@ -214,7 +214,7 @@ class AppError extends Error {
 
 **约束**：已知业务错误（用户不存在、权限不足）使用错误对象传递元数据，属**可恢复错误**，应通过 Result 单子传播；未知系统错误（内存溢出、网络中断）属**不可恢复错误**，需隔离记录后降级。
 
-**违反约束的后果**：滥用 `try-catch` 吞掉错误将导致 `Err` 分支被静默丢弃，故障定位所需的调用栈和错误码全部丢失。设错误传播率为 $P_{\text{prop}}$ ，被吞没率为 $P_{\text{swallow}}$ ，则 $P_{\text{prop}} + P_{\text{swallow}} = 1$ ，而 $P_{\text{swallow}} \to 1$ 意味着故障可观测性趋近于零。
+**违反约束的后果**：滥用 `try-catch` 吞掉错误将导致 `Err` 分支被静默丢弃，故障定位所需的调用栈和错误码全部丢失。设错误传播率为 $P_{\text{prop}}$ ，被吞没率为 $P_{\text{swallow}}$ ，则 $P_{\text{prop}} + P_{\text{swallow}} = 1$ ，而 $P_{\text{swallow}} \to 1$ 意味着故障可观测性趋近于零。 ，被吞没率为 $P_{\text{swallow}}$ ，则 $P_{\text{prop}} + P_{\text{swallow}} = 1$ ，而 $P_{\text{swallow}} \to 1$ 意味着故障可观测性趋近于零。 ，则 $P_{\text{prop}} + P_{\text{swallow}} = 1$ ，而 $P_{\text{swallow}} \to 1$ 意味着故障可观测性趋近于零。 ，而 $P_{\text{swallow}} \to 1$ 意味着故障可观测性趋近于零。 意味着故障可观测性趋近于零。
 
 ---
 

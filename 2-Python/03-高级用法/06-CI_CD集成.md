@@ -10,31 +10,31 @@ CI/CD 是软件交付流水线的两个阶段：CI（持续集成）将代码变
 
 工作流是有向无环图（DAG），节点为 jobs，边为 `needs` 依赖：
 
-$\text{Workflow} = (J, E),\ J = \{\text{job}_i\},\ E \subseteq J \times J$
+ $\text{Workflow} = (J, E),\ J = \{\text{job}_i\},\ E \subseteq J \times J$ 
 
-并行 jobs 满足 $j_a \nrightarrow j_b \land j_b \nrightarrow j_a$ ；串行 jobs 满足偏序关系。Job 内各 step 按声明顺序执行。
+并行 jobs 满足 $j_a \nrightarrow j_b \land j_b \nrightarrow j_a$ ；串行 jobs 满足偏序关系。Job 内各 step 按声明顺序执行。 ；串行 jobs 满足偏序关系。Job 内各 step 按声明顺序执行。
 
 **DAG 的拓扑排序**：工作流调度器对 DAG 进行拓扑排序，确定 jobs 的执行顺序。拓扑排序结果不唯一，但必须满足所有偏序约束。
 
-**并行度的数学约束**：设 DAG 中无依赖的 jobs 集合为 $U$ （即 $\forall j \in U, \nexists i \in J: i \to j$ 或所有前驱已完成）。则最大并行度为 $|U|$——同一时刻最多可运行 $|U|$ 个 job。
+**并行度的数学约束**：设 DAG 中无依赖的 jobs 集合为 $U$ （即 $\forall j \in U, \nexists i \in J: i \to j$ 或所有前驱已完成）。则最大并行度为 $|U|$——同一时刻最多可运行 $|U|$ 个 job。 （即 $\forall j \in U, \nexists i \in J: i \to j$ 或所有前驱已完成）。则最大并行度为 $|U|$——同一时刻最多可运行 $|U|$ 个 job。 或所有前驱已完成）。则最大并行度为 $|U|$ ——同一时刻最多可运行 $|U|$ 个 job。——同一时刻最多可运行 $|U|$ 个 job。 个 job。
 
 ### 缓存命中率
 
 CI 缓存的目的是减少重复依赖下载。缓存 key 的设计直接影响命中率：
 
-$\text{hit} \iff \text{cache-key}_\text{generated} = \text{cache-key}_\text{stored}$
+ $\text{hit} \iff \text{cache-key}_\text{generated} = \text{cache-key}_\text{stored}$ 
 
 Key 生成公式（GitHub Actions 缓存 action）：
 
-$\text{key} = \text{prefix} + \text{hash}(\text{dependencies-files})$
+ $\text{key} = \text{prefix} + \text{hash}(\text{dependencies-files})$ 
 
 常见的缓存 key 策略：
 
 | 策略 | key 格式 | 命中率 |
 |------|----------|--------|
-| 精确版本 | `${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}` | 高（依赖不变时完全命中） |
+| 精确版本 | ` ${{ runner.os }}-pip-$ {{ hashFiles('**/requirements.txt') }}` | 高（依赖不变时完全命中） |{{ hashFiles('**/requirements.txt') }}` | 高（依赖不变时完全命中） |
 | 回退匹配 | `${{ runner.os }}-pip-` | 中（依赖变化但 OS 相同时部分命中） |
-| 锁文件 | `${{ runner.os }}-poetry-${{ hashFiles('**/poetry.lock') }}` | 高（锁文件变化才失效） |
+| 锁文件 | ` ${{ runner.os }}-poetry-$ {{ hashFiles('**/poetry.lock') }}` | 高（锁文件变化才失效） |{{ hashFiles('**/poetry.lock') }}` | 高（锁文件变化才失效） |
 
 **回退匹配（restore-keys）的语义**：当精确 key 未命中时，restore-keys 按前缀匹配恢复缓存。例如 key `pip-A1B2C3` 的 restore-keys 为 `pip-` 和 `pip-A`，若存在 `pip-A1B2` 则命中恢复。这允许同一 OS 下依赖小幅更新时复用已有缓存层。
 
@@ -42,7 +42,7 @@ $\text{key} = \text{prefix} + \text{hash}(\text{dependencies-files})$
 
 覆盖率检查在 CI 中作为质量门禁：
 
-$\text{gate}(coverage, threshold) = \begin{cases} \text{pass} & coverage \geq threshold \\ \text{fail} & coverage < threshold \end{cases}$
+ $\text{gate}(coverage, threshold) = \begin{cases} \text{pass} & coverage \geq threshold \\ \text{fail} & coverage < threshold \end{cases}$ 
 
 `--cov-fail-under=80` 表示覆盖率低于 80% 时 CI 任务失败。
 
@@ -50,7 +50,7 @@ $\text{gate}(coverage, threshold) = \begin{cases} \text{pass} & coverage \geq th
 
 Matrix 是笛卡尔积展开：
 
-$\text{jobs} = |python-version| \times |os| \times |custom-vars|$
+ $\text{jobs} = |python-version| \times |os| \times |custom-vars|$ 
 
 ```yaml
 strategy:
@@ -59,13 +59,13 @@ strategy:
     poetry-version: ["1.7", "1.8"]
 ```
 
-产生 $2 \times 2 = 4$ 个并行 job 实例，每个消耗独立虚拟机实例和配额。
+产生 $2 \times 2 = 4$ 个并行 job 实例，每个消耗独立虚拟机实例和配额。 个并行 job 实例，每个消耗独立虚拟机实例和配额。
 
-**资源消耗的数学约束**：总资源消耗为 $O(\prod |dim_i|)$ 。若维度过多，job 数量指数增长可能导致配额耗尽。设 $d$ 个维度，每个维度平均 $|v|$ 个值，则 job 总数：
+**资源消耗的数学约束**：总资源消耗为 $O(\prod |dim_i|)$ 。若维度过多，job 数量指数增长可能导致配额耗尽。设 $d$ 个维度，每个维度平均 $|v|$ 个值，则 job 总数： 。若维度过多，job 数量指数增长可能导致配额耗尽。设 $d$ 个维度，每个维度平均 $|v|$ 个值，则 job 总数： 个维度，每个维度平均 $|v|$ 个值，则 job 总数： 个值，则 job 总数：
 
-$N_{jobs} = \prod_{i=1}^{d} |v_i|$
+ $N_{jobs} = \prod_{i=1}^{d} |v_i|$ 
 
-若 $d=4$ 、每个维度 3 个值， $N_{jobs} = 81$ ，可能耗尽 GitHub Actions 并发配额。
+若 $d=4$ 、每个维度 3 个值， $N_{jobs} = 81$ ，可能耗尽 GitHub Actions 并发配额。 、每个维度 3 个值， $N_{jobs} = 81$ ，可能耗尽 GitHub Actions 并发配额。 ，可能耗尽 GitHub Actions 并发配额。
 
 ## 数据流
 
@@ -132,7 +132,7 @@ GitHub Actions 工作流运行在云端虚拟机（runner）中，每个 job 在
 
 ### Matrix 策略
 
-Matrix 是笛卡尔积展开，产生 $2 \times 2 = 4$ 个并行 job 实例，每个消耗独立虚拟机实例和配额。Matrix 的每个维度独立展开，总实例数为各维度基数的乘积。
+Matrix 是笛卡尔积展开，产生 $2 \times 2 = 4$ 个并行 job 实例，每个消耗独立虚拟机实例和配额。Matrix 的每个维度独立展开，总实例数为各维度基数的乘积。 个并行 job 实例，每个消耗独立虚拟机实例和配额。Matrix 的每个维度独立展开，总实例数为各维度基数的乘积。
 
 **约束**：Matrix 维度过多会导致 job 数量指数增长。例如 4 个维度各 3 个值产生 81 个 job，可能耗尽 GitHub Actions 的并发配额。
 
@@ -180,7 +180,7 @@ CMD ["python", "src/main.py"]
 
 tox 的 `envlist` 定义测试环境矩阵：
 
-$\text{envlist} = \{\text{py312}, \text{py313}, \text{py314}, \text{lint}, \text{type}\}$
+ $\text{envlist} = \{\text{py312}, \text{py313}, \text{py314}, \text{lint}, \text{type}\}$ 
 
 每个环境在独立 virtualenv 中执行，隔离依赖。`isolated_build = True` 让 tox 为每个环境创建独立构建。
 
@@ -244,7 +244,7 @@ jobs:
       - uses: actions/cache@v4
         with:
           path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+          key: ${{ runner.os }}-pip-$ {{ hashFiles('**/requirements.txt') }}{{ hashFiles('**/requirements.txt') }}
       - run: pip install -r requirements.txt
       - run: pytest --cov=src tests/
       - uses: codecov/codecov-action@v4

@@ -6,19 +6,19 @@ HTTP 服务在 Node.js 中的本质是**基于 TCP 的文本协议抽象层**。
 
 ## 数学模型
 
-**HTTP/1.1 队头阻塞**：在单个 TCP 连接上，HTTP 请求必须等待前一个响应完全发送完毕后才能发送（管线化已被大部分服务器禁用）。设单个请求-响应耗时为 $RTT$ （Round Trip Time），则 $n$ 个顺序请求的总耗时为 $n \times RTT$ 。
+**HTTP/1.1 队头阻塞**：在单个 TCP 连接上，HTTP 请求必须等待前一个响应完全发送完毕后才能发送（管线化已被大部分服务器禁用）。设单个请求-响应耗时为 $RTT$ （Round Trip Time），则 $n$ 个顺序请求的总耗时为 $n \times RTT$ 。 （Round Trip Time），则 $n$ 个顺序请求的总耗时为 $n \times RTT$ 。 个顺序请求的总耗时为 $n \times RTT$ 。 。
 
-**HTTP/2 多路复用**：在单个 TCP 连接上并行传输 $n$ 个流，总耗时降至 $\max(RTT_1, ..., RTT_n)$ ，消除了队头阻塞。
+**HTTP/2 多路复用**：在单个 TCP 连接上并行传输 $n$ 个流，总耗时降至 $\max(RTT_1, ..., RTT_n)$ ，消除了队头阻塞。 个流，总耗时降至 $\max(RTT_1, ..., RTT_n)$ ，消除了队头阻塞。 ，消除了队头阻塞。
 
-**背压数学约束**：若写入速度 $v_w$ 小于数据产生速度 $v_d$ ，缓冲区无限增长。流通过 `write()` 返回 false 触发背压，使生产者暂停。
+**背压数学约束**：若写入速度 $v_w$ 小于数据产生速度 $v_d$ ，缓冲区无限增长。流通过 `write()` 返回 false 触发背压，使生产者暂停。 小于数据产生速度 $v_d$ ，缓冲区无限增长。流通过 `write()` 返回 false 触发背压，使生产者暂停。 ，缓冲区无限增长。流通过 `write()` 返回 false 触发背压，使生产者暂停。
 
 $$
 B(t) = B_0 + \int_0^t (v_d(\tau) - v_w(\tau)) d\tau
 $$
 
-当 $B(t) > B_{high}$ 时，暂停写入；当 $B(t) < B_{low}$ 时，恢复写入。
+当 $B(t) > B_{high}$ 时，暂停写入；当 $B(t) < B_{low}$ 时，恢复写入。 时，暂停写入；当 $B(t) < B_{low}$ 时，恢复写入。 时，恢复写入。
 
-**Keep-Alive 连接复用**：TCP 连接建立成本 $C_{tcp}$ （三次握手），HTTPS 还有 TLS 握手成本 $C_{tls}$ 。Keep-Alive 允许在同一连接上发送 $n$ 个请求，总成本：
+**Keep-Alive 连接复用**：TCP 连接建立成本 $C_{tcp}$ （三次握手），HTTPS 还有 TLS 握手成本 $C_{tls}$ 。Keep-Alive 允许在同一连接上发送 $n$ 个请求，总成本： （三次握手），HTTPS 还有 TLS 握手成本 $C_{tls}$ 。Keep-Alive 允许在同一连接上发送 $n$ 个请求，总成本： 。Keep-Alive 允许在同一连接上发送 $n$ 个请求，总成本： 个请求，总成本：
 
 $$
 C_{without\_keepalive} = n \times (C_{tcp} + C_{tls}) + n \times RTT
@@ -27,7 +27,7 @@ $$
 C_{with\_keepalive} = C_{tcp} + C_{tls} + n \times RTT
 $$
 
-节省比例： $\frac{(n-1)(C_{tcp} + C_{tls})}{n \times RTT + C_{tcp} + C_{tls}}$
+节省比例： $\frac{(n-1)(C_{tcp} + C_{tls})}{n \times RTT + C_{tcp} + C_{tls}}$ 
 
 ## 数据流
 
@@ -96,7 +96,7 @@ Express/Koa 中间件的本质是**责任链模式**：每个中间件接收 req
 
 ## 数学模型
 
-设中间件函数为 $M_i(request, response, next)$ ，整个链路是函数的复合：
+设中间件函数为 $M_i(request, response, next)$ ，整个链路是函数的复合： ，整个链路是函数的复合：
 
 $$
 Chain(Request, Response) = M_1(Request, Response, M_2(Request, Response, ... M_n(Request, Response, Handler)...))
@@ -211,7 +211,7 @@ HTTP/2 的本质是**单 TCP 连接上的流多路复用**：多个请求/响应
 | Length (24 bits) | Type (8 bits) | Flags (8 bits) | Stream ID (31 bits) |
 |------------------|---------------|----------------|---------------------|
 
-**并发流建模**：设 $n$ 个并发流，每流带宽为 $b_i$ ，总带宽 $B = \sum b_i$ （受 TCP 拥塞控制约束）。流间带宽分配由 HPACK 头部压缩和流依赖关系决定。
+**并发流建模**：设 $n$ 个并发流，每流带宽为 $b_i$ ，总带宽 $B = \sum b_i$ （受 TCP 拥塞控制约束）。流间带宽分配由 HPACK 头部压缩和流依赖关系决定。 个并发流，每流带宽为 $b_i$ ，总带宽 $B = \sum b_i$ （受 TCP 拥塞控制约束）。流间带宽分配由 HPACK 头部压缩和流依赖关系决定。 ，总带宽 $B = \sum b_i$ （受 TCP 拥塞控制约束）。流间带宽分配由 HPACK 头部压缩和流依赖关系决定。 （受 TCP 拥塞控制约束）。流间带宽分配由 HPACK 头部压缩和流依赖关系决定。
 
 ## 数据流
 
@@ -255,7 +255,7 @@ HTTP 缓存通过 Header 协商控制资源生命周期：**强缓存**（Cache-
 
 ## 数学模型
 
-**缓存新鲜度**：设资源在 $t_{fetch}$ 时获取，Cache-Control: max-age=$A$ ，则新鲜度截止时间为 $t_{fresh} = t_{fetch} + A$ 。
+**缓存新鲜度**：设资源在 $t_{fetch}$ 时获取，Cache-Control: max-age=$A$ ，则新鲜度截止时间为 $t_{fresh} = t_{fetch} + A$ 。 时获取，Cache-Control: max-age= $A$ ，则新鲜度截止时间为 $t_{fresh} = t_{fetch} + A$ 。 ，则新鲜度截止时间为 $t_{fresh} = t_{fetch} + A$ 。 。
 
 $$
 freshness(t) = \begin{cases}
@@ -269,7 +269,7 @@ $$
 match = (ETag_{client} == ETag_{server})
 $$
 
-**缓存命中率的数学期望**：设请求到达服从泊松过程，缓存项有效期为 $T_{cache}$ ，资源更新间隔为 $T_{update}$ 。则：
+**缓存命中率的数学期望**：设请求到达服从泊松过程，缓存项有效期为 $T_{cache}$ ，资源更新间隔为 $T_{update}$ 。则： ，资源更新间隔为 $T_{update}$ 。则： 。则：
 $$
 P(\text{hit}) \approx \min(1, \frac{T_{cache}}{T_{update}})
 $$

@@ -2,7 +2,7 @@
 
 ## 定义
 
-**Elasticsearch** 是基于 **倒排索引（Inverted Index）** 的全文搜索引擎，本质是将文本切分为词项（Term），建立词项到文档的映射，实现 $O(1)$ 词项查找。**MongoDB** 是 **文档数据库**，本质是将 JSON 文档作为存储单元，通过 MMAP 内存映射文件实现磁盘读写的高性能。两者代表了检索型存储与文档型存储的两个极端。
+**Elasticsearch** 是基于 **倒排索引（Inverted Index）** 的全文搜索引擎，本质是将文本切分为词项（Term），建立词项到文档的映射，实现 $O(1)$ 词项查找。**MongoDB** 是 **文档数据库**，本质是将 JSON 文档作为存储单元，通过 MMAP 内存映射文件实现磁盘读写的高性能。两者代表了检索型存储与文档型存储的两个极端。 词项查找。**MongoDB** 是 **文档数据库**，本质是将 JSON 文档作为存储单元，通过 MMAP 内存映射文件实现磁盘读写的高性能。两者代表了检索型存储与文档型存储的两个极端。
 
 **Elasticsearch 核心价值**：
 - 全文搜索：TF-IDF、BM25 相关性算法
@@ -24,7 +24,7 @@
 - 查找包含词 "Spring" 的文档：需要扫描所有文档
 
 **倒排索引**：Term → Documents（词出现在哪些文档）
-- 查找包含词 "Spring" 的文档：直接查倒排表， $O(1)$
+- 查找包含词 "Spring" 的文档：直接查倒排表， $O(1)$ 
 
 倒排索引的存储结构：
 ```
@@ -41,10 +41,10 @@ Boot   → [doc1, doc9, ...]
 
 ES 集群的 **分片分配（Shard Allocation）** 遵循 **磁盘使用率 + 分片数均衡** 策略：
 
-设节点 $N_i$ 的分片数为 $s_i$ ，磁盘使用率为 $d_i$ ，目标函数：
-$\min \sum_i |s_i - \bar{s}| + \lambda \cdot |d_i - \bar{d}|$
+设节点 $N_i$ 的分片数为 $s_i$ ，磁盘使用率为 $d_i$ ，目标函数： 的分片数为 $s_i$ ，磁盘使用率为 $d_i$ ，目标函数： ，磁盘使用率为 $d_i$ ，目标函数： ，目标函数：
+ $\min \sum_i |s_i - \bar{s}| + \lambda \cdot |d_i - \bar{d}|$ 
 
-其中 $\bar{s}$ 为平均分片数， $\bar{d}$ 为平均磁盘使用率， $\lambda$ 为权重因子。
+其中 $\bar{s}$ 为平均分片数， $\bar{d}$ 为平均磁盘使用率， $\lambda$ 为权重因子。 为平均分片数， $\bar{d}$ 为平均磁盘使用率， $\lambda$ 为权重因子。 为平均磁盘使用率， $\lambda$ 为权重因子。 为权重因子。
 
 ES 默认优先均衡分片数，新索引优先分配到分片数最少的节点。
 
@@ -54,7 +54,7 @@ MongoDB 聚合管道是 **延迟求值（Lazy Evaluation）**：
 ```
 db.orders.aggregate([
     { $match: { status: "completed" } },  // Stage 1
-    { $group: { _id: "$customer", total: { $sum: "$amount" } } }, // Stage 2
+    { $group: { _id: "$ customer", total: { $sum: "$amount" } } }, // Stage 2customer", total: { $sum: "$ amount" } } }, // Stage 2amount" } } }, // Stage 2
     { $sort: { total: -1 } }               // Stage 3
 ])
 ```
@@ -70,8 +70,8 @@ db.orders.aggregate([
 增量存储:    [1003, 1, 1, 1, 1]  // 第一个存绝对值，后续存差值
 ```
 
-差值越小，所需 bit 数越少。设平均差值为 $d$ ：
-$\text{bits\_per\_doc} = \lceil \log_2(d) \rceil$
+差值越小，所需 bit 数越少。设平均差值为 $d$ ： ：
+ $\text{bits\_per\_doc} = \lceil \log_2(d) \rceil$ 
 
 **Roaring Bitmap**：按块（2^16）存储，每块用不同策略。
 
@@ -79,13 +79,13 @@ $\text{bits\_per\_doc} = \lceil \log_2(d) \rceil$
 
 MongoDB 分片集群的副本集使用 **向量时钟（Vector Clock）** 追踪版本：
 
-设副本节点集合 $R = \{r_1, r_2, ..., r_n\}$ ，向量时钟：
-$VC = \langle c_1, c_2, ..., c_n \rangle$
+设副本节点集合 $R = \{r_1, r_2, ..., r_n\}$ ，向量时钟： ，向量时钟：
+ $VC = \langle c_1, c_2, ..., c_n \rangle$ 
 
-其中 $c_i$ 为节点 $r_i$ 看到的版本号。
+其中 $c_i$ 为节点 $r_i$ 看到的版本号。 为节点 $r_i$ 看到的版本号。 看到的版本号。
 
-**写入版本号**：写入时 $c_i = c_i + 1$
-**比较规则**： $VC_1 < VC_2$ 当且仅当 $\forall i: VC_1[i] \leq VC_2[i]$ 且 $\exists j: VC_1[j] < VC_2[j]$
+**写入版本号**：写入时 $c_i = c_i + 1$ 
+**比较规则**： $VC_1 < VC_2$ 当且仅当 $\forall i: VC_1[i] \leq VC_2[i]$ 且 $\exists j: VC_1[j] < VC_2[j]$ 当且仅当 $\forall i: VC_1[i] \leq VC_2[i]$ 且 $\exists j: VC_1[j] < VC_2[j]$ 且 $\exists j: VC_1[j] < VC_2[j]$ 
 
 ---
 
@@ -210,15 +210,15 @@ ES 通过外部事务管理器（如 Spring）实现跨系统事务，但这依�
 
 ES 使用 **BM25（Best Matching 25）** 作为默认相关性算法：
 
-$BM25(D, Q) = \sum_{i=1}^{n} \text{IDF}(q_i) \cdot \frac{f(q_i, D) \cdot (k_1 + 1)}{f(q_i, D) + k_1 \cdot (1 - b + b \cdot \frac{|D|}{\text{avgdl}})}$
+ $BM25(D, Q) = \sum_{i=1}^{n} \text{IDF}(q_i) \cdot \frac{f(q_i, D) \cdot (k_1 + 1)}{f(q_i, D) + k_1 \cdot (1 - b + b \cdot \frac{|D|}{\text{avgdl}})}$ 
 
 其中：
-- $f(q_i, D)$ = 词项 $q_i$ 在文档 $D$ 中的词频
-- $|D|$ = 文档长度
-- $\text{avgdl}$ = 平均文档长度
-- $k_1$ = 词频饱和参数（默认 1.2）
-- $b$ = 文档长度归一化参数（默认 0.75）
-- $\text{IDF}(q_i)$ = 逆文档频率
+- $f(q_i, D)$ = 词项 $q_i$ 在文档 $D$ 中的词频 = 词项 $q_i$ 在文档 $D$ 中的词频 在文档 $D$ 中的词频 中的词频
+- $|D|$ = 文档长度 = 文档长度
+- $\text{avgdl}$ = 平均文档长度 = 平均文档长度
+- $k_1$ = 词频饱和参数（默认 1.2） = 词频饱和参数（默认 1.2）
+- $b$ = 文档长度归一化参数（默认 0.75） = 文档长度归一化参数（默认 0.75）
+- $\text{IDF}(q_i)$ = 逆文档频率 = 逆文档频率
 
 **BM25 的饱和性**：BM25 解决了词频线性增长的问题——词频超过某阈值后，排名分数不再显著增加。这与 TF-IDF 的线性增长形成对比。
 
@@ -269,22 +269,22 @@ public List<CityStats> getTopCities() {
 
 ### Frame of Reference 编码
 
-对于递增的 docID 序列 $[x_0, x_1, ..., x_{n-1}]$ ，存储差值 $[x_0, x_1-x_0, x_2-x_1, ...]$ ：
+对于递增的 docID 序列 $[x_0, x_1, ..., x_{n-1}]$ ，存储差值 $[x_0, x_1-x_0, x_2-x_1, ...]$ ： ，存储差值 $[x_0, x_1-x_0, x_2-x_1, ...]$ ： ：
 
-设最大差值为 $d_{\max}$ ，每个差值需要 $\lceil \log_2(d_{\max}) \rceil$ bits。
+设最大差值为 $d_{\max}$ ，每个差值需要 $\lceil \log_2(d_{\max}) \rceil$ bits。 ，每个差值需要 $\lceil \log_2(d_{\max}) \rceil$ bits。 bits。
 
 **压缩率**：
-$\text{compression} = \frac{\sum \lceil \log_2(\Delta_i) \rceil}{\sum \lceil \log_2(x_i) \rceil}$
+ $\text{compression} = \frac{\sum \lceil \log_2(\Delta_i) \rceil}{\sum \lceil \log_2(x_i) \rceil}$ 
 
 ### Roaring Bitmap 的混合压缩
 
-Roaring Bitmap 将 docID 空间划分为 $2^{16}$ 个桶（每个桶 65536 个 ID）：
+Roaring Bitmap 将 docID 空间划分为 $2^{16}$ 个桶（每个桶 65536 个 ID）： 个桶（每个桶 65536 个 ID）：
 
 | 桶类型 | 条件 | 存储方式 |
 |--------|------|----------|
 | 空桶 | 无 docID | 无存储 |
-| 稀疏桶 | $< 4096$ 个 docID | 16位整数数组 |
-| 稠密桶 | $\geq 4096$ 个 docID | Bitmap（65536 bits） |
+| 稀疏桶 | $< 4096$ 个 docID | 16位整数数组 | 个 docID | 16位整数数组 |
+| 稠密桶 | $\geq 4096$ 个 docID | Bitmap（65536 bits） | 个 docID | Bitmap（65536 bits） |
 
 **优势**：稀疏文档集节省大量空间，稠密文档集使用紧凑 Bitmap。
 
@@ -292,6 +292,6 @@ Roaring Bitmap 将 docID 空间划分为 $2^{16}$ 个桶（每个桶 65536 个 I
 
 向量时钟实现了**因果一致性（Causal Consistency）**：
 
-$VC_1 \parallel VC_2 \iff \exists i, j: VC_1[i] > VC_2[i] \land VC_2[j] > VC_1[j]$
+ $VC_1 \parallel VC_2 \iff \exists i, j: VC_1[i] > VC_2[i] \land VC_2[j] > VC_1[j]$ 
 
 并发事件之间无法比较因果顺序，但偏序关系仍然成立。

@@ -18,16 +18,16 @@ Spring Security 的本质是 **过滤器链（Filter Chain）**——所有请�
 
 BCrypt 是专为密码哈希设计的自适应函数，基于 **Blowfish** 加密算法，加入了 **cost factor** 控制计算时间：
 
-$T = O(2^{\text{costFactor}}) = O(2^{10}) \approx 1000 \text{ 次 Blowfish 加密}$
+ $T = O(2^{\text{costFactor}}) = O(2^{10}) \approx 1000 \text{ 次 Blowfish 加密}$ 
 
 设 cost factor = 10，每次哈希耗时约 10-20ms（取决于硬件），则：
 - 单次验证：10-20ms
-- 暴力破解（假设攻击者 1000 H/s）：约 $2^{10}/1000 \approx 1$ 秒破解一个密码
+- 暴力破解（假设攻击者 1000 H/s）：约 $2^{10}/1000 \approx 1$ 秒破解一个密码 秒破解一个密码
 
 **自适应含义**：随着硬件提升，可增加 cost factor 保持破解难度。
 
 **自适应安全的不变量**：
-$\text{破解时间} = O(2^{\text{costFactor}} / \text{hashrate})$
+ $\text{破解时间} = O(2^{\text{costFactor}} / \text{hashrate})$ 
 
 当破解时间低于可接受阈值时，增加 cost factor。
 
@@ -44,31 +44,31 @@ User 集合 U ──── 分配关系 ──── Role 集合 R
 ```
 
 授权判断转化为图的可达性问题：
-$\text{hasPermission}(u, p) = \exists r \in R: (u,r) \in \text{assignments} \land (r,p) \in \text{permissions}$
+ $\text{hasPermission}(u, p) = \exists r \in R: (u,r) \in \text{assignments} \land (r,p) \in \text{permissions}$ 
 
 RBAC 相比 ACL 的优势：**层次化授权**，权限变更只需修改角色，而非每个用户。
 
-**可达性检测的算法复杂度**：设用户-角色边数为 $E_{ur}$ ，角色-权限边数为 $E_{rp}$ ，检测复杂度为 $O(E_{ur} \cdot E_{rp})$ （最坏情况遍历所有角色）。
+**可达性检测的算法复杂度**：设用户-角色边数为 $E_{ur}$ ，角色-权限边数为 $E_{rp}$ ，检测复杂度为 $O(E_{ur} \cdot E_{rp})$ （最坏情况遍历所有角色）。 ，角色-权限边数为 $E_{rp}$ ，检测复杂度为 $O(E_{ur} \cdot E_{rp})$ （最坏情况遍历所有角色）。 ，检测复杂度为 $O(E_{ur} \cdot E_{rp})$ （最坏情况遍历所有角色）。 （最坏情况遍历所有角色）。
 
 ### OAuth 2.0 + PKCE 的形式化安全分析
 
 PKCE（Proof Key for Code Exchange）防止 Authorization Code 拦截攻击。设：
 
-- $c_v$ = code_verifier（随机字符串，43-128字符）
-- $c_h$ = code_challenge = Base64URL(SHA256($c_v$))
-- $m$ = method（"S256" 表示 SHA256）
+- $c_v$ = code_verifier（随机字符串，43-128字符） = code_verifier（随机字符串，43-128字符）
+- $c_h$ = code_challenge = Base64URL(SHA256($c_v$)) = code_challenge = Base64URL(SHA256( $c_v$ ))))
+- $m$ = method（"S256" 表示 SHA256） = method（"S256" 表示 SHA256）
 
-**攻击者模型**：攻击者截获 Authorization Code，但无法获取 $c_v$ （在客户端生成，从不传输）。
+**攻击者模型**：攻击者截获 Authorization Code，但无法获取 $c_v$ （在客户端生成，从不传输）。 （在客户端生成，从不传输）。
 
-**安全证明**：攻击者拥有 $code$ 和 $c_h$ ，但不知道 $c_v$ 。由于 SHA256 是单向函数：
-$c_h = \text{SHA256}(c_v) \Rightarrow \text{无法逆推} c_v$
+**安全证明**：攻击者拥有 $code$ 和 $c_h$ ，但不知道 $c_v$ 。由于 SHA256 是单向函数： 和 $c_h$ ，但不知道 $c_v$ 。由于 SHA256 是单向函数： ，但不知道 $c_v$ 。由于 SHA256 是单向函数： 。由于 SHA256 是单向函数：
+ $c_h = \text{SHA256}(c_v) \Rightarrow \text{无法逆推} c_v$ 
 
 授权服务器验证：
-$c_h \stackrel{?}{=} \text{SHA256}(c_v)$
+ $c_h \stackrel{?}{=} \text{SHA256}(c_v)$ 
 
-攻击者无法构造正确的 $(code, c_v)$ 对，授权服务器拒绝兑换。
+攻击者无法构造正确的 $(code, c_v)$ 对，授权服务器拒绝兑换。 对，授权服务器拒绝兑换。
 
-**熵分析**： $c_v$ 的随机熵 $\geq 256$ 位，暴力破解不可行。
+**熵分析**： $c_v$ 的随机熵 $\geq 256$ 位，暴力破解不可行。 的随机熵 $\geq 256$ 位，暴力破解不可行。 位，暴力破解不可行。
 
 ### CSRF 攻击的博弈论建模
 
@@ -77,12 +77,12 @@ CSRF 攻击成功的条件（攻击者视角）：
 2. 用户被诱导触发恶意请求（GET/POST/...）
 3. 浏览器自动携带 Cookie，服务器验证 Cookie 有效
 
-**防御的博弈结构**：攻击者诱使用户发送请求 $r$ ，服务器验证 Cookie + Token：
+**防御的博弈结构**：攻击者诱使用户发送请求 $r$ ，服务器验证 Cookie + Token： ，服务器验证 Cookie + Token：
 
-$\text{Verify}(r) = \text{CookieValid}(r) \land \text{TokenValid}(r.\text{csrf\_token})$
+ $\text{Verify}(r) = \text{CookieValid}(r) \land \text{TokenValid}(r.\text{csrf\_token})$ 
 
 攻击者无法获取 Token（受同源策略保护），故：
-$P(\text{攻击成功}) = 0$
+ $P(\text{攻击成功}) = 0$ 
 
 ---
 
@@ -183,11 +183,11 @@ Signature: HMAC-SHA256(Header.Payload, secret)
 **验证逻辑**：接收 JWT → 解析 Header 和 Payload → 用公钥/密钥重新签名 → 比对签名
 
 无状态认证的数学价值：
-- 验证复杂度： $O(1)$ （只需签名验证，无需查库）
+- 验证复杂度： $O(1)$ （只需签名验证，无需查库） （只需签名验证，无需查库）
 - 空间复杂度：分布式的，无需 Session 存储
 
 **JWT 的安全性约束**：
-$\text{若 } \text{exp} < \text{now} \Rightarrow \text{Token 已过期，拒绝}$
+ $\text{若 } \text{exp} < \text{now} \Rightarrow \text{Token 已过期，拒绝}$ 
 
 ### CSRF 防护的数学原理
 
@@ -249,21 +249,21 @@ http.sessionManagement()
 2. 会话失效时转移旧会话属性到新课程
 
 **数学约束**：最大会话数限制下，新登录触发旧会话失效：
-$|S_{\text{active}}| \leq N_{\text{max}}$
+ $|S_{\text{active}}| \leq N_{\text{max}}$ 
 
 ### 密码存储的盐值与哈希迭代
 
 单纯哈希不足以抵抗暴力破解和彩虹表攻击。
 
 **盐值（Salt）**：随机生成的字符串，与密码拼接后再哈希：
-$\text{stored} = \text{Hash}(\text{password} + \text{salt})$
+ $\text{stored} = \text{Hash}(\text{password} + \text{salt})$ 
 
 同一密码每次存储的盐不同，彩虹表攻击失效。
 
 **密钥派生函数（PBKDF2/Argon2）**：
-$D = \text{PBKDF2}(\text{password}, \text{salt}, \text{iterations}, \text{keyLength})$
+ $D = \text{PBKDF2}(\text{password}, \text{salt}, \text{iterations}, \text{keyLength})$ 
 
-- iterations：迭代次数（建议 $\geq 10000$ ）
+- iterations：迭代次数（建议 $\geq 10000$ ） ）
 - 每次迭代增加攻击者计算成本，但不增加合法验证成本（并行性除外）
 
 ---
@@ -372,9 +372,9 @@ AspectJ 切面拦截
 
 Spring Security 过滤器链可归约为**函数复合（Function Composition）**：
 
-$F = f_1 \circ f_2 \circ \cdots \circ f_n$
+ $F = f_1 \circ f_2 \circ \cdots \circ f_n$ 
 
-每个过滤器 $f_i$ 是一个函数： $\text{Request} \rightarrow \text{Request} \cup \{\text{rejected}\}$ 。
+每个过滤器 $f_i$ 是一个函数： $\text{Request} \rightarrow \text{Request} \cup \{\text{rejected}\}$ 。 是一个函数： $\text{Request} \rightarrow \text{Request} \cup \{\text{rejected}\}$ 。 。
 
 链的执行语义：
 1. 顺序执行每个过滤器的 `doFilter()`
@@ -382,4 +382,4 @@ $F = f_1 \circ f_2 \circ \cdots \circ f_n$
 3. 若所有过滤器通过，请求到达 DispatcherServlet
 
 **过滤器的拒绝语义**：
-$\forall i: f_i(\text{request}) = \text{rejected} \Rightarrow \text{后续过滤器不执行}$
+ $\forall i: f_i(\text{request}) = \text{rejected} \Rightarrow \text{后续过滤器不执行}$ 

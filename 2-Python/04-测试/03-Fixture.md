@@ -31,7 +31,7 @@ $$
 
 ### Fixture DAG 与拓扑排序
 
-Fixture 依赖形成有向无环图（DAG）。令 $F$ 为 fixture 集合， $D(f) \subseteq F$ 为 $f$ 的依赖集：
+Fixture 依赖形成有向无环图（DAG）。令 $F$ 为 fixture 集合， $D(f) \subseteq F$ 为 $f$ 的依赖集： 为 fixture 集合， $D(f) \subseteq F$ 为 $f$ 的依赖集： 为 $f$ 的依赖集： 的依赖集：
 
 $$
 \text{valid\_fixture\_graph} \iff \nexists \text{ cycle in } D
@@ -39,7 +39,7 @@ $$
 
 pytest 在收集阶段对 DAG 做拓扑排序，保证依赖在被注入前已完成初始化。
 
-**拓扑排序的数学定义**：对 DAG $(V, E)$ 的拓扑排序是顶点序列 $v_1, v_2, \dots, v_n$ 使得对每条边 $(v_i, v_j) \in E$ 都有 $i < j$ 。
+**拓扑排序的数学定义**：对 DAG $(V, E)$ 的拓扑排序是顶点序列 $v_1, v_2, \dots, v_n$ 使得对每条边 $(v_i, v_j) \in E$ 都有 $i < j$ 。 的拓扑排序是顶点序列 $v_1, v_2, \dots, v_n$ 使得对每条边 $(v_i, v_j) \in E$ 都有 $i < j$ 。 使得对每条边 $(v_i, v_j) \in E$ 都有 $i < j$ 。 都有 $i < j$ 。 。
 
 **拓扑序不唯一**：若 DAG 有多条合法拓扑序，pytest 采用的是依赖深度优先遍历（DFS）的后序遍历结果。
 
@@ -115,7 +115,7 @@ $$
 \alpha(name) \rightarrow (obj,\ S \cup \{obj\})
 $$
 
-工厂在 setup 阶段初始化空的已创建集合 $S$ 和 cleanup 函数 $C$ ；每次调用工厂函数时创建一个新实例并追加到 $S$ ；teardown 阶段遍历 $S$ 执行 $C$ 。
+工厂在 setup 阶段初始化空的已创建集合 $S$ 和 cleanup 函数 $C$ ；每次调用工厂函数时创建一个新实例并追加到 $S$ ；teardown 阶段遍历 $S$ 执行 $C$ 。 和 cleanup 函数 $C$ ；每次调用工厂函数时创建一个新实例并追加到 $S$ ；teardown 阶段遍历 $S$ 执行 $C$ 。 ；每次调用工厂函数时创建一个新实例并追加到 $S$ ；teardown 阶段遍历 $S$ 执行 $C$ 。 ；teardown 阶段遍历 $S$ 执行 $C$ 。 执行 $C$ 。 。
 
 ## 数据流
 

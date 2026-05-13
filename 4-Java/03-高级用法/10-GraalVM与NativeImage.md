@@ -8,7 +8,7 @@
 
 ### 数学模型
 
-设应用启动阶段的有效工作时间为 $T_{\text{useful}}$ ，JVM启动开销为 $T_{\text{jvm}}$ ，JIT编译时间为 $T_{\text{jit}}$ ：
+设应用启动阶段的有效工作时间为 $T_{\text{useful}}$ ，JVM启动开销为 $T_{\text{jvm}}$ ，JIT编译时间为 $T_{\text{jit}}$ ： ，JVM启动开销为 $T_{\text{jvm}}$ ，JIT编译时间为 $T_{\text{jit}}$ ： ，JIT编译时间为 $T_{\text{jit}}$ ： ：
 
 $$
 \text{JVM总启动时间} = T_{\text{jvm}} + T_{\text{jit}} + T_{\text{useful}}
@@ -18,7 +18,7 @@ $$
 \text{Native Image启动时间} = T_{\text{aot\_compilation}} + T_{\text{useful}}
 $$
 
-其中 $T_{\text{aot\_compilation}}$ 是构建时开销，不影响运行时启动性能。
+其中 $T_{\text{aot\_compilation}}$ 是构建时开销，不影响运行时启动性能。 是构建时开销，不影响运行时启动性能。
 
 ### JIT编译的运行时开销
 

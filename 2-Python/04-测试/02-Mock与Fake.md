@@ -10,26 +10,26 @@ Mock 和 Fake 是测试替身（Test Double）的两种形式。Mock 是**可编
 
 ### Mock 的状态机
 
-Mock 维护内部状态 $(c, H, R, S)$ ：
+Mock 维护内部状态 $(c, H, R, S)$ ： ：
 
-- $c$ ：调用计数器（per method），整数
-- $H$ ：历史调用记录（参数序列），CallList 结构
-- $R$ ：配置返回值映射 $\{method \mapsto v\}$
-- $S$ ：side_effect 序列或函数
+- $c$ ：调用计数器（per method），整数 ：调用计数器（per method），整数
+- $H$ ：历史调用记录（参数序列），CallList 结构 ：历史调用记录（参数序列），CallList 结构
+- $R$ ：配置返回值映射 $\{method \mapsto v\}$ ：配置返回值映射 $\{method \mapsto v\}$ 
+- $S$ ：side_effect 序列或函数 ：side_effect 序列或函数
 
 $$
 \text{mock.method}(args) \rightarrow (c+1,\ H \cup \{\text{call}(args)\},\ R,\ S)
 $$
 
-每次调用返回 `side_effect` 序列的第 $n$ 个元素，或调用 `side_effect` 函数。
+每次调用返回 `side_effect` 序列的第 $n$ 个元素，或调用 `side_effect` 函数。 个元素，或调用 `side_effect` 函数。
 
 **状态转移的数学语义**：
 
 | 操作 | 前置状态 | 后置状态 |
 |------|----------|----------|
-| `mock.method(1)` | $(c, H, R, S)$ | $(c+1, H \cup \{(1)\}, R, S)$ |
-| `mock.method.return_value = 42` | $(c, H, R, S)$ | $(c, H, R \cup \{method \mapsto 42\}, S)$ |
-| `mock.method.assert_called_once()` | $(1, H, R, S)$ | 通过；若 $c \neq 1$ 则抛出 `AssertionError` |
+| `mock.method(1)` | $(c, H, R, S)$ | $(c+1, H \cup \{(1)\}, R, S)$ | | $(c+1, H \cup \{(1)\}, R, S)$ | |
+| `mock.method.return_value = 42` | $(c, H, R, S)$ | $(c, H, R \cup \{method \mapsto 42\}, S)$ | | $(c, H, R \cup \{method \mapsto 42\}, S)$ | |
+| `mock.method.assert_called_once()` | $(1, H, R, S)$ | 通过；若 $c \neq 1$ 则抛出 `AssertionError` | | 通过；若 $c \neq 1$ 则抛出 `AssertionError` | 则抛出 `AssertionError` |
 
 ### CallList 的结构
 
@@ -45,7 +45,7 @@ $$
 \text{call}(args) = ((args_1, \dots, args_k),\ \{k_1: v_1, \dots\})
 $$
 
-`assert_called_with(*args, **kwargs)` 验证 $H[-1] = \text{call}(args, kwargs)$ ，即**仅验证最后一次调用**。
+`assert_called_with(*args, **kwargs)` 验证 $H[-1] = \text{call}(args, kwargs)$ ，即**仅验证最后一次调用**。 ，即**仅验证最后一次调用**。
 
 ### side_effect 的数学语义
 
@@ -81,7 +81,7 @@ $$
 \end{cases}
 $$
 
-其中 $S$ 是被测系统（SUT）， $O$ 是测试目标。
+其中 $S$ 是被测系统（SUT）， $O$ 是测试目标。 是被测系统（SUT）， $O$ 是测试目标。 是测试目标。
 
 **本质区别**：
 - Mock 验证**控制流**（调用顺序、参数、次数）

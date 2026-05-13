@@ -12,29 +12,29 @@ Java 是一种**编译型**语言，但其编译产物是**字节码**而非机�
 
 ### 编译到执行的代价模型
 
-令 $C_{src}$ 为源代码行数， $T_{compile}$ 为 javac 编译时间， $T_{startup}$ 为 JVM 启动时间， $T_{jit}$ 为 JIT 编译时间， $T_{execute}$ 为字节码执行时间。总执行时间：
+令 $C_{src}$ 为源代码行数， $T_{compile}$ 为 javac 编译时间， $T_{startup}$ 为 JVM 启动时间， $T_{jit}$ 为 JIT 编译时间， $T_{execute}$ 为字节码执行时间。总执行时间： 为源代码行数， $T_{compile}$ 为 javac 编译时间， $T_{startup}$ 为 JVM 启动时间， $T_{jit}$ 为 JIT 编译时间， $T_{execute}$ 为字节码执行时间。总执行时间： 为 javac 编译时间， $T_{startup}$ 为 JVM 启动时间， $T_{jit}$ 为 JIT 编译时间， $T_{execute}$ 为字节码执行时间。总执行时间： 为 JVM 启动时间， $T_{jit}$ 为 JIT 编译时间， $T_{execute}$ 为字节码执行时间。总执行时间： 为 JIT 编译时间， $T_{execute}$ 为字节码执行时间。总执行时间： 为字节码执行时间。总执行时间：
 
-$T_{total} = T_{startup} + T_{jit}(warmup) + \sum_{i=1}^{N} T_{execute}(i)$
+ $T_{total} = T_{startup} + T_{jit}(warmup) + \sum_{i=1}^{N} T_{execute}(i)$ 
 
-其中 $N$ 为方法调用次数。JIT 编译在方法被调用 $k$ 次后触发（阈值通常 $k = 1000$ ），将字节码编译为本地码，消除解释开销。
+其中 $N$ 为方法调用次数。JIT 编译在方法被调用 $k$ 次后触发（阈值通常 $k = 1000$ ），将字节码编译为本地码，消除解释开销。 为方法调用次数。JIT 编译在方法被调用 $k$ 次后触发（阈值通常 $k = 1000$ ），将字节码编译为本地码，消除解释开销。 次后触发（阈值通常 $k = 1000$ ），将字节码编译为本地码，消除解释开销。 ），将字节码编译为本地码，消除解释开销。
 
-**约束**： $T_{startup}$ 与 $T_{jit}$ 是不可忽视的固定开销——对于短生命周期程序（如 serverless 函数），JIT 的收益无法回收，  $T_{total} \approx T_{startup}$。这正是 Java 在微服务时代被诟病"启动慢"的原因。
+**约束**： $T_{startup}$ 与 $T_{jit}$ 是不可忽视的固定开销——对于短生命周期程序（如 serverless 函数），JIT 的收益无法回收，  $T_{total} \approx T_{startup}$。这正是 Java 在微服务时代被诟病"启动慢"的原因。 与 $T_{jit}$ 是不可忽视的固定开销——对于短生命周期程序（如 serverless 函数），JIT 的收益无法回收，  $T_{total} \approx T_{startup}$。这正是 Java 在微服务时代被诟病"启动慢"的原因。 是不可忽视的固定开销——对于短生命周期程序（如 serverless 函数），JIT 的收益无法回收，  $T_{total} \approx T_{startup}$ 。这正是 Java 在微服务时代被诟病"启动慢"的原因。。这正是 Java 在微服务时代被诟病"启动慢"的原因。
 
 ### 字节码与机器码的映射
 
 字节码指令是**栈式指令集**：所有操作数默认从操作数栈取用，而非寄存器。这简化了 JVM 的实现（无需关心物理寄存器分配），但代价是更多内存访问（push/pop 操作）。
 
-$T_{jit}(m) = \begin{cases} O(m \cdot k) & \text{解释执行（未达阈值）} \\ O(m \cdot k) + O(m) & \text{JIT 编译后} \end{cases}$
+ $T_{jit}(m) = \begin{cases} O(m \cdot k) & \text{解释执行（未达阈值）} \\ O(m \cdot k) + O(m) & \text{JIT 编译后} \end{cases}$ 
 
-其中 $m$ 为方法规模（指令数）， $k$ 为解释执行每条指令的常数开销。
+其中 $m$ 为方法规模（指令数）， $k$ 为解释执行每条指令的常数开销。 为方法规模（指令数）， $k$ 为解释执行每条指令的常数开销。 为解释执行每条指令的常数开销。
 
 **归约终点**：栈式指令集可以归约为**寄存器式中间表示（IR）**，再由寄存器分配算法映射到物理寄存器。这是传统编译器后端的经典路径。
 
 ### 虚函数分派的数学模型
 
-令继承层次形成偏序集 $H$ ，类 $C$ 的方法表（vtable）为数组 $V_C$ 。对于虚调用 `invokevirtual C.m`：
+令继承层次形成偏序集 $H$ ，类 $C$ 的方法表（vtable）为数组 $V_C$ 。对于虚调用 `invokevirtual C.m`： ，类 $C$ 的方法表（vtable）为数组 $V_C$ 。对于虚调用 `invokevirtual C.m`： 的方法表（vtable）为数组 $V_C$ 。对于虚调用 `invokevirtual C.m`： 。对于虚调用 `invokevirtual C.m`：
 
-$V_C[i] \rightarrow \text{实际方法地址} = \begin{cases} \text{在 } C \text{ 中定义} & \rightarrow C.\text{name} \\ \text{在祖先类中定义} & \rightarrow \text{最近祖先的版本} \end{cases}$
+ $V_C[i] \rightarrow \text{实际方法地址} = \begin{cases} \text{在 } C \text{ 中定义} & \rightarrow C.\text{name} \\ \text{在祖先类中定义} & \rightarrow \text{最近祖先的版本} \end{cases}$ 
 
 运行时通过 **Klass 指针**（对象头中的 64-bit mark word 的一部分）找到实际类型，再查 vtable 分派。
 
@@ -69,16 +69,16 @@ Application ClassLoader (加载 classpath)
 JDK 8 前使用永久代（PermGen）存储类元数据，存在大小上限（通常 64MB）导致的 `OutOfMemoryError: PermGen space`。JDK 8+ 改为元空间，使用本地内存，不受堆大小限制。
 
 **数学约束**：
-- 类元数据大小 = $\sum(\text{类名长度}) + \sum(\text{方法签名长度}) + \text{常量池大小}$
+- 类元数据大小 = $\sum(\text{类名长度}) + \sum(\text{方法签名长度}) + \text{常量池大小}$ 
 - 元空间默认无上限，但受物理内存限制
 
 **违反约束的后果**：元空间 OOM 导致 `OutOfMemoryError: Metaspace`，通常发生在大量动态类生成的场景（如 Spring、CGLIB、OSGi）。
 
 ### 类型擦除的约束模型
 
-泛型信息仅存在于**编译时**，字节码中不保留。令泛型类型参数为 $\tau$ ，擦除规则：
+泛型信息仅存在于**编译时**，字节码中不保留。令泛型类型参数为 $\tau$ ，擦除规则： ，擦除规则：
 
-$\text{erase}(\tau) = \begin{cases} \text{Object} & \text{无上界} \\ \text{上界类型} & \text{有上界} \end{cases}$
+ $\text{erase}(\tau) = \begin{cases} \text{Object} & \text{无上界} \\ \text{上界类型} & \text{有上界} \end{cases}$ 
 
 **桥接方法**（Bridge Method）：当子类重写泛型父类方法时，编译器生成额外的方法签名以保持字节码兼容性。例如 `List<String>.add()` 在字节码中实际签名是 `add(Object)`，编译器额外生成 `add(String)` 调用 `add(Object)` 的桥接方法。
 
@@ -224,13 +224,13 @@ JIT 编译器采用分层策略，C1（客户端编译器）和 C2（服务端�
 
 C/C++ 中内存释放由程序员手动管理，悬空指针和内存泄漏是主要 bug 来源。Java 通过 GC 自动回收不再引用的对象，将**内存安全**从程序员责任转为运行时责任。
 
-**根搜索算法的图论模型**：堆中所有对象构成有向图 $G=(V,E)$ ，其中 $E$ 为引用关系。GC 从根集合（栈帧、静态字段）出发，执行 BFS/DFS 标记可达顶点。不可达顶点（无引用链通向根）是回收候选。
+**根搜索算法的图论模型**：堆中所有对象构成有向图 $G=(V,E)$ ，其中 $E$ 为引用关系。GC 从根集合（栈帧、静态字段）出发，执行 BFS/DFS 标记可达顶点。不可达顶点（无引用链通向根）是回收候选。 ，其中 $E$ 为引用关系。GC 从根集合（栈帧、静态字段）出发，执行 BFS/DFS 标记可达顶点。不可达顶点（无引用链通向根）是回收候选。 为引用关系。GC 从根集合（栈帧、静态字段）出发，执行 BFS/DFS 标记可达顶点。不可达顶点（无引用链通向根）是回收候选。
 
-$\text{Reachable}(v) \iff \exists \text{路径} (root \leadsto v)$
+ $\text{Reachable}(v) \iff \exists \text{路径} (root \leadsto v)$ 
 
 **分代收集的洞察**：大多数对象是"朝生夕死"的（弱代假说），因此将堆划分为 Young（短命对象）和 Old（长命对象），在 Young 区采用高频率、低停顿的收集策略。
 
-**现代 GC 的数学突破**：ZGC、Shenandoah 通过**着色指针**（colored pointers）将标记信息编码在指针本身而非对象头，实现并发标记和并发重定位，将 STW 时间从 $O(\text{堆大小})$ 降为 $O(1)$ 。
+**现代 GC 的数学突破**：ZGC、Shenandoah 通过**着色指针**（colored pointers）将标记信息编码在指针本身而非对象头，实现并发标记和并发重定位，将 STW 时间从 $O(\text{堆大小})$ 降为 $O(1)$ 。 降为 $O(1)$ 。 。
 
 ### 为什么保留基本类型（int, double）而不全部对象化？
 

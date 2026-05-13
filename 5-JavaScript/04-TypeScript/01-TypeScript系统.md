@@ -8,7 +8,7 @@ TypeScript 是 JavaScript 的一个超集，它在语法层面叠加了一层**�
 
 ### 结构化子类型
 
-TypeScript 采用**结构化类型系统**（Structural Typing），与 Java/C++ 的名义类型系统（Nominal Typing）相对。设类型 $A$ 和 $B$ 的成员集合分别为 $M(A)$ 和 $M(B)$ ，赋值兼容性定义为：
+TypeScript 采用**结构化类型系统**（Structural Typing），与 Java/C++ 的名义类型系统（Nominal Typing）相对。设类型 $A$ 和 $B$ 的成员集合分别为 $M(A)$ 和 $M(B)$ ，赋值兼容性定义为： 和 $B$ 的成员集合分别为 $M(A)$ 和 $M(B)$ ，赋值兼容性定义为： 的成员集合分别为 $M(A)$ 和 $M(B)$ ，赋值兼容性定义为： 和 $M(B)$ ，赋值兼容性定义为： ，赋值兼容性定义为：
 
 $$
 A \subtype B \iff \forall m \in M(B): m \in M(A) \land \text{type}(A.m) \subtype \text{type}(B.m)
@@ -18,18 +18,18 @@ $$
 
 ### 函数类型的协变与逆变
 
-对于函数类型 $F = (p: P) \rightarrow R$ ：
+对于函数类型 $F = (p: P) \rightarrow R$ ： ：
 
-- **返回类型 $R$ 是协变的**： $R_1 \subtype R_2 \implies F_1 \subtype F_2$
-- **参数类型 $P$ 是逆变的**： $P_1 \subtype P_2 \implies F_2 \subtype F_1$
+- **返回类型 $R$ 是协变的**： $R_1 \subtype R_2 \implies F_1 \subtype F_2$ 是协变的**： $R_1 \subtype R_2 \implies F_1 \subtype F_2$ 
+- **参数类型 $P$ 是逆变的**： $P_1 \subtype P_2 \implies F_2 \subtype F_1$ 是逆变的**： $P_1 \subtype P_2 \implies F_2 \subtype F_1$ 
 
-**为什么参数要逆变？** 设函数 $f_1: (Cat) \rightarrow void$ 和 $f_2: (Animal) \rightarrow void$ ，其中 $Cat \subtype Animal$ 。如果把 $f_2$ 赋值给 $f_1$ 的位置，调用时传 `Cat` 是安全的（因为 `Cat` 是 `Animal` 的子集，函数接收 `Animal` 自然也能接收 `Cat`）。但反过来把 $f_1$ 赋值给 $f_2$ 的位置就危险了——调用时可能传 `Dog`（也是 `Animal`），但 $f_1$ 只能处理 `Cat`。
+**为什么参数要逆变？** 设函数 $f_1: (Cat) \rightarrow void$ 和 $f_2: (Animal) \rightarrow void$ ，其中 $Cat \subtype Animal$ 。如果把 $f_2$ 赋值给 $f_1$ 的位置，调用时传 `Cat` 是安全的（因为 `Cat` 是 `Animal` 的子集，函数接收 `Animal` 自然也能接收 `Cat`）。但反过来把 $f_1$ 赋值给 $f_2$ 的位置就危险了——调用时可能传 `Dog`（也是 `Animal`），但 $f_1$ 只能处理 `Cat`。 和 $f_2: (Animal) \rightarrow void$ ，其中 $Cat \subtype Animal$ 。如果把 $f_2$ 赋值给 $f_1$ 的位置，调用时传 `Cat` 是安全的（因为 `Cat` 是 `Animal` 的子集，函数接收 `Animal` 自然也能接收 `Cat`）。但反过来把 $f_1$ 赋值给 $f_2$ 的位置就危险了——调用时可能传 `Dog`（也是 `Animal`），但 $f_1$ 只能处理 `Cat`。 ，其中 $Cat \subtype Animal$ 。如果把 $f_2$ 赋值给 $f_1$ 的位置，调用时传 `Cat` 是安全的（因为 `Cat` 是 `Animal` 的子集，函数接收 `Animal` 自然也能接收 `Cat`）。但反过来把 $f_1$ 赋值给 $f_2$ 的位置就危险了——调用时可能传 `Dog`（也是 `Animal`），但 $f_1$ 只能处理 `Cat`。 。如果把 $f_2$ 赋值给 $f_1$ 的位置，调用时传 `Cat` 是安全的（因为 `Cat` 是 `Animal` 的子集，函数接收 `Animal` 自然也能接收 `Cat`）。但反过来把 $f_1$ 赋值给 $f_2$ 的位置就危险了——调用时可能传 `Dog`（也是 `Animal`），但 $f_1$ 只能处理 `Cat`。 赋值给 $f_1$ 的位置，调用时传 `Cat` 是安全的（因为 `Cat` 是 `Animal` 的子集，函数接收 `Animal` 自然也能接收 `Cat`）。但反过来把 $f_1$ 赋值给 $f_2$ 的位置就危险了——调用时可能传 `Dog`（也是 `Animal`），但 $f_1$ 只能处理 `Cat`。 的位置，调用时传 `Cat` 是安全的（因为 `Cat` 是 `Animal` 的子集，函数接收 `Animal` 自然也能接收 `Cat`）。但反过来把 $f_1$ 赋值给 $f_2$ 的位置就危险了——调用时可能传 `Dog`（也是 `Animal`），但 $f_1$ 只能处理 `Cat`。 赋值给 $f_2$ 的位置就危险了——调用时可能传 `Dog`（也是 `Animal`），但 $f_1$ 只能处理 `Cat`。 的位置就危险了——调用时可能传 `Dog`（也是 `Animal`），但 $f_1$ 只能处理 `Cat`。 只能处理 `Cat`。
 
 TypeScript 默认使用**双向协变**（bidirectional covariance），在 `strictFunctionTypes` 模式下启用逆变检查。
 
 ### 类型推断的形式化
 
-TypeScript 编译器维护一个**类型环境** $\Gamma$ （变量名到类型的映射），对每个表达式 $e$ 推导其类型，记作 $\Gamma \vdash e: T$ 。类型推断使用**联合推断**（unification）求解类型变量。
+TypeScript 编译器维护一个**类型环境** $\Gamma$ （变量名到类型的映射），对每个表达式 $e$ 推导其类型，记作 $\Gamma \vdash e: T$ 。类型推断使用**联合推断**（unification）求解类型变量。 （变量名到类型的映射），对每个表达式 $e$ 推导其类型，记作 $\Gamma \vdash e: T$ 。类型推断使用**联合推断**（unification）求解类型变量。 推导其类型，记作 $\Gamma \vdash e: T$ 。类型推断使用**联合推断**（unification）求解类型变量。 。类型推断使用**联合推断**（unification）求解类型变量。
 
 **归约终点**：类型检查最终归约为对每个属性名的成员访问和基本类型相等性的判定，全部在编译时完成，不产生任何运行时开销。
 
@@ -57,7 +57,7 @@ TypeScript 编译器维护一个**类型环境** $\Gamma$ （变量名到类型�
 </pre>
 
 **所有权变换**：
-1. **编译期**：tsc 持有类型环境 $\Gamma$ ，对每个表达式 $e$ 推导 $\Gamma \vdash e: T$
+1. **编译期**：tsc 持有类型环境 $\Gamma$ ，对每个表达式 $e$ 推导 $\Gamma \vdash e: T$ ，对每个表达式 $e$ 推导 $\Gamma \vdash e: T$ 推导 $\Gamma \vdash e: T$ 
 2. **代码生成**：类型标注在生成 JavaScript 时完全移除，生成的 .js 文件不含任何类型信息
 3. **运行时**：V8 执行无类型的 JavaScript 代码，类型系统完全消失
 
@@ -139,7 +139,7 @@ function handle(r: Result) {
 
 ### 类型构造器
 
-泛型本身是一个从类型到类型的函数。设类型构造器 $G$ 的签名为 $G: \text{Type} \rightarrow \text{Type}$ ，则 $G<T>$ 的语义是将类型 $T$ 映射为新类型 $G_T$ 。
+泛型本身是一个从类型到类型的函数。设类型构造器 $G$ 的签名为 $G: \text{Type} \rightarrow \text{Type}$ ，则 $G<T>$ 的语义是将类型 $T$ 映射为新类型 $G_T$ 。 的签名为 $G: \text{Type} \rightarrow \text{Type}$ ，则 $G<T>$ 的语义是将类型 $T$ 映射为新类型 $G_T$ 。 ，则 $G<T>$ 的语义是将类型 $T$ 映射为新类型 $G_T$ 。 的语义是将类型 $T$ 映射为新类型 $G_T$ 。 映射为新类型 $G_T$ 。 。
 
 ```typescript
 interface Container<T> { value: T; }  // Container: Type → Type
@@ -152,11 +152,11 @@ type StringContainer = Container<string>;  // Container<string> 是具体类型
 $$
 \frac{\Gamma \vdash a: A \quad A \subtype B}{\Gamma \vdash a: B}
 $$
-对于任意类型 $T$ ，若 $x: T$ ，则 $fn(x): T$ 。
+对于任意类型 $T$ ，若 $x: T$ ，则 $fn(x): T$ 。 ，若 $x: T$ ，则 $fn(x): T$ 。 ，则 $fn(x): T$ 。 。
 
 ### 条件类型的形式化
 
-条件类型 $F<T>$ 定义为：
+条件类型 $F<T>$ 定义为： 定义为：
 $$
 F<T> = \begin{cases}
 X & \text{if } T \subtype U \\
@@ -166,7 +166,7 @@ $$
 
 ### 分布式条件类型
 
-当 $T = T_1 | T_2 | ... | T_n$ 时，条件类型满足**分配律**：
+当 $T = T_1 | T_2 | ... | T_n$ 时，条件类型满足**分配律**： 时，条件类型满足**分配律**：
 $$
 F<T_1 | T_2 | ... | T_n> = F<T_1> | F<T_2> | ... | F<T_n>
 $$
@@ -175,7 +175,7 @@ $$
 
 **物理含义**：分布式条件类型在逻辑上等价于对联合类型的每个成员分别应用条件类型，然后再合并结果。
 
-**约束**：分配律仅在 $F$ 对裸类型参数分发时触发。若条件类型被元组/数组包装，分配律不生效：
+**约束**：分配律仅在 $F$ 对裸类型参数分发时触发。若条件类型被元组/数组包装，分配律不生效： 对裸类型参数分发时触发。若条件类型被元组/数组包装，分配律不生效：
 ```typescript
 type Foo<T> = [T] extends [string] ? true : false;
 type Test = Foo<string | number>;  // false，非分布
@@ -187,7 +187,7 @@ $$
 \text{MapType}(T, f) = \{ P: f(T[P]) \mid P \in \text{keyof}(T) \}
 $$
 
-即遍历 $T$ 的每个属性键 $P$ ，用函数 $f$ 变换属性值类型。
+即遍历 $T$ 的每个属性键 $P$ ，用函数 $f$ 变换属性值类型。 的每个属性键 $P$ ，用函数 $f$ 变换属性值类型。 ，用函数 $f$ 变换属性值类型。 变换属性值类型。
 
 ### keyof 的数学定义
 
@@ -254,7 +254,7 @@ function getProperty<T, K extends keyof T>(obj: T, key: K): T[K] {
 
 ### infer 的工作原理
 
-`infer U` 在条件类型的 true 分支中声明类型变量 $U$ ，暂时搁置其具体类型的确定。编译器通过**模式匹配**从 $P$ 中"提取" $U$ 的候选类型：
+`infer U` 在条件类型的 true 分支中声明类型变量 $U$ ，暂时搁置其具体类型的确定。编译器通过**模式匹配**从 $P$ 中"提取" $U$ 的候选类型： ，暂时搁置其具体类型的确定。编译器通过**模式匹配**从 $P$ 中"提取" $U$ 的候选类型： 中"提取" $U$ 的候选类型： 的候选类型：
 
 ```typescript
 type Unwrap<T> = T extends Promise<infer U> ? U : T;
@@ -274,7 +274,7 @@ type Getters<T> = {
 };
 ```
 
-这实现了键的映射： $\text{keyof } T \xrightarrow{f} \text{keyof } T'$ ，其中  $f(P) = \text{\`get\${Capitalize(P)}\`}$。
+这实现了键的映射： $\text{keyof } T \xrightarrow{f} \text{keyof } T'$ ，其中  $f(P) = \text{\`get\${Capitalize(P)}\`}$。 ，其中  $f(P) = \text{\`get\${Capitalize(P)}\`}$ 。。
 
 ### 违反约束的后果
 
@@ -332,15 +332,15 @@ type DefaultResponse = Response;  // 等价于 Response<any>
 
 ## 定义
 
-类型收窄的本质是**在控制流中逐步消除类型的非确定性**。联合类型 $T = A | B | C$ 在编译时包含多种可能性，类型守卫通过在代码路径上逐步排除不可能的分支，使 TypeScript 在特定代码块内"相信"变量属于更具体的子类型。
+类型收窄的本质是**在控制流中逐步消除类型的非确定性**。联合类型 $T = A | B | C$ 在编译时包含多种可能性，类型守卫通过在代码路径上逐步排除不可能的分支，使 TypeScript 在特定代码块内"相信"变量属于更具体的子类型。 在编译时包含多种可能性，类型守卫通过在代码路径上逐步排除不可能的分支，使 TypeScript 在特定代码块内"相信"变量属于更具体的子类型。
 
 ## 数学模型
 
 ### 类型守卫的形式化
 
-设守卫函数 $g$ 的类型签名为 $value \rightarrow value \text{ is } X$ ，当 $g(value)$ 返回 true 时，类型环境更新为 $\Gamma \vdash value: X$ 。
+设守卫函数 $g$ 的类型签名为 $value \rightarrow value \text{ is } X$ ，当 $g(value)$ 返回 true 时，类型环境更新为 $\Gamma \vdash value: X$ 。 的类型签名为 $value \rightarrow value \text{ is } X$ ，当 $g(value)$ 返回 true 时，类型环境更新为 $\Gamma \vdash value: X$ 。 ，当 $g(value)$ 返回 true 时，类型环境更新为 $\Gamma \vdash value: X$ 。 返回 true 时，类型环境更新为 $\Gamma \vdash value: X$ 。 。
 
-类型环境 $\Gamma$ 是从变量名到类型的映射。类型收窄通过**控制流分析**更新 $\Gamma$ ：
+类型环境 $\Gamma$ 是从变量名到类型的映射。类型收窄通过**控制流分析**更新 $\Gamma$ ： 是从变量名到类型的映射。类型收窄通过**控制流分析**更新 $\Gamma$ ： ：
 
 $$
 \frac{\Gamma \vdash e: T_1 | T_2 \quad guard(e) \text{ narrows to } T_1}{\Gamma, e: T_1 \vdash \text{branch}}
@@ -348,9 +348,9 @@ $$
 
 ### 协变与逆变的形式化
 
-设函数类型 $F = (p: P) \rightarrow R$ ，则：
-- **返回类型 $R$ 是协变的**： $R_1 \subtype R_2 \implies F_1 \subtype F_2$
-- **参数类型 $P$ 是逆变的**： $P_1 \subtype P_2 \implies F_2 \subtype F_1$
+设函数类型 $F = (p: P) \rightarrow R$ ，则： ，则：
+- **返回类型 $R$ 是协变的**： $R_1 \subtype R_2 \implies F_1 \subtype F_2$ 是协变的**： $R_1 \subtype R_2 \implies F_1 \subtype F_2$ 
+- **参数类型 $P$ 是逆变的**： $P_1 \subtype P_2 \implies F_2 \subtype F_1$ 是逆变的**： $P_1 \subtype P_2 \implies F_2 \subtype F_1$ 
 
 TypeScript 默认使用**双向协变**（用于与 JavaScript 动态类型的兼容性），在 `strictFunctionTypes` 模式下启用逆变检查。
 
@@ -362,9 +362,9 @@ type UnionToIntersection<U> =
     (U extends any ? (k: U) => void : never) extends ((k: infer I) => void) ? I : never;
 ```
 
-**数学证明**：设 $U = A | B$ ：
+**数学证明**：设 $U = A | B$ ： ：
 1. `(U extends any ? (k: U) => void : never)` = `(k: A | B) => void`
-2. 根据函数参数类型的**交集性**： $(k: A | B) \rightarrow void$ 等价于 $(k: A) \rightarrow void \land (k: B) \rightarrow void$
+2. 根据函数参数类型的**交集性**： $(k: A | B) \rightarrow void$ 等价于 $(k: A) \rightarrow void \land (k: B) \rightarrow void$ 等价于 $(k: A) \rightarrow void \land (k: B) \rightarrow void$ 
 3. 因此联合类型参数被转换为交叉类型参数
 
 ## 数据流

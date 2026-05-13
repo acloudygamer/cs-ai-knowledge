@@ -8,30 +8,30 @@ JDK HttpClient、OkHttp、WebClient、RestTemplate 的核心差异在于**连接
 
 ### 连接池利用率
 
-设并发请求数为 $R$ ，连接池大小为 $C$ ，平均请求处理时间为 $T_{req}$ ，平均 I/O 阻塞时间为 $T_{io}$ ，则：
+设并发请求数为 $R$ ，连接池大小为 $C$ ，平均请求处理时间为 $T_{req}$ ，平均 I/O 阻塞时间为 $T_{io}$ ，则： ，连接池大小为 $C$ ，平均请求处理时间为 $T_{req}$ ，平均 I/O 阻塞时间为 $T_{io}$ ，则： ，平均请求处理时间为 $T_{req}$ ，平均 I/O 阻塞时间为 $T_{io}$ ，则： ，平均 I/O 阻塞时间为 $T_{io}$ ，则： ，则：
 
 - 阻塞模型（RestTemplate，每请求一线程）：
-  $\text{吞吐量} = \frac{R}{T_{req}} \cdot \text{线程利用率} \propto R$
-  线程数随并发线性增长， $R=10000$ 时需要 10000 个线程栈（~10GB 堆外内存）
+  $\text{吞吐量} = \frac{R}{T_{req}} \cdot \text{线程利用率} \propto R$ 
+  线程数随并发线性增长， $R=10000$ 时需要 10000 个线程栈（~10GB 堆外内存） 时需要 10000 个线程栈（~10GB 堆外内存）
 
 - 虚拟线程模型（JDK HttpClient + 虚拟线程）：
-  $\text{吞吐量} = \frac{R}{T_{req}}$
-  虚拟线程栈按需扩展（约 200B-1KB vs 1MB）， $R=10000$ 仅占用 ~10MB 栈空间
+  $\text{吞吐量} = \frac{R}{T_{req}}$ 
+  虚拟线程栈按需扩展（约 200B-1KB vs 1MB）， $R=10000$ 仅占用 ~10MB 栈空间 仅占用 ~10MB 栈空间
 
 - 事件驱动模型（WebClient/Netty）：
-  $\text{吞吐量} = \frac{C}{T_{io}}$
-  连接数固定为 $C$ ，吞吐量与 $R$ 解耦， $C$ 通常为 CPU 核数的 2-4 倍
+  $\text{吞吐量} = \frac{C}{T_{io}}$ 
+  连接数固定为 $C$ ，吞吐量与 $R$ 解耦， $C$ 通常为 CPU 核数的 2-4 倍 ，吞吐量与 $R$ 解耦， $C$ 通常为 CPU 核数的 2-4 倍 解耦， $C$ 通常为 CPU 核数的 2-4 倍 通常为 CPU 核数的 2-4 倍
 
 ### 连接复用率
 
 HTTP/1.1 keep-alive：同一连接可发送多个请求，但必须 **串行等待**（上一个响应完成才能发下一个）。
 
-HTTP/2 多路复用：同一连接可并行发送 $N$ 个请求（ $N$ 由流控制窗口决定），连接复用率：
-$\text{复用率} = \frac{\text{实际连接数}}{\text{理论连接数}} \in (0, 1]$
+HTTP/2 多路复用：同一连接可并行发送 $N$ 个请求（ $N$ 由流控制窗口决定），连接复用率： 个请求（ $N$ 由流控制窗口决定），连接复用率： 由流控制窗口决定），连接复用率：
+ $\text{复用率} = \frac{\text{实际连接数}}{\text{理论连接数}} \in (0, 1]$ 
 
 OkHttp 默认最大并发流为 100，HTTP/2 server push 使连接复用率进一步提升。
 
-**归约终点**：HTTP 客户端的性能模型可归约为**队列论中的 M/G/k 排队系统**，其中 $k$ 是连接池大小， $T_{req}$ 服从请求分布，瓶颈在 I/O 等待还是 CPU 计算决定了最优并发模型。
+**归约终点**：HTTP 客户端的性能模型可归约为**队列论中的 M/G/k 排队系统**，其中 $k$ 是连接池大小， $T_{req}$ 服从请求分布，瓶颈在 I/O 等待还是 CPU 计算决定了最优并发模型。 是连接池大小， $T_{req}$ 服从请求分布，瓶颈在 I/O 等待还是 CPU 计算决定了最优并发模型。 服从请求分布，瓶颈在 I/O 等待还是 CPU 计算决定了最优并发模型。
 
 ## 数据流
 
@@ -97,7 +97,7 @@ TLS 握手时协商使用 HTTP/2
 ### 为什么需要连接池
 
 TCP 三次握手 + TLS 握手开销约为 2-4 个 RTT（30-100ms）。连接池通过保持长连接复用，避免重复握手。连接池命中时：
-$\text{延迟节省} = 2 \times RTT_{\text{handshake}} + TLS_{\text{overhead}}$
+ $\text{延迟节省} = 2 \times RTT_{\text{handshake}} + TLS_{\text{overhead}}$ 
 
 ### 各客户端的连接池模型
 
@@ -147,7 +147,7 @@ Flux.interval(Duration.ofMillis(1))  // 生产：每秒1000个元素
 ```
 
 背压传播路径：
-$\text{consumer.slow} \xrightarrow{request(n)} \text{operator} \xrightarrow{request(n)} \text{producer}$
+ $\text{consumer.slow} \xrightarrow{request(n)} \text{operator} \xrightarrow{request(n)} \text{producer}$ 
 
 若消费者 request 数量有限，生产者速度自动降级。
 

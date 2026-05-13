@@ -28,13 +28,13 @@ $$
 T_{alloc\_heap} = \mathcal{O}(n) \quad \text{(取决于分配策略)}, \quad \text{释放由 GC 统一管理}
 $$
 
-**栈帧生命周期**：函数调用时创建栈帧 $F = (args, locals, return\_addr)$ ，函数返回时销毁。栈帧的创建和销毁是**确定性的**（同步于调用/返回），满足后进先出（LIFO）约束：
+**栈帧生命周期**：函数调用时创建栈帧 $F = (args, locals, return\_addr)$ ，函数返回时销毁。栈帧的创建和销毁是**确定性的**（同步于调用/返回），满足后进先出（LIFO）约束： ，函数返回时销毁。栈帧的创建和销毁是**确定性的**（同步于调用/返回），满足后进先出（LIFO）约束：
 
 $$
 \text{Push}(F) \Rightarrow size(F) \uparrow, \quad \text{Pop}(F) \Rightarrow size(F) \downarrow
 $$
 
-**堆对象引用链**：堆对象通过引用链被栈变量引用。当引用断开（赋值为 `null` 或超出作用域），对象成为**垃圾回收候选**。设引用图 $G = (V, E)$ ，其中 $V$ 为对象集合， $E$ 为引用边。GC 保留从根对象可达的子图：
+**堆对象引用链**：堆对象通过引用链被栈变量引用。当引用断开（赋值为 `null` 或超出作用域），对象成为**垃圾回收候选**。设引用图 $G = (V, E)$ ，其中 $V$ 为对象集合， $E$ 为引用边。GC 保留从根对象可达的子图： ，其中 $V$ 为对象集合， $E$ 为引用边。GC 保留从根对象可达的子图： 为对象集合， $E$ 为引用边。GC 保留从根对象可达的子图： 为引用边。GC 保留从根对象可达的子图：
 
 $$
 V_{alive} = \{ v \in V \mid \exists path\ from\ Root\ to\ v \}
@@ -66,11 +66,11 @@ $$
 
 #### 机制
 
-**V8 堆分区架构**：V8 堆分为**新生代**（Scavenge 算法，空间比 $\frac{1}{3}$ ）和**老生代**（Mark-Sweep/Mark-Compact，全堆空间）。分区目的是利用对象寿命分布规律——大多数对象生命周期极短，少数对象存活时间长。
+**V8 堆分区架构**：V8 堆分为**新生代**（Scavenge 算法，空间比 $\frac{1}{3}$ ）和**老生代**（Mark-Sweep/Mark-Compact，全堆空间）。分区目的是利用对象寿命分布规律——大多数对象生命周期极短，少数对象存活时间长。 ）和**老生代**（Mark-Sweep/Mark-Compact，全堆空间）。分区目的是利用对象寿命分布规律——大多数对象生命周期极短，少数对象存活时间长。
 
 **新生代 GC（Scavenge）**：
 - 空间分配：新生代分为 From 和 To 两半，分配只在 From 空间进行
-- 晋升条件：经历过两次 minor GC 或对象过大（> `slots` 阈值，通常 $2^{17}$ 字节）
+- 晋升条件：经历过两次 minor GC 或对象过大（> `slots` 阈值，通常 $2^{17}$ 字节） 字节）
 
 $$
 P_{promotion}(obj) = \begin{cases}
@@ -82,9 +82,9 @@ $$
 **为什么对象年龄决定晋升？** 对象的"年龄"本质上是经历 GC 的次数。经历两次 minor GC 仍存活的对象，大概率是长生命周期对象，应当晋升到老生代以避免频繁复制。新生代使用 Scavenge（空间换时间），老生代使用 Mark-Sweep（时间换空间）——两者的组合是最优策略。
 
 **老生代 GC（Mark-Sweep-Compact）**：
-- Mark 阶段：从根出发 DFS/BFS 标记可达对象， $\mathcal{O}(|V_{alive}|)$
-- Sweep 阶段：扫描整个堆，释放未标记对象， $\mathcal{O}(heap\_size)$
-- Compact 阶段：移动存活对象消除碎片， $\mathcal{O}(|V_{alive}|)$
+- Mark 阶段：从根出发 DFS/BFS 标记可达对象， $\mathcal{O}(|V_{alive}|)$ 
+- Sweep 阶段：扫描整个堆，释放未标记对象， $\mathcal{O}(heap\_size)$ 
+- Compact 阶段：移动存活对象消除碎片， $\mathcal{O}(|V_{alive}|)$ 
 
 **约束条件**：
 - Mark 阶段必须 Stop-the-World（STW），V8 通过增量标记（incremental marking）将暂停分散到多个微任务间隙
@@ -99,7 +99,7 @@ $$
 
 **标记-清除算法**（Mark-Sweep）：
 
-设 GC 触发时堆中对象总数为 $N_{total}$ ，存活对象数为 $N_{alive}$ ，则：
+设 GC 触发时堆中对象总数为 $N_{total}$ ，存活对象数为 $N_{alive}$ ，则： ，存活对象数为 $N_{alive}$ ，则： ，则：
 
 $$
 T_{mark} = \mathcal{O}(N_{alive}) + \mathcal{O}(roots) = \mathcal{O}(N_{alive}) \quad \text{(根集远小于堆)}
@@ -125,7 +125,7 @@ $$
 
 若晋升率过高，说明老生代承受大量对象压力，可能触发 Full GC。
 
-**GC 停顿时间预算**：V8 通常将 GC 停顿控制在 50ms 以内（Chrome 的 Long Task 阈值）。设 GC 目标停顿时间为 $t_{budget}$ ，则增量标记的步长 $\delta_{mark}$ 需满足：
+**GC 停顿时间预算**：V8 通常将 GC 停顿控制在 50ms 以内（Chrome 的 Long Task 阈值）。设 GC 目标停顿时间为 $t_{budget}$ ，则增量标记的步长 $\delta_{mark}$ 需满足： ，则增量标记的步长 $\delta_{mark}$ 需满足： 需满足：
 
 $$
 t_{budget} > \delta_{mark} = \mathcal{O}(new\_objects\_allocated\_since\_last\_step)
@@ -170,7 +170,7 @@ function outer() {
 const fn = outer(); // fn 持有 x 的引用，x 永不释放
 ```
 
-闭包泄漏的数学本质：设闭包 $C$ 捕获变量集 $V_c$ ，若 $V_c$ 中存在堆对象 $O$ ，则 $O$ 的引用计数至少为 1，永远不满足 $RefCount(O) = 0$ 的回收条件。
+闭包泄漏的数学本质：设闭包 $C$ 捕获变量集 $V_c$ ，若 $V_c$ 中存在堆对象 $O$ ，则 $O$ 的引用计数至少为 1，永远不满足 $RefCount(O) = 0$ 的回收条件。 捕获变量集 $V_c$ ，若 $V_c$ 中存在堆对象 $O$ ，则 $O$ 的引用计数至少为 1，永远不满足 $RefCount(O) = 0$ 的回收条件。 ，若 $V_c$ 中存在堆对象 $O$ ，则 $O$ 的引用计数至少为 1，永远不满足 $RefCount(O) = 0$ 的回收条件。 中存在堆对象 $O$ ，则 $O$ 的引用计数至少为 1，永远不满足 $RefCount(O) = 0$ 的回收条件。 ，则 $O$ 的引用计数至少为 1，永远不满足 $RefCount(O) = 0$ 的回收条件。 的引用计数至少为 1，永远不满足 $RefCount(O) = 0$ 的回收条件。 的回收条件。
 
 **为什么闭包会导致泄漏而普通函数不会？** 普通函数返回后，其局部变量（栈上的原始值或对堆对象的引用）随着栈帧销毁而失去外部引用。但闭包捕获了这些变量——返回的函数对象持有外层变量的引用，即使外层函数已返回，这些变量（和它们引用的堆对象）仍然可达。
 
@@ -194,7 +194,7 @@ $$
 \Delta_{leak} = \sum_{obj \in leaked\_set} size(obj)
 $$
 
-设程序运行时间为 $T$ ，正常内存增长率为 $r_{normal}$ （对象分配速率与回收速率之差），实际增长率为 $r_{actual}$ ，则泄漏率：
+设程序运行时间为 $T$ ，正常内存增长率为 $r_{normal}$ （对象分配速率与回收速率之差），实际增长率为 $r_{actual}$ ，则泄漏率： ，正常内存增长率为 $r_{normal}$ （对象分配速率与回收速率之差），实际增长率为 $r_{actual}$ ，则泄漏率： （对象分配速率与回收速率之差），实际增长率为 $r_{actual}$ ，则泄漏率： ，则泄漏率：
 
 $$
 r_{leak} = r_{actual} - r_{normal} = \frac{\Delta_{leak}}{T}
@@ -228,13 +228,13 @@ $$
 
 **防抖（Debounce）**：
 
-设触发时刻序列为 $T = \{t_1, t_2, ..., t_n\}$ ，防抖延迟为 $\Delta t$ ，则实际执行时刻 $t_{exec}$ 满足：
+设触发时刻序列为 $T = \{t_1, t_2, ..., t_n\}$ ，防抖延迟为 $\Delta t$ ，则实际执行时刻 $t_{exec}$ 满足： ，防抖延迟为 $\Delta t$ ，则实际执行时刻 $t_{exec}$ 满足： ，则实际执行时刻 $t_{exec}$ 满足： 满足：
 
 $$
 t_{exec} = \min\{ t \mid \forall t' \in T: |t - t'| \leq \Delta t \Rightarrow t' \leq t \}
 $$
 
-等价表述：仅当距离上次触发 $\Delta t$ 时间内无新触发时，才执行。
+等价表述：仅当距离上次触发 $\Delta t$ 时间内无新触发时，才执行。 时间内无新触发时，才执行。
 
 **节流（Throttle）**：
 
@@ -245,7 +245,7 @@ T_{throttle}(t) = \begin{cases}
 \end{cases}
 $$
 
-设时间窗口 $[0, T]$ 内的触发次数为 $n$ ，则执行次数被限制为 $\lfloor \frac{T}{\Delta t} \rfloor + 1$ 。
+设时间窗口 $[0, T]$ 内的触发次数为 $n$ ，则执行次数被限制为 $\lfloor \frac{T}{\Delta t} \rfloor + 1$ 。 内的触发次数为 $n$ ，则执行次数被限制为 $\lfloor \frac{T}{\Delta t} \rfloor + 1$ 。 ，则执行次数被限制为 $\lfloor \frac{T}{\Delta t} \rfloor + 1$ 。 。
 
 #### 数据流
 
@@ -262,25 +262,25 @@ $$
 - 防抖适合 `oninput` 搜索建议（用户停止输入后才查询，减少服务器压力）
 - 节流适合 `onscroll` 滚动事件（每 16ms 最多执行一次，与屏幕刷新率同步）
 
-**两者本质都是用时间窗口控制函数执行频率**。防抖保证"最后一次有效"，节流保证"最多每 $\Delta t$ 一次"。
+**两者本质都是用时间窗口控制函数执行频率**。防抖保证"最后一次有效"，节流保证"最多每 $\Delta t$ 一次"。 一次"。
 
 **约束边界**：
-- 防抖的 $\Delta t$ 若过大，用户等待感明显；过小则失去合并效果
+- 防抖的 $\Delta t$ 若过大，用户等待感明显；过小则失去合并效果 若过大，用户等待感明显；过小则失去合并效果
 - 节流的执行时机取决于第一次触发的时间，可能在窗口边界附近连续执行两次
 
-**违反约束的代价**：防抖若 $\Delta t = 0$ ，退化为立即执行；节流若 $\Delta t$ 小于事件触发频率，退化为每次都执行。
+**违反约束的代价**：防抖若 $\Delta t = 0$ ，退化为立即执行；节流若 $\Delta t$ 小于事件触发频率，退化为每次都执行。 ，退化为立即执行；节流若 $\Delta t$ 小于事件触发频率，退化为每次都执行。 小于事件触发频率，退化为每次都执行。
 
 ### 事件委托
 
 #### 数学模型
 
-事件委托将 $n$ 个子元素监听器合并为 $1$ 个父元素监听器：
+事件委托将 $n$ 个子元素监听器合并为 $1$ 个父元素监听器： 个子元素监听器合并为 $1$ 个父元素监听器： 个父元素监听器：
 
 $$
 \mathcal{O}(n) \xrightarrow{\text{委托}} \mathcal{O}(1)
 $$
 
-内存占用减少量：设每个监听器内存开销为 $s_{listener}$ ，则节省：
+内存占用减少量：设每个监听器内存开销为 $s_{listener}$ ，则节省： ，则节省：
 
 $$
 \Delta_{memory} = (n - 1) \times s_{listener}
@@ -300,7 +300,7 @@ DOM 树：              事件流：
 #### 机制
 
 事件委托利用了 DOM 的**事件冒泡**机制：
-- **优点**：减少内存占用（一个监听器代替 $n$ 个），支持动态添加子元素
+- **优点**：减少内存占用（一个监听器代替 $n$ 个），支持动态添加子元素 个），支持动态添加子元素
 - **缺点**：不支持不冒泡的事件（`focus`, `blur`, `change` 等需用 `focusin`/`focusout` 替代）
 
 **约束**：事件必须冒泡。不冒泡事件如 `focus`、`blur`、`load`、`error`、`scroll` 无法委托到父元素。
@@ -315,9 +315,9 @@ $$
 T_{thrashing} = \sum_{i=1}^{n} T_{reflow}(scope_i) = \mathcal{O}(n \times layout\_scope)
 $$
 
-其中 $n$ 为强制重排次数， $layout\_scope$ 为重排作用的 DOM 子树大小。
+其中 $n$ 为强制重排次数， $layout\_scope$ 为重排作用的 DOM 子树大小。 为强制重排次数， $layout\_scope$ 为重排作用的 DOM 子树大小。 为重排作用的 DOM 子树大小。
 
-**虚拟列表复杂度**： $\mathcal{O}(visible\_rows)$ 渲染，而非  $\mathcal{O}(total\_rows)$。设总行数  $N$，可见行数  $V$，则渲染优化比：
+**虚拟列表复杂度**： $\mathcal{O}(visible\_rows)$ 渲染，而非  $\mathcal{O}(total\_rows)$。设总行数  $N$，可见行数  $V$，则渲染优化比： 渲染，而非  $\mathcal{O}(total\_rows)$ 。设总行数  $N$，可见行数  $V$，则渲染优化比：。设总行数  $N$ ，可见行数  $V$，则渲染优化比：，可见行数  $V$ ，则渲染优化比：，则渲染优化比：
 
 $$
 R_{virtual} = \frac{N}{V}
@@ -350,7 +350,7 @@ $$
 
 Long Task = 主线程阻塞超过 **50ms** 的任务。Chrome DevTools Performance 面板将此标记为红色。
 
-设任务执行时间为 $t_{task}$ ，阻塞阈值 $t_{threshold} = 50ms$ ：
+设任务执行时间为 $t_{task}$ ，阻塞阈值 $t_{threshold} = 50ms$ ： ，阻塞阈值 $t_{threshold} = 50ms$ ： ：
 
 $$
 is\_long\_task(t_{task}) = \mathbb{1}(t_{task} > 50ms)
@@ -475,7 +475,7 @@ Proxy + Reflect 组合通过 Proxy 拦截、Reflect 托底，实现：
 - **只读视图**：`get` trap 返回属性，`set`/`delete` trap 抛出错误
 - **日志审计**：所有访问/修改操作记录日志
 
-**Vue 3 响应式的数学本质**：设响应式对象为 $R = Proxy(target, handler)$ ，其中 handler 拦截 `get`/`set`。当读取属性时，记录依赖（订阅）；当设置属性时，通知所有依赖（发布）：
+**Vue 3 响应式的数学本质**：设响应式对象为 $R = Proxy(target, handler)$ ，其中 handler 拦截 `get`/`set`。当读取属性时，记录依赖（订阅）；当设置属性时，通知所有依赖（发布）： ，其中 handler 拦截 `get`/`set`。当读取属性时，记录依赖（订阅）；当设置属性时，通知所有依赖（发布）：
 
 $$
 get: \quad dep.add(current\_effect)
@@ -496,7 +496,7 @@ $$
 W = WeakRef(obj) \quad \Rightarrow \quad GC \text{ 可回收 } obj \mid \neg \exists path\_from\_root(obj)
 $$
 
-**FinalizationRegistry**：在对象被 GC 回收后执行回调。设注册的目标对象集 $S_{registered}$ ，回收对象集 $S_{collected}$ ：
+**FinalizationRegistry**：在对象被 GC 回收后执行回调。设注册的目标对象集 $S_{registered}$ ，回收对象集 $S_{collected}$ ： ，回收对象集 $S_{collected}$ ： ：
 
 $$
 callback(obj) \text{ 在 } obj \in S_{collected} \text{ 时被调用}

@@ -31,7 +31,7 @@ C_{max}(domain, httpver) = \begin{cases}
 \end{cases}
 $$
 
-当 $n$ 个并发请求超过 $C_{max}$ 时，超出请求进入 FIFO 等待队列，产生**队首阻塞**（Head-of-Line Blocking）。HTTP/2 通过多路复用（Multiplexing）消除此约束：同一 TCP 连接上可并行传输多个请求-响应对。
+当 $n$ 个并发请求超过 $C_{max}$ 时，超出请求进入 FIFO 等待队列，产生**队首阻塞**（Head-of-Line Blocking）。HTTP/2 通过多路复用（Multiplexing）消除此约束：同一 TCP 连接上可并行传输多个请求-响应对。 个并发请求超过 $C_{max}$ 时，超出请求进入 FIFO 等待队列，产生**队首阻塞**（Head-of-Line Blocking）。HTTP/2 通过多路复用（Multiplexing）消除此约束：同一 TCP 连接上可并行传输多个请求-响应对。 时，超出请求进入 FIFO 等待队列，产生**队首阻塞**（Head-of-Line Blocking）。HTTP/2 通过多路复用（Multiplexing）消除此约束：同一 TCP 连接上可并行传输多个请求-响应对。
 
 **HTTP/2 多路复用数学模型**：
 
@@ -41,7 +41,7 @@ $$
 Throughput_{http2} \leq \frac{Window_{initial}}{RTT} \times Window_{max}
 $$
 
-其中 $Window_{initial}$ 通常为 256KB（HTTP/2 默认）， $RTT$ 为往返时延， $Window_{max}$ 为最大流量控制窗口。
+其中 $Window_{initial}$ 通常为 256KB（HTTP/2 默认）， $RTT$ 为往返时延， $Window_{max}$ 为最大流量控制窗口。 通常为 256KB（HTTP/2 默认）， $RTT$ 为往返时延， $Window_{max}$ 为最大流量控制窗口。 为往返时延， $Window_{max}$ 为最大流量控制窗口。 为最大流量控制窗口。
 
 ### WebSocket 双向通道状态机
 
@@ -176,11 +176,11 @@ fetch 的核心优势在于**可组合性**：
 TCP 连接空闲时，中间路由器或 NAT 设备可能超时关闭连接（超时时间通常 60-120 秒）。WebSocket 无内置心跳，需应用层实现：
 
 **约束分析**：
-- 心跳间隔 $T_{heartbeat}$ 必须满足： $T_{heartbeat} < T_{router\_timeout} - T_{margin}$
+- 心跳间隔 $T_{heartbeat}$ 必须满足： $T_{heartbeat} < T_{router\_timeout} - T_{margin}$ 必须满足： $T_{heartbeat} < T_{router\_timeout} - T_{margin}$ 
 - 过短的心跳间隔增加带宽消耗（每 30s 一次往返是常见配置）
 - 检测网络断开需要同时处理 `onclose` 和发送失败
 
-**违反约束的后果**：若 $T_{heartbeat} \geq T_{router\_timeout}$ ，NAT 映射失效，服务器收不到心跳，服务器端或客户端可能已断开连接但对端不知情，导致僵尸连接占用资源。
+**违反约束的后果**：若 $T_{heartbeat} \geq T_{router\_timeout}$ ，NAT 映射失效，服务器收不到心跳，服务器端或客户端可能已断开连接但对端不知情，导致僵尸连接占用资源。 ，NAT 映射失效，服务器收不到心跳，服务器端或客户端可能已断开连接但对端不知情，导致僵尸连接占用资源。
 
 ### Service Worker 的请求拦截模型
 
@@ -248,7 +248,7 @@ Web Workers 运行在独立线程，**内存地址空间完全隔离**（不共�
 w.postMessage({ buf: new ArrayBuffer(1024) }, [buf]); // buf 在主线程变为无效
 ```
 
-所有权转移的数学语义：设原线程持有对象 $O$ 的所有权，则转移后 $O$ 的所有权归目标线程，原线程无法再访问。
+所有权转移的数学语义：设原线程持有对象 $O$ 的所有权，则转移后 $O$ 的所有权归目标线程，原线程无法再访问。 的所有权，则转移后 $O$ 的所有权归目标线程，原线程无法再访问。 的所有权归目标线程，原线程无法再访问。
 
 ### Cache API 的缓存语义
 

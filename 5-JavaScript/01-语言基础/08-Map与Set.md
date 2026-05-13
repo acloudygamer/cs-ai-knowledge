@@ -17,8 +17,8 @@ $$
 $$
 
 SameValueZero 等价关系：
-- $a === b$ 时， $\text{SameValueZero}(a, b) = \text{true}$
-- $a = b = \text{NaN}$ 时， $\text{SameValueZero}(a, b) = \text{true}$ （与 `===` 不同，`===` 认为 `NaN !== NaN`）
+- $a === b$ 时， $\text{SameValueZero}(a, b) = \text{true}$ 时， $\text{SameValueZero}(a, b) = \text{true}$ 
+- $a = b = \text{NaN}$ 时， $\text{SameValueZero}(a, b) = \text{true}$ （与 `===` 不同，`===` 认为 `NaN !== NaN`） 时， $\text{SameValueZero}(a, b) = \text{true}$ （与 `===` 不同，`===` 认为 `NaN !== NaN`） （与 `===` 不同，`===` 认为 `NaN !== NaN`）
 
 **归约终点**：SameValueZero 是 JavaScript 的等价关系，满足自反性、对称性、传递性，但与 `===` 的区别在于对 NaN 的处理。
 
@@ -29,7 +29,7 @@ $$
 T_{\text{操作}} = O(1) \quad \text{平均时间复杂度}
 $$
 
-最坏情况 $O(n)$ （当发生哈希冲突时，退化为链表/红黑树遍历）。
+最坏情况 $O(n)$ （当发生哈希冲突时，退化为链表/红黑树遍历）。 （当发生哈希冲突时，退化为链表/红黑树遍历）。
 
 **归约终点**：Map 的查找可归约为**哈希表查找**，哈希函数质量决定碰撞概率。
 

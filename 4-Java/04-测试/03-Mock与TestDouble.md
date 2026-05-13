@@ -4,8 +4,8 @@
 
 Test Double是用伪对象替代真实依赖以隔离被测单元（SUT，System Under Test）的模式。其本质是**依赖反转**——被测单元依赖抽象接口，测试时注入Mock实现，控制实验环境。
 
-**隔离的数学意义**：设被测单元 $U$ 依赖服务 $S$ ，则测试目标 $T(U)$ 受 $T(S)$ 影响。引入 Test Double $D$ 替代 $S$ 后， $T(U)$ 可独立验证：
-$T(U | D) \perp T(S)$
+**隔离的数学意义**：设被测单元 $U$ 依赖服务 $S$ ，则测试目标 $T(U)$ 受 $T(S)$ 影响。引入 Test Double $D$ 替代 $S$ 后， $T(U)$ 可独立验证： 依赖服务 $S$ ，则测试目标 $T(U)$ 受 $T(S)$ 影响。引入 Test Double $D$ 替代 $S$ 后， $T(U)$ 可独立验证： ，则测试目标 $T(U)$ 受 $T(S)$ 影响。引入 Test Double $D$ 替代 $S$ 后， $T(U)$ 可独立验证： 受 $T(S)$ 影响。引入 Test Double $D$ 替代 $S$ 后， $T(U)$ 可独立验证： 影响。引入 Test Double $D$ 替代 $S$ 后， $T(U)$ 可独立验证： 替代 $S$ 后， $T(U)$ 可独立验证： 后， $T(U)$ 可独立验证： 可独立验证：
+ $T(U | D) \perp T(S)$ 
 
 测试结果与真实服务的实现细节解耦。
 
@@ -21,7 +21,7 @@ $$
 \forall u \in U, \forall s \in S: u \xrightarrow{\text{call}} s \iff u \xrightarrow{\text{call}} d, d \in D
 $$
 
-其中 $D$ 实现了与 $S$ 相同的接口 $I$ 。
+其中 $D$ 实现了与 $S$ 相同的接口 $I$ 。 实现了与 $S$ 相同的接口 $I$ 。 相同的接口 $I$ 。 。
 
 ---
 
@@ -54,7 +54,7 @@ $$
 \text{inOrder}((e_1, e_2, \ldots, e_n)) \iff \forall i < j: e_i \xrightarrow{*} e_j
 $$
 
-其中 $\xrightarrow{*}$ 表示可达关系（传递闭包）。
+其中 $\xrightarrow{*}$ 表示可达关系（传递闭包）。 表示可达关系（传递闭包）。
 
 ### Stub 链式返回的状态机模型
 
@@ -67,9 +67,9 @@ $$
 ```
 
 数学表达：
-$S_{i+1} = \delta(S_i, \text{call})$
-$\text{output}(S_i) = v_i \quad \text{for } i < n$
-$\text{output}(S_i) = v_n \quad \text{for } i \geq n$
+ $S_{i+1} = \delta(S_i, \text{call})$ 
+ $\text{output}(S_i) = v_i \quad \text{for } i < n$ 
+ $\text{output}(S_i) = v_n \quad \text{for } i \geq n$ 
 
 最后预设值作为稳态输出。
 
@@ -228,13 +228,13 @@ $$
 \forall s_1, s_2 \in \text{Stubbing}: s_1.\text{pattern} \preceq s_2.\text{pattern} \implies s_1 \text{ 必须在 } s_2 \text{ 之前声明}
 $$
 
-其中 $\preceq$ 表示"比...更具体"。
+其中 $\preceq$ 表示"比...更具体"。 表示"比...更具体"。
 
 ### verifyNoMoreInteractions() 的门禁语义
 
 `verifyNoMoreInteractions()` 作为最终门禁，确保测试后无意外调用：
 
-$\forall m \in \text{MockMethods}: \text{callCount}(m) = \text{verifiedCount}(m)$
+ $\forall m \in \text{MockMethods}: \text{callCount}(m) = \text{verifiedCount}(m)$ 
 
 若存在未验证的调用，测试失败。这防止"漏验证"——测试只验证了关心的调用，但没有检查是否有多余调用。
 
