@@ -6,14 +6,34 @@ function formatText(text) {
   const BGN = '\uE000';
   const END = '\uE001';
 
-  // 1. 保护代码块
+  // ==========================================
+  // 阶段 1：保护与提取（代码块与块级公式）
+  // ==========================================
+  
+  // 1. 保护代码块（避免里面的 $ 符号被误改）
   const codes = [];
   text = text.replace(/(`{1,3})[\s\S]*?\1/g, match => {
     codes.push(match);
     return `${BGN}C${codes.length - 1}${END}`;
   });
 
-  // 2. 保护并提取公式
+  // 2. 保护块级公式（$$...$$）并【强制前后空行】
+  const blockFormulas = [];
+  text = text.replace(/(\$\$[\s\S]+?\$\$)/g, match => {
+    blockFormulas.push(match);
+    return `${BGN}B${blockFormulas.length - 1}${END}`;
+  });
+
+  const blockRegexStr = `${BGN}B\\d+${END}`;
+  // 核心逻辑：无论原本挤在一起还是空了太多行，强制收敛为有且仅有一个空行 (\n\n)
+  text = text.replace(new RegExp(`([^\\n])\\s*(${blockRegexStr})`, 'g'), '$1\n\n$2');
+  text = text.replace(new RegExp(`(${blockRegexStr})\\s*([^\\n])`, 'g'), '$1\n\n$2');
+
+  // ==========================================
+  // 阶段 2：保护与排版（行内公式）
+  // ==========================================
+
+  // 3. 保护并提取行内公式（$...$）
   const formulas = [];
   text = text.replace(/(?<!\\|\$)(\$[^$\n]+?\$)(?!\$)/g, match => {
     formulas.push(match);
@@ -22,35 +42,34 @@ function formatText(text) {
 
   const formulaRegexStr = `${BGN}F\\d+${END}`;
 
-  // 3. 收紧多余空格
+  // 4. 强制收紧多余的空格（原稿里的连续空格被压缩为 1 个）
   text = text.replace(new RegExp(` {2,}(${formulaRegexStr})`, 'g'), ' $1');
   text = text.replace(new RegExp(`(${formulaRegexStr}) {2,}`, 'g'), '$1 ');
 
-  // 4. 处理【前边界】（核心修正！）
-  // 移除了全角标点！现在遇到“检验：$x$”，会被强制修正为“检验： $x$”以保证渲染。
-  // 只有遇到真正在视觉上包裹公式的左括号、左引号等，才会允许紧贴。
+  // 5. 处理【前边界】：遇到文字和冒号等强行加空格，确保渲染引擎识别
   const excludeBefore = `[^\\s\\(\\[\\{<"'“‘（【《*_\\-~]`;
   text = text.replace(new RegExp(`(${excludeBefore})(${formulaRegexStr})`, 'g'), '$1 $2');
 
-  // 5. 处理【后边界】
-  // 后边界保持不变：公式后面紧跟句号、逗号等标点是合法的，不会破坏渲染，不加空格。
+  // 6. 处理【后边界】：除了标点符号和括号，其余强行加空格
   const excludeAfter = `[^\\s\\.,;:!\\?\\)\\]\\}>"'”’，。！？；：、）】》*_\\-~]`;
   text = text.replace(new RegExp(`(${formulaRegexStr})(${excludeAfter})`, 'g'), '$1 $2');
 
-  // 【新增的一步：强制紧贴后置标点！】
-  // 如果公式和标点符号之间有任何空格，无情地删掉它们，实现绝对紧贴。
+  // 7. 终极补丁【强制紧贴后置标点】：清除原稿中标点前面的多余空格！
   const tightAfterPunctuation = `([\\.,;:!\\?\\)\\]\\}>"'”’，。！？；：、）】》])`;
   text = text.replace(new RegExp(`(${formulaRegexStr})\\s+${tightAfterPunctuation}`, 'g'), '$1$2');
-  // 6. 还原公式
-  text = text.replace(/\uE000F(\d+)\uE001/g, (_, i) => formulas[i]);
 
-  // 7. 还原代码块
+  // ==========================================
+  // 阶段 3：全量还原
+  // ==========================================
+
+  text = text.replace(/\uE000F(\d+)\uE001/g, (_, i) => formulas[i]);
+  text = text.replace(/\uE000B(\d+)\uE001/g, (_, i) => blockFormulas[i]);
   text = text.replace(/\uE000C(\d+)\uE001/g, (_, i) => codes[i]);
 
   return text;
 }
 
-// 遍历及文件处理逻辑
+// 遍历及文件读写逻辑
 function processTarget(targetPath) {
   const stat = fs.statSync(targetPath);
   
@@ -65,12 +84,12 @@ function processTarget(targetPath) {
     
     if (oldText !== newText) {
       fs.writeFileSync(targetPath, newText, 'utf-8');
-      console.log(`[已排版 - 渲染安全] ${targetPath}`);
+      console.log(`[已完美排版] ${targetPath}`);
     }
   }
 }
 
-// 运行脚本
+// 运行入口
 const target = process.argv[2] || '.';
 if (!fs.existsSync(target)) {
   console.error('路径不存在！');
