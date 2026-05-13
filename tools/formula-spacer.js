@@ -41,43 +41,33 @@ function padRight(str, pos) {
 
 // 处理行内公式 $...$
 function processInlineFormula(line) {
-  let result = line;
   // 匹配 $...$，支持转义 \$
   const regex = /(?<!\\)\$(?!\$)((?:[^$\\]|\\.)+?)(?<!\\)\$/g;
-  let match;
+  let result = '';
+  let lastIndex = 0;
   let offset = 0;
+  let match;
 
   while ((match = regex.exec(line)) !== null) {
     const fullMatch = match[0];
     const start = match.index;
     const end = start + fullMatch.length - 1;
 
-    const before = line.substring(0, start);
-    const after = line.substring(end + 1);
+    // 原始字符串上 [lastIndex, start) 是上一个公式之后、本公式之前的部分
+    const middle = line.substring(lastIndex, start);
+    // 检查公式左边（middle 的最后一个字符）
+    const leftChar = middle[middle.length - 1];
+    const paddedMiddle = (leftChar && isChinese(leftChar)) ? middle + ' ' : middle;
 
-    let newBefore = before;
-    let newAfter = after;
+    // 公式右边的第一个字符
+    const rightChar = line[end + 1];
+    const paddedMatch = (rightChar && isChinese(rightChar)) ? ' ' + fullMatch : fullMatch;
 
-    // 检查左边
-    if (before.length > 0) {
-      const lastChar = before[before.length - 1];
-      if (isChinese(lastChar)) {
-        newBefore = before + ' ';
-      }
-    }
-
-    // 检查右边
-    if (after.length > 0) {
-      const firstChar = after[0];
-      if (isChinese(firstChar)) {
-        newAfter = ' ' + after;
-      }
-    }
-
-    const newLine = newBefore + fullMatch + newAfter;
-    result = result.replace(line, newLine);
-    line = newLine;
+    result += paddedMiddle + paddedMatch;
+    lastIndex = end + 1;
   }
+
+  result += line.substring(lastIndex);
   return result;
 }
 
