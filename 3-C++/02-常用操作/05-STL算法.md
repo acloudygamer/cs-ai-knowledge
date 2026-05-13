@@ -70,7 +70,7 @@ S(p) = \frac{1}{(1 - f) + \frac{f}{p}}
 $$
 
 其中 $f$ 是可并行化比例。对于 `par` 算法（工作窃取调度）：
-- 可并行部分： $T_{par}(n, p) = \frac{O(n)}{p} + O(\log n)$ （$\log n$ 为同步开销）
+- 可并行部分： $T_{par}(n, p) = \frac{O(n)}{p} + O(\log n)$ （ $\log n$ 为同步开销）
 - 不可并行部分（串行）： $O(\log n)$
 
 `par_unseq` 进一步允许**向量化**（单指令多数据），理论 throughput 提升至 $p \times v$ （ $v$ 为 SIMD 宽度）。

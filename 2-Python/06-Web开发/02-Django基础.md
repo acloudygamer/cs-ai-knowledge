@@ -210,7 +210,7 @@ Middleware1.process_response
 
 **为什么这样设计**：洋葱模型确保中间件可以"包裹"整个请求处理过程——请求阶段从外到内，响应阶段从内到外。这使得中间件可以统一处理进入和离开的请求，例如日志中间件记录请求进入时间，在响应阶段计算总耗时。
 
-**短路语义的形式化**：若 $M_i.\text{process\_request}$ 返回非 None，则执行序列在 $M_i$ 处截断，跳到所有已注册中间件的 `process_response`（从 $M_i$ 向上逆序）。这与短路求值（ $A \land B$ 中 $A$ 为 False 则不求 $B$）完全对应。
+**短路语义的形式化**：若 $M_i.\text{process\_request}$ 返回非 None，则执行序列在 $M_i$ 处截断，跳到所有已注册中间件的 `process_response`（从 $M_i$ 向上逆序）。这与短路求值（ $A \land B$ 中 $A$ 为 False 则不求  $B$）完全对应。
 
 **违反约束的后果**：若 `process_request` 返回 HttpResponse 后忘记调用 `process_response`，响应不会正确返回给客户端（因为中间件的响应处理链未执行）。这是中间件开发的常见错误。
 

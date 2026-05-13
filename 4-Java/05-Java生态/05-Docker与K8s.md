@@ -188,7 +188,7 @@ spec:
       maxSurge: 1          # 最多超出期望 Pod 数
 ```
 
-设 $N$ = 期望副本数， $S$ = maxSurge，$U$ = maxUnavailable：
+设 $N$ = 期望副本数， $S$ = maxSurge， $U$ = maxUnavailable：
 
 **最小可用 Pod 数**： $N - U$
 **最大总 Pod 数**： $N + S$

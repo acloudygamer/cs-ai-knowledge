@@ -65,8 +65,8 @@ HTTP/2 的多路复用允许在**单一 TCP 连接**上并发多个请求/响应
 ### 数学模型
 
 **队首阻塞（Head-of-Line Blocking）量化**：
-- HTTP/1.1：请求 $i$ 的响应被请求 $i-1$ 阻塞，假设单请求处理时间 $T_{req}$ ， $N$ 个请求的最小总时间 $T_{total} \approx N \times T_{req}$（串行）
-- HTTP/2： $N$ 个请求时间重叠，$T_{total} \approx \max(T_{req,1}, T_{req,2}, \dots, T_{req,N})$（并行）
+- HTTP/1.1：请求 $i$ 的响应被请求 $i-1$ 阻塞，假设单请求处理时间 $T_{req}$ ， $N$ 个请求的最小总时间  $T_{total} \approx N \times T_{req}$（串行）
+- HTTP/2： $N$ 个请求时间重叠，  $T_{total} \approx \max(T_{req,1}, T_{req,2}, \dots, T_{req,N})$（并行）
 
 **帧复用开销**：HTTP/2 将消息拆分为多个 DATA 帧交织发送，每帧含 stream ID 标识归属。切换成本仅为解析 9 字节帧头的 O(1) 操作。
 

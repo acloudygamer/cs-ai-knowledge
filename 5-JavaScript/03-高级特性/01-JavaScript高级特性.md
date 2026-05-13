@@ -317,7 +317,7 @@ $$
 
 其中 $n$ 为强制重排次数， $layout\_scope$ 为重排作用的 DOM 子树大小。
 
-**虚拟列表复杂度**： $\mathcal{O}(visible\_rows)$ 渲染，而非 $\mathcal{O}(total\_rows)$。设总行数 $N$，可见行数 $V$，则渲染优化比：
+**虚拟列表复杂度**： $\mathcal{O}(visible\_rows)$ 渲染，而非  $\mathcal{O}(total\_rows)$。设总行数  $N$，可见行数  $V$，则渲染优化比：
 
 $$
 R_{virtual} = \frac{N}{V}

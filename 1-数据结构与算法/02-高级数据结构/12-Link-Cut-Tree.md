@@ -30,7 +30,7 @@ $$
 
 access 将根到 $x$ 的路径变为 $x$ 的 preferred path（即 $x$ 的左子树链）。Splay(x) 后， $x$ 的左子树正好是 $x$ 到原树根的路径。
 
-**数学表达**：access 后， $x$ 的左子树中序遍历 $= \text{path}(\text{root}, x)$，且按深度升序排列。
+**数学表达**：access 后， $x$ 的左子树中序遍历  $= \text{path}(\text{root}, x)$，且按深度升序排列。
 
 ### makeroot 的机制
 
@@ -48,7 +48,7 @@ $$
 \text{query}(u, v) = \text{makeroot}(u);\ \text{access}(v);\ \text{Splay}(v)
 $$
 
-此时 $v$ 的左子树包含 $u \to v$ 路径上的所有节点， $v$ 自身的值（即 $\text{val}[v]$）可通过 $\text{push\_up}(v)$ 获得路径聚合结果。
+此时 $v$ 的左子树包含 $u \to v$ 路径上的所有节点， $v$ 自身的值（即  $\text{val}[v]$）可通过 $\text{push\_up}(v)$ 获得路径聚合结果。
 
 **归约终点**：LCT 将动态树上的路径操作归约为**辅助树的中序遍历区间操作**，本质是 Splay 树在森林上的扩展应用。
 

@@ -29,7 +29,7 @@ $$
 L.\text{state} = \{(v, \text{copy}(v)) \mid v \in S\} \cup \{(v, \&v) \mid v \in S \land \text{c-ref}(v)\}
 $$
 
-其中 $\text{copy}(v)$ 是值拷贝， $\&v$ 是引用，$\text{c-ref}(v)$ 表示按引用捕获。
+其中 $\text{copy}(v)$ 是值拷贝， $\&v$ 是引用， $\text{c-ref}(v)$ 表示按引用捕获。
 
 **捕获的代数语义**：
 

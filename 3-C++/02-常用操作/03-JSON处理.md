@@ -88,7 +88,7 @@ $$
 \text{validate}(v, \text{schema}) = \bigwedge_{i} p_i(v, \text{schema}_i)
 $$
 
-其中 $p_i$ 可以是：类型检查（ $v.\text{type} == \text{schema.type}$ ）、值域检查（$v > \text{minimum}$）、枚举约束（$v \in \text{enum}$）、格式约束（正则表达式匹配）。任何 $p_i$ 为假则整体验证失败。
+其中 $p_i$ 可以是：类型检查（ $v.\text{type} == \text{schema.type}$ ）、值域检查（  $v > \text{minimum}$）、枚举约束（  $v \in \text{enum}$）、格式约束（正则表达式匹配）。任何 $p_i$ 为假则整体验证失败。
 
 ## 机制
 

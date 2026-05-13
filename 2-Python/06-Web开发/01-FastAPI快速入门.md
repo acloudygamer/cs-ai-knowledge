@@ -26,7 +26,7 @@ $T_{\text{total}} = T_{\text{validate}} + T_{\text{inject}} + T_{\text{handle}} 
 
 $\text{toposort}(\mathcal{D}) = (d_{i_1}, d_{i_2}, \ldots, d_{i_m})$
 
-拓扑排序采用 Kahn 算法：维护入度为 0 的节点队列，逐步移除边并更新入度。设图中有 $N$ 个节点、 $E$ 条边，算法复杂度 $O(N + E)$。
+拓扑排序采用 Kahn 算法：维护入度为 0 的节点队列，逐步移除边并更新入度。设图中有 $N$ 个节点、 $E$ 条边，算法复杂度  $O(N + E)$。
 
 每个依赖 $d_j$ 的求值结果作为后续依赖的参数传递。这保证了依赖求值顺序无歧义。
 
@@ -40,7 +40,7 @@ $r = (\text{method}, \text{path\_pattern}, \text{handler}, \text{dependencies})$
 
 路径匹配函数 $m: (\text{RequestPath}, \text{RequestMethod}) \rightarrow \mathcal{R} \cup \{\bot\}$ 将请求映射到对应路由，未命中时返回 $\bot$ （触发 404）。
 
-路径模式解析为正则表达式。设路径 `/items/{item_id}` 解析为正则 `^/items/(?P<item_id>[^/]+)，匹配复杂度为 $O(|\text{path}|)$，与路由总数无关（字典查找）。
+路径模式解析为正则表达式。设路径 `/items/{item_id}` 解析为正则 `^/items/(?P<item_id>[^/]+)，匹配复杂度为  $O(|\text{path}|)$，与路由总数无关（字典查找）。
 
 FastAPI 在启动时将路由编译为状态机（确定性有限自动机，DFA）。路径匹配过程本质是 DFA 的状态转移：从起始状态 $s_0$ 读取输入字符序列，经由读取的路径段转移至终态 $s_f$ 。若 $s_f$ 对应某个路由处理器则匹配成功，否则失败。
 

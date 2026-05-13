@@ -41,7 +41,7 @@ $$
 Throughput_{http2} \leq \frac{Window_{initial}}{RTT} \times Window_{max}
 $$
 
-其中 $Window_{initial}$ 通常为 256KB（HTTP/2 默认）， $RTT$ 为往返时延，$Window_{max}$ 为最大流量控制窗口。
+其中 $Window_{initial}$ 通常为 256KB（HTTP/2 默认）， $RTT$ 为往返时延， $Window_{max}$ 为最大流量控制窗口。
 
 ### WebSocket 双向通道状态机
 

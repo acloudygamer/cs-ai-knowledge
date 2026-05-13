@@ -24,7 +24,7 @@ Python 模块导入可建模为**有序路径搜索**：
 
 $\text{import}(name) \iff \exists p \in sys.path: \exists file(name, p)$
 
-其中 $file(name, p)$ 表示在路径 $p$ 下存在 $name.py$ 、 $name\backslash\_\_init\_\_.py$ 或 $name.so$（C 扩展）。
+其中 $file(name, p)$ 表示在路径 $p$ 下存在 $name.py$ 、 $name\backslash\_\_init\_\_.py$ 或  $name.so$（C 扩展）。
 
 **sys.path 的标准顺序**（从左到右）：
 

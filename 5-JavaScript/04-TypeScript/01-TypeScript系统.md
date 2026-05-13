@@ -274,7 +274,7 @@ type Getters<T> = {
 };
 ```
 
-这实现了键的映射： $\text{keyof } T \xrightarrow{f} \text{keyof } T'$ ，其中 $f(P) = \text{\`get\${Capitalize(P)}\`}$。
+这实现了键的映射： $\text{keyof } T \xrightarrow{f} \text{keyof } T'$ ，其中  $f(P) = \text{\`get\${Capitalize(P)}\`}$。
 
 ### 违反约束的后果
 

@@ -32,7 +32,7 @@ $$
 E[H_n] = \frac{1}{\ln 2} \ln n + O(1) \approx 1.44 \log_2 n
 $$
 
-相比 AVL（ $\approx 1.44 \log_2 n$ ）和红黑树（$\approx 2 \log_2 n$），Treap 的期望高度与 AVL 相当。
+相比 AVL（ $\approx 1.44 \log_2 n$ ）和红黑树（  $\approx 2 \log_2 n$），Treap 的期望高度与 AVL 相当。
 
 ### 隐式 Treap：用下标替代 key
 

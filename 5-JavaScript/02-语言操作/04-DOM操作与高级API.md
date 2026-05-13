@@ -18,7 +18,7 @@ DOM（Document Object Model）是浏览器将 HTML/XML 文档抽象为**树形�
 | `querySelector` | $\mathcal{O}(n)$ | CSS 选择器解析 + 匹配 |
 | `querySelectorAll` | $\mathcal{O}(n)$ | 返回 Static NodeList，全量匹配 |
 
-**`getElementById` 的 $\mathcal{O}(1)$ 复杂度来源**：浏览器在解析 HTML 时构建 `id` 属性到 Element 的**哈希表**（HashMap）。设哈希表负载因子为 $\alpha = \frac{n}{m}$ （ $n$ 为元素数，$m$ 为桶数），查找过程仅需一次哈希计算和一次链表/红黑树探查，平均时间复杂度为 $\mathcal{O}(1 + \alpha)$。浏览器通常将 $\alpha$ 控制在 0.75 以下。
+**`getElementById` 的 $\mathcal{O}(1)$ 复杂度来源**：浏览器在解析 HTML 时构建 `id` 属性到 Element 的**哈希表**（HashMap）。设哈希表负载因子为 $\alpha = \frac{n}{m}$ （ $n$ 为元素数， $m$ 为桶数），查找过程仅需一次哈希计算和一次链表/红黑树探查，平均时间复杂度为  $\mathcal{O}(1 + \alpha)$。浏览器通常将 $\alpha$ 控制在 0.75 以下。
 
 **选择器匹配的代价分解**：
 
@@ -27,7 +27,7 @@ $$
 C_{query}(n, s) = C_{parse}(s) + C_{match}(n, s)
 $$
 
-其中 $C_{parse}(s)$ 是 CSS 选择器解析代价（ $s$ 为选择器长度），$C_{match}(n, s)$ 是对 $n$ 个 DOM 节点匹配选择器的代价。浏览器通常对常见选择器（如 tag、class、id）有快速路径优化。
+其中 $C_{parse}(s)$ 是 CSS 选择器解析代价（ $s$ 为选择器长度）， $C_{match}(n, s)$ 是对 $n$ 个 DOM 节点匹配选择器的代价。浏览器通常对常见选择器（如 tag、class、id）有快速路径优化。
 
 ### DOM 树操作成本
 

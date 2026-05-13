@@ -8,7 +8,7 @@ Maven 是基于项目对象模型（POM）的构建自动化工具，核心是�
 
 ### 依赖解析的最短路径算法
 
-Maven 使用最近声明优先（Nearest Definition）策略解析版本冲突。设依赖图 $G = (V, E)$ ， $V$ 为 artifact，$E$ 为依赖关系边。
+Maven 使用最近声明优先（Nearest Definition）策略解析版本冲突。设依赖图 $G = (V, E)$ ， $V$ 为 artifact， $E$ 为依赖关系边。
 
 对于 artifact $a$ ，其版本 $\text{ver}(a)$ 按以下规则确定：
 
@@ -19,7 +19,7 @@ $$\text{ver}(a) = \begin{cases}
 
 其中 $\text{nearest}(a)$ 返回从根节点（当前项目）到 $a$ 的**最短路径**上的最后一个声明版本。若存在等长路径，选择声明顺序靠前的。
 
-**形式化**：设 $P = \{p_1, p_2, ..., p_k\}$ 为所有从根到 $a$ 的路径， $|p_i|$ 为路径长度，$v_i$ 为 $p_i$ 末端的版本。则：
+**形式化**：设 $P = \{p_1, p_2, ..., p_k\}$ 为所有从根到 $a$ 的路径， $|p_i|$ 为路径长度， $v_i$ 为 $p_i$ 末端的版本。则：
 
 $\text{nearest}(a) = v_j \text{ where } j = \arg\min_i |p_i|$
 

@@ -12,13 +12,13 @@ Java 是一种**编译型**语言，但其编译产物是**字节码**而非机�
 
 ### 编译到执行的代价模型
 
-令 $C_{src}$ 为源代码行数， $T_{compile}$ 为 javac 编译时间，$T_{startup}$ 为 JVM 启动时间，$T_{jit}$ 为 JIT 编译时间，$T_{execute}$ 为字节码执行时间。总执行时间：
+令 $C_{src}$ 为源代码行数， $T_{compile}$ 为 javac 编译时间， $T_{startup}$ 为 JVM 启动时间， $T_{jit}$ 为 JIT 编译时间， $T_{execute}$ 为字节码执行时间。总执行时间：
 
 $T_{total} = T_{startup} + T_{jit}(warmup) + \sum_{i=1}^{N} T_{execute}(i)$
 
 其中 $N$ 为方法调用次数。JIT 编译在方法被调用 $k$ 次后触发（阈值通常 $k = 1000$ ），将字节码编译为本地码，消除解释开销。
 
-**约束**： $T_{startup}$ 与 $T_{jit}$ 是不可忽视的固定开销——对于短生命周期程序（如 serverless 函数），JIT 的收益无法回收，$T_{total} \approx T_{startup}$。这正是 Java 在微服务时代被诟病"启动慢"的原因。
+**约束**： $T_{startup}$ 与 $T_{jit}$ 是不可忽视的固定开销——对于短生命周期程序（如 serverless 函数），JIT 的收益无法回收，  $T_{total} \approx T_{startup}$。这正是 Java 在微服务时代被诟病"启动慢"的原因。
 
 ### 字节码与机器码的映射
 

@@ -58,7 +58,7 @@ $A + I = P$
 | REPEATABLE_READ | P0 ✗, P1 ✗, P2 ✗ (MySQL: 部分 P2) |
 | SERIALIZABLE | 全部 ✗ |
 
-设事务 $T_1, T_2$ 并发执行， $T_1$ 读取数据 $x$，$T_2$ 修改 $x$ 并提交，$T_1$ 再次读取 $x$：
+设事务 $T_1, T_2$ 并发执行， $T_1$ 读取数据  $x$， $T_2$ 修改 $x$ 并提交， $T_1$ 再次读取  $x$：
 - 若两次结果不同 → Non-repeatable Read (P1)
 
 ## 数据流

@@ -248,7 +248,7 @@ pytest 的核心是极简的 hook 调度器。插件（无论是内置的还是�
 | `cache` | session | `pytest_cache/.cache` | 不清理（持久化） |
 | `capsys` | function | `CapturedStdout/Stderr` | 还原 sys.stdin/out/err |
 
-**monkeypatch 的数学语义**：monkeypatch 在进入时记录原绑定，在退出时还原。设 $M$ 为被补丁的模块命名空间， $k$ 为被补丁的属性，$v_{\text{old}}$ 为原值：
+**monkeypatch 的数学语义**：monkeypatch 在进入时记录原绑定，在退出时还原。设 $M$ 为被补丁的模块命名空间， $k$ 为被补丁的属性， $v_{\text{old}}$ 为原值：
 
 $$
 \text{monkeypatch.setattr}(M, k, v_{\text{new}}) \iff (v_{\text{old}} = M[k];\ M[k] = v_{\text{new}})

@@ -85,7 +85,7 @@ $$
 - $c$ ：密文
 - $t$ ：认证标签
 
-解密验证： $\text{AEAD}^{-1}(k, n, a, c, t) \rightarrow p$ 或 $\perp$（失败）
+解密验证： $\text{AEAD}^{-1}(k, n, a, c, t) \rightarrow p$ 或  $\perp$（失败）
 
 ## 数据流
 
@@ -256,7 +256,7 @@ $$
 t = \text{GHASH}(H, a, c) \oplus \text{MSB}_{128}(n \cdot H) \quad \text{（认证部分）}
 $$
 
-其中 $H = \text{AES}(k, 0^{128})$ 是哈希密钥， $a$ 是关联数据，$n$ 是计数器。
+其中 $H = \text{AES}(k, 0^{128})$ 是哈希密钥， $a$ 是关联数据， $n$ 是计数器。
 
 **GHASH的数学性质**：GHASH是有限域 $GF(2^{128})$ 上的乘法运算，满足：
 $$

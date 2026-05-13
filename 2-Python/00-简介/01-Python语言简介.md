@@ -27,7 +27,7 @@ $T_{total}(n, m) = \Theta(n) + \Theta(m)$
 
 $T_{compiled}(n, N_{runs}) = T_{compile}(n) + N_{runs} \cdot T_{machine\_code}(m)$
 
-当 $N_{runs} \to \infty$ 时， $T_{compile}(n) / N_{runs} \to 0$ ，编译型语言占优。但对于 $N_{runs} = 1$（一次性脚本）或快速原型迭代场景，Python 的解释执行避免了编译等待。
+当 $N_{runs} \to \infty$ 时， $T_{compile}(n) / N_{runs} \to 0$ ，编译型语言占优。但对于  $N_{runs} = 1$（一次性脚本）或快速原型迭代场景，Python 的解释执行避免了编译等待。
 
 ### GIL 的并发约束形式化
 

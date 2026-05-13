@@ -12,7 +12,7 @@ Flask 是核心极简但扩展生态丰富的 Python WSGI Web 框架，通过松
 
 Flask 上下文管理基于 `werkzeug.local.LocalStack`，其数学模型是**线程/协程隔离的词法作用域**，可归约为线程局部存储（TLS）的变体。
 
-设 $\text{LS}$ 为 LocalStack， $\text{tid}$ 为当前线程/协程 ID，$\text{stack}[\text{tid}]$ 为该 ID 对应的对象栈：
+设 $\text{LS}$ 为 LocalStack， $\text{tid}$ 为当前线程/协程 ID， $\text{stack}[\text{tid}]$ 为该 ID 对应的对象栈：
 
 $\text{LS.push}(x) \triangleq \text{stack}[\text{tid}].\text{append}(x)$
 $\text{LS.pop}() \triangleq \text{stack}[\text{tid}].\text{pop}()$
