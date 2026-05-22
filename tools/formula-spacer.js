@@ -51,7 +51,7 @@ function formatText(text) {
   text = text.replace(new RegExp(`(${excludeBefore})(${formulaRegexStr})`, 'g'), '$1 $2');
 
   // 6. 处理【后边界】：除了标点符号和括号，其余强行加空格
-  const excludeAfter = `[^\\s\\.,;:!\\?\\)\\]\\}>"'”’，。！？；：、）】》*_\\-~]`;
+  const excludeAfter = `[^\\s\\.,;:!\\?\\)\\]\\}>"'”’，。！？；：、）】》\\-~]`;
   text = text.replace(new RegExp(`(${formulaRegexStr})(${excludeAfter})`, 'g'), '$1 $2');
 
   // 7. 终极补丁【强制紧贴后置标点】：清除原稿中标点前面的多余空格！
