@@ -69,31 +69,62 @@ function formatText(text) {
   return text;
 }
 
+// 解析 --lines 参数，支持 --lines=N-M 或 --lines N-M
+function parseLineRange(argv) {
+  for (let i = 2; i < argv.length; i++) {
+    const m = argv[i].match(/^--lines[= ](\d+)[-,](\d+)$/);
+    if (m) {
+      const start = parseInt(m[1], 10);
+      const end = parseInt(m[2], 10);
+      argv.splice(i, 1);
+      return { start, end };
+    }
+  }
+  return null;
+}
+
 // 遍历及文件读写逻辑
-function processTarget(targetPath) {
+function processTarget(targetPath, lineRange) {
   const stat = fs.statSync(targetPath);
-  
+
   if (stat.isDirectory()) {
     const entries = fs.readdirSync(targetPath, { withFileTypes: true });
     for (const entry of entries) {
-      processTarget(path.join(targetPath, entry.name));
+      processTarget(path.join(targetPath, entry.name), lineRange);
     }
   } else if (stat.isFile() && targetPath.endsWith('.md')) {
     const oldText = fs.readFileSync(targetPath, 'utf-8');
-    const newText = formatText(oldText);
-    
+
+    let newText;
+    if (lineRange) {
+      const lines = oldText.split('\n');
+      const start = lineRange.start - 1;  // 转 0-based
+      const end = lineRange.end;
+      const head = lines.slice(0, start).join('\n');
+      const body = lines.slice(start, end).join('\n');
+      const tail = lines.slice(end).join('\n');
+      const formattedBody = formatText(body);
+      newText = [head, formattedBody, tail].filter(s => s !== '').join('\n');
+    } else {
+      newText = formatText(oldText);
+    }
+
     if (oldText !== newText) {
       fs.writeFileSync(targetPath, newText, 'utf-8');
-      console.log(`[已完美排版] ${targetPath}`);
+      const mode = lineRange
+        ? `行选模式 L${lineRange.start}-${lineRange.end}`
+        : '完整模式';
+      console.log(`[已完美排版] ${targetPath} (${mode})`);
     }
   }
 }
 
 // 运行入口
+const lineRange = parseLineRange(process.argv);
 const target = process.argv[2] || '.';
 if (!fs.existsSync(target)) {
   console.error('路径不存在！');
   process.exit(1);
 }
 
-processTarget(target);
+processTarget(target, lineRange);
