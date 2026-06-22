@@ -195,3 +195,7 @@ SendMessage `[DISPATCH]` 时附带说明：`请先阅读 .claude/agents/<role>.m
 ```
 
 > **注意**：等待成员响应时，保持 session 可用，接受来自成员的 shutdown_approved 消息后自动进入下一轮。
+
+## 写作规范
+
+- **公式排版**：`公式排版规范.md` — Markdown 渲染管线中 `\text{}` 下划线的双重标准（`$$` vs `$`）及全场景安全对策
