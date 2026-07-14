@@ -1,6 +1,6 @@
 {
   "enabledMcpjsonServers": [
-    "MiniMax",
+    "mcp-server-askecho-search-infinity",
     "context7",
     "sequential-thinking",
     "github",
