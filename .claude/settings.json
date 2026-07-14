@@ -4,7 +4,8 @@
     "context7",
     "sequential-thinking",
     "github",
-    "firecrawl"
+    "firecrawl",
+    "filesystem"
   ],
   "enabledPlugins": {
     "autoresearch@autoresearch": false
