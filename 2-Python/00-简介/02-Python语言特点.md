@@ -1,6 +1,9 @@
 # 语言特点
 
-## 定义
+> **版本基准**：Python 3.12 stable（latest=3.14，新特性章节保留并标注）
+
+
+## 本质
 
 Python 的核心语言特点源于其**引用语义 + 动态类型 + 解释执行**三位一体的设计：
 
@@ -20,17 +23,17 @@ Python 的变量是**命名到对象的单射绑定**：
 
  $unbind: Name \times Object \rightarrow \emptyset$ 
 
-每个对象 $o$ 是一个五元组： 是一个五元组：
+每个对象 $o$ 是一个五元组：
 
- $o = (value, \tau, rc, storage, identity)$ 
+ $o = (value, \tau, rc, storage, identity)$
 
 | 字段 | 语义 | 域 |
 |------|------|-----|
-| $value$ | 对象的实际数据 | 依赖 $\tau$ | | 对象的实际数据 | 依赖 $\tau$ | |
-| $\tau$ | 类型（`type(obj)`） | $Type$ | | 类型（`type(obj)`） | $Type$ | |
-| $rc$ | 引用计数（reference count） | $\mathbb{N}$ | | 引用计数（reference count） | $\mathbb{N}$ | |
-| $storage$ | 存储位置（堆/栈/静态） | $Storage$ | | 存储位置（堆/栈/静态） | $Storage$ | |
-| $identity$ | 对象身份（`id(obj)`，内存地址） | $\mathbb{N}$ | | 对象身份（`id(obj)`，内存地址） | $\mathbb{N}$ | |
+| $value$ | 对象的实际数据 | 依赖 $\tau$ |
+| $\tau$ | 类型（`type(obj)`） | $Type$ |
+| $rc$ | 引用计数（reference count） | $\mathbb{N}$ |
+| $storage$ | 存储位置（堆/栈/静态） | $Storage$ |
+| $identity$ | 对象身份（`id(obj)`，内存地址） | $\mathbb{N}$ |
 
 **约束不变量**：
 
@@ -80,13 +83,13 @@ Python `dict` 基于**开放地址法的哈希表**：
 
  $h(key, i) = (hash(key) + i \cdot c) \bmod m$ 
 
-其中 $i$ 是探测序列索引， $c$ 是步长（通常为 1 或奇数）， $m$ 是哈希表大小（始终为  $2^k$）。 是探测序列索引， $c$ 是步长（通常为 1 或奇数）， $m$ 是哈希表大小（始终为  $2^k$）。 是步长（通常为 1 或奇数）， $m$ 是哈希表大小（始终为  $2^k$）。 是哈希表大小（始终为  $2^k$ ）。）。
+其中 $i$ 是探测序列索引， $c$ 是步长（通常为 1 或奇数）， $m$ 是哈希表大小（始终为 $2^k$）。
 
 **负载因子约束**：
 
- $\alpha = \frac{n}{m} \quad \text{（n = 已存储键数，m = 表大小）}$ 
+ $\alpha = \frac{n}{m} \quad \text{（n = 已存储键数，m = 表大小）}$
 
-当 $\alpha > 2/3$ 时，CPython 触发 resize（扩容至 $2m$ ）。这个阈值保证探测链长度期望 $O(1)$ ： 时，CPython 触发 resize（扩容至 $2m$ ）。这个阈值保证探测链长度期望 $O(1)$ ： ）。这个阈值保证探测链长度期望 $O(1)$ ： ：
+当 $\alpha > 2/3$ 时，CPython 触发 resize（扩容至 $2m$）。这个阈值保证探测链长度期望 $O(1)$：
 
  $E[\text{探测长度}] \approx \frac{1}{1-\alpha}$ 
 
@@ -102,9 +105,9 @@ Python 的类型系统形成格（lattice）：
 
  $\mathcal{L} = (Type, \preceq, \top, \bot)$ 
 
-- $\top = object$ ：所有类的最终基类 ：所有类的最终基类
-- $\bot$ ：无公共下界（基本类型如 `int`、`str` 之间无继承关系） ：无公共下界（基本类型如 `int`、`str` 之间无继承关系）
-- $t_1 \preceq t_2 \iff t_1$ 是 $t_2$ 的子类 是 $t_2$ 的子类 的子类
+- $\top = object$：所有类的最终基类
+- $\bot$：无公共下界（基本类型如 `int`、`str` 之间无继承关系）
+- $t_1 \preceq t_2 \iff t_1$ 是 $t_2$ 的子类
 
  $t_1 \preceq t_2 \implies \forall o \in t_1: o \in t_2$ 
 
@@ -126,7 +129,7 @@ CPython 的循环垃圾回收器基于**弱代际假设**（weak generational hy
 
  $E[\text{扫描时间}] = \sum_{g=0}^{2} |O_g| \cdot P(\text{对象在 Gen g 存活})$ 
 
-分代假设保证 $|O_0| \gg |O_2|$ 且 $P(\text{存活}|g=0) \ll P(\text{存活}|g=2)$ ，从而减少总体扫描量。 且 $P(\text{存活}|g=0) \ll P(\text{存活}|g=2)$ ，从而减少总体扫描量。 ，从而减少总体扫描量。
+分代假设保证 $|O_0| \gg |O_2|$ 且 $P(\text{存活}|g=0) \ll P(\text{存活}|g=2)$，从而减少总体扫描量。
 
 ## 数据流
 
@@ -237,9 +240,9 @@ struct {
 
 **属性查找的代价分解**：
 
- $\text{attr\_lookup}(obj, name) = \underbrace{O(1)}_{ob\_type \text{ 解引用}} + \underbrace{O(1)}_{dict \text{ 哈希查找}} + \underbrace{O(1)}_{描述符协议}$ 
+ $\text{attr-lookup}(obj, name) = \underbrace{O(1)}_{ob\_type \text{ 解引用}} + \underbrace{O(1)}_{dict \text{ 哈希查找}} + \underbrace{O(1)}_{描述符协议}$
 
-总计 $O(1)$ 但带有**三个间接层**：类型指针解引用、字典查找、可能的对象描述符调用。相比之下，C 的 `struct.field` 是编译时偏移计算（ $O(1)$ 无间接），Python 的灵活性以间接性换得。 但带有**三个间接层**：类型指针解引用、字典查找、可能的对象描述符调用。相比之下，C 的 `struct.field` 是编译时偏移计算（ $O(1)$ 无间接），Python 的灵活性以间接性换得。 无间接），Python 的灵活性以间接性换得。
+总计 $O(1)$ 但带有**三个间接层**：类型指针解引用、字典查找、可能的对象描述符调用。相比之下，C 的 `struct.field` 是编译时偏移计算（ $O(1)$ 无间接），Python 的灵活性以间接性换得。
 
 **`__slots__` 的优化原理**：`__slots__` 将对象属性存储在紧凑数组中（而非 `__dict__` 字典），将属性访问从 dict 查找降为编译时偏移计算：
 
@@ -291,21 +294,21 @@ Python dict 的哈希冲突解决使用**伪随机再探测**（与线性探测�
 
 **探测序列的数学性质**：
 
- $h(key, i) = (hash(key) \cdot 5 + i + 1) \bmod 2^k$ 
+ $h(key, i) = (hash(key) \cdot 5 + i + 1) \bmod 2^k$
 
-乘以 5（与 2 的幂互质）确保探测序列覆盖几乎所有槽位（循环节为 $2^k$ ）。这保证了即使发生冲突，也能概率上找到空槽。 ）。这保证了即使发生冲突，也能概率上找到空槽。
+乘以 5（与 2 的幂互质）确保探测序列覆盖几乎所有槽位（循环节为 $2^k$）。这保证了即使发生冲突，也能概率上找到空槽。
 
-**最坏情况复杂度**：虽然理论上仍为 $O(m)$ （遍历所有槽位），但对于均匀哈希分布，期望探测次数为： （遍历所有槽位），但对于均匀哈希分布，期望探测次数为：
+**最坏情况复杂度**：虽然理论上仍为 $O(m)$ （遍历所有槽位），但对于均匀哈希分布，期望探测次数为：
 
- $E[\text{探测次数}] = \frac{1}{\alpha} \ln\left(\frac{1}{1-\alpha}\right)$ 
+ $E[\text{探测次数}] = \frac{1}{\alpha} \ln\left(\frac{1}{1-\alpha}\right)$
 
-当 $\alpha = 2/3$ 时，约 1.85 次探测。 时，约 1.85 次探测。
+当 $\alpha = 2/3$ 时，约 1.85 次探测。
 
 ### 字符串驻留（String Interning）
 
 Python 对短字符串和标识符使用**字符串驻留**（内部池化）以节省内存和加速比较：
 
- $\text{intern}(s): \quad \text{若 } s \in \text{string\_pool} \implies \text{返回池中对象；否则加入池}$ 
+`intern(s)`：若 `s` 已在字符串驻留池（`string_pool`）中则返回池中对象，否则加入驻留池。
 
 **自动驻留的条件**（CPython）：
 - 标识符（变量名、函数名）：由编译器/解释器自动驻留
@@ -353,7 +356,7 @@ Python 使用缩进划分代码块，因为**没有显式的 `end` 关键字或�
 - **PyPy**：通过软件模拟 GIL（Tracair implementation）支持 C 扩展，但性能特性不同
 - **Jython/IronPython**：无 GIL，线程并行不受限制，但无法直接使用 CPython 的 C 扩展
 
-## 参考存根
+## 代码示例
 
 ```python
 import sys

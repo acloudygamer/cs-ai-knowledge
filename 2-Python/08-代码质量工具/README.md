@@ -32,7 +32,7 @@
 
 工具设计在精确率和召回率之间权衡。Ruff 选择高精确率（快且误报少），Pylint 选择高召回率（全面但慢）。
 
-**F1 分数**： $F_1 = 2 \cdot \frac{\text{Precision} \cdot \text{Recall}}{\text{Precision} + \text{Recall}}$ ，综合衡量工具性能。 ，综合衡量工具性能。
+**F1 分数**： $F_1 = 2 \cdot \frac{\text{Precision} \cdot \text{Recall}}{\text{Precision} + \text{Recall}}$，综合衡量工具性能。 ，综合衡量工具性能。
 
 ### 类型安全（类型检查器）
 

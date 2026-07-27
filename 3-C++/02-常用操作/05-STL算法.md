@@ -23,25 +23,23 @@ Introsort 是三种算法的动态混合，根据递归深度 $d$ 自适应切�
 $$
 \text{sort}(A, l, r, d) = \begin{cases}
 \text{heapsort}(A, l, r) & d \le 0 \quad \text{（防止最坏情况）} \\
-\text{quicksort}(A, l, r) & 0 < d < \text{depth\_threshold} \\
+\text{quicksort}(A, l, r) & 0 < d < \text{depth-threshold} \\
 \text{introselect}(A, l, r, k) & \text{仅找第 k 小}
 \end{cases}
 $$
 
 **为什么需要混合**：
-- Quicksort：平均 $O(n \log n)$ ，但最坏 $O(n^2)$ （当轴点选择不当且输入有序时）。 ，但最坏 $O(n^2)$ （当轴点选择不当且输入有序时）。 （当轴点选择不当且输入有序时）。
-- Heapsort：保证 $O(n \log n)$ ，但常数因子大、缓存局部性差。 ，但常数因子大、缓存局部性差。
+- Quicksort：平均 $O(n \log n)$，但最坏 $O(n^2)$ （当轴点选择不当且输入有序时）。 ，但最坏 $O(n^2)$ （当轴点选择不当且输入有序时）。 （当轴点选择不当且输入有序时）。
+- Heapsort：保证 $O(n \log n)$，但常数因子大、缓存局部性差。 ，但常数因子大、缓存局部性差。
 - Introsort 在递归深度超过 $2 \lfloor \log_2 n \rfloor$ 时自动切换到 heapsort，防止 Quicksort 在某些输入下的退化。 时自动切换到 heapsort，防止 Quicksort 在某些输入下的退化。
 
 ### erase-remove 惯用法的复杂度
 
 `std::remove_if` 不真正删除元素，只将"保留"的元素移到范围前端，返回新逻辑末尾：
 
-$$
-\text{remove\_if}([l, r), P) \to [l, r')
-$$
+`remove_if` $([l, r), P) \to [l, r')$
 
-其中 $r' = l + |\{ x \in [l, r) \mid P(x) = \text{false} \}|$ 。 。
+其中 $r' = l + |\{ x \in [l, r) \mid P(x) = \text{false} \}|$。
 
 时间复杂度： $O(n)$ （每个元素最多一次移动）。 （每个元素最多一次移动）。
 空间复杂度： $O(1)$ （原地操作）。 （原地操作）。
@@ -59,7 +57,7 @@ T(\lfloor n/2 \rfloor) + T(\lceil n/2 \rceil) + O(n) & n > 1
 \end{cases}
 $$
 
-展开递归树：第 $i$ 层有 $2^i$ 个子问题，每个子问题处理 $n/2^i$ 规模，总工作量 $2^i \times O(n/2^i) = O(n)$ 。层数为 $\lceil \log_2 n \rceil + 1$ ，因此 $T(n) = O(n \log n)$ 。 层有 $2^i$ 个子问题，每个子问题处理 $n/2^i$ 规模，总工作量 $2^i \times O(n/2^i) = O(n)$ 。层数为 $\lceil \log_2 n \rceil + 1$ ，因此 $T(n) = O(n \log n)$ 。 个子问题，每个子问题处理 $n/2^i$ 规模，总工作量 $2^i \times O(n/2^i) = O(n)$ 。层数为 $\lceil \log_2 n \rceil + 1$ ，因此 $T(n) = O(n \log n)$ 。 规模，总工作量 $2^i \times O(n/2^i) = O(n)$ 。层数为 $\lceil \log_2 n \rceil + 1$ ，因此 $T(n) = O(n \log n)$ 。 。层数为 $\lceil \log_2 n \rceil + 1$ ，因此 $T(n) = O(n \log n)$ 。 ，因此 $T(n) = O(n \log n)$ 。 。
+展开递归树：第 $i$ 层有 $2^i$ 个子问题，每个子问题处理 $n/2^i$ 规模，总工作量 $2^i \times O(n/2^i) = O(n)$。层数为 $\lceil \log_2 n \rceil + 1$，因此 $T(n) = O(n \log n)$。 层有 $2^i$ 个子问题，每个子问题处理 $n/2^i$ 规模，总工作量 $2^i \times O(n/2^i) = O(n)$。层数为 $\lceil \log_2 n \rceil + 1$，因此 $T(n) = O(n \log n)$。 个子问题，每个子问题处理 $n/2^i$ 规模，总工作量 $2^i \times O(n/2^i) = O(n)$。层数为 $\lceil \log_2 n \rceil + 1$，因此 $T(n) = O(n \log n)$。 规模，总工作量 $2^i \times O(n/2^i) = O(n)$。层数为 $\lceil \log_2 n \rceil + 1$，因此 $T(n) = O(n \log n)$。 。层数为 $\lceil \log_2 n \rceil + 1$，因此 $T(n) = O(n \log n)$。 ，因此 $T(n) = O(n \log n)$。 。
 
 ### 执行策略的并行复杂度（C++17）
 
@@ -140,16 +138,16 @@ STL 算法通过 **C++20 概念**（此前是非正式的"迭代器概念"）约
 `lower_bound`：返回第一个**不小于** value 的元素的迭代器。等价于在有序区间中定位插入点——若 value 存在，则指向第一个等于 value 的元素；若不存在，则指向第一个大于 value 的元素。
 
 $$
-\text{lower\_bound}([first, last), val) = \min \{ i \mid A[i] \ge val \}
+`lower_bound` $([first, last), val) = \min \{ i \mid A[i] \ge val \}$
 $$
 
 `upper_bound`：返回第一个**大于** value 的元素的迭代器。
 
 $$
-\text{upper\_bound}([first, last), val) = \min \{ i \mid A[i] > val \}
+`upper_bound` $([first, last), val) = \min \{ i \mid A[i] > val \}$
 $$
 
-**用途**：相等元素区间为 $[ \text{lower\_bound}(val), \text{upper\_bound}(val) )$ 。 。
+**用途**：相等元素区间为 [`lower_bound(val)`, `upper_bound(val)`)。
 
 ### 执行策略的调度语义
 
@@ -182,11 +180,11 @@ $$
 
 ### C++23 std::ranges::to 的容器转换语义
 
+> **latest 预览**：本节使用 C++23 特性（`std::ranges::to`），stable（C++20）等价写法为 `std::vector<T> v(r.begin(), r.end());` 或 `copy`，见下方对比。
+
 **[C++23]** `std::ranges::to<Container>()` 将任何 range 直接转换为容器，消除了 `push_back` 循环的模板代码：
 
-$$
-\text{ranges\_to}: \text{Range} \times \text{ContainerType} \rightarrow \text{ContainerType}
-$$
+`ranges_to` $: \text{Range} \times \text{ContainerType} \rightarrow \text{ContainerType}$
 
 **转换路径的数学描述**：
 
@@ -200,6 +198,19 @@ auto v = some_range | std::views::transform(f) | std::ranges::to<std::vector<int
 
 // 或更直接
 std::vector<int> v = some_range | std::ranges::to<std::vector>();
+```
+
+**C++20 等价写法**（用迭代器范围构造或 `copy`，替代 `ranges::to`）：
+
+```cpp
+// C++20：直接用迭代器范围构造容器
+auto r = some_range | std::views::transform(f);
+std::vector<int> v(r.begin(), r.end());
+
+// 或 std::ranges::copy（C++20）
+std::vector<int> v;
+std::ranges::copy(some_range | std::views::transform(f),
+                  std::back_inserter(v));
 ```
 
 **类型推导的约束**：

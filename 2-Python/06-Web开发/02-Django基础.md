@@ -1,6 +1,8 @@
 # Django 基础
 
-## 定义
+> **版本基准**：Python 3.12 stable（latest=3.14，新特性章节保留并标注）
+
+## 本质
 
 Django 是一个遵循"batteries included"原则的 MTV（Model-Template-View）Web 框架，通过三层职责分离（数据持久化、展示渲染、业务编排）实现 Web 开发各层面的解耦。核心哲学是"不要重复自己"（DRY）——数据模型单次定义后，表单、Admin、API 自动从同一模型派生，而非各自重复声明。
 
@@ -18,19 +20,19 @@ Django 请求处理可建模为 M/G/1 队列系统。设请求到达率为 $\lam
 
 稳态下，服务利用率 $\rho = \lambda \mathbb{E}[S]$ （ $\mathbb{E}[S]$ 为平均服务时间），当 $\rho \to 1$ 时响应时间急剧增长（Django 请求堆积）。这解释了为何 Django 应用需关注： （ $\mathbb{E}[S]$ 为平均服务时间），当 $\rho \to 1$ 时响应时间急剧增长（Django 请求堆积）。这解释了为何 Django 应用需关注： 为平均服务时间），当 $\rho \to 1$ 时响应时间急剧增长（Django 请求堆积）。这解释了为何 Django 应用需关注： 时响应时间急剧增长（Django 请求堆积）。这解释了为何 Django 应用需关注：
 - 数据库查询的 $\mathbb{E}[S]$ （慢查询拖慢整个请求） （慢查询拖慢整个请求）
-- 中间件链的 $N_{\text{mw}}$ （每个中间件增加 $\mathbb{E}[S]$ ） （每个中间件增加 $\mathbb{E}[S]$ ） ）
+- 中间件链的 $N_{\text{mw}}$ （每个中间件增加 $\mathbb{E}[S]$） （每个中间件增加 $\mathbb{E}[S]$） ）
 - 连接池大小 $K$ （当 $\rho > 0.7$ 时应扩容） （当 $\rho > 0.7$ 时应扩容） 时应扩容）
 
 **队列饱和分析**：M/G/1 队列的平均响应时间公式：
  $W = \frac{\lambda \mathbb{E}[S^2]}{2(1-\rho)} + \mathbb{E}[S]$ 
 
-其中 $\mathbb{E}[S^2]$ 是服务时间的二阶矩。当 $\rho \to 1$ 时，分母 $1-\rho \to 0$ ，响应时间 $W \to \infty$——这是队列饱和的数学表述。 是服务时间的二阶矩。当 $\rho \to 1$ 时，分母 $1-\rho \to 0$ ，响应时间 $W \to \infty$——这是队列饱和的数学表述。 时，分母 $1-\rho \to 0$ ，响应时间 $W \to \infty$——这是队列饱和的数学表述。 ，响应时间 $W \to \infty$ ——这是队列饱和的数学表述。——这是队列饱和的数学表述。
+其中 $\mathbb{E}[S^2]$ 是服务时间的二阶矩。当 $\rho \to 1$ 时，分母 $1-\rho \to 0$，响应时间 $W \to \infty$ ——这是队列饱和的数学表述。 是服务时间的二阶矩。当 $\rho \to 1$ 时，分母 $1-\rho \to 0$，响应时间 $W \to \infty$ ——这是队列饱和的数学表述。 时，分母 $1-\rho \to 0$，响应时间 $W \to \infty$ ——这是队列饱和的数学表述。 ，响应时间 $W \to \infty$ ——这是队列饱和的数学表述。——这是队列饱和的数学表述。
 
 ### ORM 查询代价的形式化分析
 
 Django ORM 查询代价由三部分构成：解析代价 + 网络代价 + 计算代价。
 
-设查询计划为有向无环图（DAG），节点 $i$ 的代价为 $c_i$ ： 的代价为 $c_i$ ： ：
+设查询计划为有向无环图（DAG），节点 $i$ 的代价为 $c_i$： 的代价为 $c_i$： ：
 
  $T_{\text{total}} = \sum_{i \in \text{DAG}} c_i + \underbrace{(n_{\text{query}} - 1) \cdot t_{\text{rtt}}}_{\text{网络往返代价}}$ 
 
@@ -41,10 +43,10 @@ Django ORM 查询代价由三部分构成：解析代价 + 网络代价 + 计算
 
 预加载后降至 $T_{\text{prefetch}} = T_{\text{initial}} + T_{\text{related}}$ （常数次往返，与 $N$ 无关）。 （常数次往返，与 $N$ 无关）。 无关）。
 
-**JOIN 复杂度**：设关联深度为 $d$ ，每层最多 $m_i$ 个关联模型，最坏 JOIN 数： ，每层最多 $m_i$ 个关联模型，最坏 JOIN 数： 个关联模型，最坏 JOIN 数：
+**JOIN 复杂度**：设关联深度为 $d$，每层最多 $m_i$ 个关联模型，最坏 JOIN 数： ，每层最多 $m_i$ 个关联模型，最坏 JOIN 数： 个关联模型，最坏 JOIN 数：
  $N_{\text{JOIN}} \le \prod_{i=0}^{d} (1 + m_i) - 1$ 
 
-对于单层 $m$ 个外键： $N_{\text{JOIN}} \le m$ 。这就是为何深度嵌套的 `select_related` 会生成臃肿 SQL。 个外键： $N_{\text{JOIN}} \le m$ 。这就是为何深度嵌套的 `select_related` 会生成臃肿 SQL。 。这就是为何深度嵌套的 `select_related` 会生成臃肿 SQL。
+对于单层 $m$ 个外键： $N_{\text{JOIN}} \le m$。这就是为何深度嵌套的 `select_related` 会生成臃肿 SQL。 个外键： $N_{\text{JOIN}} \le m$。这就是为何深度嵌套的 `select_related` 会生成臃肿 SQL。 。这就是为何深度嵌套的 `select_related` 会生成臃肿 SQL。
 
 ### URL 模式匹配
 
@@ -62,7 +64,7 @@ Django URL 分派使用正则匹配，路径表达式编译为以下优先序列
 
 ### 中间件的格代数
 
-Django 中间件链构成一个**格（lattice）结构**。设中间件集合 $M = \{M_1, M_2, \ldots, M_n\}$ ，定义偏序关系： ，定义偏序关系：
+Django 中间件链构成一个**格（lattice）结构**。设中间件集合 $M = \{M_1, M_2, \ldots, M_n\}$，定义偏序关系： ，定义偏序关系：
 
  $M_i \prec M_j \iff i < j \text{（在 settings.py 中的注册顺序）}$ 
 
@@ -210,7 +212,7 @@ Middleware1.process_response
 
 **为什么这样设计**：洋葱模型确保中间件可以"包裹"整个请求处理过程——请求阶段从外到内，响应阶段从内到外。这使得中间件可以统一处理进入和离开的请求，例如日志中间件记录请求进入时间，在响应阶段计算总耗时。
 
-**短路语义的形式化**：若 $M_i.\text{process\_request}$ 返回非 None，则执行序列在 $M_i$ 处截断，跳到所有已注册中间件的 `process_response`（从 $M_i$ 向上逆序）。这与短路求值（ $A \land B$ 中 $A$ 为 False 则不求  $B$）完全对应。 返回非 None，则执行序列在 $M_i$ 处截断，跳到所有已注册中间件的 `process_response`（从 $M_i$ 向上逆序）。这与短路求值（ $A \land B$ 中 $A$ 为 False 则不求  $B$）完全对应。 处截断，跳到所有已注册中间件的 `process_response`（从 $M_i$ 向上逆序）。这与短路求值（ $A \land B$ 中 $A$ 为 False 则不求  $B$）完全对应。 向上逆序）。这与短路求值（ $A \land B$ 中 $A$ 为 False 则不求  $B$）完全对应。 中 $A$ 为 False 则不求  $B$）完全对应。 为 False 则不求  $B$ ）完全对应。）完全对应。
+**短路语义的形式化**：若 $M_i.\text{process-request}$ 返回非 None，则执行序列在 $M_i$ 处截断，跳到所有已注册中间件的 `process_response`（从 $M_i$ 向上逆序）。这与短路求值（ $A \land B$ 中 $A$ 为 False 则不求 $B$）完全对应。
 
 **违反约束的后果**：若 `process_request` 返回 HttpResponse 后忘记调用 `process_response`，响应不会正确返回给客户端（因为中间件的响应处理链未执行）。这是中间件开发的常见错误。
 
@@ -246,7 +248,7 @@ Django 的会话框架与认证框架完全解耦：
 
 **PBKDF2 的安全性**：PBKDF2 通过迭代哈希 $H^n(\text{salt} + \text{password})$ 提供防护。默认配置（SHA256，360,000 次迭代）使每次密码验证计算代价约 100ms，难以暴力破解。 提供防护。默认配置（SHA256，360,000 次迭代）使每次密码验证计算代价约 100ms，难以暴力破解。
 
-## 参考存根
+## 代码示例
 
 ```python
 from django.db import connection, reset_queries

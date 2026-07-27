@@ -1,6 +1,8 @@
 # Mock 与 Fake
 
-## 定义
+> **版本基准**：Python 3.12 stable（latest=3.14，新特性章节保留并标注）
+
+## 本质
 
 Mock 和 Fake 是测试替身（Test Double）的两种形式。Mock 是**可编程的观察点**——记录交互但不执行真实逻辑，用于验证"什么被调用"；Fake 是**轻量可执行替代品**——用简化实现替代复杂外部依赖，用于提供"真实但可控"的测试环境。两者共同目标：消除测试对外部系统的依赖，实现快速、可重复的单元测试。
 
@@ -10,12 +12,12 @@ Mock 和 Fake 是测试替身（Test Double）的两种形式。Mock 是**可编
 
 ### Mock 的状态机
 
-Mock 维护内部状态 $(c, H, R, S)$ ： ：
+Mock 维护内部状态 $(c, H, R, S)$： ：
 
-- $c$ ：调用计数器（per method），整数 ：调用计数器（per method），整数
-- $H$ ：历史调用记录（参数序列），CallList 结构 ：历史调用记录（参数序列），CallList 结构
-- $R$ ：配置返回值映射 $\{method \mapsto v\}$ ：配置返回值映射 $\{method \mapsto v\}$ 
-- $S$ ：side_effect 序列或函数 ：side_effect 序列或函数
+- $c$：调用计数器（per method），整数 ：调用计数器（per method），整数
+- $H$：历史调用记录（参数序列），CallList 结构 ：历史调用记录（参数序列），CallList 结构
+- $R$：配置返回值映射 $\{method \mapsto v\}$：配置返回值映射 $\{method \mapsto v\}$ 
+- $S$：side_effect 序列或函数 ：side_effect 序列或函数
 
 $$
 \text{mock.method}(args) \rightarrow (c+1,\ H \cup \{\text{call}(args)\},\ R,\ S)
@@ -45,20 +47,20 @@ $$
 \text{call}(args) = ((args_1, \dots, args_k),\ \{k_1: v_1, \dots\})
 $$
 
-`assert_called_with(*args, **kwargs)` 验证 $H[-1] = \text{call}(args, kwargs)$ ，即**仅验证最后一次调用**。 ，即**仅验证最后一次调用**。
+`assert_called_with(*args, **kwargs)` 验证 $H[-1] = \text{call}(args, kwargs)$，即**仅验证最后一次调用**。 ，即**仅验证最后一次调用**。
 
 ### side_effect 的数学语义
 
 `side_effect` 将调用序号映射到结果：
 
 $$
-\text{side\_effect}_n = \text{side\_effect}(args_n)
+\text{side-effect}_n = \text{side-effect}(args_n)
 $$
 
 **列表形式（离散映射）**：
 
 $$
-\text{side\_effect} = [v_1, v_2, \dots, v_n] \Rightarrow \text{call}_i \mapsto v_i
+\text{side-effect} = [v_1, v_2, \dots, v_n] \Rightarrow \text{call}_i \mapsto v_i
 $$
 
 若调用次数超出列表长度，抛出 `StopIteration`。
@@ -66,7 +68,7 @@ $$
 **函数形式（连续映射）**：
 
 $$
-\text{side\_effect}(args) = f(args)
+\text{side-effect}(args) = f(args)
 $$
 
 每次调用执行该函数，可产生不同结果。
@@ -306,7 +308,7 @@ class FakeUserRepository:
 | Patch 与被测模块导入顺序 | 若被测模块在被 patch 前已导入，则 patch 无效（已绑定旧引用） |
 | spec/autospec 与实现不一致 | 当真实 API 变更但 spec 未更新时，spec 可能拒绝合法调用或接受非法调用 |
 
-## 参考存根
+## 代码示例
 
 ```python
 from unittest.mock import Mock, MagicMock, patch, autospec, PropertyMock, Spy

@@ -1,6 +1,8 @@
 # Fixture
 
-## 定义
+> **版本基准**：Python 3.12 stable（latest=3.14，新特性章节保留并标注）
+
+## 本质
 
 Fixture 是 pytest 的测试依赖工厂，通过声明式作用域和 `yield` 清理语义实现测试资源的自动生命周期管理。Fixture 函数名即依赖令牌——测试函数通过参数声明对 fixture 的依赖，pytest 在测试执行前自动注入已解析的依赖实例。
 
@@ -34,12 +36,12 @@ $$
 Fixture 依赖形成有向无环图（DAG）。令 $F$ 为 fixture 集合， $D(f) \subseteq F$ 为 $f$ 的依赖集： 为 fixture 集合， $D(f) \subseteq F$ 为 $f$ 的依赖集： 为 $f$ 的依赖集： 的依赖集：
 
 $$
-\text{valid\_fixture\_graph} \iff \nexists \text{ cycle in } D
+\text{valid-fixture-graph} \iff \nexists \text{ cycle in } D
 $$
 
 pytest 在收集阶段对 DAG 做拓扑排序，保证依赖在被注入前已完成初始化。
 
-**拓扑排序的数学定义**：对 DAG $(V, E)$ 的拓扑排序是顶点序列 $v_1, v_2, \dots, v_n$ 使得对每条边 $(v_i, v_j) \in E$ 都有 $i < j$ 。 的拓扑排序是顶点序列 $v_1, v_2, \dots, v_n$ 使得对每条边 $(v_i, v_j) \in E$ 都有 $i < j$ 。 使得对每条边 $(v_i, v_j) \in E$ 都有 $i < j$ 。 都有 $i < j$ 。 。
+**拓扑排序的数学定义**：对 DAG $(V, E)$ 的拓扑排序是顶点序列 $v_1, v_2, \dots, v_n$ 使得对每条边 $(v_i, v_j) \in E$ 都有 $i < j$。 的拓扑排序是顶点序列 $v_1, v_2, \dots, v_n$ 使得对每条边 $(v_i, v_j) \in E$ 都有 $i < j$。 使得对每条边 $(v_i, v_j) \in E$ 都有 $i < j$。 都有 $i < j$。 。
 
 **拓扑序不唯一**：若 DAG 有多条合法拓扑序，pytest 采用的是依赖深度优先遍历（DFS）的后序遍历结果。
 
@@ -48,13 +50,13 @@ pytest 在收集阶段对 DAG 做拓扑排序，保证依赖在被注入前已�
 `yield` 将 fixture 函数切为两段：前段（setup）返回对象给测试，后段（teardown）在测试完成后总被执行。这等价于将 cleanup 代码放在 `finally` 块中，但由 pytest 管理而非显式编写：
 
 $$
-\text{fixture\_teardown}(f) \iff \text{yield} \Rightarrow \text{cleanup\_runs} = \text{always}
+\text{fixture-teardown}(f) \iff \text{yield} \Rightarrow \text{cleanup-runs} = \text{always}
 $$
 
 **异常处理语义**：
 
 $$
-\text{cleanup\_execution} = \begin{cases}
+\text{cleanup-execution} = \begin{cases}
 \text{执行} & \text{测试正常返回} \\
 \text{执行} & \text{测试抛出异常（teardown 仍会运行）} \\
 \text{不执行} & \text{setup 中抛异常} \\
@@ -66,7 +68,7 @@ $$
 - `yield`：函数被"暂停"，teardown 在消费方完成后执行
 
 $$
-\text{fixture\_semantics}(f) = \begin{cases}
+\text{fixture-semantics}(f) = \begin{cases}
 \text{return} \Rightarrow \text{无清理} \\
 \text{yield} \Rightarrow \text{强制清理}
 \end{cases}
@@ -77,7 +79,7 @@ $$
 `@pytest.fixture(params=...)` 生成参数化的 fixture 实例，每个参数值产生独立的 fixture 实例：
 
 $$
-\text{param\_fixture}(p) \rightarrow \bigcup_{v \in \text{params}} \text{instance}(p, v)
+\text{param-fixture}(p) \rightarrow \bigcup_{v \in \text{params}} \text{instance}(p, v)
 $$
 
 测试函数接收到参数化 fixture 时，pytest 自动为每个参数值生成一个独立测试实例。
@@ -85,7 +87,7 @@ $$
 **与 parametrize 的笛卡尔积**：参数化 fixture 与 parametrize 标记叠加时，生成笛卡尔积：
 
 $$
-|\text{最终实例}| = |\text{parametrize\_instances}| \times |\text{fixture\_param\_instances}|
+|\text{最终实例}| = |\text{parametrize-instances}| \times |\text{fixture-param-instances}|
 $$
 
 ### Fixture 参数缓存
@@ -115,7 +117,7 @@ $$
 \alpha(name) \rightarrow (obj,\ S \cup \{obj\})
 $$
 
-工厂在 setup 阶段初始化空的已创建集合 $S$ 和 cleanup 函数 $C$ ；每次调用工厂函数时创建一个新实例并追加到 $S$ ；teardown 阶段遍历 $S$ 执行 $C$ 。 和 cleanup 函数 $C$ ；每次调用工厂函数时创建一个新实例并追加到 $S$ ；teardown 阶段遍历 $S$ 执行 $C$ 。 ；每次调用工厂函数时创建一个新实例并追加到 $S$ ；teardown 阶段遍历 $S$ 执行 $C$ 。 ；teardown 阶段遍历 $S$ 执行 $C$ 。 执行 $C$ 。 。
+工厂在 setup 阶段初始化空的已创建集合 $S$ 和 cleanup 函数 $C$；每次调用工厂函数时创建一个新实例并追加到 $S$；teardown 阶段遍历 $S$ 执行 $C$。 和 cleanup 函数 $C$；每次调用工厂函数时创建一个新实例并追加到 $S$；teardown 阶段遍历 $S$ 执行 $C$。 ；每次调用工厂函数时创建一个新实例并追加到 $S$；teardown 阶段遍历 $S$ 执行 $C$。 ；teardown 阶段遍历 $S$ 执行 $C$。 执行 $C$。 。
 
 ## 数据流
 
@@ -244,7 +246,7 @@ def make_user():
 **数学模型**：
 
 $$
-\text{make\_user} \triangleq \lambda f.\ \text{let } c = [] \text{ in } (\lambda name.\ f(name, c),\ \text{cleanup}(c))
+\text{make-user} \triangleq \lambda f.\ \text{let } c = [] \text{ in } (\lambda name.\ f(name, c),\ \text{cleanup}(c))
 $$
 
 工厂函数返回一个内部函数 `_create`，每次调用创建一个新实例并记录到 `created` 列表。fixture teardown 时遍历 `created` 列表统一清理。
@@ -274,7 +276,7 @@ class Derived(Base):
 在同一作用域内，fixture 实例按 (fixture_name, param) 缓存：
 
 $$
-\text{fixture\_cache}[(f\_name, param\_value)] = \text{cached\_instance}
+\text{fixture-cache}[(f\_name, param\_value)] = \text{cached-instance}
 $$
 
 重复请求同一 fixture 时，pytest 直接返回缓存实例，而非重新执行 fixture 函数。这保证了同一作用域内 fixture 的单例语义。
@@ -293,7 +295,7 @@ $$
 | 父类 fixture 被子类覆盖时作用域不一致 | 收集阶段报 FixtureScopeError |
 | autouse fixture 之间存在隐式依赖 | 未声明的依赖顺序导致不可预测的执行顺序 |
 
-## 参考存根
+## 代码示例
 
 ```python
 import pytest

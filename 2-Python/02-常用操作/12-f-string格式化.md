@@ -1,6 +1,8 @@
 # f-string 格式化深入
 
-## 定义
+> **版本基准**：Python 3.12 stable（latest=3.14，新特性章节保留并标注）
+
+## 本质
 
 f-string 是在**编译期**将字符串字面量解析为 AST 节点，在**运行时**对嵌入的花括号表达式求值并通过 `__format__` 协议转换为字符串的格式化机制。其本质是**运行时解释执行的字符串字面量**——编译阶段确定求值表达式，运行时动态解释执行。
 
@@ -8,7 +10,7 @@ f-string 是在**编译期**将字符串字面量解析为 AST 节点，在**运
 
 ### 格式化偏函数
 
-f-string 格式化是一个偏函数 $F: O \times \Sigma^* \rightharpoonup S$ ： ：
+f-string 格式化是一个偏函数 $F: O \times \Sigma^* \rightharpoonup S$： ：
  $F(v, \text{spec}) = v.\__format\_\_(\text{spec})$ 
 
 格式规格符的形式语言（EBNF）：
@@ -25,7 +27,7 @@ type       ::= "b" | "c" | "d" | "e" | "E" | "f" | "F" | "g" | "G" | "n" | "o" |
 | `str.format()` | 运行时（索引/关键字） | 受限于 `{0[key]}` 槽位 | 相同 |
 | 预计算常量 | 编译期（静态） | 无表达式 | 最优 |
 
-**归约终点**：f-string 的求值可归约为**字节码解释执行的表达式求值**——编译器生成 `LOAD_NAME`/`FORMAT_VALUE`/`BUILD_STRING` 指令序列，运行时由 Python 虚拟机解释执行这些指令。格式化协议 `__format__` 是 Python 鸭子类型系统在格式化场景的具体体现。
+> **洞察**：f-string 的求值可归约为**字节码解释执行的表达式求值**——编译器生成 `LOAD_NAME`/`FORMAT_VALUE`/`BUILD_STRING` 指令序列，运行时由 Python 虚拟机解释执行这些指令。格式化协议 `__format__` 是 Python 鸭子类型系统在格式化场景的具体体现。
 
 ## 数据流
 
@@ -119,7 +121,7 @@ def __format__(self, format_spec):
 
 **词法优先级**：`{{` 总是被替换为 `{`，而不是被解释为 `{{` + `x` + `}}`。
 
-## 参考存根
+## 代码示例
 
 ```python
 from datetime import datetime

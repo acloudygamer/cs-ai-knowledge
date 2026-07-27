@@ -1,6 +1,8 @@
 # FastAPI 快速入门
 
-## 定义
+> **版本基准**：Python 3.12 stable（latest=3.14，新特性章节保留并标注）
+
+## 本质
 
 FastAPI 是基于 ASGI（异步服务器网关接口）的 Python Web 框架，其核心设计哲学是**类型即契约**——利用 Python 类型提示在运行时自动完成请求解析、验证、响应序列化和 OpenAPI 文档生成。框架将类型注解从静态声明升级为**运行时执行约束**，使类型系统成为自动机状态转移的规则引擎。
 
@@ -10,7 +12,7 @@ FastAPI 是基于 ASGI（异步服务器网关接口）的 Python Web 框架，�
 
 ### 请求处理管道的形式化
 
-设请求到达过程为泊松过程（Poisson process），到达率 $\lambda$ （请求/秒）。每个请求 $r_i$ 经过处理管道 $\mathcal{P}$ ： （请求/秒）。每个请求 $r_i$ 经过处理管道 $\mathcal{P}$ ： 经过处理管道 $\mathcal{P}$ ： ：
+设请求到达过程为泊松过程（Poisson process），到达率 $\lambda$ （请求/秒）。每个请求 $r_i$ 经过处理管道 $\mathcal{P}$： （请求/秒）。每个请求 $r_i$ 经过处理管道 $\mathcal{P}$： 经过处理管道 $\mathcal{P}$： ：
 
  $\mathcal{P}(r_i) = \text{validate}(r_i) \rightarrow \text{inject}(r_i) \rightarrow \text{handle}(r_i) \rightarrow \text{serialize}(r_i)$ 
 
@@ -18,27 +20,27 @@ FastAPI 是基于 ASGI（异步服务器网关接口）的 Python Web 框架，�
 
  $T_{\text{total}} = T_{\text{validate}} + T_{\text{inject}} + T_{\text{handle}} + T_{\text{serialize}}$ 
 
-在稳态下，系统吞吐率 $\mu$ 满足 $\lambda < \mu$ （否则队列无限增长）。若处理时间分布为指数分布，则系统可建模为 M/M/1 队列，平均响应时间 $W = \frac{1}{\mu - \lambda}$ 。 满足 $\lambda < \mu$ （否则队列无限增长）。若处理时间分布为指数分布，则系统可建模为 M/M/1 队列，平均响应时间 $W = \frac{1}{\mu - \lambda}$ 。 （否则队列无限增长）。若处理时间分布为指数分布，则系统可建模为 M/M/1 队列，平均响应时间 $W = \frac{1}{\mu - \lambda}$ 。 。
+在稳态下，系统吞吐率 $\mu$ 满足 $\lambda < \mu$ （否则队列无限增长）。若处理时间分布为指数分布，则系统可建模为 M/M/1 队列，平均响应时间 $W = \frac{1}{\mu - \lambda}$。 满足 $\lambda < \mu$ （否则队列无限增长）。若处理时间分布为指数分布，则系统可建模为 M/M/1 队列，平均响应时间 $W = \frac{1}{\mu - \lambda}$。 （否则队列无限增长）。若处理时间分布为指数分布，则系统可建模为 M/M/1 队列，平均响应时间 $W = \frac{1}{\mu - \lambda}$。 。
 
 ### 依赖注入的 DAG 调度
 
-设依赖集合 $\mathcal{D} = \{d_1, d_2, \ldots, d_m\}$ ，依赖关系构成有向无环图 $G = (\mathcal{D}, E)$ ，其中 $(d_i, d_j) \in E$ 表示 $d_j$ 依赖 $d_i$ 的求值结果。框架按拓扑序求值： ，依赖关系构成有向无环图 $G = (\mathcal{D}, E)$ ，其中 $(d_i, d_j) \in E$ 表示 $d_j$ 依赖 $d_i$ 的求值结果。框架按拓扑序求值： ，其中 $(d_i, d_j) \in E$ 表示 $d_j$ 依赖 $d_i$ 的求值结果。框架按拓扑序求值： 表示 $d_j$ 依赖 $d_i$ 的求值结果。框架按拓扑序求值： 依赖 $d_i$ 的求值结果。框架按拓扑序求值： 的求值结果。框架按拓扑序求值：
+设依赖集合 $\mathcal{D} = \{d_1, d_2, \ldots, d_m\}$，依赖关系构成有向无环图 $G = (\mathcal{D}, E)$，其中 $(d_i, d_j) \in E$ 表示 $d_j$ 依赖 $d_i$ 的求值结果。框架按拓扑序求值： ，依赖关系构成有向无环图 $G = (\mathcal{D}, E)$，其中 $(d_i, d_j) \in E$ 表示 $d_j$ 依赖 $d_i$ 的求值结果。框架按拓扑序求值： ，其中 $(d_i, d_j) \in E$ 表示 $d_j$ 依赖 $d_i$ 的求值结果。框架按拓扑序求值： 表示 $d_j$ 依赖 $d_i$ 的求值结果。框架按拓扑序求值： 依赖 $d_i$ 的求值结果。框架按拓扑序求值： 的求值结果。框架按拓扑序求值：
 
  $\text{toposort}(\mathcal{D}) = (d_{i_1}, d_{i_2}, \ldots, d_{i_m})$ 
 
-拓扑排序采用 Kahn 算法：维护入度为 0 的节点队列，逐步移除边并更新入度。设图中有 $N$ 个节点、 $E$ 条边，算法复杂度  $O(N + E)$。 个节点、 $E$ 条边，算法复杂度  $O(N + E)$。 条边，算法复杂度  $O(N + E)$ 。。
+拓扑排序采用 Kahn 算法：维护入度为 0 的节点队列，逐步移除边并更新入度。设图中有 $N$ 个节点、 $E$ 条边，算法复杂度 $O(N + E)$。 个节点、 $E$ 条边，算法复杂度 $O(N + E)$。 条边，算法复杂度 $O(N + E)$。。
 
 每个依赖 $d_j$ 的求值结果作为后续依赖的参数传递。这保证了依赖求值顺序无歧义。 的求值结果作为后续依赖的参数传递。这保证了依赖求值顺序无歧义。
 
-**约束**：DAG 中不允许环——若 $d_i$ 依赖 $d_j$ 且 $d_j$ 依赖 $d_i$ ，则在拓扑排序时无法找到起点，框架抛出循环依赖错误。 依赖 $d_j$ 且 $d_j$ 依赖 $d_i$ ，则在拓扑排序时无法找到起点，框架抛出循环依赖错误。 且 $d_j$ 依赖 $d_i$ ，则在拓扑排序时无法找到起点，框架抛出循环依赖错误。 依赖 $d_i$ ，则在拓扑排序时无法找到起点，框架抛出循环依赖错误。 ，则在拓扑排序时无法找到起点，框架抛出循环依赖错误。
+**约束**：DAG 中不允许环——若 $d_i$ 依赖 $d_j$ 且 $d_j$ 依赖 $d_i$，则在拓扑排序时无法找到起点，框架抛出循环依赖错误。 依赖 $d_j$ 且 $d_j$ 依赖 $d_i$，则在拓扑排序时无法找到起点，框架抛出循环依赖错误。 且 $d_j$ 依赖 $d_i$，则在拓扑排序时无法找到起点，框架抛出循环依赖错误。 依赖 $d_i$，则在拓扑排序时无法找到起点，框架抛出循环依赖错误。 ，则在拓扑排序时无法找到起点，框架抛出循环依赖错误。
 
 ### 路径匹配的数学表达
 
-设路由集合 $\mathcal{R}$ ，每个路由 $r \in \mathcal{R}$ 定义为四元组： ，每个路由 $r \in \mathcal{R}$ 定义为四元组： 定义为四元组：
+设路由集合 $\mathcal{R}$，每个路由 $r \in \mathcal{R}$ 定义为四元组： ，每个路由 $r \in \mathcal{R}$ 定义为四元组： 定义为四元组：
 
- $r = (\text{method}, \text{path\_pattern}, \text{handler}, \text{dependencies})$ 
+ $r = (\text{method}, \text{path-pattern}, \text{handler}, \text{dependencies})$
 
-路径匹配函数 $m: (\text{RequestPath}, \text{RequestMethod}) \rightarrow \mathcal{R} \cup \{\bot\}$ 将请求映射到对应路由，未命中时返回 $\bot$ （触发 404）。 将请求映射到对应路由，未命中时返回 $\bot$ （触发 404）。 （触发 404）。
+路径匹配函数 $m: (\text{RequestPath}, \text{RequestMethod}) \rightarrow \mathcal{R} \cup \{\bot\}$ 将请求映射到对应路由，未命中时返回 $\bot$ （触发 404）。
 
 路径模式解析为正则表达式。设路径 `/items/{item_id}` 解析为正则 `^/items/(?P<item_id>[^/]+)，匹配复杂度为  $O(|\text{path}|)$ ，与路由总数无关（字典查找）。，与路由总数无关（字典查找）。
 
@@ -180,7 +182,7 @@ FastAPI 的 Handler 支持 `async def` 和普通 `def`。`async def` 的并发�
 
 **违反约束的后果**：同步阻塞操作会独占事件循环，导致所有其他协程无法取得进展，请求堆积，响应时间爆炸。
 
-## 参考存根
+## 代码示例
 
 ```python
 from fastapi import FastAPI, Path, Query, HTTPException, Depends, Header

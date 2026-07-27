@@ -20,7 +20,7 @@ $$
 \end{aligned}
 $$
 
-解析器对每个非终结符维护一个递归调用栈帧，栈深度等于 JSON 嵌套层数 $D$ 。解析复杂度 $O(N)$ ，其中 $N$ 是 JSON 文本字节数（每个字节只被处理一次）。 。解析复杂度 $O(N)$ ，其中 $N$ 是 JSON 文本字节数（每个字节只被处理一次）。 ，其中 $N$ 是 JSON 文本字节数（每个字节只被处理一次）。 是 JSON 文本字节数（每个字节只被处理一次）。
+解析器对每个非终结符维护一个递归调用栈帧，栈深度等于 JSON 嵌套层数 $D$。解析复杂度 $O(N)$，其中 $N$ 是 JSON 文本字节数（每个字节只被处理一次）。 。解析复杂度 $O(N)$，其中 $N$ 是 JSON 文本字节数（每个字节只被处理一次）。 ，其中 $N$ 是 JSON 文本字节数（每个字节只被处理一次）。 是 JSON 文本字节数（每个字节只被处理一次）。
 
 ### nlohmann/json的ADL序列化查找
 
@@ -36,7 +36,7 @@ namespace adl_serializer {
 
 ADL 使得为任意用户类型提供 `to_json/from_json` 特化时，无需显式声明依赖——只需在类型所在命名空间内定义或特化。
 
-**查找路径的数学描述**：对类型 `T`，编译器构造候选函数集合 $S(T)$ ： ：
+**查找路径的数学描述**：对类型 `T`，编译器构造候选函数集合 $S(T)$： ：
 
 $$
 S(T) = \{ f \mid f \in (\text{T}\text{的命名空间}) \cup (\text{T}\text{的模板实参的命名空间}) \}
@@ -88,13 +88,13 @@ $$
 \text{validate}(v, \text{schema}) = \bigwedge_{i} p_i(v, \text{schema}_i)
 $$
 
-其中 $p_i$ 可以是：类型检查（ $v.\text{type} == \text{schema.type}$ ）、值域检查（  $v > \text{minimum}$）、枚举约束（  $v \in \text{enum}$）、格式约束（正则表达式匹配）。任何 $p_i$ 为假则整体验证失败。 可以是：类型检查（ $v.\text{type} == \text{schema.type}$ ）、值域检查（  $v > \text{minimum}$）、枚举约束（  $v \in \text{enum}$）、格式约束（正则表达式匹配）。任何 $p_i$ 为假则整体验证失败。 ）、值域检查（  $v > \text{minimum}$ ）、枚举约束（  $v \in \text{enum}$）、格式约束（正则表达式匹配）。任何 $p_i$ 为假则整体验证失败。）、枚举约束（  $v \in \text{enum}$ ）、格式约束（正则表达式匹配）。任何 $p_i$ 为假则整体验证失败。）、格式约束（正则表达式匹配）。任何 $p_i$ 为假则整体验证失败。 为假则整体验证失败。
+其中 $p_i$ 可以是：类型检查（ $v.\text{type} == \text{schema.type}$）、值域检查（ $v > \text{minimum}$）、枚举约束（ $v \in \text{enum}$）、格式约束（正则表达式匹配）。任何 $p_i$ 为假则整体验证失败。 可以是：类型检查（ $v.\text{type} == \text{schema.type}$）、值域检查（ $v > \text{minimum}$）、枚举约束（ $v \in \text{enum}$）、格式约束（正则表达式匹配）。任何 $p_i$ 为假则整体验证失败。 ）、值域检查（ $v > \text{minimum}$）、枚举约束（ $v \in \text{enum}$）、格式约束（正则表达式匹配）。任何 $p_i$ 为假则整体验证失败。）、枚举约束（ $v \in \text{enum}$）、格式约束（正则表达式匹配）。任何 $p_i$ 为假则整体验证失败。）、格式约束（正则表达式匹配）。任何 $p_i$ 为假则整体验证失败。 为假则整体验证失败。
 
 ## 机制
 
 ### JSON Schema 的递归验证深度
 
-JSON Schema 支持嵌套引用（` $ref`），验证器通过**递归**处理嵌套 schema。设 JSON 文档嵌套深度为 $ D_{json}$，Schema 嵌套深度为 $D_{schema}$，最坏情况下的递归调用栈深度为：D_{json} $，Schema 嵌套深度为 $ D_{schema}$，最坏情况下的递归调用栈深度为：D_{schema}$，最坏情况下的递归调用栈深度为：
+JSON Schema 支持嵌套引用（` $ref`），验证器通过**递归**处理嵌套 schema。设 JSON 文档嵌套深度为 $ D_{json}$，Schema 嵌套深度为 $D_{schema}$，最坏情况下的递归调用栈深度为：D_{json} $，Schema 嵌套深度为 $ D_{schema} $，最坏情况下的递归调用栈深度为：D_{schema}$，最坏情况下的递归调用栈深度为：
 
 $$
 D_{max} = D_{json} \times D_{schema}
@@ -111,13 +111,13 @@ $$
 - 非 `null` 值：**替换**目标中的对应值（若目标是 object，则递归合并）。
 
 $$
-\text{patch\_apply}(target, patch) = \begin{cases}
-\text{recursive\_merge}(target, patch) & \text{若 patch 是 object} \\
+\text{patch-apply}(target, patch) = \begin{cases}
+\text{recursive-merge}(target, patch) & \text{若 patch 是 object} \\
 patch & \text{否则（直接替换）}
 \end{cases}
 $$
 
-其中 `recursive_merge` 的语义：对于 `patch` 中的每个键值对 $(k, v)$ ，若 $v$ 为 `null` 则从 `target` 删除 $k$ ，否则用 $v$ 覆盖 `target[k]`（若 $target[k]$ 也是 object 且 $v$ 是 object，则递归合并）。 ，若 $v$ 为 `null` 则从 `target` 删除 $k$ ，否则用 $v$ 覆盖 `target[k]`（若 $target[k]$ 也是 object 且 $v$ 是 object，则递归合并）。 为 `null` 则从 `target` 删除 $k$ ，否则用 $v$ 覆盖 `target[k]`（若 $target[k]$ 也是 object 且 $v$ 是 object，则递归合并）。 ，否则用 $v$ 覆盖 `target[k]`（若 $target[k]$ 也是 object 且 $v$ 是 object，则递归合并）。 覆盖 `target[k]`（若 $target[k]$ 也是 object 且 $v$ 是 object，则递归合并）。 也是 object 且 $v$ 是 object，则递归合并）。 是 object，则递归合并）。
+其中 `recursive_merge` 的语义：对于 `patch` 中的每个键值对 $(k, v)$，若 $v$ 为 `null` 则从 `target` 删除 $k$，否则用 $v$ 覆盖 `target[k]`（若 $target[k]$ 也是 object 且 $v$ 是 object，则递归合并）。 ，若 $v$ 为 `null` 则从 `target` 删除 $k$，否则用 $v$ 覆盖 `target[k]`（若 $target[k]$ 也是 object 且 $v$ 是 object，则递归合并）。 为 `null` 则从 `target` 删除 $k$，否则用 $v$ 覆盖 `target[k]`（若 $target[k]$ 也是 object 且 $v$ 是 object，则递归合并）。 ，否则用 $v$ 覆盖 `target[k]`（若 $target[k]$ 也是 object 且 $v$ 是 object，则递归合并）。 覆盖 `target[k]`（若 $target[k]$ 也是 object 且 $v$ 是 object，则递归合并）。 也是 object 且 $v$ 是 object，则递归合并）。 是 object，则递归合并）。
 
 ### JSON 的数值精度问题
 

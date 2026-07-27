@@ -20,7 +20,7 @@ Type traits 是编译期计算，**零运行时开销**。它们在编译期折�
 
 ### 类型作为编译期值
 
-设类型集合 $\mathbb{T}$ ，type trait 是类型上的函数： ，type trait 是类型上的函数：
+设类型集合 $\mathbb{T}$，type trait 是类型上的函数： ，type trait 是类型上的函数：
 
 $$
 f : \mathbb{T} \rightarrow \mathbb{B} \quad \text{（查询属性，返回 bool）}
@@ -34,8 +34,8 @@ $$
 
 SFINAE（Substitution Failure Is Not An Error）是重载决议的一部分：
 
-设模板候选集 $C = \{t_1, t_2, \dots, t_n\}$ ，对调用 $c(\text{args})$ ： ，对调用 $c(\text{args})$ ： ：
-1. 对每个候选 $t_i$ ，用 `args` 替换参数 ，用 `args` 替换参数
+设模板候选集 $C = \{t_1, t_2, \dots, t_n\}$，对调用 $c(\text{args})$： ，对调用 $c(\text{args})$： ：
+1. 对每个候选 $t_i$，用 `args` 替换参数 ，用 `args` 替换参数
 2. 如果替换失败（类型不匹配、约束不满足），从候选集**移除** $t_i$ （不报错） （不报错）
 3. 如果替换成功， $t_i$ 参与重载决议 参与重载决议
 4. 如果候选集为空，编译错误
@@ -46,9 +46,7 @@ SFINAE（Substitution Failure Is Not An Error）是重载决议的一部分：
 
 `std::void_t<void, T...>` 将任意类型序列映射为 `void`：
 
-$$
-\text{void\_t}[T_1, T_2, \dots] = \text{void}
-$$
+`void_t` $[T_1, T_2, \dots] = \text{void}$
 
 用途：**检测表达式有效性**。通过 SFINAE 检测类型是否有某成员或某成员函数：
 
@@ -64,12 +62,10 @@ struct has_value_type<T, std::void_t<typename T::value_type>> : std::true_type {
 
 ### std::enable_if 的语义
 
-$$
-\text{enable\_if}_{B,T} = \begin{cases}
+`enable_if` $_{B,T} = \begin{cases}
 T & \text{if } B = \text{true} \\
 \text{substitution failure} & \text{if } B = \text{false}
-\end{cases}
-$$
+\end{cases}$
 
 利用 SFINAE，enable_if 可以在条件为 false 时"移除"模板候选。
 
@@ -261,4 +257,4 @@ T bit_count(T n) {
 
 ---
 
-**归约终点**：Type traits 可归约为 **类型到布尔/类型的编译期函数**，其计算发生在模板实例化阶段（编译时）。SFINAE 是编译器重载决议的一部分。Concepts 是对 Type traits 约束的语义化包装，提供更直观的约束语法。
+> **洞察**：Type traits 可归约为 **类型到布尔/类型的编译期函数**，其计算发生在模板实例化阶段（编译时）。SFINAE 是编译器重载决议的一部分。Concepts 是对 Type traits 约束的语义化包装，提供更直观的约束语法。

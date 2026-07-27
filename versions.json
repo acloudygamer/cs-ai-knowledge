@@ -9,7 +9,7 @@
     "1-数据结构与算法/": {
       "stable": "universal",
       "latest": null,
-      "notes": "代码示例使用 Python 3.12"
+      "notes": "代码示例同时使用 Python 3.12 和 C++20, 且坚持代码最简原则和算法最优原则，注释清晰明了，便于理解和学习。"
     },
     "2-Python/": {
       "stable": "Python 3.12",

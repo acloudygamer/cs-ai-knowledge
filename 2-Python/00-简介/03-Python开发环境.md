@@ -1,6 +1,9 @@
 # 开发环境
 
-## 定义
+> **版本基准**：Python 3.12 stable（latest=3.14，新特性章节保留并标注）
+
+
+## 本质
 
 Python 开发环境是**字节码执行 + 包解析 + 符号表管理**的运行时基础。安装 Python 本质是将 CPython 解释器（`python.exe`）及其标准库部署到本地文件系统，并通过 `PATH` 环境变量使解释器可被发现。虚拟环境通过目录隔离 + `sys.path` 调整实现依赖隔离。
 
@@ -10,9 +13,9 @@ Python 开发环境是**字节码执行 + 包解析 + 符号表管理**的运行
 
 执行 `python script.py` 时，shell 查找 `python` 可执行文件的过程是**首个匹配原则**：
 
- $\text{python\_path}(python) = \min \{ p_i \in PATH \mid \exists python.exe \in p_i \}$ 
+ $\text{python-path}(python) = \min \{ p_i \in PATH \mid \exists python.exe \in p_i \}$
 
-其中 $\min$ 按 $PATH$ 中的顺序定义（从左到右扫描，返回第一个匹配）。 按 $PATH$ 中的顺序定义（从左到右扫描，返回第一个匹配）。 中的顺序定义（从左到右扫描，返回第一个匹配）。
+其中 $\min$ 按 $PATH$ 中的顺序定义（从左到右扫描，返回第一个匹配）。
 
 **约束**：若存在多个 Python 安装，后加入 `PATH` 的目录优先级更高。这导致：
 - 后安装的 Python 会"遮蔽"先安装的版本
@@ -22,9 +25,9 @@ Python 开发环境是**字节码执行 + 包解析 + 符号表管理**的运行
 
 Python 模块导入可建模为**有序路径搜索**：
 
- $\text{import}(name) \iff \exists p \in sys.path: \exists file(name, p)$ 
+ $\text{import}(name) \iff \exists p \in sys.path: \exists file(name, p)$
 
-其中 $file(name, p)$ 表示在路径 $p$ 下存在 $name.py$ 、 $name\backslash\_\_init\_\_.py$ 或  $name.so$（C 扩展）。 表示在路径 $p$ 下存在 $name.py$ 、 $name\backslash\_\_init\_\_.py$ 或  $name.so$（C 扩展）。 下存在 $name.py$ 、 $name\backslash\_\_init\_\_.py$ 或  $name.so$（C 扩展）。 、 $name\backslash\_\_init\_\_.py$ 或  $name.so$（C 扩展）。 或  $name.so$ （C 扩展）。（C 扩展）。
+其中 $file(name, p)$ 表示在路径 $p$ 下存在 `name.py`、`name/__init__.py` 或 `name.so`（C 扩展）。
 
 **sys.path 的标准顺序**（从左到右）：
 
@@ -55,9 +58,9 @@ Python 模块导入可建模为**有序路径搜索**：
 
 pip 使用**贪婪版本匹配 + 回溯求解**策略：
 
- $\text{selected\_version}(pkg) = \max \{ v \in \text{available\_versions}(pkg) \mid v \succeq \text{constraint} \}$ 
+ $\text{selected-version}(pkg) = \max \{ v \in \text{available-versions}(pkg) \mid v \succeq \text{constraint} \}$
 
-其中 $\succeq$ 是满足语义版本约束的偏序关系。 是满足语义版本约束的偏序关系。
+其中 $\succeq$ 是满足语义版本约束的偏序关系。
 
 **依赖冲突的数学描述**：
 
@@ -287,9 +290,9 @@ venv/ (虚拟环境根目录)
 **约束**：Python 3.14 是前沿版本，可能存在不稳定因素。生产环境应使用 Python 3.12 稳定版。
 
 - **Python 3.12（稳定底座）**：改进错误消息、`async` 协程改进、`typing` 增强
-- **Python 3.14（前沿增量）**：实验性 `py	stdin` 模块（PEP 749），改进的 JIT 编译器接口
+- **Python 3.14（前沿增量）**：实验性 `pystdin` 模块（PEP 749），改进的 JIT 编译器接口
 
-## 参考存根
+## 代码示例
 
 ```bash
 # 查看 Python 和 pip 版本
@@ -316,6 +319,6 @@ pip cache purge              # 清除缓存
 
 ---
 
-**Python 3.14 增量特性**：实验性 `py	stdin` 模块（PEP 749）提供标准化标准流重定向接口。
+**Python 3.14 增量特性**：实验性 `pystdin` 模块（PEP 749）提供标准化标准流重定向接口。
 
 **Python 3.14 重大变化**：无。

@@ -32,15 +32,15 @@ Base (polymorphic)
 dynamic_cast<B*>(p) 的判定函数：
 
 $$
-\text{is\_safe\_cast}(p, B) = \exists H \in \text{hierarchy}(B) : \text{typeid}(p) \equiv H
+\text{is-safe-cast}(p, B) = \exists H \in \text{hierarchy}(B) : \text{typeid}(p) \equiv H
 $$
 
-即：沿着对象的实际类型向上遍历，直到遇见目标类型或根节点。设继承深度为 $d$ ，最坏情况 $O(d)$ 。 ，最坏情况 $O(d)$ 。 。
+即：沿着对象的实际类型向上遍历，直到遇见目标类型或根节点。设继承深度为 $d$，最坏情况 $O(d)$。 ，最坏情况 $O(d)$。 。
 
-**多重继承的复杂度**：设类 $C$ 继承自 $B_1, B_2, \dots, B_m$ ，每个基类都有自己的 vptr。对 $C*$ 做 dynamic_cast 到 $B_i*$ ，需要知道 $C$ 的 vptr 在对象布局中的偏移 $offset_i$ ： 继承自 $B_1, B_2, \dots, B_m$ ，每个基类都有自己的 vptr。对 $C*$ 做 dynamic_cast 到 $B_i*$ ，需要知道 $C$ 的 vptr 在对象布局中的偏移 $offset_i$ ： ，每个基类都有自己的 vptr。对 $C*$ 做 dynamic_cast 到 $B_i*$ ，需要知道 $C$ 的 vptr 在对象布局中的偏移 $offset_i$ ： 做 dynamic_cast 到 $B_i*$ ，需要知道 $C$ 的 vptr 在对象布局中的偏移 $offset_i$ ： ，需要知道 $C$ 的 vptr 在对象布局中的偏移 $offset_i$ ： 的 vptr 在对象布局中的偏移 $offset_i$ ： ：
+**多重继承的复杂度**：设类 $C$ 继承自 $B_1, B_2, \dots, B_m$，每个基类都有自己的 vptr。对 $C*$ 做 dynamic_cast 到 $B_i*$，需要知道 $C$ 的 vptr 在对象布局中的偏移 $offset_i$： 继承自 $B_1, B_2, \dots, B_m$，每个基类都有自己的 vptr。对 $C*$ 做 dynamic_cast 到 $B_i*$，需要知道 $C$ 的 vptr 在对象布局中的偏移 $offset_i$： ，每个基类都有自己的 vptr。对 $C*$ 做 dynamic_cast 到 $B_i*$，需要知道 $C$ 的 vptr 在对象布局中的偏移 $offset_i$： 做 dynamic_cast 到 $B_i*$，需要知道 $C$ 的 vptr 在对象布局中的偏移 $offset_i$： ，需要知道 $C$ 的 vptr 在对象布局中的偏移 $offset_i$： 的 vptr 在对象布局中的偏移 $offset_i$： ：
 
 $$
-\text{real\_address} = p + offset_i
+\text{real-address} = p + offset_i
 $$
 
 然后在该地址读取 vptr，再查 type_info。
@@ -48,7 +48,7 @@ $$
 **多重继承的对象布局**：
 
 $$
-\text{layout}(C) = \{\text{vptr}_0, \text{Base}_1\_subobject, \text{vptr}_1, \text{Base}_2\_subobject, \dots, \text{Derived\_part}\}
+\text{layout}(C) = \{\text{vptr}_0, \text{Base}_1\_subobject, \text{vptr}_1, \text{Base}_2\_subobject, \dots, \text{Derived-part}\}
 $$
 
 偏移 $offset_i$ 由编译器在编译期确定，存储在 vtable 的调节条目中。 由编译器在编译期确定，存储在 vtable 的调节条目中。
@@ -241,4 +241,4 @@ template<typename T> void process(const T& obj) { /* T 已知 */ }
 
 ---
 
-**归约终点**：RTTI 可归约为 **vtable 指针跳转 + 类型层次遍历**。typeid 是单次跳转，dynamic_cast 是 O(depth) 遍历。consteval 是编译期图灵机（有停止保证的特殊子集）。
+> **洞察**：RTTI 可归约为 **vtable 指针跳转 + 类型层次遍历**。typeid 是单次跳转，dynamic_cast 是 O(depth) 遍历。consteval 是编译期图灵机（有停止保证的特殊子集）。

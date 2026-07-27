@@ -1,6 +1,8 @@
 # Flask 基础
 
-## 定义
+> **版本基准**：Python 3.12 stable（latest=3.14，新特性章节保留并标注）
+
+## 本质
 
 Flask 是核心极简但扩展生态丰富的 Python WSGI Web 框架，通过松耦合设计让开发者按需选择组件，而非强制捆绑。核心只提供路由、请求/响应对象和上下文本地代理；数据库、会话、认证等功能由扩展按需引入。这与 Django 的"batteries included"哲学形成鲜明对比。
 
@@ -18,13 +20,13 @@ Flask 上下文管理基于 `werkzeug.local.LocalStack`，其数学模型是**�
  $\text{LS.pop}() \triangleq \text{stack}[\text{tid}].\text{pop}()$ 
  $\text{LS.top}() \triangleq \text{stack}[\text{tid}][-1]$ 
 
-**隔离性**：若 $\text{tid}_1 \neq \text{tid}_2$ ，则 $\text{stack}[\text{tid}_1] \cap \text{stack}[\text{tid}_2] = \emptyset$ 。这保证了不同请求并发执行时，上下文完全隔离。 ，则 $\text{stack}[\text{tid}_1] \cap \text{stack}[\text{tid}_2] = \emptyset$ 。这保证了不同请求并发执行时，上下文完全隔离。 。这保证了不同请求并发执行时，上下文完全隔离。
+**隔离性**：若 $\text{tid}_1 \neq \text{tid}_2$，则 $\text{stack}[\text{tid}_1] \cap \text{stack}[\text{tid}_2] = \emptyset$。这保证了不同请求并发执行时，上下文完全隔离。 ，则 $\text{stack}[\text{tid}_1] \cap \text{stack}[\text{tid}_2] = \emptyset$。这保证了不同请求并发执行时，上下文完全隔离。 。这保证了不同请求并发执行时，上下文完全隔离。
 
 **归约链**：LocalStack → contextvars（Python 3.7+） → threading.local（Python 2+） → OS-managed TLS 寄存器。Flask 的上下文隔离最终归约到操作系统层面的线程局部存储机制，是这一基础原语在 Web 框架中的具体实现。
 
 ### 会话签名（HMAC-SHA256）
 
-Flask session 本质是经密钥签名的 Cookie。设会话数据为 $D$ ，密钥为 $k$ ，时间戳为 $t$ ： ，密钥为 $k$ ，时间戳为 $t$ ： ，时间戳为 $t$ ： ：
+Flask session 本质是经密钥签名的 Cookie。设会话数据为 $D$，密钥为 $k$，时间戳为 $t$： ，密钥为 $k$，时间戳为 $t$： ，时间戳为 $t$： ：
 
  $\text{session} = \text{base64}(D) \cdot \text{SEP} \cdot \text{base64}(\text{HMAC-SHA256}(k, \text{base64}(D) \cdot t \cdot \text{salt}))$ 
 
@@ -44,11 +46,11 @@ Flask session 本质是经密钥签名的 Cookie。设会话数据为 $D$ ，密
 
 ### 路由匹配复杂度
 
-Flask 按定义顺序线性扫描路由列表。设路由数为 $R$ ，最坏情况匹配复杂度： ，最坏情况匹配复杂度：
+Flask 按定义顺序线性扫描路由列表。设路由数为 $R$，最坏情况匹配复杂度： ，最坏情况匹配复杂度：
 
  $T_{\text{match}} = O(R)$ 
 
-Blueprint 注册后，Werkzeug 的 `Map` 维护一个按路径前缀构建的字典跳表（radix trie），典型路径查找均摊 $O(1)$ ，但 Blueprint 内部仍按注册顺序扫描。 ，但 Blueprint 内部仍按注册顺序扫描。
+Blueprint 注册后，Werkzeug 的 `Map` 维护一个按路径前缀构建的字典跳表（radix trie），典型路径查找均摊 $O(1)$，但 Blueprint 内部仍按注册顺序扫描。 ，但 Blueprint 内部仍按注册顺序扫描。
 
 **Radix Trie 的结构**：每个节点包含 (prefix, handler, parameters) 三元组。匹配时从根开始，按路径段前缀递减查找，时间复杂度 $O(P)$ 其中 $P$ 为路径段数，与路由总数无关。 其中 $P$ 为路径段数，与路由总数无关。 为路径段数，与路由总数无关。
 
@@ -66,7 +68,7 @@ Flask 本身是**同步阻塞 I/O** 模型。单个 worker 在同一时刻只能
 
 **归约**：Flask (同步) → Gunicorn (多 worker) → OS 进程调度 → 时间片轮转。真正的并发来自多 worker 进程，而非 Flask 本身。
 
-**并发度建模**：设 Gunicorn 配置 $N$ 个 worker 进程，每个 worker 处理一个请求。系统并发处理能力为 $N$ 。若请求到达率 $\lambda > N \cdot \mu$ （ $\mu$ 为单 worker 处理率），队列无限增长，响应时间爆炸。 个 worker 进程，每个 worker 处理一个请求。系统并发处理能力为 $N$ 。若请求到达率 $\lambda > N \cdot \mu$ （ $\mu$ 为单 worker 处理率），队列无限增长，响应时间爆炸。 。若请求到达率 $\lambda > N \cdot \mu$ （ $\mu$ 为单 worker 处理率），队列无限增长，响应时间爆炸。 （ $\mu$ 为单 worker 处理率），队列无限增长，响应时间爆炸。 为单 worker 处理率），队列无限增长，响应时间爆炸。
+**并发度建模**：设 Gunicorn 配置 $N$ 个 worker 进程，每个 worker 处理一个请求。系统并发处理能力为 $N$。若请求到达率 $\lambda > N \cdot \mu$ （ $\mu$ 为单 worker 处理率），队列无限增长，响应时间爆炸。 个 worker 进程，每个 worker 处理一个请求。系统并发处理能力为 $N$。若请求到达率 $\lambda > N \cdot \mu$ （ $\mu$ 为单 worker 处理率），队列无限增长，响应时间爆炸。 。若请求到达率 $\lambda > N \cdot \mu$ （ $\mu$ 为单 worker 处理率），队列无限增长，响应时间爆炸。 （ $\mu$ 为单 worker 处理率），队列无限增长，响应时间爆炸。 为单 worker 处理率），队列无限增长，响应时间爆炸。
 
 **为什么这样设计**：同步模型简化了开发——开发者无需担心竞态条件、锁、事务边界等并发问题。一切请求串行处理，状态在请求内是确定性的。
 
@@ -254,7 +256,7 @@ Flask 作为 WSGI 应用本身是同步的，Gunicorn 通过 pre-fork worker 模
 
 **违反约束的后果**：若 worker 处理请求时间过长（同步 CPU 密集型），会独占 worker，导致其他请求排队。若 worker 崩溃（未捕获异常），Master 会自动 fork 新 worker，但正在处理的请求会丢失。
 
-## 参考存根
+## 代码示例
 
 ```python
 from flask import Flask, g, session, request, jsonify, abort

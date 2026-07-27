@@ -1,6 +1,8 @@
 # pytest 基础
 
-## 定义
+> **版本基准**：Python 3.12 stable（latest=3.14，新特性章节保留并标注）
+
+## 本质
 
 pytest 是 Python 的第三方测试框架，其核心设计哲学是**断言即文档**——测试代码中的 `assert` 语句既是运行时检查，也是测试意图的说明文本。pytest 在收集阶段（collection）通过 AST 重写增强断言失败信息，在运行阶段执行测试函数并管理 fixture 生命周期。
 
@@ -14,7 +16,7 @@ $$
 \text{Rewrite}(\text{assert } e) = \text{AssertExpr}(e, \text{source}(e))
 $$
 
-**断言等价性**：令 $v = \text{eval}(e)$ ，重写断言的数学语义： ，重写断言的数学语义：
+**断言等价性**：令 $v = \text{eval}(e)$，重写断言的数学语义： ，重写断言的数学语义：
 
 $$
 \text{AssertExpr}(e, \text{source}(e)) \triangleq \begin{cases}
@@ -38,7 +40,7 @@ L_pass:
 
 pytest 的 AST 重写将上述序列替换为函数调用 `pytest.assertion.assertion_path(repr(expr), {locals})`，该函数在失败时重新解析源码字符串并逐节点求值。
 
-**归约终点**：断言重写的代价归结为**AST 遍历 + 节点重写 + 源码保留**。AST 遍历本身是 $O(N)$ 的，重写节点数为测试文件中的 assert 语句总数 $K$ ，总复杂度 $O(N + K)$ 。 的，重写节点数为测试文件中的 assert 语句总数 $K$ ，总复杂度 $O(N + K)$ 。 ，总复杂度 $O(N + K)$ 。 。
+> **洞察**：断言重写的代价归结为**AST 遍历 + 节点重写 + 源码保留**。AST 遍历本身是 $O(N)$ 的，重写节点数为测试文件中的 assert 语句总数 $K$，总复杂度 $O(N + K)$。 的，重写节点数为测试文件中的 assert 语句总数 $K$，总复杂度 $O(N + K)$。 ，总复杂度 $O(N + K)$。 。
 
 ### 浮点比较的失效条件
 
@@ -48,7 +50,7 @@ $$
 |a - b| \leq \epsilon \cdot \max(|a|, |b|)
 $$
 
-默认 $\epsilon = 10^{-7}$ （相对误差）。对于 $0.1 + 0.2 \approx 0.3$ ，误差在容差范围内。 （相对误差）。对于 $0.1 + 0.2 \approx 0.3$ ，误差在容差范围内。 ，误差在容差范围内。
+默认 $\epsilon = 10^{-7}$ （相对误差）。对于 $0.1 + 0.2 \approx 0.3$，误差在容差范围内。 （相对误差）。对于 $0.1 + 0.2 \approx 0.3$，误差在容差范围内。 ，误差在容差范围内。
 
 **相对误差的退化点**：当 $a = b = 0$ 时，上式退化为： 时，上式退化为：
 
@@ -88,12 +90,12 @@ $$
 Fixture 依赖形成有向无环图（DAG）。令 $F$ 为 fixture 集合， $D(f) \subseteq F$ 为 $f$ 的依赖集： 为 fixture 集合， $D(f) \subseteq F$ 为 $f$ 的依赖集： 为 $f$ 的依赖集： 的依赖集：
 
 $$
-\text{valid\_fixture\_graph} \iff \nexists \text{ cycle in } D
+\text{valid-fixture-graph} \iff \nexists \text{ cycle in } D
 $$
 
 pytest 在收集阶段对 DAG 做拓扑排序，保证依赖在被注入前已完成初始化。
 
-**拓扑排序的数学定义**：对 DAG $(V, E)$ 的拓扑排序是顶点序列 $v_1, v_2, \dots, v_n$ 使得对每条边 $(v_i, v_j) \in E$ 都有 $i < j$ 。 的拓扑排序是顶点序列 $v_1, v_2, \dots, v_n$ 使得对每条边 $(v_i, v_j) \in E$ 都有 $i < j$ 。 使得对每条边 $(v_i, v_j) \in E$ 都有 $i < j$ 。 都有 $i < j$ 。 。
+**拓扑排序的数学定义**：对 DAG $(V, E)$ 的拓扑排序是顶点序列 $v_1, v_2, \dots, v_n$ 使得对每条边 $(v_i, v_j) \in E$ 都有 $i < j$。 的拓扑排序是顶点序列 $v_1, v_2, \dots, v_n$ 使得对每条边 $(v_i, v_j) \in E$ 都有 $i < j$。 使得对每条边 $(v_i, v_j) \in E$ 都有 $i < j$。 都有 $i < j$。 。
 
 ### raises 的语义模型
 
@@ -217,7 +219,7 @@ def session_db(function_scope_fixture):  # 收集时报 FixtureScopeError
 `yield` 将 fixture 函数切为两段：前段（setup）返回对象给测试，后段（teardown）在测试完成后总被执行。这等价于将 cleanup 代码放在 `finally` 块中，但由 pytest 管理而非显式编写：
 
 $$
-\text{fixture\_teardown}(f) \iff \text{yield} \Rightarrow \text{cleanup\_runs} = \text{always}
+\text{fixture-teardown}(f) \iff \text{yield} \Rightarrow \text{cleanup-runs} = \text{always}
 $$
 
 **异常处理**：若 setup 部分抛异常，yield 后的 cleanup 不会执行；若测试函数抛异常，cleanup 仍会执行。
@@ -254,9 +256,7 @@ $$
 \text{monkeypatch.setattr}(M, k, v_{\text{new}}) \iff (v_{\text{old}} = M[k];\ M[k] = v_{\text{new}})
 $$
 
-$$
-\text{monkeypatch.__exit\_\_} \implies M[k] = v_{\text{old}}
-$$
+当 `monkeypatch.__exit__` 被调用时，恢复 $M[k] = v_{\text{old}}$。
 
 ## 约束与违反后果
 
@@ -271,7 +271,7 @@ $$
 | monkeypatch 在 fixture 外使用 | 补丁可能影响后续不相关的测试（应始终在 function scope 内使用） |
 | tmp_path 路径跨平台 | Windows 和 Unix 路径分隔符不同，硬编码路径在 CI 中失败 |
 
-## 参考存根
+## 代码示例
 
 ```python
 # 基础断言

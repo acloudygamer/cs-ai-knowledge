@@ -1,192 +1,205 @@
-# 树链剖分
+# 树链剖分（HLD）
 
-## 定义
+> **版本基准**：universal —— 代码示例同时使用 Python 3.12 与 C++20
 
-> **版本基准**: universal
+## 本质
 
-树链剖分（Heavy-Light Decomposition, HLD）是将树拆分为若干条**重链**的算法，使任意两点间路径被分解为 $O(\log n)$ 条链，每条链在序列上是连续区间，从而可以用线段树或树状数组在 $O(\log^2 n)$ 时间内完成路径查询/更新。 条链，每条链在序列上是连续区间，从而可以用线段树或树状数组在 $O(\log^2 n)$ 时间内完成路径查询/更新。 时间内完成路径查询/更新。
-
-核心思想：**轻重边划分 + DFS 序编号**。重链内部的节点在序列上连续，跨链移动只需 $O(\log n)$ 次。 次。
-
-**本质**：HLD 是**树的线性化**技术，通过轻重边划分将树上路径操作转化为链上连续区间操作。
-
-**资源视角**：HLD 消耗的核心资源是**两趟 DFS 的计算时间**和**链上区间查询的数据结构空间**。
+树链剖分（Heavy-Light Decomposition）把树拆成若干**重链**，使任意两点间路径被分解为 $O(\log n)$ 条链、每条链在序列上是连续区间，从而用线段树/树状数组在 $O(\log^2 n)$ 内完成路径查询/更新。核心是**轻重边划分 + DFS 序编号**——重链内部节点在序列上连续，跨链移动 $O(\log n)$ 次。本质是**树的线性化**：把树上路径操作转成链上连续区间操作。
 
 ## 数学模型
 
-### 重子（Heavy Child）定义
+### 重子定义
 
-$$
-\text{heavy}(v) = \arg\max_{c \in \text{children}(v)} \text{size}(c)
-$$
+$$\text{heavy}(v)=\arg\max_{c\in\text{children}(v)}\text{size}(c)$$
 
-size 为子树大小。heavy child 是子树最大的子节点。
+连接 $v$ 与 heavy(v) 的边为**重边**，其他为**轻边**。重边连续构成**重链**，链顶为 head。
 
-**重边定义**：连接父节点 $v$ 与 $\text{heavy}(v)$ 的边为重边；其他边为轻边。 与 $\text{heavy}(v)$ 的边为重边；其他边为轻边。 的边为重边；其他边为轻边。
+### 轻边数 $\le\log n$
 
-### 轻边与重链的性质
-
-- **轻边**：父节点连接非 heavy child 的边
-- **重链**：由 heavy 边连续构成的路径，起点为链顶（head）
-
-**关键性质**：从任意节点沿父向边走向根，最多经过 $O(\log n)$ 条轻边。 条轻边。
-
-**证明**：每条轻边 $(v, \text{parent}(v))$ 满足 $\text{size}(\text{parent}(v)) \geq 2 \times \text{size}(v)$ ，因为 parent 的 heavy child 至少与 v 同等大小。因此每次经过轻边，子树大小至少翻倍。从大小为 1 的节点出发，翻倍 $\log n$ 次后大小超过 $n$ ，故轻边数 $\leq \log n$ 。 满足 $\text{size}(\text{parent}(v)) \geq 2 \times \text{size}(v)$ ，因为 parent 的 heavy child 至少与 v 同等大小。因此每次经过轻边，子树大小至少翻倍。从大小为 1 的节点出发，翻倍 $\log n$ 次后大小超过 $n$ ，故轻边数 $\leq \log n$ 。 ，因为 parent 的 heavy child 至少与 v 同等大小。因此每次经过轻边，子树大小至少翻倍。从大小为 1 的节点出发，翻倍 $\log n$ 次后大小超过 $n$ ，故轻边数 $\leq \log n$ 。 次后大小超过 $n$ ，故轻边数 $\leq \log n$ 。 ，故轻边数 $\leq \log n$ 。 。
-
-**重链的几何性质**：同一条重链上的节点在 DFS 序中连续。这是因为 DFS 优先遍历 heavy child，保证重链内部不被轻边打断。
+每条轻边 $(v,\text{parent}(v))$ 满足 $\text{size}(\text{parent}(v))\ge 2\cdot\text{size}(v)$ ——因为 parent 的 heavy child 至少与 $v$ 同大。故每经一条轻边子树大小至少翻倍，从大小 1 出发翻倍 $\log n$ 次后超 $n$，故任一节点到根的轻边数 $\le\log n$。
 
 ### 路径分解的链数上界
 
-任意两点间路径经过的轻边数 $\leq 2 \log n$ （每端各 $\log n$ 条），因此链数 $O(\log n)$ 。 （每端各 $\log n$ 条），因此链数 $O(\log n)$ 。 条），因此链数 $O(\log n)$ 。 。
+任意两点 $u,v$ 路径经轻边数 $\le 2\log n$ （每端各 $\log n$），故链数 $O(\log n)$。
 
-### 序列编号（DFS 序）
+### DFS 序连续性
 
-每个节点被赋予一个时间戳 $\text{pos}(v)$ ，同一条重链上的节点拥有连续的编号。维护线段树时，同链节点的查询转化为区间的连续查询。 ，同一条重链上的节点拥有连续的编号。维护线段树时，同链节点的查询转化为区间的连续查询。
+第二趟 DFS 优先遍历 heavy child，保证重链内部编号连续；非 heavy child 开启新链。约束：同链连续，跨链不一定有序。
 
-**约束**：重链剖分保证同链连续，但不同链节点不一定有序。
-
-**归约终点**：HLD 将树上路径操作归约为**链上连续区间操作 + 链间跳转**的组合，本质是树的**线性化（Euler 序 + DFS 序的变体）**，使得路径可被分解为 $O(\log n)$ 个区间。 个区间。
+> **洞察**：HLD 的根因是"轻边翻倍"——每条轻边让子树大小至少翻倍，所以到根的轻边数被 $\log n$ 钉死。heavy child 优先遍历让重链在 DFS 序里连续，于是"树上路径"变成"$O(\log n)$ 段连续区间"，可喂给线段树。
 
 ## 数据流
 
-### 树到序列的映射
+### 两趟 DFS
 
 <pre>
-原始树结构:
-           A(0)
-         / | \
-       B(1) C(5) D(7)
-      / |   |
-    E(2) F(3) G(4)
-    |
-  G(6)
+DFS1 自底向上: 算 size[v] 和 heavy[v]
+  size[v] = 1 + Σ size[child]; heavy[v] = size 最大的 child
 
-重链划分（A-B-E-G 为一条重链，C-D 为另一条）:
-  重链1: A-B-E-G（位置连续: 0→1→2→3）
-  重链2: C-D（位置连续: 5→6）
-  轻节点: 无重链顶节点（7）
-
-路径查询 A→D（A 在链1顶，D 是链2顶）:
-  1. A 与 D 不在同链，A 的链顶是 A，D 的链顶是 C
-  2. 深度更大的先处理：A 链顶更深，查询 [pos(A), pos(E)] = [0,3]
-  3. 跳到 A 的父链顶...A 是根，跳无可跳
-  4. 继续处理 D：D 在自己的链上，查询 [pos(C), pos(D)] = [5,6]
-  5. 合并两段区间结果
+DFS2 自顶向下: 建 head[v](链顶) 和 pos[v](时间戳)
+  heavy child 与父同链: head[heavy] = head[parent]
+  非 heavy child 开新链: head[light] = light
+  沿 heavy 边先遍历 → 重链节点 pos 连续
 </pre>
 
-### 两趟 DFS 的数据流
+### 路径查询 $u\to v$
 
 <pre>
-第一趟 DFS（自底向上）:
-  计算 size[v] 和 heavy[v]
-  遍历子树，回溯时累加 size
-  size[v] = 1 + Σ size[child]
-
-第二趟 DFS（自顶向下）:
-  建立 head[v]（当前链顶）和 pos[v]（时间戳）
-  heavy child 与父节点同链（head[heavy] = head[parent]）
-  非 heavy child 成为新链顶（head[light] = light）
-  沿 heavy 边先遍历，保证重链连续
-  每次访问新链，时间戳连续递增
+while head[u] != head[v]:
+  if depth[head[u]] < depth[head[v]]: 交换 u,v   # u 链顶更深
+  查询区间 [pos[head[u]], pos[u]]               # 当前链上一段
+  u = parent[head[u]]                           # 跳到上一链
+# 同链后:
+if depth[u] > depth[v]: 交换 u,v
+查询区间 [pos[u], pos[v]]                        # 最后一段
+合并所有段结果
 </pre>
 
 ## 机制
 
-### 为什么 heavy child 优先遍历？
+### 为什么 heavy child 优先遍历
 
-heavy child 的子树最大，优先遍历 heavy 能保证重链内部节点编号连续。若轻节点优先遍历，则重链会被打断为多段不连续区间，破坏 HLD 的核心不变量——同链节点在序列上连续。
+heavy child 子树最大，优先遍历让重链内部编号连续——这是 HLD 的核心不变量。若轻节点优先，重链被切成多段不连续区间，破坏"同链连续"。
 
-**DFS 序的连续性保证**：在第二趟 DFS 中，先递归处理 heavy child（保持链内连续），再处理其他 child（开启新链）。这样每个 heavy 路径上的节点获得连续编号。
+### 复杂度 $O(\log^2 n)$
 
-### 路径查询的标准模板
+总复杂度 = 链数 $\times$ 每链线段树查询。链数 $O(\log n)$ （每端 $\le\log n$ 条轻边，路径 $\le 2\log n$ 链），每链线段树查询 $O(\log n)$，总 $O(\log^2 n)$。每次 `while` 处理一条链（一次线段树查询 + 一次跳链 $O(1)$），共 $c\le 2\log n$ 次。
 
-**查询 $u \to v$ 的路径**： 的路径**：
+### 复杂度降维
 
-```python
-def path_query(u, v):
-    result = None  # 依操作而定（sum/min/max）
-    while head[u] != head[v]:
-        if depth[head[u]] < depth[head[v]]:
-            u, v = v, u  # 确保 u 的链顶更深
-        result = merge(result, seg_query(pos[head[u]], pos[u]))
-        u = parent[head[u]]  # 跳到上一条链
-    if depth[u] > depth[v]:
-        u, v = v, u
-    return merge(result, seg_query(pos[u], pos[v]))
-```
+| 优化 | 复杂度 | 条件 |
+|------|--------|------|
+| 点值查询无聚合 | $O(\log n)$ | 链上直接读数组，无需线段树 |
+| 链上用 Fenwick | $O(\log n)$ | 仅单点更新 |
+| 链上用 $O(1)$ RMQ | $O(\log n)$ | 查点值非聚合 |
 
-### 为什么复杂度是 $O(\log^2 n)$ ？ ？
+### HLD vs 其他路径方案
 
-总复杂度 = 链数 × 每链的线段树查询时间：
+| 方案 | 路径查询 | 路径更新 | 子树查询 | 难度 |
+|------|----------|----------|----------|------|
+| HLD+线段树 | $O(\log^2 n)$ | $O(\log^2 n)$ | $O(\log n)$ | 中 |
+| Euler Tour+RMQ | $O(1)$ （仅LCA） | 不支持 | $O(1)$ （点改） | 低 |
+| Link-Cut Tree | $O(\log n)$ | $O(\log n)$ | $O(\log n)$ | 高 |
 
-- 链数 $O(\log n)$ （每条轻边最多 $\log n$ 条） （每条轻边最多 $\log n$ 条） 条）
-- 每链的线段树查询 $O(\log n)$ 
+选择：树静态只做点/边权更新 → HLD；仅 LCA → Euler Tour+RMQ；树动态加/删边 → LCT。
 
-因此总复杂度 $O(\log n) \times O(\log n) = O(\log^2 n)$ 。 。
+### 违规后果
 
-**精确分析**：设路径经过 $c$ 条链（ $c \leq 2\log n$ ），每次 `while` 循环处理一条链（包括一次线段树查询 $O(\log n)$ 和一次父链跳转  $O(1)$），共 $c$ 次循环，总代价  $O(c \log n) = O(\log^2 n)$。 条链（ $c \leq 2\log n$ ），每次 `while` 循环处理一条链（包括一次线段树查询 $O(\log n)$ 和一次父链跳转  $O(1)$），共 $c$ 次循环，总代价  $O(c \log n) = O(\log^2 n)$。 ），每次 `while` 循环处理一条链（包括一次线段树查询 $O(\log n)$ 和一次父链跳转  $O(1)$），共 $c$ 次循环，总代价  $O(c \log n) = O(\log^2 n)$。 和一次父链跳转  $O(1)$ ），共 $c$ 次循环，总代价  $O(c \log n) = O(\log^2 n)$。），共 $c$ 次循环，总代价  $O(c \log n) = O(\log^2 n)$。 次循环，总代价  $O(c \log n) = O(\log^2 n)$ 。。
+| 违规 | 后果 |
+|------|------|
+| 非 heavy child 优先遍历 | 重链被打断，pos 不连续，区间查询错 |
+| 跳链未按深度更深者先 | 路径漏段或重复 |
+| 链上线段树 merge 非结合律 | 路径聚合结果错 |
 
-**常数因子来源**：`while head[u] != head[v]` 的每次迭代中，链顶深度较大的节点上移（跳到父节点的链），跳链次数不超过 $2\log n$ 。 。
+## 代码示例
 
-### 复杂度降维方法
-
-| 优化手段 | 复杂度变化 | 条件 |
-|----------|------------|------|
-| 点值查询（无区间合并） | $O(\log n)$ | 链上直接读数组，无需线段树 | | 链上直接读数组，无需线段树 |
-| 链上使用 Fenwick 树 | $O(\log n)$ （单点更新） | 链上只有单点更新 | （单点更新） | 链上只有单点更新 |
-| 在链上使用 $O(1)$ RMQ | $O(\log n)$ | 查询对象为点值而非聚合 | RMQ | $O(\log n)$ | 查询对象为点值而非聚合 | | 查询对象为点值而非聚合 |
-
-### HLD 与其他路径操作方案的对比
-
-| 方案 | 路径查询 | 路径更新 | 子树查询 | 实现难度 |
-|------|----------|----------|---------|---------|
-| HLD + 线段树 | $O(\log^2 n)$ | $O(\log^2 n)$ | $O(\log n)$ | 中 | | $O(\log^2 n)$ | $O(\log n)$ | 中 | | $O(\log n)$ | 中 | | 中 |
-| Euler Tour + RMQ | $O(1)$ （仅 LCA）| 不支持 | $O(1)$ （点修改） | 低 | （仅 LCA）| 不支持 | $O(1)$ （点修改） | 低 | （点修改） | 低 |
-| Link-Cut Tree | $O(\log n)$ | $O(\log n)$ | $O(\log n)$ | 高 | | $O(\log n)$ | $O(\log n)$ | 高 | | $O(\log n)$ | 高 | | 高 |
-
-**选择原则**：
-- **树结构静态、只做点/边权更新**：HLD 最实用
-- **只做 LCA 查询**：Euler Tour + RMQ 足够
-- **树结构动态变化（加边/删边）**：必须使用 LCT
-
-## 参考存根
+**Python 3.12**：
 
 ```python
 class HLD:
-    def __init__(self, n, g):
-        self.n = n
-        self.g = g
-        self.parent = [-1] * n
-        self.depth = [0] * n
-        self.size = [0] * n
-        self.heavy = [-1] * n
-        self.head = [0] * n
-        self.pos = [0] * n
-        self.cur_pos = 0
+    def __init__(self, n, g, vals):
+        self.n, self.g, self.val = n, g, vals
+        self.parent = [-1]*n; self.depth = [0]*n
+        self.size = [0]*n; self.heavy = [-1]*n
+        self.head = [0]*n; self.pos = [0]*n
         self._dfs_sz(0, -1)
         self._dfs_hld(0, 0)
+        # 用 pos 重排为序列,建线段树(此处用数组模拟区间和)
+        self.arr = [0]*n
+        for v in range(n): self.arr[self.pos[v]] = vals[v]
+        # 简化:用前缀和做静态区间和(动态可换线段树)
+        self.pref = [0]*(n+1)
+        for i in range(n): self.pref[i+1] = self.pref[i] + self.arr[i]
 
-    def _dfs_sz(self, v, p):
-        self.parent[v] = p
-        self.size[v] = 1
-        max_sz = 0
+    def _dfs_sz(self, v, p):                       # DFS1: size + heavy
+        self.parent[v] = p; self.size[v] = 1; mx = 0
         for to in self.g[v]:
-            if to == p:
-                continue
+            if to == p: continue
             self.depth[to] = self.depth[v] + 1
             self._dfs_sz(to, v)
             self.size[v] += self.size[to]
-            if self.size[to] > max_sz:
-                max_sz = self.size[to]
-                self.heavy[v] = to
+            if self.size[to] > mx: mx = self.size[to]; self.heavy[v] = to
 
-    def _dfs_hld(self, v, h):
-        self.head[v] = h
-        self.pos[v] = self.cur_pos
-        self.cur_pos += 1
-        if self.heavy[v] != -1:
-            self._dfs_hld(self.heavy[v], h)
+    def _dfs_hld(self, v, h):                      # DFS2: head + pos,heavy 优先
+        self.head[v] = h; self.pos[v] = self._cur; self._cur += 1
+        if self.heavy[v] != -1: self._dfs_hld(self.heavy[v], h)
         for to in self.g[v]:
             if to != self.parent[v] and to != self.heavy[v]:
                 self._dfs_hld(to, to)
+
+    _cur = 0
+
+    def _range_sum(self, l, r):                     # [l,r] 区间和(前缀和)
+        return self.pref[r+1] - self.pref[l]
+
+    def path_sum(self, u, v):                       # u→v 路径和
+        res = 0
+        while self.head[u] != self.head[v]:
+            if self.depth[self.head[u]] < self.depth[self.head[v]]: u, v = v, u
+            res += self._range_sum(self.pos[self.head[u]], self.pos[u])
+            u = self.parent[self.head[u]]
+        if self.depth[u] > self.depth[v]: u, v = v, u
+        res += self._range_sum(self.pos[u], self.pos[v])
+        return res
+
+# —— 简易输入输出 ——
+# 树: 0-1,0-2,1-3,1-4 ; 点值 [1,2,3,4,5]
+g = {0:[1,2],1:[0,3,4],2:[0],3:[1],4:[1]}
+hld = HLD(5, g, [1,2,3,4,5])
+print(hld.path_sum(3, 4))   # 3→1→4: 4+2+5 = 11
+print(hld.path_sum(2, 3))   # 2→0→1→3: 3+1+2+4 = 10
+```
+
+**C++20**：
+
+```cpp
+#include <iostream>
+#include <vector>
+
+class HLD {
+    int n; std::vector<std::vector<int>> g;
+    std::vector<int> parent, depth, size, heavy, head, pos, arr;
+    std::vector<long long> pref;
+    int cur = 0;
+    void dfs_sz(int v, int p) {                      // size + heavy
+        parent[v] = p; size[v] = 1; int mx = 0;
+        for (int to : g[v]) if (to != p) {
+            depth[to] = depth[v] + 1; dfs_sz(to, v);
+            size[v] += size[to];
+            if (size[to] > mx) { mx = size[to]; heavy[v] = to; }
+        }
+    }
+    void dfs_hld(int v, int h) {                      // head + pos, heavy 优先
+        head[v] = h; pos[v] = cur++;
+        if (heavy[v] != -1) dfs_hld(heavy[v], h);
+        for (int to : g[v]) if (to != parent[v] && to != heavy[v]) dfs_hld(to, to);
+    }
+    long long range_sum(int l, int r) { return pref[r+1] - pref[l]; }   // 前缀和
+public:
+    HLD(int n, const std::vector<std::vector<int>>& g, const std::vector<int>& vals)
+        : n(n), g(g), parent(n,-1), depth(n,0), size(n,0), heavy(n,-1), head(n), pos(n), arr(n) {
+        dfs_sz(0, -1); dfs_hld(0, 0);
+        for (int v = 0; v < n; ++v) arr[pos[v]] = vals[v];
+        pref.assign(n+1, 0);
+        for (int i = 0; i < n; ++i) pref[i+1] = pref[i] + arr[i];
+    }
+    long long path_sum(int u, int v) {               // u→v 路径和
+        long long res = 0;
+        while (head[u] != head[v]) {
+            if (depth[head[u]] < depth[head[v]]) std::swap(u, v);
+            res += range_sum(pos[head[u]], pos[u]);
+            u = parent[head[u]];
+        }
+        if (depth[u] > depth[v]) std::swap(u, v);
+        return res + range_sum(pos[u], pos[v]);
+    }
+};
+
+// —— 简易输入输出 ——
+int main() {
+    std::vector<std::vector<int>> g = {{1,2},{0,3,4},{0},{1},{1}};
+    HLD h(5, g, {1,2,3,4,5});
+    std::cout << h.path_sum(3, 4) << '\n';   // 4+2+5=11
+    std::cout << h.path_sum(2, 3) << '\n';   // 3+1+2+4=10
+}
 ```

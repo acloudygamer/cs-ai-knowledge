@@ -21,7 +21,7 @@ Lambda 的核心价值：**将函数作为一等公民（first-class citizen）�
 
 ### 闭包的状态空间
 
-设外部变量集合 $V = \{v_1, v_2, \dots, v_n\}$ ，捕获方式集合 $C = \{\text{by-value}, \text{by-ref}, \text{by-move}\}$ 。 ，捕获方式集合 $C = \{\text{by-value}, \text{by-ref}, \text{by-move}\}$ 。 。
+设外部变量集合 $V = \{v_1, v_2, \dots, v_n\}$，捕获方式集合 $C = \{\text{by-value}, \text{by-ref}, \text{by-move}\}$。 ，捕获方式集合 $C = \{\text{by-value}, \text{by-ref}, \text{by-move}\}$。 。
 
 闭包对象 $L$ 的状态是 $V$ 中变量的一个子集 $S \subseteq V$ 在捕获时刻的快照： 的状态是 $V$ 中变量的一个子集 $S \subseteq V$ 在捕获时刻的快照： 中变量的一个子集 $S \subseteq V$ 在捕获时刻的快照： 在捕获时刻的快照：
 
@@ -167,7 +167,7 @@ C++20 允许 Lambda 作为模板参数（通过 `template <typename F>` 推导�
 template<std::invocable F>
 void call(F f) { f(); }
 
-call([]{ std::println("called"); });
+call([]{ std::cout << "called\n"; });
 ```
 
 Concept `std::invocable` 约束 F 必须是可以调用的。
@@ -239,9 +239,9 @@ auto lambda = [](int x) { return x; };  // 内联
 
 // Lambda 作为模板参数（C++20）
 std::vector<int> v{1, 2, 3};
-std::ranges::for_each(v, [](int x) { std::print("{}\n", x); });
+std::ranges::for_each(v, [](int x) { std::cout << x << '\n'; });
 ```
 
 ---
 
-**归约终点**：Lambda 可归约为 **编译器合成的闭包类（带 operator() 的函子）**，捕获是将外部变量的所有权（或引用）注入闭包状态的行为。泛型 lambda 是 **参数类型的静态分发**（编译期多态），而 std::function 是 **运行时分发**（类型擦除）。
+> **洞察**：Lambda 可归约为 **编译器合成的闭包类（带 operator() 的函子）**，捕获是将外部变量的所有权（或引用）注入闭包状态的行为。泛型 lambda 是 **参数类型的静态分发**（编译期多态），而 std::function 是 **运行时分发**（类型擦除）。

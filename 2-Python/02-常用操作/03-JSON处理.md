@@ -1,6 +1,8 @@
 # JSON处理
 
-## 定义
+> **版本基准**：Python 3.12 stable（latest=3.14，新特性章节保留并标注）
+
+## 本质
 
 JSON 处理是 JSON 文本与 Python 对象之间的双向转换过程：序列化将 Python 对象图映射为符合 JSON 语法的字节序列；反序列化将 JSON 字节序列经由有限状态自动机解析为 Python 字典/列表/标量的语法树。核心约束是 JSON 本身是上下文无关文法，且 Python 对象图可能是循环图或包含不可序列化类型。
 
@@ -8,30 +10,30 @@ JSON 处理是 JSON 文本与 Python 对象之间的双向转换过程：序列�
 
 ### JSON 词法分析状态机
 
-JSON 文本可视为一个有限状态自动机，状态集合 $Q$ 包含初始、键（after `{`）、值、字符串、数值、布尔/空等状态。状态转移由下一个字符决定： 包含初始、键（after `{`）、值、字符串、数值、布尔/空等状态。状态转移由下一个字符决定：
+JSON 文本可视为一个有限状态自动机，状态集合 $Q$ 包含初始、键（after `{`）、值、字符串、数值、布尔/空等状态。状态转移由下一个字符决定：
 
  $\delta: Q \times \Sigma \rightarrow Q$ 
 
-其中 $\Sigma$ 是 Unicode 字符集。接受状态集 $F = \{\text{string\_end}, \text{number\_end}, \text{true\_end}, \text{false\_end}, \text{null\_end}, \text{array\_end}, \text{object\_end}\}$ 。 是 Unicode 字符集。接受状态集 $F = \{\text{string\_end}, \text{number\_end}, \text{true\_end}, \text{false\_end}, \text{null\_end}, \text{array\_end}, \text{object\_end}\}$ 。 。
+其中 $\Sigma$ 是 Unicode 字符集。接受状态集 $F = \{\text{string-end}, \text{number-end}, \text{true-end}, \text{false-end}, \text{null-end}, \text{array-end}, \text{object-end}\}$。
 
-**归约终点**：JSON 状态机可归约为正则文法（Chomsky 3型），与上下文无关文法（JSON 本身是 LALR 可解析）不同——这解释了为何自引用结构无法直接序列化。
+> **洞察**：JSON 状态机可归约为正则文法（Chomsky 3型），与上下文无关文法（JSON 本身是 LALR 可解析）不同——这解释了为何自引用结构无法直接序列化。
 
 ### 解析复杂度
 
-设 JSON 文本长度为 $n$ ，标准库 `json.loads` 的最坏情况时间复杂度为 $O(n)$ （单次扫描），但存在针对特定恶意输入的攻击变种（如重复嵌套 `[`/`{` 导致栈溢出）。 ，标准库 `json.loads` 的最坏情况时间复杂度为 $O(n)$ （单次扫描），但存在针对特定恶意输入的攻击变种（如重复嵌套 `[`/`{` 导致栈溢出）。 （单次扫描），但存在针对特定恶意输入的攻击变种（如重复嵌套 `[`/`{` 导致栈溢出）。
+设 JSON 文本长度为 $n$，标准库 `json.loads` 的最坏情况时间复杂度为 $O(n)$ （单次扫描），但存在针对特定恶意输入的攻击变种（如重复嵌套 `[`/`{` 导致栈溢出）。
 
 **正则表达式 DoS 攻击的数学模型**：
-设模式为 $(a+)+b$ ，输入为 $a^n c$ （ $n$ 个 a 后跟 c）。NFA 回溯探索所有可能的 $a+$ 分组方式： ，输入为 $a^n c$ （ $n$ 个 a 后跟 c）。NFA 回溯探索所有可能的 $a+$ 分组方式： （ $n$ 个 a 后跟 c）。NFA 回溯探索所有可能的 $a+$ 分组方式： 个 a 后跟 c）。NFA 回溯探索所有可能的 $a+$ 分组方式： 分组方式：
+设模式为 $(a+)+b$，输入为 $a^n c$ （ $n$ 个 a 后跟 c）。NFA 回溯探索所有可能的 $a+$ 分组方式：
 
  $T(n) = 2^n$ 
 
 这是指数级探索，源于重叠的量词分支。
 
-**ijson 流式解析的约束**：ijson 增量式解析将内存复杂度从 $O(n)$ 降至 $O(d)$ ，其中 $d$ 为当前嵌套深度（调用栈深度）。这是以时间换空间：每次 yield 需要维护解析器状态。 降至 $O(d)$ ，其中 $d$ 为当前嵌套深度（调用栈深度）。这是以时间换空间：每次 yield 需要维护解析器状态。 ，其中 $d$ 为当前嵌套深度（调用栈深度）。这是以时间换空间：每次 yield 需要维护解析器状态。 为当前嵌套深度（调用栈深度）。这是以时间换空间：每次 yield 需要维护解析器状态。
+**ijson 流式解析的约束**：ijson 增量式解析将内存复杂度从 $O(n)$ 降至 $O(d)$，其中 $d$ 为当前嵌套深度（调用栈深度）。这是以时间换空间：每次 yield 需要维护解析器状态。
 
 ### 序列化内存占用
 
-Python 字符串在内存中以 UTF-8 或 Latin-1 编码存储（3.0+ 内部用 flexible string representation）。设原始对象序列化后 JSON 文本长度为 $L$ 字节，则序列化过程需要 $O(L)$ 的临时内存（用于构建字符串和转义缓冲区）。 字节，则序列化过程需要 $O(L)$ 的临时内存（用于构建字符串和转义缓冲区）。 的临时内存（用于构建字符串和转义缓冲区）。
+Python 字符串在内存中以 UTF-8 或 Latin-1 编码存储（3.0+ 内部用 flexible string representation）。设原始对象序列化后 JSON 文本长度为 $L$ 字节，则序列化过程需要 $O(L)$ 的临时内存（用于构建字符串和转义缓冲区）。
 
 ## 数据流
 
@@ -145,7 +147,7 @@ def detect_cycle(obj, path=None):
     return False
 ```
 
-**约束边界**：循环检测的时间复杂度为 $O(V+E)$ （图遍历），空间复杂度为 $O(D)$ （当前路径深度）。对于大对象图，这可能成为性能瓶颈。 （图遍历），空间复杂度为 $O(D)$ （当前路径深度）。对于大对象图，这可能成为性能瓶颈。 （当前路径深度）。对于大对象图，这可能成为性能瓶颈。
+**约束边界**：循环检测的时间复杂度为 $O(V+E)$ （图遍历），空间复杂度为 $O(D)$ （当前路径深度）。对于大对象图，这可能成为性能瓶颈。
 
 ### ijson 的流式解析
 
@@ -160,7 +162,7 @@ def detect_cycle(obj, path=None):
                    string_value → object_end / array_end
 ```
 
-## 参考存根
+## 代码示例
 
 ```python
 import json
@@ -198,7 +200,7 @@ def atomic_write(filepath, data):
 ```
 
 ```python
-# Python 3.14: 使用 orjson 处理大文件（第三方库，效率更高）
+# 使用 orjson 处理大文件（第三方库，效率更高）
 # orjson 默认返回 bytes，支持 dataclass、datetime、numpy 序列化
 import orjson
 

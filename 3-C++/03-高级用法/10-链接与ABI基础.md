@@ -40,7 +40,7 @@ ODR（One Definition Rule）违反：两个强符号同名 → 链接错误。
 
 ### 名字修饰（Name Mangling）
 
-C++ 函数名被编码为包含参数类型、命名空间、CV 限定符等信息。设函数 $f$ 的修饰名为 $M(f)$ ： 的修饰名为 $M(f)$ ： ：
+C++ 函数名被编码为包含参数类型、命名空间、CV 限定符等信息。设函数 $f$ 的修饰名为 $M(f)$： 的修饰名为 $M(f)$： ：
 
 $$
 M(f) = \text{prefix} \oplus \text{namespace}_1 \oplus \text{::} \oplus \dots \oplus \text{namespace}_n \oplus \text{::} \oplus f \oplus \text{typecode}(T_1) \oplus \dots \oplus \text{typecode}(T_n)
@@ -60,7 +60,7 @@ inline 函数的链接行为：
 
 ### 链接器的 ODR 检查
 
-ODR 要求每个实体有且只有一个定义，或多个定义完全相同。设定义集合 $D$ ，等价关系 $\equiv$ ： ，等价关系 $\equiv$ ： ：
+ODR 要求每个实体有且只有一个定义，或多个定义完全相同。设定义集合 $D$，等价关系 $\equiv$： ，等价关系 $\equiv$： ：
 
 $$
 \forall s \in S, |D(s)| = 1 \lor (\forall d_1, d_2 \in D(s) : d_1 \equiv d_2)
@@ -211,4 +211,4 @@ inline constexpr std::size_t cache_line = 64;
 
 ---
 
-**归约终点**：链接是 **符号图上的匹配问题**（最大匹配 + ODR 一致性检查），链接器将多个目标文件的符号合并为单一命名空间。ABI 是 **调用约定 + 内存布局 + 符号修饰规则** 的总和，是跨编译器/跨语言互操作的基础。
+> **洞察**：链接是 **符号图上的匹配问题**（最大匹配 + ODR 一致性检查），链接器将多个目标文件的符号合并为单一命名空间。ABI 是 **调用约定 + 内存布局 + 符号修饰规则** 的总和，是跨编译器/跨语言互操作的基础。

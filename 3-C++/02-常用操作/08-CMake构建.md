@@ -11,7 +11,7 @@ CMake 是**声明式构建配置语言**，通过 `CMakeLists.txt` 描述构建�
 构建系统本质上是一个 **DAG（有向无环图）**。设节点集合 $T$ 为 Target，边集合 $E \subseteq T \times T$ 表示依赖关系（ $(A, B) \in E$ 表示 A 依赖 B，即 B 必须先于 A 构建）。 为 Target，边集合 $E \subseteq T \times T$ 表示依赖关系（ $(A, B) \in E$ 表示 A 依赖 B，即 B 必须先于 A 构建）。 表示依赖关系（ $(A, B) \in E$ 表示 A 依赖 B，即 B 必须先于 A 构建）。 表示 A 依赖 B，即 B 必须先于 A 构建）。
 
 **拓扑排序约束**：
- $\forall (A, B) \in E: \text{build_order}(B) < \text{build_order}(A)$ 
+ $\forall (A, B) \in E: \text{build-order}(B) < \text{build-order}(A)$ 
 
 CMake 通过 `add_dependencies`、`target_link_libraries` 等命令向图中插入节点和边。
 
@@ -41,24 +41,24 @@ if 仍有边剩余: 报告循环依赖
 **生成器表达式的条件求值**：
 
 生成器表达式是配置感知的字符串模板，形式化为：
- $E = \$\langle \text{<}type\text{:}cond\text{>}:value\rangle$ 
+ $E = \$ \langle \text{<}type\text{:}cond\text{>}:value\rangle$ 
 
 **求值函数**：
  $\text{eval}(E, C) = \begin{cases} value & \text{if } \text{cond} \in C \\ \text{empty} & \text{otherwise} \end{cases}$ 
 
 其中 $C$ 是配置集合（`Debug`, `Release`, `RelWithDebInfo` 等）。多条件链式展开： 是配置集合（`Debug`, `Release`, `RelWithDebInfo` 等）。多条件链式展开：
- $\text{eval}(\$<CONFIG:Debug>:debug_lib, \{Debug\}) = \text{"debug_lib"}$ 
+ $\text{eval}(\$ <CONFIG:Debug>: $ `debug_lib` $, \{Debug\}) =$ `"debug_lib"` 
 
 **生成器表达式的完备性**：
 
-设配置集合 $C = \{c_1, c_2, ..., c_n\}$ 。生成器表达式可构造如下逻辑： 。生成器表达式可构造如下逻辑：
+设配置集合 $C = \{c_1, c_2, ..., c_n\}$。生成器表达式可构造如下逻辑： 。生成器表达式可构造如下逻辑：
 
 | 表达式 | 语义 |
 |--------|------|
-| $\$<CONFIG:Debug>:X$ | Debug 配置下为 X，否则为空 | | Debug 配置下为 X，否则为空 |
-| $\$<NOT:$ <CONFIG:Debug>>:X$ | 非 Debug 下为 X |<CONFIG:Debug>>:X$ | 非 Debug 下为 X |
-| $\$<AND:$ <CONFIG:Debug>,$<CONFIG:Release>>:X$ | 同时满足时为 X（无意义，永空） |<CONFIG:Debug>, $<CONFIG:Release>>:X$ | 同时满足时为 X（无意义，永空） | | 同时满足时为 X（无意义，永空） |
-| $\$<OR:$ <CONFIG:Debug>,$<CONFIG:Release>>:X$ | 任一满足时为 X |<CONFIG:Debug>, $<CONFIG:Release>>:X$ | 任一满足时为 X | | 任一满足时为 X |
+| $\$ <CONFIG:Debug>:X$ | Debug 配置下为 X，否则为空 | | Debug 配置下为 X，否则为空 |
+| $\$ <NOT: $ <CONFIG:Debug>>:X$ | 非 Debug 下为 X |<CONFIG:Debug>>:X$ | 非 Debug 下为 X |
+| $\$ <AND: $ <CONFIG:Debug>,$ <CONFIG:Release>>:X $ | 同时满足时为 X（无意义，永空） |<CONFIG:Debug>, $ <CONFIG:Release>>:X$ | 同时满足时为 X（无意义，永空） | | 同时满足时为 X（无意义，永空） |
+| $\$ <OR: $ <CONFIG:Debug>,$ <CONFIG:Release>>:X $ | 任一满足时为 X |<CONFIG:Debug>, $ <CONFIG:Release>>:X$ | 任一满足时为 X | | 任一满足时为 X |
 
 **PUBLIC/PRIVATE/INTERFACE 依赖传递**：
 
@@ -66,7 +66,7 @@ if 仍有边剩余: 报告循环依赖
 
 | 传递性 | 含义 | 公式 |
 |--------|------|------|
-| PRIVATE | 仅当前 Target 使用，不传播 | $P_T = D_T \cap \text{used_by}(T)$ | |
+| PRIVATE | 仅当前 Target 使用，不传播 | $P_T = D_T \cap \text{used-by}(T)$ | |
 | PUBLIC | 当前 Target 使用，且传播 | $P_T = D_T$ | |
 | INTERFACE | 仅传播，不直接使用 | $P_T = D_T$ | |
 
@@ -168,7 +168,7 @@ find_package(Boost 1.70 REQUIRED COMPONENTS filesystem)
 
 **find_package 搜索路径的形式化**：
 
-设搜索根目录集合 $R$ ，包名为 $P$ 。模块模式搜索： ，包名为 $P$ 。模块模式搜索： 。模块模式搜索：
+设搜索根目录集合 $R$，包名为 $P$。模块模式搜索： ，包名为 $P$。模块模式搜索： 。模块模式搜索：
  $S_{\text{module}} = \{ p \in R \mid \exists \text{ Find}P\text{.cmake} \}$ 
 
 配置模式搜索：

@@ -38,10 +38,10 @@ Python Web 框架分为三类核心范式，每种范式代表了对 Web 开发�
 
 **Flask 请求处理**：
 - LocalStack 实现上下文隔离，数学本质是线程/协程局部存储
-- 路由匹配：Radix Trie 查找，均摊 $O(1)$ ；Blueprint 内部线性扫描， $O(R)$ ；Blueprint 内部线性扫描， $O(R)$ 
+- 路由匹配：Radix Trie 查找，均摊 $O(1)$；Blueprint 内部线性扫描， $O(R)$；Blueprint 内部线性扫描， $O(R)$ 
 
 **Django 请求处理**：
-- M/G/1 队列模型： $\rho = \lambda \mathbb{E}[S]$ ， $\rho \to 1$ 时响应时间爆炸 ， $\rho \to 1$ 时响应时间爆炸 时响应时间爆炸
+- M/G/1 队列模型： $\rho = \lambda \mathbb{E}[S]$， $\rho \to 1$ 时响应时间爆炸 ， $\rho \to 1$ 时响应时间爆炸 时响应时间爆炸
 - 中间件链：格代数结构，`process_request` 向下、`process_response` 逆序
 
 **FastAPI 请求处理**：

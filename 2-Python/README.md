@@ -2,7 +2,7 @@
 
 最适合入门的人工智能语言，简洁易读的语法让它成为全球最受欢迎的编程语言之一。
 
-> **版本基准**：stable = Python 3.12，latest = Python 3.14（详见 `版本.json`）
+> **版本基准**：stable = Python 3.12，latest = Python 3.14（详见 `versions.json`）
 
 ## 核心特点
 
