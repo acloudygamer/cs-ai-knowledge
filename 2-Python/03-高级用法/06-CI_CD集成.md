@@ -14,11 +14,11 @@ CI/CD 是软件交付流水线的两个阶段：CI（持续集成）将代码变
 
  $\text{Workflow} = (J, E),\ J = \{\text{job}_i\},\ E \subseteq J \times J$ 
 
-并行 jobs 满足 $j_a \nrightarrow j_b \land j_b \nrightarrow j_a$；串行 jobs 满足偏序关系。Job 内各 step 按声明顺序执行。 ；串行 jobs 满足偏序关系。Job 内各 step 按声明顺序执行。
+并行 jobs 满足 $j_a \nrightarrow j_b \land j_b \nrightarrow j_a$；串行 jobs 满足偏序关系。Job 内各 step 按声明顺序执行。
 
 **DAG 的拓扑排序**：工作流调度器对 DAG 进行拓扑排序，确定 jobs 的执行顺序。拓扑排序结果不唯一，但必须满足所有偏序约束。
 
-**并行度的数学约束**：设 DAG 中无依赖的 jobs 集合为 $U$ （即 $\forall j \in U, \nexists i \in J: i \to j$ 或所有前驱已完成）。则最大并行度为 $|U|$ ——同一时刻最多可运行 $|U|$ 个 job。 （即 $\forall j \in U, \nexists i \in J: i \to j$ 或所有前驱已完成）。则最大并行度为 $|U|$ ——同一时刻最多可运行 $|U|$ 个 job。 或所有前驱已完成）。则最大并行度为 $|U|$ ——同一时刻最多可运行 $|U|$ 个 job。——同一时刻最多可运行 $|U|$ 个 job。 个 job。
+**并行度的数学约束**：设 DAG 中无依赖的 jobs 集合为 $U$ （即 $\forall j \in U, \nexists i \in J: i \to j$ 或所有前驱已完成）。则最大并行度为 $|U|$ ——同一时刻最多可运行 $|U|$ 个 job。
 
 ### 缓存命中率
 
@@ -61,13 +61,13 @@ strategy:
     poetry-version: ["1.7", "1.8"]
 ```
 
-产生 $2 \times 2 = 4$ 个并行 job 实例，每个消耗独立虚拟机实例和配额。 个并行 job 实例，每个消耗独立虚拟机实例和配额。
+产生 $2 \times 2 = 4$ 个并行 job 实例，每个消耗独立虚拟机实例和配额。
 
-**资源消耗的数学约束**：总资源消耗为 $O(\prod |dim_i|)$。若维度过多，job 数量指数增长可能导致配额耗尽。设 $d$ 个维度，每个维度平均 $|v|$ 个值，则 job 总数： 。若维度过多，job 数量指数增长可能导致配额耗尽。设 $d$ 个维度，每个维度平均 $|v|$ 个值，则 job 总数： 个维度，每个维度平均 $|v|$ 个值，则 job 总数： 个值，则 job 总数：
+**资源消耗的数学约束**：总资源消耗为 $O(\prod |dim_i|)$。若维度过多，job 数量指数增长可能导致配额耗尽。设 $d$ 个维度，每个维度平均 $|v|$ 个值，则 job 总数：
 
  $N_{jobs} = \prod_{i=1}^{d} |v_i|$ 
 
-若 $d=4$、每个维度 3 个值， $N_{jobs} = 81$，可能耗尽 GitHub Actions 并发配额。 、每个维度 3 个值， $N_{jobs} = 81$，可能耗尽 GitHub Actions 并发配额。 ，可能耗尽 GitHub Actions 并发配额。
+若 $d=4$、每个维度 3 个值， $N_{jobs} = 81$，可能耗尽 GitHub Actions 并发配额。
 
 ## 数据流
 
@@ -134,7 +134,7 @@ GitHub Actions 工作流运行在云端虚拟机（runner）中，每个 job 在
 
 ### Matrix 策略
 
-Matrix 是笛卡尔积展开，产生 $2 \times 2 = 4$ 个并行 job 实例，每个消耗独立虚拟机实例和配额。Matrix 的每个维度独立展开，总实例数为各维度基数的乘积。 个并行 job 实例，每个消耗独立虚拟机实例和配额。Matrix 的每个维度独立展开，总实例数为各维度基数的乘积。
+Matrix 是笛卡尔积展开，产生 $2 \times 2 = 4$ 个并行 job 实例，每个消耗独立虚拟机实例和配额。Matrix 的每个维度独立展开，总实例数为各维度基数的乘积。
 
 **约束**：Matrix 维度过多会导致 job 数量指数增长。例如 4 个维度各 3 个值产生 81 个 job，可能耗尽 GitHub Actions 的并发配额。
 

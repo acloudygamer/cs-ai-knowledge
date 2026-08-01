@@ -4,7 +4,7 @@
 
 **链接是将多个编译单元合并为可执行文件或库的过程，ABI（应用程序二进制接口）定义了二进制层面的调用约定、数据布局、符号可见性。C++ 的链接模型比 C 更复杂，因为需要处理名字修饰、重载、模板实例化等问题。**
 
-## 定义
+## 本质
 
 | 概念 | 本质操作 | 约束边界 |
 |------|----------|----------|
@@ -21,7 +21,7 @@
 
 ### 符号强弱规则（Strong/Weak Symbol）
 
-设 $S$ 为所有符号的集合， $D(s)$ 为符号 $s$ 的定义集合： 为所有符号的集合， $D(s)$ 为符号 $s$ 的定义集合： 为符号 $s$ 的定义集合： 的定义集合：
+设 $S$ 为所有符号的集合， $D(s)$ 为符号 $s$ 的定义集合：
 
 - **强符号**：有初始化的函数定义、全局变量定义
 - **弱符号**：未初始化的全局变量
@@ -40,7 +40,7 @@ ODR（One Definition Rule）违反：两个强符号同名 → 链接错误。
 
 ### 名字修饰（Name Mangling）
 
-C++ 函数名被编码为包含参数类型、命名空间、CV 限定符等信息。设函数 $f$ 的修饰名为 $M(f)$： 的修饰名为 $M(f)$： ：
+C++ 函数名被编码为包含参数类型、命名空间、CV 限定符等信息。设函数 $f$ 的修饰名为 $M(f)$：
 
 $$
 M(f) = \text{prefix} \oplus \text{namespace}_1 \oplus \text{::} \oplus \dots \oplus \text{namespace}_n \oplus \text{::} \oplus f \oplus \text{typecode}(T_1) \oplus \dots \oplus \text{typecode}(T_n)
@@ -48,7 +48,7 @@ $$
 
 例如：`void foo(int, double)` → `_Z3fooid`（GCC/Clang）
 
-extern "C" 的作用是设置 $M(f) = f$ （不修饰），允许 C++ 调用 C 函数或被 C 调用。 （不修饰），允许 C++ 调用 C 函数或被 C 调用。
+extern "C" 的作用是设置 $M(f) = f$ （不修饰），允许 C++ 调用 C 函数或被 C 调用。
 
 ### 内联链接单元合并（Weak Symbol 实现）
 
@@ -60,7 +60,7 @@ inline 函数的链接行为：
 
 ### 链接器的 ODR 检查
 
-ODR 要求每个实体有且只有一个定义，或多个定义完全相同。设定义集合 $D$，等价关系 $\equiv$： ，等价关系 $\equiv$： ：
+ODR 要求每个实体有且只有一个定义，或多个定义完全相同。设定义集合 $D$，等价关系 $\equiv$：
 
 $$
 \forall s \in S, |D(s)| = 1 \lor (\forall d_1, d_2 \in D(s) : d_1 \equiv d_2)
@@ -126,7 +126,7 @@ LTO：每个 .cpp → .bc（LLVM bitcode），链接器在链接阶段：
 
 **IPO（Inter-Procedural Optimization）的数学本质**：
 
-设程序 $P$ 由翻译单元 $U_1, U_2, \dots, U_n$ 组成，传统编译的优化空间是各 TU 的并集： 由翻译单元 $U_1, U_2, \dots, U_n$ 组成，传统编译的优化空间是各 TU 的并集： 组成，传统编译的优化空间是各 TU 的并集：
+设程序 $P$ 由翻译单元 $U_1, U_2, \dots, U_n$ 组成，传统编译的优化空间是各 TU 的并集：
 
 $$
 \text{Opt}_{\text{local}}(P) = \bigoplus_{i=1}^n \text{Opt}(\text{machine}(U_i))
@@ -190,7 +190,7 @@ ODR（One Definition Rule）要求：
 | multiple definition | ODR 违反（两个强符号） | 检查全局变量/函数定义 |
 | unresolved symbol | 动态库未加载 | 检查 LD_LIBRARY_PATH / rpath |
 
-## 参考存根
+## 代码示例
 
 ```cpp
 // 避免名字修饰

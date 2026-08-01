@@ -4,7 +4,7 @@
 
 **Lambda 是匿名函数对象的语法糖，闭包在创建时捕获外部变量，形成"词法闭包"。其本质是编译器在编译期生成一个带有 operator() 的匿名类（闭包类），捕获列表成为其成员变量。泛型 lambda 使 operator() 成为函数模板，实现与参数类型的静态多态。**
 
-## 定义
+## 本质
 
 | 特性 | 本质操作 | 约束边界 |
 |------|----------|----------|
@@ -21,15 +21,15 @@ Lambda 的核心价值：**将函数作为一等公民（first-class citizen）�
 
 ### 闭包的状态空间
 
-设外部变量集合 $V = \{v_1, v_2, \dots, v_n\}$，捕获方式集合 $C = \{\text{by-value}, \text{by-ref}, \text{by-move}\}$。 ，捕获方式集合 $C = \{\text{by-value}, \text{by-ref}, \text{by-move}\}$。 。
+设外部变量集合 $V = \{v_1, v_2, \dots, v_n\}$，捕获方式集合 $C = \{\text{by-value}, \text{by-ref}, \text{by-move}\}$。
 
-闭包对象 $L$ 的状态是 $V$ 中变量的一个子集 $S \subseteq V$ 在捕获时刻的快照： 的状态是 $V$ 中变量的一个子集 $S \subseteq V$ 在捕获时刻的快照： 中变量的一个子集 $S \subseteq V$ 在捕获时刻的快照： 在捕获时刻的快照：
+闭包对象 $L$ 的状态是 $V$ 中变量的一个子集 $S \subseteq V$ 在捕获时刻的快照：
 
 $$
 L.\text{state} = \{(v, \text{copy}(v)) \mid v \in S\} \cup \{(v, \&v) \mid v \in S \land \text{c-ref}(v)\}
 $$
 
-其中 $\text{copy}(v)$ 是值拷贝， $\&v$ 是引用， $\text{c-ref}(v)$ 表示按引用捕获。 是值拷贝， $\&v$ 是引用， $\text{c-ref}(v)$ 表示按引用捕获。 是引用， $\text{c-ref}(v)$ 表示按引用捕获。 表示按引用捕获。
+其中 $\text{copy}(v)$ 是值拷贝， $\&v$ 是引用， $\text{c-ref}(v)$ 表示按引用捕获。
 
 **捕获的代数语义**：
 
@@ -207,7 +207,7 @@ void call(Args... args) {
 | 性能 | 最优（零间接开销） | 有间接调用开销 |
 | 适用场景 | 局部使用、短期闭包 | 需要类型统一、运行时多态 |
 
-## 参考存根
+## 代码示例
 
 ```cpp
 #include <functional>

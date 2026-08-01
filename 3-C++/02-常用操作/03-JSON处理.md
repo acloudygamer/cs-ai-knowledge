@@ -1,6 +1,6 @@
 # JSON处理
 
-## 定义
+## 本质
 
 JSON 处理是将 C++ 的类型系统（结构体、容器、枚举）与 JSON 的嵌套树结构（object/array/string/number/boolean/null）进行**结构保持的双射**过程。核心挑战在于类型系统的异构性（JSON 是动态类型，C++ 是静态强类型）以及序列化/反序列化过程中的所有权转移与错误恢复。
 
@@ -20,7 +20,7 @@ $$
 \end{aligned}
 $$
 
-解析器对每个非终结符维护一个递归调用栈帧，栈深度等于 JSON 嵌套层数 $D$。解析复杂度 $O(N)$，其中 $N$ 是 JSON 文本字节数（每个字节只被处理一次）。 。解析复杂度 $O(N)$，其中 $N$ 是 JSON 文本字节数（每个字节只被处理一次）。 ，其中 $N$ 是 JSON 文本字节数（每个字节只被处理一次）。 是 JSON 文本字节数（每个字节只被处理一次）。
+解析器对每个非终结符维护一个递归调用栈帧，栈深度等于 JSON 嵌套层数 $D$。解析复杂度 $O(N)$，其中 $N$ 是 JSON 文本字节数（每个字节只被处理一次）。
 
 ### nlohmann/json的ADL序列化查找
 
@@ -88,13 +88,13 @@ $$
 \text{validate}(v, \text{schema}) = \bigwedge_{i} p_i(v, \text{schema}_i)
 $$
 
-其中 $p_i$ 可以是：类型检查（ $v.\text{type} == \text{schema.type}$）、值域检查（ $v > \text{minimum}$）、枚举约束（ $v \in \text{enum}$）、格式约束（正则表达式匹配）。任何 $p_i$ 为假则整体验证失败。 可以是：类型检查（ $v.\text{type} == \text{schema.type}$）、值域检查（ $v > \text{minimum}$）、枚举约束（ $v \in \text{enum}$）、格式约束（正则表达式匹配）。任何 $p_i$ 为假则整体验证失败。 ）、值域检查（ $v > \text{minimum}$）、枚举约束（ $v \in \text{enum}$）、格式约束（正则表达式匹配）。任何 $p_i$ 为假则整体验证失败。）、枚举约束（ $v \in \text{enum}$）、格式约束（正则表达式匹配）。任何 $p_i$ 为假则整体验证失败。）、格式约束（正则表达式匹配）。任何 $p_i$ 为假则整体验证失败。 为假则整体验证失败。
+其中 $p_i$ 可以是：类型检查（ $v.\text{type} == \text{schema.type}$）、值域检查（ $v > \text{minimum}$）、枚举约束（ $v \in \text{enum}$）、格式约束（正则表达式匹配）。任何 $p_i$ 为假则整体验证失败。
 
 ## 机制
 
 ### JSON Schema 的递归验证深度
 
-JSON Schema 支持嵌套引用（` $ref`），验证器通过**递归**处理嵌套 schema。设 JSON 文档嵌套深度为 $ D_{json}$，Schema 嵌套深度为 $D_{schema}$，最坏情况下的递归调用栈深度为：D_{json} $，Schema 嵌套深度为 $ D_{schema} $，最坏情况下的递归调用栈深度为：D_{schema}$，最坏情况下的递归调用栈深度为：
+JSON Schema 支持嵌套引用（` $ref`），验证器通过**递归**处理嵌套 schema。设 JSON 文档嵌套深度为 $D_{json}$，Schema 嵌套深度为 $D_{schema}$，最坏情况下的递归调用栈深度为：
 
 $$
 D_{max} = D_{json} \times D_{schema}
@@ -117,11 +117,11 @@ patch & \text{否则（直接替换）}
 \end{cases}
 $$
 
-其中 `recursive_merge` 的语义：对于 `patch` 中的每个键值对 $(k, v)$，若 $v$ 为 `null` 则从 `target` 删除 $k$，否则用 $v$ 覆盖 `target[k]`（若 $target[k]$ 也是 object 且 $v$ 是 object，则递归合并）。 ，若 $v$ 为 `null` 则从 `target` 删除 $k$，否则用 $v$ 覆盖 `target[k]`（若 $target[k]$ 也是 object 且 $v$ 是 object，则递归合并）。 为 `null` 则从 `target` 删除 $k$，否则用 $v$ 覆盖 `target[k]`（若 $target[k]$ 也是 object 且 $v$ 是 object，则递归合并）。 ，否则用 $v$ 覆盖 `target[k]`（若 $target[k]$ 也是 object 且 $v$ 是 object，则递归合并）。 覆盖 `target[k]`（若 $target[k]$ 也是 object 且 $v$ 是 object，则递归合并）。 也是 object 且 $v$ 是 object，则递归合并）。 是 object，则递归合并）。
+其中 `recursive_merge` 的语义：对于 `patch` 中的每个键值对 $(k, v)$，若 $v$ 为 `null` 则从 `target` 删除 $k$，否则用 $v$ 覆盖 `target[k]`（若 $target[k]$ 也是 object 且 $v$ 是 object，则递归合并）。
 
 ### JSON 的数值精度问题
 
-JSON 标准不限定数值的精度。C++ `double`（IEEE 754 双精度）有 53 位尾数精度（约 15-16 位十进制有效数字）。大于 $2^{53}$ （9007199254740992）的整数经 JSON 往返后可能丢失精度： （9007199254740992）的整数经 JSON 往返后可能丢失精度：
+JSON 标准不限定数值的精度。C++ `double`（IEEE 754 双精度）有 53 位尾数精度（约 15-16 位十进制有效数字）。大于 $2^{53}$ （9007199254740992）的整数经 JSON 往返后可能丢失精度：
 
 $$
 \text{精度损失} = \left| x - \text{round}\left(\frac{x}{2^{53-x.\text{exponent}}}\right) \times 2^{53-x.\text{exponent}} \right|
@@ -144,7 +144,7 @@ $$
 
 `*` 是通配符，遍历所有数组元素；`..` 是递归下降运算符，不限制树深度。
 
-## 参考存根
+## 代码示例
 
 ```cpp
 // 展示 ADL 机制：为自定义类型添加序列化

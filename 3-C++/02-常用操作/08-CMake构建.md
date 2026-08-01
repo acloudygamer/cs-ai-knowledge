@@ -1,6 +1,6 @@
 # CMake 构建
 
-## 定义
+## 本质
 
 CMake 是**声明式构建配置语言**，通过 `CMakeLists.txt` 描述构建产物的图依赖关系，经生成器（Makefile、Ninja、Visual Studio 等）转换为目标平台的原生构建指令。其本质是将**构建意图（Target + Dependency Graph）**与**构建执行（Build System）**解耦。
 
@@ -8,7 +8,7 @@ CMake 是**声明式构建配置语言**，通过 `CMakeLists.txt` 描述构建�
 
 **构建依赖图**：
 
-构建系统本质上是一个 **DAG（有向无环图）**。设节点集合 $T$ 为 Target，边集合 $E \subseteq T \times T$ 表示依赖关系（ $(A, B) \in E$ 表示 A 依赖 B，即 B 必须先于 A 构建）。 为 Target，边集合 $E \subseteq T \times T$ 表示依赖关系（ $(A, B) \in E$ 表示 A 依赖 B，即 B 必须先于 A 构建）。 表示依赖关系（ $(A, B) \in E$ 表示 A 依赖 B，即 B 必须先于 A 构建）。 表示 A 依赖 B，即 B 必须先于 A 构建）。
+构建系统本质上是一个 **DAG（有向无环图）**。设节点集合 $T$ 为 Target，边集合 $E \subseteq T \times T$ 表示依赖关系（ $(A, B) \in E$ 表示 A 依赖 B，即 B 必须先于 A 构建）。
 
 **拓扑排序约束**：
  $\forall (A, B) \in E: \text{build-order}(B) < \text{build-order}(A)$ 
@@ -46,12 +46,12 @@ if 仍有边剩余: 报告循环依赖
 **求值函数**：
  $\text{eval}(E, C) = \begin{cases} value & \text{if } \text{cond} \in C \\ \text{empty} & \text{otherwise} \end{cases}$ 
 
-其中 $C$ 是配置集合（`Debug`, `Release`, `RelWithDebInfo` 等）。多条件链式展开： 是配置集合（`Debug`, `Release`, `RelWithDebInfo` 等）。多条件链式展开：
+其中 $C$ 是配置集合（`Debug`, `Release`, `RelWithDebInfo` 等）。多条件链式展开：
  $\text{eval}(\$ <CONFIG:Debug>: $ `debug_lib` $, \{Debug\}) =$ `"debug_lib"` 
 
 **生成器表达式的完备性**：
 
-设配置集合 $C = \{c_1, c_2, ..., c_n\}$。生成器表达式可构造如下逻辑： 。生成器表达式可构造如下逻辑：
+设配置集合 $C = \{c_1, c_2, ..., c_n\}$。生成器表达式可构造如下逻辑：
 
 | 表达式 | 语义 |
 |--------|------|
@@ -62,7 +62,7 @@ if 仍有边剩余: 报告循环依赖
 
 **PUBLIC/PRIVATE/INTERFACE 依赖传递**：
 
-设 $D_T$ 为 Target $T$ 的直接依赖集， $P_T$ 为传播依赖集（影响其他 Target 的）。 为 Target $T$ 的直接依赖集， $P_T$ 为传播依赖集（影响其他 Target 的）。 的直接依赖集， $P_T$ 为传播依赖集（影响其他 Target 的）。 为传播依赖集（影响其他 Target 的）。
+设 $D_T$ 为 Target $T$ 的直接依赖集， $P_T$ 为传播依赖集（影响其他 Target 的）。
 
 | 传递性 | 含义 | 公式 |
 |--------|------|------|
@@ -168,7 +168,7 @@ find_package(Boost 1.70 REQUIRED COMPONENTS filesystem)
 
 **find_package 搜索路径的形式化**：
 
-设搜索根目录集合 $R$，包名为 $P$。模块模式搜索： ，包名为 $P$。模块模式搜索： 。模块模式搜索：
+设搜索根目录集合 $R$，包名为 $P$。模块模式搜索：
  $S_{\text{module}} = \{ p \in R \mid \exists \text{ Find}P\text{.cmake} \}$ 
 
 配置模式搜索：
@@ -234,7 +234,7 @@ app (exe)
 5. app（依赖 mylib, mylib_header）
 ```
 
-## 参考存根
+## 代码示例
 
 ```cmake
 cmake_minimum_required(VERSION 3.20)

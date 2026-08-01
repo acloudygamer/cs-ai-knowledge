@@ -16,7 +16,7 @@ $$
 \text{Rewrite}(\text{assert } e) = \text{AssertExpr}(e, \text{source}(e))
 $$
 
-**断言等价性**：令 $v = \text{eval}(e)$，重写断言的数学语义： ，重写断言的数学语义：
+**断言等价性**：令 $v = \text{eval}(e)$，重写断言的数学语义：
 
 $$
 \text{AssertExpr}(e, \text{source}(e)) \triangleq \begin{cases}
@@ -40,7 +40,7 @@ L_pass:
 
 pytest 的 AST 重写将上述序列替换为函数调用 `pytest.assertion.assertion_path(repr(expr), {locals})`，该函数在失败时重新解析源码字符串并逐节点求值。
 
-> **洞察**：断言重写的代价归结为**AST 遍历 + 节点重写 + 源码保留**。AST 遍历本身是 $O(N)$ 的，重写节点数为测试文件中的 assert 语句总数 $K$，总复杂度 $O(N + K)$。 的，重写节点数为测试文件中的 assert 语句总数 $K$，总复杂度 $O(N + K)$。 ，总复杂度 $O(N + K)$。 。
+> **洞察**：断言重写的代价归结为**AST 遍历 + 节点重写 + 源码保留**。AST 遍历本身是 $O(N)$ 的，重写节点数为测试文件中的 assert 语句总数 $K$，总复杂度 $O(N + K)$。
 
 ### 浮点比较的失效条件
 
@@ -50,9 +50,9 @@ $$
 |a - b| \leq \epsilon \cdot \max(|a|, |b|)
 $$
 
-默认 $\epsilon = 10^{-7}$ （相对误差）。对于 $0.1 + 0.2 \approx 0.3$，误差在容差范围内。 （相对误差）。对于 $0.1 + 0.2 \approx 0.3$，误差在容差范围内。 ，误差在容差范围内。
+默认 $\epsilon = 10^{-7}$ （相对误差）。对于 $0.1 + 0.2 \approx 0.3$，误差在容差范围内。
 
-**相对误差的退化点**：当 $a = b = 0$ 时，上式退化为： 时，上式退化为：
+**相对误差的退化点**：当 $a = b = 0$ 时，上式退化为：
 
 $$
 |0 - 0| \leq \epsilon \cdot 0 \iff 0 \leq 0
@@ -60,7 +60,7 @@ $$
 
 这恒成立。因此 `pytest.approx(0.0)` 无法验证零点，应使用绝对误差 `abs=0.0001`。
 
-更一般地，当 $|a| + |b| \ll \epsilon$ 时，容差范围趋近于 0，相对误差比较失效。 时，容差范围趋近于 0，相对误差比较失效。
+更一般地，当 $|a| + |b| \ll \epsilon$ 时，容差范围趋近于 0，相对误差比较失效。
 
 ### Fixture 作用域的格结构
 
@@ -87,7 +87,7 @@ $$
 
 ### Fixture DAG 的拓扑排序
 
-Fixture 依赖形成有向无环图（DAG）。令 $F$ 为 fixture 集合， $D(f) \subseteq F$ 为 $f$ 的依赖集： 为 fixture 集合， $D(f) \subseteq F$ 为 $f$ 的依赖集： 为 $f$ 的依赖集： 的依赖集：
+Fixture 依赖形成有向无环图（DAG）。令 $F$ 为 fixture 集合， $D(f) \subseteq F$ 为 $f$ 的依赖集：
 
 $$
 \text{valid-fixture-graph} \iff \nexists \text{ cycle in } D
@@ -95,7 +95,7 @@ $$
 
 pytest 在收集阶段对 DAG 做拓扑排序，保证依赖在被注入前已完成初始化。
 
-**拓扑排序的数学定义**：对 DAG $(V, E)$ 的拓扑排序是顶点序列 $v_1, v_2, \dots, v_n$ 使得对每条边 $(v_i, v_j) \in E$ 都有 $i < j$。 的拓扑排序是顶点序列 $v_1, v_2, \dots, v_n$ 使得对每条边 $(v_i, v_j) \in E$ 都有 $i < j$。 使得对每条边 $(v_i, v_j) \in E$ 都有 $i < j$。 都有 $i < j$。 。
+**拓扑排序的数学定义**：对 DAG $(V, E)$ 的拓扑排序是顶点序列 $v_1, v_2, \dots, v_n$ 使得对每条边 $(v_i, v_j) \in E$ 都有 $i < j$。
 
 ### raises 的语义模型
 
@@ -250,7 +250,7 @@ pytest 的核心是极简的 hook 调度器。插件（无论是内置的还是�
 | `cache` | session | `pytest_cache/.cache` | 不清理（持久化） |
 | `capsys` | function | `CapturedStdout/Stderr` | 还原 sys.stdin/out/err |
 
-**monkeypatch 的数学语义**：monkeypatch 在进入时记录原绑定，在退出时还原。设 $M$ 为被补丁的模块命名空间， $k$ 为被补丁的属性， $v_{\text{old}}$ 为原值： 为被补丁的模块命名空间， $k$ 为被补丁的属性， $v_{\text{old}}$ 为原值： 为被补丁的属性， $v_{\text{old}}$ 为原值： 为原值：
+**monkeypatch 的数学语义**：monkeypatch 在进入时记录原绑定，在退出时还原。设 $M$ 为被补丁的模块命名空间， $k$ 为被补丁的属性， $v_{\text{old}}$ 为原值：
 
 $$
 \text{monkeypatch.setattr}(M, k, v_{\text{new}}) \iff (v_{\text{old}} = M[k];\ M[k] = v_{\text{new}})
