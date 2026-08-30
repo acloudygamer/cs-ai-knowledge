@@ -1,0 +1,35 @@
+{
+  "updated": "2026-04-25",
+  "versions": {
+    "0-计算机基础/": {
+      "stable": "universal",
+      "latest": null,
+      "notes": "Windows 11 / Ubuntu 24.04 / WSL 2.6 / PowerShell 7.6.1 / GNU Bash 5.2"
+    },
+    "1-数据结构与算法/": {
+      "stable": "universal",
+      "latest": null,
+      "notes": "代码示例同时使用 Python 3.12 和 C++20, 代码在功能完整情况下最简和最优原则，模块化分割，注释清晰，便于理解和学习。"
+    },
+    "2-Python/": {
+      "stable": "Python 3.12",
+      "latest": "Python 3.14"
+    },
+    "3-C++/": {
+      "stable": "C++20",
+      "latest": ["C++23", "C++26"]
+    },
+    "4-Java/": {
+      "stable": "Java 21",
+      "latest": "Java 25"
+    },
+    "5-JavaScript/": {
+      "stable": "Node24+ES2024",
+      "latest": "Node26+ES2026"
+    },
+    "6-Go/": {
+      "stable": "Go 1.24",
+      "latest": "Go 1.26"
+    }
+  }
+}

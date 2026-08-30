@@ -1,0 +1,7 @@
+{
+  "updated": "2026-04-25",
+  "directory": "2-Python/",
+  "stable": "Python 3.12",
+  "latest": "Python 3.14",
+  "notes": "Python 3.14 为前沿版本，部分特性可能不稳定"
+}

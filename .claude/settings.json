@@ -1,0 +1,13 @@
+{
+  "enabledMcpjsonServers": [
+    "mcp-server-askecho-search-infinity",
+    "context7",
+    "sequential-thinking",
+    "github",
+    "firecrawl",
+    "filesystem"
+  ],
+  "enabledPlugins": {
+    "autoresearch@autoresearch": false
+  }
+}
