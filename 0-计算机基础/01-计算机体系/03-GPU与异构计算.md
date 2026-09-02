@@ -38,7 +38,7 @@ $$
 U_{bw} = \frac{B_{实际}}{B_{理论}} = \frac{\text{活跃 warp 数} \times \text{每 warp 带宽需求}}{B_{理论}}
 $$
 
-当 $U_{bw} < 50\%$ 时，计算单元饥饿（memory bound）；当 $U_{bw} > 80\%$ 时，计算单元饱和（compute bound）。 时，计算单元饥饿（memory bound）；当 $U_{bw} > 80\%$ 时，计算单元饱和（compute bound）。 时，计算单元饱和（compute bound）。
+当 $U_{bw} < 50\\%$ 时，计算单元饥饿（memory bound）；当 $U_{bw} > 80\\%$ 时，计算单元饱和（compute bound）。
 
 ### Roofline 模型
 
@@ -48,7 +48,7 @@ $$
 \text{性能} = \min(\text{AI}_{实际} \times \text{带宽}, \text{峰值性能})
 $$
 
-其中算术强度 $AI = \frac{\text{浮点运算数}}{\text{字节传输量}}$ 。 。
+其中算术强度 $AI = \frac{\text{浮点运算数}}{\text{字节传输量}}$ 。
 
 ```
         TFLOP/s
@@ -70,21 +70,21 @@ $$
 B_{实际} = B_{DRAM} \times (1 - H_{L2}) + B_{global} \times H_{L2}
 $$
 
-其中 $H_{L2}$ 为 L2 命中率， $B_{global}$ 为全局内存带宽。当 $H_{L2}$ 提升时，实际内存流量降低， $U_{bw}$ 降低。 为 L2 命中率， $B_{global}$ 为全局内存带宽。当 $H_{L2}$ 提升时，实际内存流量降低， $U_{bw}$ 降低。 为全局内存带宽。当 $H_{L2}$ 提升时，实际内存流量降低， $U_{bw}$ 降低。 提升时，实际内存流量降低， $U_{bw}$ 降低。 降低。
+其中 $H_{L2}$ 为 L2 命中率， $B_{global}$ 为全局内存带宽。当 $H_{L2}$ 提升时，实际内存流量降低， $U_{bw}$ 降低。
 
 ### Warp 调度优先级数学
 
-Warp Scheduler 采用 oldest-ready-first 策略：扫描所有 Warp，选择等待最久且操作数已就绪的 Warp 发射。调度延迟 $L_{schedule}$ 近似为： 近似为：
+Warp Scheduler 采用 oldest-ready-first 策略：扫描所有 Warp，选择等待最久且操作数已就绪的 Warp 发射。调度延迟 $L_{schedule}$ 近似为：
 
 $$
-L_{schedule} = \frac{N_{warp}}{W_{dispatch\_width}}
+L_{schedule} = \frac{N_{warp}}{W_{dispatch\\_width}}
 $$
 
-其中 $N_{warp}$ 是活跃 Warp 数， $W_{dispatch\_width}$ 是每周期发射的 Warp 数（通常为 2）。当 $N_{warp} \gg W_{dispatch\_width}$ 时，调度器始终有选择余地，流水线保持满载。 是活跃 Warp 数， $W_{dispatch\_width}$ 是每周期发射的 Warp 数（通常为 2）。当 $N_{warp} \gg W_{dispatch\_width}$ 时，调度器始终有选择余地，流水线保持满载。 是每周期发射的 Warp 数（通常为 2）。当 $N_{warp} \gg W_{dispatch\_width}$ 时，调度器始终有选择余地，流水线保持满载。 时，调度器始终有选择余地，流水线保持满载。
+其中 $N_{warp}$ 是活跃 Warp 数， $`W_{dispatch\_width}`$ 是每周期发射的 Warp 数（通常为 2）。当 $`N_{warp} \gg W_{dispatch\_width}`$ 时，调度器始终有选择余地，流水线保持满载。
 
 ### 共享内存 Bank Conflict 的量化
 
-共享内存分为 32 个 bank（每个 bank 4 字节宽度）。当 $N$ 个线程访问 $N$ 个不同 bank 且地址差为 4 字节的倍数时，并发访问；否则发生冲突，最坏串行化： 个线程访问 $N$ 个不同 bank 且地址差为 4 字节的倍数时，并发访问；否则发生冲突，最坏串行化： 个不同 bank 且地址差为 4 字节的倍数时，并发访问；否则发生冲突，最坏串行化：
+共享内存分为 32 个 bank（每个 bank 4 字节宽度）。当 $N$ 个线程访问 $N$ 个不同 bank 且地址差为 4 字节的倍数时，并发访问；否则发生冲突，最坏串行化：
 
 $$
 T_{bank} = \begin{cases}
@@ -93,17 +93,17 @@ N \text{ 周期} & \text{所有线程访问同一 bank} \\
 \end{cases}
 $$
 
-Bank conflict 比率 $r_{conflict} = \frac{T_{实际} - 1}{N - 1}$ 。 。
+Bank conflict 比率 $r_{conflict} = \frac{T_{实际} - 1}{N - 1}$ 。
 
 ### Tensor Core 矩阵乘法数学
 
-矩阵乘累加（MMA）执行 $D = A \times B + C$ ，数学形式为： ，数学形式为：
+矩阵乘累加（MMA）执行 $D = A \times B + C$ ，数学形式为：
 
 $$
 D_{m,n} = \sum_{k=0}^{K-1} A_{m,k} \times B_{k,n} + C_{m,n}
 $$
 
-每周期完成 $M \times N \times K$ 次乘累加。Tensor Core 将 $K$ 维度展开在流水线中，实现高吞吐。 次乘累加。Tensor Core 将 $K$ 维度展开在流水线中，实现高吞吐。 维度展开在流水线中，实现高吞吐。
+每周期完成 $M \times N \times K$ 次乘累加。Tensor Core 将 $K$ 维度展开在流水线中，实现高吞吐。
 
 ## 数据流
 
@@ -214,7 +214,7 @@ Block A (16×16)            Block B (16×16)
          │
          ▼
     输出矩阵 D (M×N, FP16/FP32)
-```
+</pre>
 
 ## 机制
 
@@ -272,7 +272,7 @@ NVLink 不通过 PCIe 总线，而采用点对点高速互联（每链路 50 GB/
 
 ### Tensor Core
 
-矩阵乘累加（MMA）专用单元，执行 $D = A \times B + C$ ： ：
+矩阵乘累加（MMA）专用单元，执行 $D = A \times B + C$ ：
 
 - A: MXK 矩阵，B: KXN 矩阵，C/D: MXN 矩阵
 - 混合精度：FP16 输入，FP32 累加（防止精度损失）
@@ -338,7 +338,7 @@ GPU 的 L1D Cache 是读写合并的（write-through，无写分配）。Store �
 
 **全局内存访问合并（Memory Coalescing）**：
 
-当 Warp 内所有线程访问连续地址时（对齐到 32 字节或 64 字节边界），一次内存事务可以服务整个 Warp。合并访问模式下， $N$ 个线程的 $N$ 个请求合并为 $N/32$ 个 cache line 请求。 个线程的 $N$ 个请求合并为 $N/32$ 个 cache line 请求。 个请求合并为 $N/32$ 个 cache line 请求。 个 cache line 请求。
+当 Warp 内所有线程访问连续地址时（对齐到 32 字节或 64 字节边界），一次内存事务可以服务整个 Warp。合并访问模式下， $N$ 个线程的 $N$ 个请求合并为 $N/32$ 个 cache line 请求。
 
 **非合并访问的带宽损失**：
 
@@ -346,7 +346,7 @@ $$
 B_{实际} = B_{理论} \times \frac{\text{合并请求数}}{\text{总请求数}}
 $$
 
-最坏情况（每个线程独立请求不同 cache line）， $B_{实际} \approx B_{理论} / 32$ 。 。
+最坏情况（每个线程独立请求不同 cache line）， $B_{实际} \approx B_{理论} / 32$ 。
 
 **寄存器溢出（Register Spilling）**：
 
