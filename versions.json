@@ -1,10 +1,10 @@
 {
-  "updated": "2026-04-25",
+  "updated": "2026-09-02",
   "versions": {
     "0-计算机基础/": {
       "stable": "universal",
       "latest": null,
-      "notes": "Windows 11 / Ubuntu 24.04 / WSL 2.6 / PowerShell 7.6.1 / GNU Bash 5.2"
+      "notes": "Windows 11 / Ubuntu 24.04 / WSL 2.6 / PowerShell 7.6.5 / GNU Bash 5.3"
     },
     "1-数据结构与算法/": {
       "stable": "universal",
