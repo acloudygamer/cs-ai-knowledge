@@ -8,7 +8,7 @@
 
 三段流程：
   1. 自动修（默认直接改原文件；--check 只列不改）：
-     - 开 $ 前是阻断字符（非空格/行首/半角(）→ 补半角空格
+     - 开 $ 前是阻断字符（非空格/行首/半角(）→ 补半角空格（例外：`**` 紧贴开 $ 不补——strong 不杀公式，补空格会杀死加粗）
      - 闭 $ 后是词字符（字母/数字/_）→ 补半角空格
      - 公式内侧空白（`$ x$` / `$x $`）→ 去成紧贴
      - 公式内单写 \\% \\{ \\} \\_ \\& \\# \\, \\; \\! \\: \\. → 双写
@@ -214,9 +214,12 @@ def fix_inline(text, rep, check_mode):
 
         # 开侧边界
         if i > 0 and text[i - 1] not in OPEN_OK:
-            edits.append((i, 0, ' '))
-            rep.fixes.append((line, '开 $ 前补空格（前字符「%s」）' % text[i - 1]))
-            alive = False
+            if text[i - 1] == '*' and text[i - 2:i] == '**':
+                pass  # `**$…$` 紧贴加粗：strong 容器不杀公式（API 实测），补空格反会破坏 ** 的 flanking 规则、杀死加粗
+            else:
+                edits.append((i, 0, ' '))
+                rep.fixes.append((line, '开 $ 前补空格（前字符「%s」）' % text[i - 1]))
+                alive = False
         # 闭侧边界
         if closer + 1 < n and WORD_RE.match(text[closer + 1]):
             edits.append((closer + 1, 0, ' '))
