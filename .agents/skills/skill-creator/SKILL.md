@@ -456,6 +456,24 @@ If you're in Cowork, the main things to know are:
 
 ---
 
+## Kimi Code CLI 适配说明
+
+本技能原生面向 Claude Code / Claude.ai / Cowork。在 Kimi Code CLI 下使用时按本节裁剪：
+
+**主回路可直接用**。子代理（Agent 工具）、后台任务、TodoList 都具备：同一轮里同时发起 with-skill 与 baseline 两批子代理运行、iteration 目录组织、grader/comparator/analyzer 子代理指令均无需改动。
+
+**Eval viewer 用静态模式**。`generate_review.py` 为纯标准库脚本，加 `--static <输出路径>` 生成独立 HTML，然后用 Windows 的 `start <路径>` 打开（不要用 macOS 的 `open`）；`nohup ... &` 在 Git Bash 下可用。
+
+**Description 优化环节整体跳过**。`run_loop.py` / `run_eval.py` / `improve_description.py` 依赖 `claude -p` 子进程与 `.claude/commands/` 目录，测出的是 Claude 模型的触发率——而实际触发技能的是 Kimi，优化会瞄错靶子。替代做法：手工维护约 20 条 should-trigger / should-not-trigger 用例（near-miss 负例最有价值），在真实会话中观察触发表现，人工迭代 description。
+
+**timing.json 量力而行**。任务完成通知不一定携带 `total_tokens` / `duration_ms`；能获取就按格式填，获取不到就跳过——benchmark 缺少时间/token 列不影响主流程。
+
+**其余**：`present_files` 工具不存在，按技能本体说明跳过 Package and Present；上文 Claude.ai / Cowork 两节不适用。
+
+注意：本技能来自第三方仓库（anthropics/skills），`npx skills update` 会覆盖包含本节在内的全部本地改动。
+
+---
+
 ## Reference files
 
 The agents/ directory contains instructions for specialized subagents. Read them when you need to spawn the relevant subagent.
