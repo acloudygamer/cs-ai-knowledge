@@ -26,7 +26,7 @@ class Article(models.Model):
         ordering = ["-published_at"]        # 默认排序进元数据（查询默认值的正确位置）
 ```
 
-- 迁移是 **schema 的 git**：`makemigrations`（自动 diff 模型变化生成迁移文件）→ `migrate`（应用到库）。迁移文件**进版本库**——生产 schema 由代码历史完整表达（[06-数据库操作](../02-IO与工程实践/06-数据库操作.md) 末尾"迁移管理"的承诺在此兑现）。
+- 迁移是 **schema 的 git**：`makemigrations`（自动 diff 模型变化生成迁移文件）→ `migrate`（应用到库）。迁移文件**进版本库**——生产 schema 由代码历史完整表达（[06-数据库操作](../02-IO与工程实践/06-数据库操作.md) 连接表"迁移管理"一行的承诺在此兑现）。
 - ORM 查询构造：`Article.objects.filter(tags__name="py").exclude(published_at=None)`——`__` 穿透关系；N+1 的解药是 `select_related`（JOIN 外键）/`prefetch_related`（批量取多对多），配合 `queryset.query` 或日志验证实际 SQL（[02-性能优化与剖析](../03-运行时与性能/02-性能优化与剖析.md) 的"先测后改"对 ORM 同样成立）。
 
 ### Admin：全家桶里最独家的件
