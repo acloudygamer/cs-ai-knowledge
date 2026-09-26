@@ -1,260 +1,151 @@
-# TypeTraits 完整指南
+# 06-模板与Concepts
 
-> **版本关系**：C++11（基础）→ C++14（变量模板）→ C++17（void_t、if constexpr）→ C++20（concepts）→ C++23/26
+> 前置：[05-移动语义与拷贝控制](05-移动语义与拷贝控制.md)（完美转发是推演规则的直接下游） · 后续：[07-错误处理](07-错误处理.md)
 
-**Type traits 是 C++ 在编译期查询和操作类型的工具，本质上是将类型映射为布尔常量或转换类型的函数对象。其核心价值在于让编译器在实例化模板时选择正确路径，实现编译期多态（无运行时间接调用开销）。**
+> **版本基准**：C++20；C++23/26 特性行内标注。示例实测环境：GCC 14.2（MinGW-w64，Windows）。
+
+本篇讲三件事：模板这台编译期代码生成器怎么运转（推演→实例化），实例化在什么条件下失败（特化、SFINAE），以及 C++20 Concepts 如何把约束从替换失败的副作用升级为显式语法。
 
 ## 本质
 
-| 类别 | 本质操作 | 典型 trait |
-|------|----------|------------|
-| 类型类别 | 查询类型的基本属性（是否整数、指针、类等） | `is_integral`、`is_pointer`、`is_class` |
-| 类型关系 | 查询两个类型间的关系 | `same_as`、`is_base_of`、`derived_from` |
-| 类型属性 | 查询类型的 CV 限定、引用、数组等 | `is_const`、`is_reference`、`is_array` |
-| 类型转换 | 在编译期修改类型 | `add_const`、`remove_pointer`、`conditional` |
-| 条件类型 | 基于布尔常量选择类型 | `enable_if`、`conditional`、`if constexpr` |
+模板（template）是 C++ 的**编译期代码生成器**：模板本身既不是函数也不是类，而是一份带类型空位的源码蓝图。生成一份实体走两步：
 
-Type traits 是编译期计算，**零运行时开销**。它们在编译期折叠为常量，供编译器在实例化模板时选择分支。
+1. **推演**（deduction）：从使用点的实参确定每个模板形参的具体实参；
+2. **实例化**（instantiation）：把实参代入蓝图，当场生成一份普通函数或类，与手写代码走完全相同的优化流水线——这是"零开销抽象"（见 [01-语言定位与编译模型](../00-概览/01-语言定位与编译模型.md)）在泛型上的兑现。
 
-## 数学模型
+两条结构性推论。**懒实例化**：类模板的成员函数只有被调用才实例化，未被调用的成员里即使写着对当前实参不合法的代码也不报错——`Box<int>` 携带一个调用 `value.size()` 的成员照样编译通过（见示例）。**定义必须可见**：实例化点编译器必须看得见模板完整定义，这就是模板代码放头文件的原因（链接失败实测见示例）。
 
-### 类型作为编译期值
-
-设类型集合 $\mathbb{T}$，type trait 是类型上的函数：
-
-$$
-f : \mathbb{T} \rightarrow \mathbb{B} \quad \text{（查询属性，返回 bool）}
-$$
-
-$$
-g : \mathbb{T} \times \mathbb{B} \rightarrow \mathbb{T} \quad \text{（条件选择）}
-$$
-
-### SFINAE 的形式化
-
-SFINAE（Substitution Failure Is Not An Error）是重载决议的一部分：
-
-设模板候选集 $C = \{t_1, t_2, \dots, t_n\}$，对调用 $c(\text{args})$：
-1. 对每个候选 $t_i$，用 `args` 替换参数
-2. 如果替换失败（类型不匹配、约束不满足），从候选集**移除** $t_i$ （不报错） （不报错）
-3. 如果替换成功， $t_i$ 参与重载决议 参与重载决议
-4. 如果候选集为空，编译错误
-
-**关键**：SFINAE 只在函数模板替换阶段触发。类模板成员、变量模板的替换失败可能报硬错误（C++20 前）。
-
-### std::void_t 的语义
-
-`std::void_t<void, T...>` 将任意类型序列映射为 `void`：
-
-`void_t` $[T_1, T_2, \dots] = \text{void}$
-
-用途：**检测表达式有效性**。通过 SFINAE 检测类型是否有某成员或某成员函数：
-
-```cpp
-template<typename T, typename = void>
-struct has_value_type : std::false_type {};
-
-template<typename T>
-struct has_value_type<T, std::void_t<typename T::value_type>> : std::true_type {};
-```
-
-当 `T::value_type` 存在时，`std::void_t<..., T::value_type>` 成功替换，否则失败。
-
-### std::enable_if 的语义
-
-`enable_if` $_{B,T} = \begin{cases}
-T & \text{if } B = \text{true} \\
-\text{substitution failure} & \text{if } B = \text{false}
-\end{cases}$
-
-利用 SFINAE，enable_if 可以在条件为 false 时"移除"模板候选。
-
-## 数据流
-
-<pre>
-类型 T ────────────────────→ type_traits 查询 ────────────────────→ bool 常量
-      │                              │                               │
-      │                              ├─ is_integral<T>  ────────────→ true/false
-      │                              ├─ is_pointer<T>    ────────────→ true/false
-      │                              ├─ is_same<T, U>   ────────────→ true/false
-      │                              ├─ is_base_of<B, D> ────────────→ true/false
-      │                              │                                     │
-      │                              └─ 类型转换 ─────────────────────→ 新类型
-      │                                        │                        │
-      │                                        ├─ add_const<T> ──────→ const T
-      │                                        ├─ remove_reference<T> ──→ T（去除引用）
-      │                                        ├─ conditional<cond,T,U> ─→ T 或 U
-      │                                        └─ decay<T> ──────────→ 裸类型
-      │
-      └─ if constexpr(cond) ──────────────→ 编译期分支选择（不实例化错误分支）
-</pre>
-
-**所有权/变换**：
-- type traits 查询不改变 T 本身，返回布尔值或新类型
-- `if constexpr` 在编译期选择分支，未选中的分支不会被实例化（SFINAE 的更直观写法）
+Concepts（C++20）是给蓝图空位加的**编译期契约**：在推演与实例化之间插一道谓词检查，不满足约束的实参在蓝图展开前就被拒，错误停在调用点而不是模板深处。
 
 ## 机制
 
-### C++11/14 vs C++17 的 trait 使用方式
+### 函数模板推演与引用折叠
 
-**C++11/14（类型别名）**：
-```cpp
-typename std::remove_reference<T>::type  // 需要 ::type
-```
+- `template<typename T> void f(T x)`：T 推为实参的退化类型——数组衰变为指针，顶层 const 与引用被剥掉（规则与 `auto` 推演一致）。
+- `template<typename T> void f(T&& x)`：形参是**转发引用**，T 依实参值类别推演——传左值推为 `U&`，传右值推为 `U`；随后**引用折叠**（`&` 遇任何组合得 `&`，仅 `&& + &&` 得 `&&`）把 `T&&` 折回实参原本的值类别。`std::forward` 与完美转发就建立在这条规则上，展开见 [05-移动语义与拷贝控制](05-移动语义与拷贝控制.md)。
 
-**C++14（变量模板）**：
-```cpp
-std::remove_reference_t<T>  // 更简洁
-```
+### 类模板与 CTAD
 
-C++14 的 `_t` 后缀变量模板是 C++11 辅助类型的语法糖：
+类模板没有函数调用那样的实参列表可供推演，历来要手写 `std::vector<int> v`。CTAD（类模板实参推导，Class Template Argument Deduction，C++17）让构造函数充当推演依据：`std::vector v{1, 2, 3}` 从初始化列表推为 `vector<int>`。构造函数推不动时可补**推导指引**（deduction guide）；标准库的 `std::pair`、`std::lock_guard` 都靠它免去手写实参。
 
-```cpp
-template<typename T> using remove_reference_t = typename remove_reference<T>::type;
-```
+### 特化与 SFINAE
 
-### if constexpr（C++17）的优势
+- **全特化**：把所有形参钉死（`template<> struct Tag<int>`），为该实参组合手工定制实体。
+- **偏特化**（仅类模板与变量模板支持）：钉死一部分结构（`template<typename T> struct Tag<T*>`）；多个偏特化同时匹配时，编译器选结构最特殊的一个。
+- **SFINAE**（替换失败不是错误，Substitution Failure Is Not An Error）：重载决议阶段，把实参代入某模板候选的声明时若替换失败（类型没有该成员、表达式不成立），该候选被**静默移出候选集**而非报错；所有候选都失败才是编译错误。这把"类型是否具备某能力"变成了可编程的分支条件——`enable_if` 与 `void_t` 探测惯用法全部建立在它上面。
 
-`if constexpr` 替代了 SFINAE 的技巧写法：
+### type traits 常用族
 
-```cpp
-// 旧写法（SFINAE）
-template<typename T>
-std::enable_if_t<std::is_integral_v<T>, int> foo(T) { return 0; }
+type traits（`<type_traits>`，C++11）是编译期的类型查询与变换函数集，结果是编译期常量，零运行时开销。常用四族：
 
-// C++17 if constexpr
-template<typename T>
-int foo(T x) {
-    if constexpr (std::is_integral_v<T>) {
-        return x;  // 这个分支被实例化
-    } else {
-        return 0;  // 这个分支不被实例化（不会检查其中的错误）
-    }
-}
-```
+| 族 | 代表 | 干什么 |
+|---|---|---|
+| 查询 | `is_same_v<T,U>`、`is_integral_v<T>` | 类型谓词 → bool |
+| 变换 | `decay_t<T>`、`remove_reference_t<T>` | 类型 → 类型 |
+| 选择 | `conditional_t<B,T,U>`、`enable_if_t<B>` | 按编译期布尔挑类型，或掐掉模板候选 |
+| 探测 | `void_t<...>` 配偏特化 | 表达式合法则命中真分支，否则借 SFINAE 落回假分支 |
 
-**关键区别**：`if constexpr` 的 else 分支即使有语法错误，只要编译时条件为 false，也不会报硬错误。SFINAE 需要巧妙设计让错误分支"先失败"才能避免硬错误。
+`_v`/`_t` 后缀是 C++14/17 补的糖衣：`is_same_v<T,U>` ≡ `is_same<T,U>::value`。
 
-### concepts（C++20）的语义
+### Concepts：约束成为一等语法
 
-Concept 是对模板参数的**约束**：
+Concept 是对模板实参的编译期谓词。`requires` 表达式直接试探一组操作的合法性——`requires(T a, T b) { a + b; }` 意为"T 支持加法"；`concept` 定义把谓词命名，模板以 `template<Integral T>` 或尾部 `requires` 子句施加约束。
 
-$$
-\text{Concept} \ C \cong \exists P : \forall T : T \ \text{satisfies} \ C \Leftrightarrow P(T) = \text{true}
-$$
+约束之间有**偏序**：concept A 的定义若在逻辑上蕴含 concept B（A = B 再加条件），A 就比 B **更具体**（subsumes）；两个受约束的重载同时满足时，更具体者胜出（见示例 `kind()`）。偏序只发生在 concept 层级——把同样条件裸写成两个 `requires` 表达式的重载不参与偏序，会得到歧义错误。
 
-例如：
+与 SFINAE 是**替代关系而非叠加**：SFINAE 把约束藏在替换失败的副作用里，失败时错误从实例化深处连带着模板栈炸出；concepts 在候选筛选阶段就报"约束不满足"，一行指认违反的 concept——错误信息质量是它最大的实际收益。type traits 并未退场：标准 concept（`std::integral` 等）底层仍由 type traits 组合而成。
 
-```cpp
-template<typename T>
-concept Numeric = std::integral<T> || std::floating_point<T>;
-```
+### 模板代码为什么放头文件
 
-使用方式：
-```cpp
-template<Numeric T>  // 约束
-T add(T a, T b) { return a + b; }
-```
+实例化 = 当场生成代码，生成需要蓝图全文。蓝图在 `.cpp` 里、调用在另一个翻译单元时，调用点只能生成对外部符号的引用，而蓝图所在的 `.cpp` 没遇到这个实参、不会生成对应实例——链接期报 undefined reference（实测见示例）。惯例因此是：模板定义进头文件，随 `#include` 粘贴到每个使用点；代价是同一实例可能在多个单元重复生成，由链接器按 ODR 去重（机制见 [03-链接与ABI](../04-性能与底层/03-链接与ABI.md)）。C++20 模块不改变这条规则：`export` 的模板定义仍随模块接口单元分发。
 
-**约束检查在 SFINAE 之前**：编译器先检查 concept 约束，失败则直接排除候选，比 SFINAE 的"替换失败"更清晰。
+## 连接
 
-### derived_from vs is_base_of
+- 转发引用与完美转发的完整链条：[05-移动语义与拷贝控制](05-移动语义与拷贝控制.md)。
+- 模板实例的跨单元去重、ODR 与名字修饰：[03-链接与ABI](../04-性能与底层/03-链接与ABI.md)。
+- concept 在标准库的成体系应用（ranges 算法的约束签名）：[02-迭代器与算法](../02-标准库/02-迭代器与算法.md)。
+- 编译期检查的另一支柱 `static_assert` 与宏的分工：[09-预处理与宏](09-预处理与宏.md)。
 
-| Trait | 含义 | 支持私有继承 |
-|-------|------|-------------|
-| `is_base_of<B, D>` | B 是 D 的基类 | 是 |
-| `derived_from<D>` | D 公有派生自 B，或相同 | 否（要求 public） |
+## 示例
 
-`derived_from` 考虑了隐式转换：
+推演、CTAD、懒实例化、特化、void_t 探测、约束偏序，一次跑完（GCC 14.2，`-std=c++20 -Wall`，无警告）：
 
 ```cpp
-class Base {};
-class Derived : public Base {};
-static_assert(std::derived_from<Derived, Base>);  // true
-static_assert(std::is_base_of_v<Base, Derived>);  // true
-```
-
-### Type traits 与概念的关系
-
-C++20 concepts 部分替代了 Type traits 的 SFINAE 用法：
-
-- **约束**：`template<Numeric T>` 替代 `enable_if`
-- **查询**：`std::integral<T>` concept 替代 `is_integral_v<T>`
-
-但 Type traits 仍然是底层实现工具：concepts 内部通常用 type traits 组合实现。
-
-## 违反约束的后果
-
-| 违反场景 | 系统行为 | 后果严重程度 |
-|----------|----------|--------------|
-| SFINAE 替换失败报硬错误（C++20 前） | 编译错误 | 代码无法编译 |
-| enable_if 条件为 false 且无其他候选 | 编译错误：找不到函数 | 代码无法编译 |
-| if constexpr 条件为 false 但 else 分支有错误 | C++17 后不报错，之前报硬错误 | 取决于 C++ 标准版本 |
-| 对 non-type-template-parameter 使用 is_const | 结果永远为 false | 可能导致逻辑错误 |
-| 模板参数不满足 concept 约束 | 编译错误 | 代码无法编译 |
-| is_same<T, U> 中 T 和 U 都是数组类型 | 退化为指针比较（衰减） | 可能导致非预期结果 |
-
-## 对比参照
-
-| 特性 | SFINAE（enable_if） | if constexpr（C++17） | Concepts（C++20） |
-|------|---------------------|----------------------|-------------------|
-| 语法 | 模板参数技巧 | 编译期分支语句 | 约束声明语法 |
-| 错误分支处理 | 需精心设计避免硬错误 | 自动不实例化 | 约束检查失败即排除 |
-| 可读性 | 差（技巧性强） | 好（像普通 if） | 好（语义清晰） |
-| 组合能力 | 嵌套 enable_if | &&/\|\| 运算符 | requires 子句 |
-| 适用场景 | C++11/14 兼容 | C++17+ 通用 | C++20+ 约束声明 |
-
-## 代码示例
-
-```cpp
+#include <iostream>
+#include <string>
+#include <string_view>
 #include <type_traits>
+#include <vector>
 #include <concepts>
 
-// 编译期查询
-static_assert(std::is_integral_v<int>);
-static_assert(!std::is_pointer_v<int>);
-static_assert(std::same_as<std::remove_reference_t<int&>, int>);
+// 函数模板推演：T 从实参推
+template <typename T>
+T twice(T x) { return x + x; }
 
-// SFINAE
-template<typename T, typename = void>
-struct has_begin : std::false_type {};
-template<typename T>
-struct has_begin<T, std::void_t<decltype(std::declval<T>().begin())>>
-    : std::true_type {};
-
-// enable_if
-template<typename T, std::enable_if_t<std::is_integral_v<T>, int> = 0>
-T triple(T x) { return x * 3; }
-
-// if constexpr
-template<typename T>
-auto process(T val) {
-    if constexpr (std::is_integral_v<T>)
-        return val * 2;
-    else if constexpr (std::is_floating_point_v<T>)
-        return val * 2.0;
-    else
-        static_assert(sizeof(T) && false, "unsupported type");
+// 引用折叠：T&& 依实参值类别推演
+template <typename T>
+std::string_view category(T&&) {
+    if constexpr (std::is_lvalue_reference_v<T&&>) return "lvalue";
+    else return "rvalue";
 }
 
-// concepts（C++20）
-template<std::integral T>
-T bit_count(T n) {
-    int count = 0;
-    while (n) { count += n & 1; n >>= 1; }
-    return count;
+// 懒实例化：不调用就不实例化
+template <typename T>
+struct Box {
+    T value;
+    void show_size() { std::cout << value.size() << '\n'; }  // 仅对有 size() 的 T 合法
+};
+
+// 特化：全特化 + 偏特化
+template <typename T> struct Tag { static constexpr std::string_view name = "generic"; };
+template <> struct Tag<int> { static constexpr std::string_view name = "full-spec int"; };
+template <typename T> struct Tag<T*> { static constexpr std::string_view name = "partial-spec ptr"; };
+
+// SFINAE + void_t：探测嵌套类型名
+template <typename T, typename = void>
+struct has_value_type : std::false_type {};
+template <typename T>
+struct has_value_type<T, std::void_t<typename T::value_type>> : std::true_type {};
+
+// Concepts：requires 表达式与约束偏序
+template <typename T> concept Integral = std::integral<T>;
+template <typename T> concept Wide = Integral<T> && (sizeof(T) >= 4);
+
+template <Integral T> int kind(T) { return 1; }
+template <Wide T> int kind(T) { return 2; }   // Wide 蕴含 Integral，更具体者胜出
+
+template <typename T>
+concept Addable = requires(T a, T b) { a + b; };
+
+int main() {
+    std::cout << twice(21) << ' ' << twice(std::string{"ab"}) << '\n';  // 42 abab
+
+    int n = 1;
+    std::cout << category(n) << ' ' << category(2) << '\n';             // lvalue rvalue
+
+    std::vector v{1, 2, 3};   // CTAD：推为 vector<int>
+    static_assert(std::is_same_v<decltype(v), std::vector<int>>);
+    std::cout << v.size() << '\n';                                      // 3
+
+    Box<int> b{42};           // 合法：show_size 从未被调用，故未实例化
+    (void)b;
+
+    std::cout << Tag<double>::name << " | " << Tag<int>::name << " | "
+              << Tag<int*>::name << '\n';  // generic | full-spec int | partial-spec ptr
+
+    static_assert(has_value_type<std::vector<int>>::value);
+    static_assert(!has_value_type<int>::value);
+    static_assert(Addable<int> && !Addable<Box<int>>);
+
+    std::cout << kind(42) << ' ' << kind(short{1}) << '\n';             // 2 1
 }
 ```
 
-## 编译器支持
+模板定义放 `.cpp` 的后果（实测两文件分离编译）：
 
-| Feature | GCC | Clang | MSVC |
-|---------|-----|-------|------|
-| C++11 type_traits | 4.3+ | 2.9+ | VS2015+ |
-| C++14 variable templates | 5+ | 3.4+ | VS2017+ |
-| C++17 if constexpr | 7+ | 3.9+ | VS2017+ |
-| C++20 concepts | 10+ | 6+ | VS2019+ |
-
----
-
-> **洞察**：Type traits 可归约为 **类型到布尔/类型的编译期函数**，其计算发生在模板实例化阶段（编译时）。SFINAE 是编译器重载决议的一部分。Concepts 是对 Type traits 约束的语义化包装，提供更直观的约束语法。
+```bash
+# lib.cpp: template <typename T> T square(T x) { return x * x; }
+# main.cpp: template <typename T> T square(T);   ← 只有声明
+g++ -std=c++20 -c lib.cpp && g++ -std=c++20 main.cpp lib.o
+# ld: undefined reference to `int square<int>(int)'  ← 实例化在调用点发生，定义却不可见
+```

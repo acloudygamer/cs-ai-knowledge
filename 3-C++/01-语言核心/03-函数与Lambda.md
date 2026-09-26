@@ -1,358 +1,118 @@
-# 函数
+# 03-函数与Lambda
+
+> 前置：[02-控制流程](02-控制流程.md) · 后续：[04-类与资源管理](04-类与资源管理.md)、[06-模板与Concepts](06-模板与Concepts.md)
+
+> **版本基准**：C++20；C++23/26 特性行内标注
+
+函数把一段控制流封装成可调用的单元。本篇覆盖调用侧的三层机制：编译器如何在多个同名函数里选一个（重载决议），默认实参在哪一端被补上，以及三种"把函数当值"的手段——函数指针、`std::function`、lambda——各自的形态与代价。
 
 ## 本质
 
-**函数的本质是代码块的命名抽象，其核心机制是将调用-返回契约编码为栈帧布局——调用方压参，被调用方通过帧指针偏移访问参数和局部变量，返回时通过 `ret` 指令回到调用点。** 函数将程序划分为独立的计算单元，每个单元有**严格的输入输出边界**。
+**函数 = 代码块 + 调用契约**：契约（名字、参数类型、返回类型）在编译期参与类型检查与重载决议；机器层面，调用就是一次带约定的控制转移——参数按调用约定进寄存器或栈，`call` 压入返回地址，`ret` 弹回。C++ 的编译期分账让这一切在编译后几乎只剩两条指令加参数搬运；`inline` 是对编译器的建议（而非命令），被采纳时函数体直接嵌入调用点，连这两跳都省掉。
 
-从数学角度看，函数是**从定义域到值域的映射**：
- $f: D \rightarrow R$ 
-
-在冯·诺依曼架构中，这个映射被编码为**指令序列 + 数据存储**。调用点通过**控制转移**进入函数体，执行完成后通过**控制转移**返回调用点。栈帧则是这种控制转移的**状态快照**——保存调用前的执行上下文，以便返回后能恢复。
-
-## 数学模型
-
-### 函数调用的开销分析
-
-设 $T_{\text{调用}}$ 为单次函数调用的时间开销：
- $T_{\text{调用}} = T_{\text{参数压栈}} + T_{\text{跳转}} + T_{\text{栈帧创建}} + T_{\text{返回值处理}}$ 
-
-典型值（x86-64）：
-- 参数传递：0-3 个整数参数用寄存器（ $O(1)$，无栈操作） ，无栈操作）
-- 4+ 个参数：栈传递（ $O(n)$） ）
-- 栈帧创建： $O(1)$ （更新 RSP）
-- 返回值： $O(1)$ （RAX 或 XMM0）
-
-**内联的收益**：若函数体小且调用频繁，内联消除调用开销，但增加代码大小：
- $\text{收益} = T_{\text{调用}} - \text{代码膨胀代价}$ 
-
-**内联决策的数学模型**：
- $\text{内联}(f) \iff \text{size}(f) \times \text{call-count}(f) < \text{threshold}$ 
-
-### 函数重载的 name mangling
-
-函数签名 $\sigma = (name, \text{参数类型列表})$ 经由名字修饰映射到唯一符号：
- $\text{mangle} : \Sigma \rightarrow \text{Symbol}$ 
-
-C++ 的修饰规则：
-| 签名 | 修饰后符号 |
-|------|------------|
-| `int add(int, int)` | `_Z3addii` |
-| `double add(double, double)` | `_Z3adddd` |
-| `void foo(int, char)` | `_Z3fooic` |
-
-**约束**：不同编译器的 mangling 规则不同，跨编译器的符号链接需要 `extern "C"`。
-
-### 移动语义的所有权转移模型
-
-移动构造的本质是**资源所有权转移**，而非内存拷贝：
- $\text{move}(x) \rightsquigarrow x.\text{resource} \rightarrow \text{新对象}$ 
-
-设对象 $A$ 和 $B$， $A$ 拥有资源 $R$：
- $B = \text{move}(A) \implies \begin{cases} B.\text{resource} = R \\ A.\text{resource} = \emptyset \\ \text{析构} A.\text{resource} = \text{无操作} \end{cases}$ 
-
-**零拷贝原则**：移动语义保证目标对象获得原对象的资源，无需分配新内存。
-
-### 尾递归优化的条件
-
-尾递归的形式化定义：
- $f(x) = g(f(h(x)))$ 
-
-其中 $g$ 是 `return` 语句的唯一操作（而非 `return expr`）。优化后：
- $\text{TCO}: f \Rightarrow \text{迭代} \Rightarrow T_f(n) = O(1) \text{ 栈空间}$ 
-
-**C++ 不保证 TCO**：编译器可自行实现，但标准未强制要求。
-
-**尾调用优化的数学本质**：
- $\text{TailCall}(f, g) \implies \text{复用当前栈帧而非创建新帧}$ 
- $T_{\text{空间}} = O(1) \quad \text{而非 } O(n)$ 
-
-## 数据流
-
-### 调用栈的数据流
-
-<pre>
-调用前（caller 栈帧）:
-    ┌─────────────────┐
-    │ ...             │
-    │ 实参 1 (rdi)   │ ←─────────── 寄存器传递（x86-64 前3个参数）
-    │ 实参 2 (rsi)   │
-    │ 实参 3 (rdx)   │
-    │ 返回地址        │ ←─────────── CALL 指令压栈
-    └─────────────────┘
-              │
-              ▼ call func
-调用后（callee 栈帧）:
-    ┌─────────────────┐
-    │ ...             │
-    │ 实参 1          │ ←─────────── 从寄存器保存到栈（可选）
-    │ 实参 2          │
-    │ 返回地址        │
-    │ 旧 RBP          │ ←─────────── PUSH RBP
-    │ 局部变量 1      │ ←─────────── SUB RSP, N
-    │ 局部变量 2      │
-    │ ...             │
-    │ 临时变量        │
-    └─────────────────┘
-              │
-              ▼ ret
-返回后（caller 栈帧恢复）:
-    RAX/XMM0 ← 返回值
-    RSP 已恢复
-    继续执行 CALL 后的下一条指令
-</pre>
-
-**栈帧的生命周期**：
-1. `call` 指令压入返回地址
-2. `callee` 保存旧 RBP，设立新 RBP
-3. `callee` 分配局部变量空间
-4. `callee` 执行函数体
-5. `callee` 恢复 RBP，释放局部变量
-6. `ret` 指令弹出返回地址
-7. `caller` 继续执行
-
-### Lambda 闭包的数据流
-
-<pre>
-源代码:
-    int x = 10;
-    auto f = [x](int y) { return x + y; };
-
-编译后生成的闭包类:
-    class __Lambda1 {
-    public:
-        int captured_x;  // 按值捕获的拷贝
-
-        __Lambda1(int __x) : captured_x(__x) {}
-
-        int operator()(int y) const {
-            return captured_x + y;
-        }
-    };
-
-使用:
-    __Lambda1 f(10);  // x 的值被拷贝到闭包
-    int z = f(5);     // z = 10 + 5 = 15
-</pre>
-
-**闭包的生命周期**：
-- 捕获发生于 lambda 创建时
-- 捕获的变量在 lambda 整个生命周期内有效
-- 若按值捕获，原变量的变化不影响 lambda 内部的值
-
-### RVO/NRVO 的优化数据流
-
-<pre>
-无优化:
-    Buffer create_buffer() {
-        Buffer buf(1000);
-        return buf;  // 拷贝构造：buf → 返回值临时对象
-    }
-
-    // 等价于:
-    Buffer create_buffer() {
-        Buffer buf(1000);
-        return Buffer(buf);  // 拷贝
-    }
-
-有 NRVO 优化:
-    Buffer create_buffer() {
-        Buffer buf(1000);
-        return buf;  // 移动构造：无拷贝
-    }
-
-    // 等价于:
-    Buffer create_buffer(Buffer& __result) {
-        __result.Buffer(1000);  // 直接构造到调用方的内存
-        return;
-    }
-</pre>
-
-**NRVO 激活条件**：
- $\text{NRVO} \Leftrightarrow \text{返回本地对象} \land \text{编译器能证明无别名}$ 
-
-**RVO（返回值优化）** 是 NRVO 的特例：
- $T(x) \Rightarrow T(\text{构造函数参数}) \quad \text{直接构造到目标位置}$ 
+**可调用对象**是比函数更大的集合：函数指针、仿函数（重载了 `operator()` 的类）、lambda 都是。模板参数 `F f` 能同时吃下三者，因为模板只要语法匹配（`f(args)` 合法）即可——这是编译期多态，与运行期多态（虚函数）的分界见 [04-类与资源管理](04-类与资源管理.md)。
 
 ## 机制
 
-### 参数传递语义
+### 重载决议：候选 → 可行 → 最优
 
-| 传递方式 | 语义 | 拷贝代价 | 修改影响 |
-|---------|------|---------|---------|
-| 值传递 `T arg` | 拷贝实参 | $O(\text{sizeof}(T))$ | 不影响实参 | | 不影响实参 |
-| 引用传递 `T& arg` | 传递引用 | $O(1)$ | 影响实参 | | 影响实参 |
-| 常引用 `const T& arg` | 传递只读引用 | $O(1)$ | 不影响实参，可接受任何实参 | | 不影响实参，可接受任何实参 |
-| 移动 `T&& arg` | 窃取实参资源 | $O(1)$ | 实参变为有效但未定义状态 | | 实参变为有效但未定义状态 |
+同名函数并存时，编译器按三步在编译期选定一个（全部静态发生，与运行时无关）：
 
-**移动语义的设计动机**：对于大型对象（如 `std::vector`、`std::string`），拷贝代价为 $O(n)$，而移动代价为 $O(1)$。
+1. **候选集**：作用域内所有同名可见函数；
+2. **可行集**：参数个数对得上、每个实参能转换成形参类型的留下；
+3. **最优**：逐参数比较隐式转换序列，精确匹配 > 提升 > 标准转换 > 用户定义转换；**所有参数上都不劣于、至少一个参数上严格优于**其余候选者胜出，否则报"歧义"编译错误。
 
-### Lambda 捕获的约束
+约束直接读出两条纪律：重载之间的差别必须体现在参数类型上（返回值类型不参与决议）；转换路径越"省"越优先，所以 `f(1)` 选 `f(int)` 而非 `f(long)`。
 
-**值捕获的安全性**：捕获发生时，lambda 持有一个独立的拷贝。即使原变量离开作用域，lambda 仍然有效。
+### 默认实参：调用处补齐，静态绑定
 
-**引用捕获的危险**：
+默认实参的求值发生在**调用处**：编译器在调用点把缺省实参按声明时的表达式就地补上。两条推论：
+
+- 默认值引用全局/静态对象时，取的是调用时刻的值而非定义时刻的值；
+- 默认实参与虚函数组合是个陷阱：它按**指针的静态类型**（声明类型）而非动态类型补齐——基类指针调用被重写的虚函数，拿到的默认实参是基类版本的。纪律：虚函数不要改默认实参。
+
+### 函数指针 vs std::function：零开销与类型擦除
+
+| | 函数指针 `int(*)(int,int)` | `std::function<int(int,int)>` |
+|---|---|---|
+| 能装什么 | 同签名函数（或无捕获 lambda） | 任何同签名可调用对象：函数、仿函数、任意捕获的 lambda |
+| 形态 | 一个地址（8 字节，64 位） | 类型擦除包装：内部存指向擦除桥接的指针，调用多一次间接 |
+| 代价 | 一次间接调用，编译器常可去虚拟化为直接调用 | 一次间接调用；可调用对象超过小对象缓冲（典型 16 字节）时还要堆分配 |
+| 选它当 | 接口面窄、签名固定、回调热路径 | 要装异构可调用对象（回调注册表、事件队列） |
+
+`std::function` 的机制是**类型擦除**：把具体可调用类型藏在统一接口后面，编译期类型信息被"擦掉"换运行时灵活性。对照组是直接用 lambda 的匿名类型（`auto` 或模板参数）——编译器能看到具体类型，调用可内联，零开销。
+
+### lambda = 编译器生成的闭包类
+
+lambda 不是语言黑魔法，是语法糖：编译器为每个 lambda 表达式生成一个唯一的匿名类，**捕获列表变成成员变量**，函数体变成 `operator()`。`[x]` 生成 `int x_;` 成员并拷贝初值，`[&x]` 生成 `int& x_;` 成员。lambda 对象就是这个闭包类的一个实例。
+
+- **`mutable`**：`operator()` 默认是 const 成员函数（闭包的捕获成员不可改）；标了 `mutable` 后它变成非 const，**可以修改按值捕获的副本**——注意改的是闭包内的副本，外部原变量不动。
+- **泛型 lambda（C++14）**：`[](auto a, auto b)` 让 `operator()` 成为函数模板，每个 `auto` 独立推演类型。
+- **模板 lambda（C++20）**：`[]<typename T>(T a, T b)` 显式给出模板参数，强制参数共享同一类型，也能在 lambda 体内直接引用 `T`。
+- **初始化捕获（C++14）**：`[p = std::move(ptr)]` 把任意表达式（包括只移对象）搬进闭包成员——这是把 `unique_ptr` 塞进 lambda 的正规通道。
+
+### 捕获的生命周期陷阱：悬垂捕获
+
+捕获语义在闭包创建时刻定死：按值捕获的是**当时值的副本**，按引用捕获的是**原变量的地址**。陷阱只有一个方向——**闭包活得比被引用的变量长**：
+
 ```cpp
-auto make_adder(int x) {
-    return [&, x](int y) { return x + y; };  // x 按值捕获，安全
-    // return [&](int y) { return x + y; }; // 危险：x 是参数，
-    // 在函数返回后销毁，lambda 内的引用悬空
+std::function<int(int)> make_adder(int x) {
+    return [&](int) { return x; };
+    // 错误：x 是形参，函数返回即销毁，闭包里的引用悬空 → 调用即未定义行为
 }
 ```
 
-**约束条件**：若 lambda 使用引用捕获，且引用的对象在 lambda 之前销毁，则 lambda 调用时引用悬空。
+同样形态的还有 `[this]`（对象析构后闭包里是悬垂 this）与 `[&]` 全引用捕获（作用域内任何变量先死都中招）。判别纪律：**闭包会逃逸出当前作用域（被返回、被存进容器、被异步持有）时，只许按值/初始化捕获**。`[*this]`（C++17）捕获整个对象的副本，专门解异步场景下 this 悬垂的问题。
 
-### 默认参数的实现
+## 连接
 
-默认参数在**编译期**被替换到调用点：
-```cpp
-void foo(int x, int y = 10, int z = 20);
+- 重载决议在模板语境里叠加一层推演，SFINAE 与 Concepts 是约束候选集的手段，见 [06-模板与Concepts](06-模板与Concepts.md)。
+- 成员函数、虚函数与 `this` 的机制见 [04-类与资源管理](04-类与资源管理.md)。
+- 返回值优化与 `std::move` 的交互见 [05-移动语义与拷贝控制](05-移动语义与拷贝控制.md)。
 
-foo(1);    // 重写为 foo(1, 10, 20)
-foo(1, 2); // 重写为 foo(1, 2, 20)
-foo(1, 2, 3); // 无替换
-```
+## 示例
 
-**约束**：默认参数不能引用参数列表中后面的参数：
-```cpp
-int x = 10;
-// void foo(int a = x, int b); // 错误：b 在 a 之后，无法用作默认值
-```
-
-### inline 的优化效果
-
-`inline` 是**优化建议**而非**强制要求**：
-- 小函数（< 10 行）：编译器通常自动内联
-- 大函数：即使声明 `inline`，编译器也可能拒绝
-
-**内联的数学效应**：
-- 收益：消除调用开销（ $T_{\text{调用}}$） ）
-- 代价：代码膨胀（ $S_{\text{函数体}}$ 复制到每个调用点）
-- 净收益： $\text{收益} > \text{代价}$ 时应内联 时应内联
-
-**内联的约束**：
-- 递归函数通常不能内联（除非编译器能展开）
-- 虚函数依赖运行时类型信息，不能内联到未知类型
-
-### 函数指针与 std::function
-
-**函数指针**：
- $\text{类型} : \tau(*)(\tau_1, \tau_2, ...) \rightarrow \tau_{\text{ret}}$ 
-
-指向特定签名的函数，无运行时开销（仅存储地址）。
-
-**std::function**：
- $\text{类型} : \text{std::function}<\tau_{\text{ret}}(\tau_1, ...)>$ 
-
-类型擦除的包装器，支持 lambda、函数指针、仿函数。运行时开销：一次间接调用 + 类型擦除的 small buffer 优化。
+（GCC 14.2 MinGW 实测，`-std=c++20`）
 
 ```cpp
-// 小型可调用对象（lambda，无捕获）→ 无堆分配
-// 大型可调用对象（有捕获）→ 堆分配
-std::function<int(int, int)> f1 = [](int a, int b) { return a + b; };  // 无堆分配
-std::function<int(int, int)> f2 = my_functor();  // 可能堆分配
-```
-
-### 函数签名的类型系统
-
-**函数类型**本身是一等公民：
-```cpp
-using FnType = int(int, int);  // 函数类型（非指针）
-int (*fn_ptr)(int, int) = add;  // 函数指针
-
-// std::invoke_result 推导返回类型
-static_assert(std::is_same_v<
-    std::invoke_result_t<decltype(add), int, int>,
-    int
->);
-```
-
-### 可变参数模板的展开模型
-
-**折叠表达式**（C++17）：
- $\text{fold} : (\tau_1, \tau_2, ..., \tau_n) \rightarrow \tau$ 
- $(args + ...) = \(((arg_1 + arg_2) + ...) + arg_n$ 
-
-```cpp
-template<typename... Args>
-auto sum(Args... args) {
-    return (args + ...);  // 展开为 arg1 + (arg2 + (arg3 + ...))
-}
-```
-
-## 代码示例
-
-```cpp
-#include <utility>
-#include <memory>
 #include <functional>
+#include <iostream>
+#include <memory>
 
-// Lambda 表达式演示
-auto make_counter(int start) {
-    int count = start;
-    return [count]() mutable { return ++count; };
-    // mutable 允许修改按值捕获的变量
-}
+void f(int)    { std::cout << "int "; }
+void f(double) { std::cout << "double "; }
 
-// std::move 演示
-struct Buffer {
-    char* data;
-    size_t size;
+int gv = 10;
+int g(int x = gv) { return x; }        // 默认实参在调用处求值
 
-    Buffer(size_t s) : data(new char[s]), size(s) {}
-    ~Buffer() { delete[] data; }
+int add(int a, int b) { return a + b; }
 
-    // 移动构造
-    Buffer(Buffer&& other) noexcept : data(other.data), size(other.size) {
-        other.data = nullptr;
-        other.size = 0;
-    }
+int main() {
+    f(1); f(1.5); std::cout << '\n';                    // int double：按转换代价选最优
 
-    // 移动赋值
-    Buffer& operator=(Buffer&& other) noexcept {
-        if (this != &other) {
-            delete[] data;
-            data = other.data;
-            size = other.size;
-            other.data = nullptr;
-            other.size = 0;
-        }
-        return *this;
-    }
+    gv = 20;
+    std::cout << g() << '\n';                           // 20：取调用时刻的值
 
-    Buffer(const Buffer&) = delete;  // 禁止拷贝
-    Buffer& operator=(const Buffer&) = delete;
-};
+    int (*fp)(int, int) = add;                          // 函数指针：一个地址
+    std::function<int(int,int)> sf = add;               // 类型擦除：多一次间接
+    std::cout << fp(1,2) << ' ' << sf(3,4) << '\n';     // 3 7
 
-// 使用演示
-Buffer create_buffer() {
-    Buffer buf(1000);
-    return buf;  // NRVO 优化
-}
+    int x = 10;
+    auto lam = [x](int y) { return x + y; };            // [x] = 闭包里的 int 成员
+    std::cout << lam(5) << '\n';                        // 15
 
-// std::bind 演示
-void demo_bind() {
-    auto add5 = std::bind(std::plus<int>{}, std::placeholders::_1, 5);
-    int result = add5(10);  // 15
-}
+    int c = 0;
+    auto counter = [c]() mutable { return ++c; };       // mutable：改的是闭包内副本
+    counter(); counter();
+    std::cout << counter() << '\n';                     // 3
 
-// 可变参数模板
-template<typename... Args>
-auto sum(Args... args) {
-    return (args + ...);  // C++17 折叠表达式
+    auto gen  = [](auto a, auto b) { return a + b; };   // 泛型 lambda（C++14）
+    auto tmpl = []<typename T>(T a, T b) { return a + b; };  // 模板 lambda（C++20）
+    std::cout << gen(1, 2.5) << '\n';                   // 3.5：两个 auto 各自推演
+    std::cout << tmpl(1, 2) << '\n';                    // 3
+
+    auto p = std::make_unique<int>(42);
+    auto hold = [p = std::move(p)] { return *p; };      // 初始化捕获（C++14）搬进只移对象
+    std::cout << hold() << '\n';                        // 42
 }
 ```
-
-## 约束与违反后果
-
-| 约束 | 违反后果 |
-|------|----------|
-| 移动构造必须是 `noexcept` | `vector` 扩容时不使用移动，退化为拷贝 |
-| 递归必须有终止条件 | 栈溢出（Stack Overflow） |
-| 虚函数调用通过 vptr 解析 | 比普通函数调用多一次内存访问 |
-| lambda 捕获局部引用后对象销毁 | 悬挂引用，调用时未定义行为 |
-| 默认参数不能引用后面的参数 | 编译错误 |
-| `inline` 是建议而非强制 | 即使声明 `inline`，编译器也可拒绝内联 |
-| 函数模板必须可见（通常在头文件） | 链接错误：undefined reference |
-| `std::function` 包装大型 lambda | 堆分配，运行时开销增加 |
-| 返回局部对象的引用 | 悬垂引用，调用时未定义行为 |
-| 默认参数求值时机是调用点 | 若实参被求值多次，可能导致副作用重复 |
