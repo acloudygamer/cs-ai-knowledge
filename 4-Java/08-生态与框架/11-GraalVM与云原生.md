@@ -1,268 +1,59 @@
-# GraalVM与Native Image
+# GraalVM 与云原生
 
-> GraalVM Native Image的本质是AOT编译（提前编译）——在构建时将Java应用编译为本地机器码的可执行文件，省去JVM启动和JIT编译的运行时开销，从而实现毫秒级启动和极低内存占用。
+> 前置：[10-响应式编程](10-响应式编程.md)、[01-Java全景](../00-概览/01-Java全景.md)（JIT 分层编译是本篇的对照系） · 后续：[12-安全编码](12-安全编码.md)
 
----
+> **版本基准**：GraalVM 自 2023 年起版本号对齐 JDK——写作时（2026-09）Oracle GraalVM 25 LTS 为稳定线，25.1 为创新线（2026-06 发布）；Spring Boot 3.0（2022）起内置 Native Image 构建支持。性能数字采用官方宣称口径并标注，示例为**骨架，未实测**。
 
-## AOT vs JIT：编译模型对比
+GraalVM Native Image 的本质是**把"边跑边编译"换成"构建时一次编译完"**：启动时不再有 JVM 引导、类加载、解释执行、JIT 热身这一串开销，产物是一个自包含的本地可执行文件。它回应的约束是云原生的计费与调度模型——按毫秒计费的函数计算、快速伸缩的副本——把 JVM 的"启动慢、热身慢"从可容忍变成了不可接受（JIT 的两笔账见 [01-Java全景](../00-概览/01-Java全景.md)）。
 
-### 数学模型
+## 本质：封闭世界假设
 
-设应用启动阶段的有效工作时间为 $T_{\text{useful}}$ ，JVM启动开销为 $T_{\text{jvm}}$ ，JIT编译时间为 $T_{\text{jit}}$ ： ，JVM启动开销为 $T_{\text{jvm}}$ ，JIT编译时间为 $T_{\text{jit}}$ ： ，JIT编译时间为 $T_{\text{jit}}$ ： ：
+AOT 编译器必须回答一个 JIT 永远不用回答的问题：**程序会执行的所有代码是哪些？** JIT 可以观望——跑到再编；AOT 必须构建时定案。Native Image 的答案是**封闭世界假设（closed-world assumption）**：从入口方法出发做**可达性分析（reachability analysis）**，把可达的类、方法、字段全部找出来编进可执行文件，**不可达的物理上不存在于产物中**。
 
-$$
-\text{JVM总启动时间} = T_{\text{jvm}} + T_{\text{jit}} + T_{\text{useful}}
-$$
+这条假设直接划定了边界：
 
-$$
-\text{Native Image启动时间} = T_{\text{aot\_compilation}} + T_{\text{useful}}
-$$
+- **能的**：反射（只要登记）、动态代理（只要登记）、资源文件（只要登记）；
+- **不能的**：运行时发现新代码——`Class.forName("运行时才知道的类名")`、动态加载 jar、运行时生成字节码（无法枚举的形式）。JVMTI agent、Attach API 这类"旁观 JVM"的调试/监控通道也不存在。
 
-其中 $T_{\text{aot\_compilation}}$ 是构建时开销，不影响运行时启动性能。 是构建时开销，不影响运行时启动性能。
+### 可达性元数据：告诉分析器"分析不出来的动态行为"
 
-### JIT编译的运行时开销
+反射调用 `Class.forName(name)` 的目标在字符串里，静态分析看不见。解法是把这类动态行为登记成 **reachability metadata**（GraalVM 25 起各配置文件合并为统一的 `reachability-metadata.json`，旧的 `reflect-config.json` 等仍被识别）。两条来源：
 
-JIT（即时编译）将字节码在运行时编译为本地机器码：
+1. **Tracing agent**：在普通 JVM 上挂 `-agentlib:native-image-agent` 跑一遍测试/典型路径，agent 把实际发生的反射、代理、资源加载记录下来生成元数据；
+2. **共享元数据仓库**（graalvm-reachability-metadata）：主流库（Netty、Logback、Hibernate…）的元数据社区已备好，构建插件自动拉取——这是"Spring 应用能 native 化"的实际基础。
 
-$$
-T_{\text{jit}} = \sum_{i=1}^{n} \underbrace{T_{\text{detect}}(h_i)}_{\text{热点检测}} + \underbrace{T_{\text{compile}}(h_i)}_{\text{编译耗时}}
-$$
+### 镜像堆：把初始化搬到构建时
 
-热点检测依赖采样或计数器，需积累足够调用才能触发编译，导致应用启动阶段无法达到峰值性能。
+Native Image 构建时还会执行类的静态初始化并把对象图**快照进可执行文件的镜像堆（image heap）**：启动时这些对象已经存在，无需再 new。启动快的一半功劳在这里；另一半约束也在这里——静态初始化里做"运行时才有意义的事"（开 socket、读环境）会在构建时炸出来，框架必须适配（Spring Boot 3 起通过 AOT 处理引擎把自动配置、Bean 定义在构建期固化，把条件评估从运行期挪到构建期）。
 
-### AOT编译的优势
+### 代价面：峰值与调试
 
-Native Image在构建时：
-1. 执行所有类的静态初始化
-2. 通过静态分析（+动态追踪）确定可达代码
-3. 生成包含所有已编译代码的本地可执行文件
+- **峰值性能可能低于 JIT**：JIT 能用运行时画像（profile）做激进内联与去虚化，AOT 只有静态信息。Oracle GraalVM 的 PGO（Profile-Guided Optimization）用画像数据回补一部分，缩小差距。
+- **构建慢且吃内存**：可达性分析 + 全量编译，分钟级、数 GB 内存，CI 成本显著高于 `mvn package`。
+- **观测与诊断降级**：JFR、agent、heap dump 工具链大多不可用或受限——[08-可观测性](08-可观测性.md) 的指标/追踪仍可用（Micrometer 层面），JVM 内部诊断不行。
 
-$$
-\text{启动时无需 JIT} \implies \text{即时进入峰值性能}
-$$
+## 三条启动加速路线的对比
 
----
+Native Image 不是唯一答案，2024-2026 年 HotSpot 阵营补齐了两条替代路线：
 
-## Native Image 构建过程
+| 路线 | 机制 | 启动 | 动态性 | 代价 |
+|---|---|---|---|---|
+| **GraalVM Native Image** | AOT 编译为本地可执行文件 | 最快（官方口径：毫秒级启动、内存数倍于 JVM 的降幅，实测因应用而异） | 封闭世界，反射/代理需元数据 | 构建重、工具链降级、峰值可能略低 |
+| **CRaC**（Coordinated Restore at Checkpoint） | JVM 热身后对进程做 checkpoint，启动 = 恢复快照 | 快（恢复通常百毫秒级） | 完整 JVM，动态性全保留 | checkpoint 前要关闭 socket/文件句柄并在 restore 后重建（框架需配合）；无跨机器架构可移植性 |
+| **Project Leyden（AOT cache）** | HotSpot 把训练运行中已加载链接的类与方法画像存成缓存，下次启动直接映射（JEP 483，JDK 24；JEP 514/515，JDK 25 扩展） | 中等加速（数倍） | 完整 JVM，零适配 | 加速幅度小于前两者 |
 
-### 两阶段架构
+选型的机制逻辑：能接受封闭世界、追求极限冷启动（函数计算、CLI）→ Native Image；要保留全部 JVM 生态（agent、反射自由）、有预热窗口 → CRaC；只想零成本吃掉一部分启动开销 → Leyden AOT cache（JDK 25 自带，`-XX:AOTCache` 系列开关）。
 
-<pre>
-构建时阶段（Build Time）
-    │
-    ├── 1. 静态分析：从入口点出发，递归遍历所有可达类/方法
-    ├── 2. 动态追踪（可选）：运行 agent 追踪运行时反射/资源/类加载
-    │       生成：reflection-config.json、resource-config.json、proxy-config.json
-    └── 3. AOT 编译：生成ELF/PE/Mach-O本地可执行文件
+## Spring Boot 集成
 
-运行时阶段（Runtime）
-    │
-    ├── Substrate VM（极简运行时）：无垃圾回收器、无JIT、无字节码解释器
-    └── 直接执行编译后的本地代码
-</pre>
-
-### 镜像堆（Image Heap）
-
-Native Image在构建时分配并初始化一个**镜像堆**——包含应用启动时所有可达对象的预初始化快照。启动时无需类加载和对象分配，直接使用预分配内存：
-
-$$
-\text{Memory}_{\text{image}} = \text{预初始化对象} + \text{类元数据} + \text{GC元数据}
-$$
-
-**约束**：镜像堆中的对象在构建时被"冻结"——它们的地址在运行时不改变，这允许Native Image省略传统的对象头部（对象指针直接指向数据而非头部）。
-
-### SubstrateVM组件
-
-Substrate VM是极简运行时，仅包含：
-
-| 组件 | Native Image | Hotspot JVM |
-|------|-------------|-------------|
-| GC | 无（或G1/Serial提前配置） | ZGC/Shenandoah/... |
-| JIT | 无 | 有（C1/C2） |
-| 解释器 | 无 | 有 |
-| 类加载 | 仅运行时需要的类 | 按需动态加载 |
-| 反射 | 需预注册 | 原生支持 |
-
----
-
-## 反射配置
-
-### 必要性
-
-静态分析无法处理所有反射场景（如`Class.forName(name)`），因此需要运行时配置文件声明必须保留的反射元数据。
-
-### 配置模型
-
-```json
-[
-  {
-    "name": "com.example.model.User",
-    "allDeclaredConstructors": true,
-    "allDeclaredMethods": true,
-    "fields": [
-      { "name": "id", "type": "long" },
-      { "name": "name", "type": "java.lang.String" }
-    ]
-  }
-]
-```
-
-字段`type`使用JVM内部签名格式（`Ljava/lang/String;`）。
-
-### Native Image Agent
-
-Agent在试运行（test run）阶段自动生成配置文件：
+Boot 3.0+ 内置 `native` profile，构建命令一句（骨架，未实测）：
 
 ```bash
-native-image-agent -jar target/app.jar -agentlib:native-image-agent=config-output-dir=.
-./target/app      # 触发各种代码路径
-# 生成 reflection-config.json, resource-config.json, jni-config.json
+mvn -Pnative spring-boot:build-image    # 或 ./mvnw -Pnative native:compile
 ```
 
----
-
-## 动态类加载
-
-### 约束
-
-Native Image在构建时需要预知所有运行的代码。`Class.forName()`等动态加载场景必须在配置文件中预注册：
-
-```java
-public Object loadPlugin(String className) {
-    // 构建时 className 未知，静态分析无法发现该类
-    Class<?> clazz = Class.forName(className);  // 必须在 reflection-config.json 中注册
-    return clazz.getDeclaredConstructor().newInstance();
-}
-```
-
-**违反约束的后果**：若Class.forName()加载的类未在配置文件中注册，构建时该类不会被包含在可执行文件中，运行时会抛出 `ClassNotFoundException`。
-
-### 运行时类加载限制
-
-即使注册了动态类，`Class.forName()`也只能加载：
-1. 构建时已知超类的子类
-2. 构建时已知接口的实现类
+背后是 Spring AOT 引擎在构建期运行自动配置评估、生成固化的 Bean 定义与反射元数据。适配负担真实存在：用到未登记反射的库会在运行时才抛 `ClassNotFoundException`/`MissingReflectionRegistrationError`——迁移纪律是"JVM 模式全测试通过 → tracing agent 补元数据 → native 模式重跑测试"，CI 里 native 测试应是独立一环。
 
 ---
 
-## 性能对比
-
-### 启动时间模型
-
-$$
-\text{启动加速比} \approx \frac{T_{\text{jvm}}}{T_{\text{native}}}
-\approx \frac{1-10\,\text{s}}{0.01-0.1\,\text{s}} \approx 10-100\text{x}
-$$
-
-### 内存占用模型
-
-$$
-\text{内存占用比} \approx \frac{M_{\text{jvm}}}{M_{\text{native}}}
-\approx \frac{100-500\,\text{MB}}{10-50\,\text{MB}} \approx 10-20\text{x}
-$$
-
-JVM的内存占用包含：JVM堆、元空间、JIT编译缓存、线程栈（1MB/线程）。Native Image的线程栈按需增长（分页提交），无JIT缓存。
-
-### 性能指标表
-
-| 指标 | JVM Hotspot | Native Image | 提升 |
-|------|-------------|--------------|------|
-| 启动时间 | 2.5s | 85ms | ~30x |
-| 内存占用 | 256MB | 32MB | ~8x |
-| 首次响应 | 800ms（含JIT） | 12ms | ~67x |
-| 峰值性能 | 最优（JIT优化后） | 略低（AOT优化有限） | ~5-10%差距 |
-
-**关键约束**：Native Image的峰值性能通常略低于JIT编译的代码——因为JIT可以利用运行时profiling数据进行激进优化（如内联、虚调用去虚化），而AOT只能做静态分析。
-
----
-
-## 常用构建选项
-
-| 选项 | 说明 | 使用场景 |
-|------|------|----------|
-| `--no-fallback` | 不使用fallback解释器（构建失败则报错） | 生产构建 |
-| `-O<level>` | 优化级别（1-4） | 性能调优 |
-| `--initialize-at-build-time` | 构建时初始化指定类 | SLF4J等静态初始化 |
-| `-H:+ReportExceptionStackTraces` | 报告异常堆栈 | 调试 |
-| `-H:NativeMemoryTracking=summary` | 跟踪本地内存 | 内存分析 |
-
----
-
-## Spring Boot集成
-
-Spring Boot 3.x原生支持Native Image，通过`spring-boot-starter-parent`自动配置`spring-aot-maven-plugin`：
-
-```xml
-<plugin>
-    <groupId>org.graalvm.buildtools</groupId>
-    <artifactId>native-maven-plugin</artifactId>
-    <configuration>
-        <imageName>native-demo</imageName>
-        <buildArgs>--no-fallback</buildArgs>
-    </configuration>
-</plugin>
-```
-
----
-
-## 容器集成
-
-### 镜像体积优势
-
-Native Image的镜像极小，适合Serverless和容器化：
-
-```dockerfile
-FROM ghcr.io/graalvm/native-image:ol9-java17 as builder
-WORKDIR /app
-COPY mvnw pom.xml ./
-RUN ./mvnw dependency:go-offline
-COPY src src
-RUN ./mvnw -Pnative package -DskipTests
-FROM ghcr.io/graalvm/native-image:ol9-java17
-WORKDIR /app
-COPY --from=builder /app/target/native-demo /app/native-demo
-ENTRYPOINT ["/app/native-demo"]
-```
-
-### Kubernetes资源建议
-
-```yaml
-resources:
-  requests:
-    memory: "32Mi"   # Native Image 极低内存
-    cpu: "100m"
-  limits:
-    memory: "128Mi"  # 仍远低于 JVM
-    cpu: "500m"
-```
-
----
-
-## 迁移检查清单
-
-1. **JVM模式先行**：所有测试在JVM模式通过后再尝试Native Image
-2. **Agent追踪**：使用native-image-agent捕获所有反射/资源/类加载
-3. **注册反射**：将生成的reflection-config.json合并到项目
-4. **迭代构建**：使用`--verbose`定位问题
-5. **性能验证**：对比JVM与Native Image性能，确保关键路径无退化
-
----
-
-## GraalVM检测
-
-```java
-String version = System.getProperty("java.vm.version");
-if (version.contains("GraalVM")) {
-    System.out.println("Running on GraalVM");
-}
-```
-
----
-
-## 版本选择
-
-| 场景 | 推荐版本 |
-|------|---------|
-| 生产环境 | GraalVM CE 22.x + Java 17 |
-| 新项目（Native优先） | GraalVM CE 23.x + Java 21 |
-| Spring Boot 3.x | GraalVM 22+ required |
+> 前置：[10-响应式编程](10-响应式编程.md) · 后续：[12-安全编码](12-安全编码.md)——生态篇收官：把前面所有外部输入当不可信来源处理

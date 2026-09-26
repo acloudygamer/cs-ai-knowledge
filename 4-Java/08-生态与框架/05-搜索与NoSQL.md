@@ -1,297 +1,71 @@
-# Elasticsearch 与 MongoDB
+# 搜索与 NoSQL：Elasticsearch 与 MongoDB
 
-## 定义
+> 前置：[04-Kafka](04-Kafka.md) · 后续：[06-SpringCloud微服务](06-SpringCloud微服务.md)
 
-**Elasticsearch** 是基于 **倒排索引（Inverted Index）** 的全文搜索引擎，本质是将文本切分为词项（Term），建立词项到文档的映射，实现 $O(1)$ 词项查找。**MongoDB** 是 **文档数据库**，本质是将 JSON 文档作为存储单元，通过 MMAP 内存映射文件实现磁盘读写的高性能。两者代表了检索型存储与文档型存储的两个极端。 词项查找。**MongoDB** 是 **文档数据库**，本质是将 JSON 文档作为存储单元，通过 MMAP 内存映射文件实现磁盘读写的高性能。两者代表了检索型存储与文档型存储的两个极端。
+> **版本基准**：Elasticsearch 9.x（写作时 2026-09 最新 9.5 线，8.x 仍在维护）；MongoDB 8.x（8.0 GA 2024-10，默认存储引擎 WiredTiger）。两者均为服务端机制叙述，客户端示例为**骨架，未实测**。
 
-**Elasticsearch 核心价值**：
-- 全文搜索：TF-IDF、BM25 相关性算法
-- 日志分析：ELK Stack
-- 实时分析：聚合计算
+Elasticsearch 与 MongoDB 常被并称"NoSQL"，但它们回答的是两个不同问题：ES 回答"**怎么在亿级文本里按词找到文档**"（检索引擎），MongoDB 回答"**怎么让数据库直接存程序里的对象形状**"（文档数据库）。共同的偏离点是关系模型；各自的立身机制完全不同——倒排索引与文档堆。
 
-**MongoDB 核心价值**：
-- 灵活 schema：无固定结构，字段可增删
-- 文档模型：天然的对象映射
-- 水平扩展：分片集群
+## Elasticsearch：倒排索引与段
+
+### 本质
+
+**倒排索引（inverted index）** 把映射方向反过来：正排是"文档 → 含哪些词"，检索时得全表扫；倒排是"词 → 出现在哪些文档"（posting list），查询词项经词项字典（FST，内存中的有限状态机）一步定位到文档列表。文本先经分析器（analyzer）分词、归一化（小写、词干），再入索引——**写入时的分词与查询时的分词必须用同一分析器**，这是"查不到明明存在的数据"的第一嫌疑。
+
+相关性排序默认 **BM25**：词频收益递减（饱和）、文档越长越被归一化惩罚、稀有词权重高（IDF）。它是 TF-IDF 的工程化修正版，5.0（2016）起取代 TF-IDF 成为 Lucene/ES 默认。
+
+### 段（Segment）：不可变带来的一切
+
+Lucene 的索引由若干**段**组成，段一旦写完永不修改：
+
+```text
+写入 → 内存 buffer + translog（落盘，防丢）
+     → refresh（默认 1s）：buffer 生成新段，可被搜索   ← "近实时"的来源
+     → flush：translog 截断，段正式提交
+     → 后台 merge：小段并大段，被删文档此时才真正物理清除
+```
+
+从这条链可直接读出三个性质：
+
+- **近实时（NRT）**：写入默认约 1 秒后可搜到——"写入立即可查"要强制 refresh，代价是小段暴增。
+- **删除是标记**：段不可变，删除只是在 `.del` 文件里打标记，merge 时才回收空间——更新 = 标记删 + 重插。
+- **translog 保不丢**：段在内存时崩溃可重放 translog 恢复。
+
+**分片（Shard）** 是分布式的单位：一个索引切成多个主分片（建索引时定死，改不了——reindex 是唯一出路），每分片是一个独立 Lucene 索引，可配副本分片抗故障。查询是 scatter-gather：协调节点广播到相关分片，收集各分片 top-K 归并。**深度分页因此昂贵**（第 10000 页要每个分片都吐出前 10010 条再归并），深翻页的正确姿势是 `search_after` 游标。
+
+**边界**：ES 没有多文档事务、没有 JOIN（`nested`/父子 join 是索引期铺平的近似）；它是检索与聚合引擎，不是交易系统的主库——主库写关系库，经 CDC（如 Kafka，见 [04-Kafka](04-Kafka.md)）同步进 ES 是标准拓扑。
+
+## MongoDB：文档模型与 WiredTiger
+
+### 本质
+
+**文档（document）** 是 BSON（二进制 JSON）存储单元：程序里的对象/嵌套结构几乎原形状落库，省掉 ORM 的对象—关系翻译（对照 [02-持久化框架](02-持久化框架.md) 的阻抗失配）。schema 不强制的含义是"校验责任从数据库挪到应用"——灵活性与脏数据风险是同一条边的两面（可用 schema validation 收回部分约束）。
+
+**建模的第一决策是内嵌还是引用**：一比少、一起读的数据内嵌进文档（一次读全，单文档原子更新）；一比多且独立访问的用引用（外键式，应用层拼）。内嵌让"一次读/写一个文档"覆盖绝大多数业务操作——这正是 MongoDB 只保证**单文档原子性**也够用很久的原因；4.0（2018）起副本集支持多文档事务（快照隔离），4.2 扩展到分片，但事务有性能代价，建模正确时应很少需要。
+
+### WiredTiger：文档之下
+
+存储引擎自 3.2 起默认 WiredTiger（更早的 MMAPv1 早已移除），三个机制决定可观察行为：
+
+1. **文档级并发控制**：写写冲突以文档为粒度（不是表锁/库锁），高并发写不同文档互不阻塞。
+2. **checkpoint + journal**：内存中的写先记 journal（WAL），每 60 秒左右打一次 checkpoint 把脏页刷盘——崩溃恢复 = 最近 checkpoint + journal 重放。`writeConcern: { w: "majority", j: true }` 才换来"不丢已确认写"。
+3. **压缩**：默认块压缩（snappy，可选 zstd），文档模型的冗余字段名在压缩下代价可控。
+
+### 副本集与分片
+
+副本集：一主多从，主写从复制（oplog 操作日志），主宕机自动选主。`writeConcern` 控写确认面（`w: 1` 只主确认，`w: "majority"` 多数派确认）；`readConcern` 控读到的一致性（`majority` 只读多数派确认过的数据，`snapshot` 用于事务）。**`w:1` 写入在主宕机时可能被回滚掉**——读自己刚写的数据消失，是没调 writeConcern 的经典惊吓。
+
+分片集群：按片键（shard key）把文档水平切到多个分片，mongos 路由。片键一旦选定不可改（4.4 起可 refine，有限），且决定数据与查询的分布——片键选错（单调递增如时间戳）会让所有写都打到末尾分片形成热点。
+
+## 各自边界
+
+| | Elasticsearch | MongoDB |
+|---|---|---|
+| 主业 | 全文检索、日志/指标分析、聚合 | 通用业务主库（文档形状友好） |
+| 一致性 | 近实时，无多文档事务 | 单文档原子，可选多文档事务 |
+| 典型拓扑 | 主库 + CDC 同步而来的检索副本 | 直接作为主库 |
+| 不该做的事 | 当交易系统主库 | 当分析/搜索引擎用（全文检索能力远弱于 ES） |
 
 ---
 
-## 数学模型
-
-### 倒排索引的查找复杂度
-
-**正排索引**：Document → Terms（文档包含哪些词）
-- 查找包含词 "Spring" 的文档：需要扫描所有文档
-
-**倒排索引**：Term → Documents（词出现在哪些文档）
-- 查找包含词 "Spring" 的文档：直接查倒排表， $O(1)$ 
-
-倒排索引的存储结构：
-```
-倒排表（Posting List）：
-Spring → [doc1, doc3, doc5, doc7, ...]  (每个 doc 以 docID 形式存储)
-Boot   → [doc1, doc9, ...]
-```
-
-词项越多，倒排表越长。内存受限场景下可压缩：
-- **FOR（Frame of Reference）**：压缩 docID 差值
-- **Roaring Bitmap**：按块压缩 docID
-
-### Elasticsearch 分片分配的负载均衡
-
-ES 集群的 **分片分配（Shard Allocation）** 遵循 **磁盘使用率 + 分片数均衡** 策略：
-
-设节点 $N_i$ 的分片数为 $s_i$ ，磁盘使用率为 $d_i$ ，目标函数： 的分片数为 $s_i$ ，磁盘使用率为 $d_i$ ，目标函数： ，磁盘使用率为 $d_i$ ，目标函数： ，目标函数：
- $\min \sum_i |s_i - \bar{s}| + \lambda \cdot |d_i - \bar{d}|$ 
-
-其中 $\bar{s}$ 为平均分片数， $\bar{d}$ 为平均磁盘使用率， $\lambda$ 为权重因子。 为平均分片数， $\bar{d}$ 为平均磁盘使用率， $\lambda$ 为权重因子。 为平均磁盘使用率， $\lambda$ 为权重因子。 为权重因子。
-
-ES 默认优先均衡分片数，新索引优先分配到分片数最少的节点。
-
-### MongoDB 聚合管道的延迟求值
-
-MongoDB 聚合管道是 **延迟求值（Lazy Evaluation）**：
-```
-db.orders.aggregate([
-    { $match: { status: "completed" } },  // Stage 1
-    { $group: { _id: "$ customer", total: { $sum: "$amount" } } }, // Stage 2customer", total: { $sum: "$ amount" } } }, // Stage 2amount" } } }, // Stage 2
-    { $sort: { total: -1 } }               // Stage 3
-])
-```
-
-管道不会一次性加载所有数据到内存，而是 **流式处理**：每个 document 依次通过所有 stage，按需产出结果。这允许处理远大于内存的数据集。
-
-### 倒排索引的压缩算法
-
-**Frame of Reference (FOR)**：存储 docID 的增量，而非绝对值。
-
-```
-原始 docIDs: [1003, 1004, 1005, 1006, 1007]
-增量存储:    [1003, 1, 1, 1, 1]  // 第一个存绝对值，后续存差值
-```
-
-差值越小，所需 bit 数越少。设平均差值为 $d$ ： ：
- $\text{bits\_per\_doc} = \lceil \log_2(d) \rceil$ 
-
-**Roaring Bitmap**：按块（2^16）存储，每块用不同策略。
-
-### 分布式一致性的向量时钟模型
-
-MongoDB 分片集群的副本集使用 **向量时钟（Vector Clock）** 追踪版本：
-
-设副本节点集合 $R = \{r_1, r_2, ..., r_n\}$ ，向量时钟： ，向量时钟：
- $VC = \langle c_1, c_2, ..., c_n \rangle$ 
-
-其中 $c_i$ 为节点 $r_i$ 看到的版本号。 为节点 $r_i$ 看到的版本号。 看到的版本号。
-
-**写入版本号**：写入时 $c_i = c_i + 1$ 
-**比较规则**： $VC_1 < VC_2$ 当且仅当 $\forall i: VC_1[i] \leq VC_2[i]$ 且 $\exists j: VC_1[j] < VC_2[j]$ 当且仅当 $\forall i: VC_1[i] \leq VC_2[i]$ 且 $\exists j: VC_1[j] < VC_2[j]$ 且 $\exists j: VC_1[j] < VC_2[j]$ 
-
----
-
-## 数据流
-
-<pre>
-Elasticsearch 写入流程
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-┌──────────────────────────────────────────────────────────────┐
-│  Client                                                      │
-│   │                                                          │
-│   ▼                                                          │
-│  Coordinating Node（接收请求的节点）                          │
-│   │                                                          │
-│   ├─▶ 写入请求转发到 Primary Shard                            │
-│   │                                                          │
-│   │   Primary Shard ──▶ 写入内存 Buffer                       │
-│   │                        │                                 │
-│   │                        ▼                                 │
-│   │                   写入 Translog（持久化）                 │
-│   │                        │                                 │
-│   │                        ▼                                 │
-│   │                   refresh() → Segment                    │
-│   │                        │                                 │
-│   │                        ▼                                 │
-│   │                   可被搜索                                          │
-│   │                                                          │
-│   │   异步：Segment 合并 → 写入磁盘（fsync）                   │
-│   │                                                          │
-│   └──▶ 副本同步（Replicas）                                  │
-└──────────────────────────────────────────────────────────────┘
-
-Elasticsearch 搜索流程
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-┌──────────────────────────────────────────────────────────────┐
-│  Client → Query                                              │
-│   │                                                          │
-│   ▼                                                          │
-│  Coordinating Node →广播查询到所有相关 Shard                   │
-│   │                                                          │
-│   ├─▶ Primary Shard 1 → 返回 Top-K 结果                      │
-│   ├─▶ Primary Shard 2 → 返回 Top-K 结果                      │
-│   └─▶ Primary Shard 3 → 返回 Top-K 结果                      │
-│   │                                                          │
-│   ▼                                                          │
-│  Coordinating Node 合并所有 Shard 结果 → 返回最终 Top-K         │
-└──────────────────────────────────────────────────────────────┘
-
-MongoDB 写入流程
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-┌──────────────────────────────────────────────────────────────┐
-│  Client                                                      │
-│   │                                                          │
-│   ▼                                                          │
-│  mongos（路由节点，分片集群）                                 │
-│   │                                                          │
-│   ▼                                                          │
-│  Primary Replica Set                                         │
-│   │                                                          │
-│   ├─▶ 写入内存（WiredTiger Cache）                           │
-│   │                                                          │
-│   ├─▶ 写入 Journal（日志）                                    │
-│   │                                                          │
-│   └─▶ 返回 ACK（可配置 writeConcern）                         │
-│                                                              │
-│  异步：Checkpoint → 内存数据刷写到磁盘                        │
-└──────────────────────────────────────────────────────────────┘
-</pre>
-
----
-
-## 机制
-
-### Elasticsearch 的分片与副本一致性
-
-ES 的 **写一致性** 通过 **quorum** 机制保证：
-```yaml
-wait_for_active_shards: 1  # 默认，等待 1 个 shard 就绪
-# 可选：all（全部），quorum（多数）
-```
-
-写操作必须在 `wait_for_active_shards` 数量的 shard（包括 primary）写入成功后才返回。这确保了数据不丢失。
-
-**副本同步机制**：ES 使用 **基于版本的复制（Version-based replication）**：
-- Primary 写入后分配全局递增 version
-- Replica 按 version 增量同步
-- 若 replica 落后太多，Primary 发送全量 Lucene segment
-
-### MongoDB 的写Concern 与 ReadConcern
-
-**Write Concern** 控制写入确认级别：
-```javascript
-{ w: 0 }   // 不等待任何确认（最快，最不安全）
-{ w: 1 }   // 等待 Primary 确认（默认）
-{ w: "majority" } // 等待多数节点确认（最强一致性）
-```
-
-**Read Concern** 控制读取一致性级别：
-```javascript
-{ readConcern: "local" }        // 读取本地最新数据
-{ readConcern: "available" }    // 分片集群：读取任意分片数据
-{ readConcern: "majority" }     // 读取被多数节点确认的数据
-{ readConcern: "snapshot" }      // 事务内读取快照
-```
-
-**组合效果**：`{ w: "majority", readConcern: "majority" }` 提供 **线性一致性（Linearizable）** 保证。
-
-### 两者事务能力对比
-
-| 维度 | Elasticsearch | MongoDB |
-|------|--------------|---------|
-| 单文档原子性 | ✅ Lucene 层面保证 | ✅ WiredTiger 层面保证 |
-| 多文档事务 | ❌ 无（5.x+ 有，但有限制） | ✅ Replica Set 快照隔离 |
-| 事务隔离级别 | 无 | 快照隔离（Snapshot） |
-
-ES 通过外部事务管理器（如 Spring）实现跨系统事务，但这依赖外部补偿机制，非 ACID 事务。
-
-### Elasticsearch 全文搜索的 BM25 排名算法
-
-ES 使用 **BM25（Best Matching 25）** 作为默认相关性算法：
-
- $BM25(D, Q) = \sum_{i=1}^{n} \text{IDF}(q_i) \cdot \frac{f(q_i, D) \cdot (k_1 + 1)}{f(q_i, D) + k_1 \cdot (1 - b + b \cdot \frac{|D|}{\text{avgdl}})}$ 
-
-其中：
-- $f(q_i, D)$ = 词项 $q_i$ 在文档 $D$ 中的词频 = 词项 $q_i$ 在文档 $D$ 中的词频 在文档 $D$ 中的词频 中的词频
-- $|D|$ = 文档长度 = 文档长度
-- $\text{avgdl}$ = 平均文档长度 = 平均文档长度
-- $k_1$ = 词频饱和参数（默认 1.2） = 词频饱和参数（默认 1.2）
-- $b$ = 文档长度归一化参数（默认 0.75） = 文档长度归一化参数（默认 0.75）
-- $\text{IDF}(q_i)$ = 逆文档频率 = 逆文档频率
-
-**BM25 的饱和性**：BM25 解决了词频线性增长的问题——词频超过某阈值后，排名分数不再显著增加。这与 TF-IDF 的线性增长形成对比。
-
-**归约视角**：BM25 可归约为**带饱和的词项匹配 + 文档长度归一化**——本质是 TF-IDF 的非线性变体。
-
----
-
-## 参考存根
-
-```java
-// 展示 Elasticsearch 批量写入
-@Service
-public class ElasticsearchService {
-    private final ElasticsearchOperations esOps;
-
-    public void bulkIndex(List<Product> products) {
-        BulkOperations bulkOps = esOps.bulkOps(BulkOptions.defaultOptions(), Product.class);
-        products.forEach(bulkOps::save);
-        BulkResult result = bulkOps.index();
-        if (result.hasErrors()) {
-            result.getErrors().forEach(e ->
-                System.err.println("Failed: " + e.getItem().getId()));
-        }
-    }
-}
-
-// 展示 MongoDB 聚合管道
-public List<CityStats> getTopCities() {
-    Aggregation agg = Aggregation.newAggregation(
-        // Stage 1: 过滤已完成订单
-        Aggregation.match(Criteria.where("status").is("COMPLETED")),
-        // Stage 2: 按城市分组统计
-        Aggregation.group("shippingAddress.city")
-            .count().as("orderCount")
-            .sum("totalAmount").as("revenue"),
-        // Stage 3: 按收入排序取前 10
-        Aggregation.sort(Sort.Direction.DESC, "revenue"),
-        Aggregation.limit(10)
-    );
-    return mongoTemplate.aggregate(agg, "orders", CityStats.class)
-        .getMappedResults();
-}
-```
-
----
-
-## 深度：倒排索引的压缩数学
-
-### Frame of Reference 编码
-
-对于递增的 docID 序列 $[x_0, x_1, ..., x_{n-1}]$ ，存储差值 $[x_0, x_1-x_0, x_2-x_1, ...]$ ： ，存储差值 $[x_0, x_1-x_0, x_2-x_1, ...]$ ： ：
-
-设最大差值为 $d_{\max}$ ，每个差值需要 $\lceil \log_2(d_{\max}) \rceil$ bits。 ，每个差值需要 $\lceil \log_2(d_{\max}) \rceil$ bits。 bits。
-
-**压缩率**：
- $\text{compression} = \frac{\sum \lceil \log_2(\Delta_i) \rceil}{\sum \lceil \log_2(x_i) \rceil}$ 
-
-### Roaring Bitmap 的混合压缩
-
-Roaring Bitmap 将 docID 空间划分为 $2^{16}$ 个桶（每个桶 65536 个 ID）： 个桶（每个桶 65536 个 ID）：
-
-| 桶类型 | 条件 | 存储方式 |
-|--------|------|----------|
-| 空桶 | 无 docID | 无存储 |
-| 稀疏桶 | $< 4096$ 个 docID | 16位整数数组 | 个 docID | 16位整数数组 |
-| 稠密桶 | $\geq 4096$ 个 docID | Bitmap（65536 bits） | 个 docID | Bitmap（65536 bits） |
-
-**优势**：稀疏文档集节省大量空间，稠密文档集使用紧凑 Bitmap。
-
-### 向量时钟的因果一致性
-
-向量时钟实现了**因果一致性（Causal Consistency）**：
-
- $VC_1 \parallel VC_2 \iff \exists i, j: VC_1[i] > VC_2[i] \land VC_2[j] > VC_1[j]$ 
-
-并发事件之间无法比较因果顺序，但偏序关系仍然成立。
+> 前置：[04-Kafka](04-Kafka.md) · 后续：[06-SpringCloud微服务](06-SpringCloud微服务.md)——单机中间件到齐，接下来是把它们连成分布式系统

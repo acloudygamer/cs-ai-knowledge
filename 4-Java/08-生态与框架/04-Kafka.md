@@ -1,316 +1,83 @@
 # Kafka
 
-## 定义
+> 前置：[03-Redis](03-Redis.md) · 后续：[05-搜索与NoSQL](05-搜索与NoSQL.md)
 
-Kafka 是分布式流处理平台，其本质是 **持久化日志（Immutable Log）**——消息只能追加（append），不能修改或删除。Kafka 通过 **顺序写磁盘** 实现高吞吐（远超随机写），通过 **分区（Partition）** 实现水平扩展，通过 **消费者组（Consumer Group）** 实现负载均衡和消息冗余消费。
+> **版本基准**：Kafka 4.x——4.0（GA 2025-03-18）彻底移除 ZooKeeper，KRaft 成为唯一部署形态，新消费组协议（KIP-848）同版 GA；写作时（2026-09）最新线为 4.3.x。客户端示例均为**骨架，未实测**。
 
-**核心价值**：
-- **高吞吐**：顺序写磁盘 + 页缓存 + 零拷贝
-- **持久化**：消息持久化到磁盘，可重复消费
-- **水平扩展**：分区机制，支持并行消费
-- **容错**：副本机制，保证消息不丢失
+Kafka 的本质是**一条持久化、只追加的日志（append-only log）被做成了分布式服务**：消息不是"队列里等待被取走的包裹"，而是日志文件里一条有编号的记录；生产是向日志尾部追加，消费是按编号（offset）从头或中间读。删除不由消费者触发，由保留期（retention）到期触发——读不改写数据，同一条消息可以被任意多个消费方各读一遍。这个模型颠覆了"消费即删除"的传统队列语义，也是 Kafka 一切能力（重放、多订阅方、流处理）的来源。
 
----
+## 本质
 
-## 数学模型
+**为什么拿磁盘做日志还能高吞吐**——三个机制叠加：
 
-### 磁盘顺序写的性能建模
+1. **顺序写**：追加只写文件尾，磁盘不需要寻道。机械盘上顺序写与随机写的吞吐差可达数量级，这是日志结构的第一性优势。
+2. **页缓存（Page Cache）**：写入先落内核页缓存即返回，刷盘由 OS 异步做；消费端读的常常还是热页缓存——磁盘几乎不出现在关键路径上。
+3. **零拷贝（zero-copy）**：broker 向消费者发数据走 `sendfile`（Java 侧 `FileChannel.transferTo`），数据从页缓存直接进 socket 缓冲区，绕过用户态——省掉了"内核→用户→内核"的两次拷贝和上下文切换。
 
-传统磁盘随机写吞吐量： $\sim 0.5\text{-}2\text{ MB/s}$ （受寻道时间限制） （受寻道时间限制）
-Kafka 顺序写吞吐量： $\sim 500\text{-}600\text{ MB/s}$ （受磁盘带宽限制） （受磁盘带宽限制）
-
-设寻道时间 $T_{\text{seek}} = 10ms$ ，旋转延迟 $T_{\text{rot}} = 5ms$ ，传输时间 $T_{\text{trans}}$ 可忽略： ，旋转延迟 $T_{\text{rot}} = 5ms$ ，传输时间 $T_{\text{trans}}$ 可忽略： ，传输时间 $T_{\text{trans}}$ 可忽略： 可忽略：
-- 随机写：每条消息需要 $T_{\text{seek}} + T_{\text{rot}}$ → 1500 消息/秒 → 1500 消息/秒
-- 顺序写：初始一次寻道后，传输时间 $T_{\text{trans}} \approx 0$ → 近乎无限吞吐量 → 近乎无限吞吐量
-
-Kafka 利用 OS 的 **页缓存（Page Cache）**：写入数据先到页缓存，后台异步刷盘。消费时也先读页缓存，未命中才读磁盘。这实现了"写即返回"的低延迟。
-
-### 分区再均衡的图论分析
-
-设 Consumer Group 有 $C$ 个消费者，Topic 有 $P$ 个分区。分配关系是 **二分图匹配**： 个消费者，Topic 有 $P$ 个分区。分配关系是 **二分图匹配**： 个分区。分配关系是 **二分图匹配**：
-
-```
-分区集合 Partitions = {P1, P2, ..., Pp}
-消费者集合 Consumers = {C1, C2, ..., Cc}
-
-分配约束：
-1. 每个分区只能分配给一个消费者
-2. 每个消费者至少分配 0 个分区
-3. 分区尽量均匀分布（负载均衡）
-```
-
-当消费者数量变化（加入/离开）时，触发 **再均衡（Rebalance）**：
-- 所有消费者暂停消费（Stop The World）
-- 重新计算分配方案
-- 各消费者领取新分配的分区
-- 恢复消费
-
-**再均衡代价**：期间所有消费暂停，影响吞吐量。再均衡频繁会导致性能震荡。
-
-### 消息投递语义的形式化
-
-Kafka 支持三种消息投递语义，通过 Producer 和 Consumer 配置组合实现：
-
-| 语义 | Producer | Consumer | 消息丢失 | 重复消费 |
-|------|---------|---------|---------|---------|
-| at-most-once | acks=0 | 自动提交 | 可能 | 不可能 |
-| at-least-once | acks=all | 手动提交 | 不可能 | 可能 |
-| exactly-once | 事务 | 事务 | 不可能 | 不可能 |
-
-**exactly-once 的形式化定义**：
-
-设消息 $m$ 被生产两次（由于 Producer 重试），记为 $m_1$ 和 $m_2$ （ $m_1 = m_2$ ）。exactly-once 保证： 被生产两次（由于 Producer 重试），记为 $m_1$ 和 $m_2$ （ $m_1 = m_2$ ）。exactly-once 保证： 和 $m_2$ （ $m_1 = m_2$ ）。exactly-once 保证： （ $m_1 = m_2$ ）。exactly-once 保证： ）。exactly-once 保证：
-
- $\forall m: \text{Deliver}(m) = 1$ 
-
-即每条消息被 Consumer 处理恰好一次，无论 Producer 发送多少次。
-
-**幂等生产者的数学约束**：
-
-幂等生产者（`enable.idempotence=true`）为每条消息分配唯一 `producer_id + sequence_number`。设：
-- $p$ = producer ID（分配给每个 Producer 实例） = producer ID（分配给每个 Producer 实例）
-- $seq$ = 序列号（每条消息递增） = 序列号（每条消息递增）
-
-去重条件：
- $(p, seq) \rightarrow \text{唯一确定一条消息}$ 
-
-若检测到相同 $(p, seq)$ ，Kafka 拒绝重复，返回 -1。 ，Kafka 拒绝重复，返回 -1。
-
-### 分区写入的法定写入多数
-
-Kafka 使用 **WAL（Write-Ahead Log）** + **ISR 复制** 保证持久性。
-
-设：
-- $W$ = 写入成功所需的确认副本数 = 写入成功所需的确认副本数
-- $ISR$ = 当前与 Leader 同步的副本集合 = 当前与 Leader 同步的副本集合
-
-写入成功条件：
- $|W \cap ISR| \geq W$ 
-
-常见配置：
-- `acks=1`： $W=1$ （仅 Leader），最快但可能丢数据 （仅 Leader），最快但可能丢数据
-- `acks=all`（或 -1）： $W=|ISR|$ ，最强一致性 ，最强一致性
-
-**脑裂问题与 fencing**：
-
-当网络分区导致多个副本认为自己为 Leader 时：
-```
-分区前：Leader = Replica_1，ISR = {1, 2, 3}
-分区后：Replica_1 无法与 Replica_2,3 通信
-        Replica_2 被选为新 Leader（ISR = {2, 3}）
-        Replica_1 仍认为自己是 Leader（旧 Leader）
-```
-
-**Fencing 机制**：每个 Write 请求携带 `epoch`（任期号）。旧 Leader 收到更高 epoch 的 Write 请求时自动失效。
-
-**Fencing 的数学不变量**：
- $\text{valid}(write) \iff \text{epoch}_{\text{write}} \geq \text{epoch}_{\text{current\_leader}}$ 
-
----
-
-## 数据流
-
-<pre>
-Kafka Producer → Broker → Consumer 数据流
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-Producer                              Broker
-   │                                    │
-   │ ── Metadata Request ──────────────▶│ 获取 topic partition leader
-   │◀── Metadata Response ──────────────│
-   │                                    │
-   │ ── Produce Request (批量) ────────▶│
-   │      └─ acks 配置决定写入策略        │
-   │                                    │
-   │◀── Produce Response ───────────────│ (leader 写入 → 复制到 ISR)
-   │      └─ baseOffset 分配             │
-   │                                    │
-   │         Consumer Group A
-   │              │
-   │              ▼
-   │ ◀── Fetch Request (从 offset 开始) ─│
-   │     └─ consumer.poll()             │
-   │                                  Broker
-   │◀── Fetch Response ────────────────│
-   │     └─ 消息批次                     │
-   │              │
-   │              ▼
-   │         业务处理                     │
-   │              │
-   │              ▼
-   │ ◀── Commit Offset (异步) ─────────│
-   │     └─ 记录已消费到的位置             │
-
-幂等 Producer 消息去重
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-Producer 发送消息 m（第一次尝试）
-   │
-   │ P1 分配 (p_id=5, seq=100)
-   │ 写入 Leader → 写入 ISR → 返回 baseOffset=500
-   │ ⚠️ 网络超时，未收到响应
-   │
-Producer 重试发送消息 m（第二次尝试）
-   │
-   │ P1 分配相同 (p_id=5, seq=100)
-   │ Leader 检查：(p_id=5, seq=100) 已存在
-   │ → 返回 baseOffset=500（重复，拒绝写入）
-   │ ⚠️ Consumer 看到同一 offset，内容相同
-</pre>
-
----
+上游是生产者（Producer），下游是消费者（Consumer），中间隔着的 broker 集群本质上是一组日志文件的管理者。
 
 ## 机制
 
-### ISR（In-Sync Replicas）的共识机制
+### 分区与副本：日志的横向切分与备份
 
-Kafka 的高可用建立在 **ISR 列表** 之上：
-- **AR（Assigned Replicas）**：分区所有副本
-- **ISR（In-Sync Replicas）**：与 leader 保持同步的副本（lag < replica.lag.time.max.ms）
+一个 topic 的日志被切成若干**分区（Partition）**，每分区是一条独立的、分区内严格有序的日志；分区是并行度的单位——一个分区同一时刻只能被消费组内一个消费者读，因此"单分区有序 + 多分区并行"是鱼与熊掌的显式取舍：要全局有序就只能单分区，放弃并行。
 
-Leader election 只从 ISR 中选取。若所有 follower 落后太多（超出阈值），该分区不可用——这是 **CAP 定理** 中 Kafka 选择 **C**（一致性）而非 **A**（可用性）的一致性保证。
+每条分区日志有多个**副本（Replica）**分布在不同 broker：一个 leader 对外读写，其余 follower 追随复制。**ISR（In-Sync Replicas）** 是与 leader 同步差距在阈值内的副本集合——leader 挂了，新 leader 只从 ISR 里选，这是"不丢已确认数据"的机制基础。
 
-**写入一致性决策**：
-- `acks=0`：发即忘，可能丢消息（leader 写入后崩溃）
-- `acks=1`：leader 写入后返回，若 leader 崩溃且未复制到 ISR，消息丢失
-- `acks=all`（或 -1）：leader + ISR 全部写入后返回，最强一致性
+消息进哪个分区由 key 决定：`hash(key) % 分区数`。同一 key 永远落同一分区——局部有序性按 key 粒度获得（如同一订单的全部事件）。
 
-### 零拷贝（Zero-Copy）技术
+### 生产端的三档确认与幂等
 
-传统 I/O 需要 4 次数据拷贝：
+`acks` 配置决定"写入算成功"的位置：
+
+| 配置 | 成功条件 | 风险 |
+|---|---|---|
+| `acks=0` | 发出去就算 | leader 未落盘即崩，丢 |
+| `acks=1` | leader 写入本地日志 | leader 崩前未同步 follower，丢 |
+| `acks=all` | ISR 全部写入 | 不丢（代价：延迟随最慢 ISR 成员走） |
+
+重试会引入重复：生产者没收到 `acks=all` 的响应而重发，broker 其实已写过一次。**幂等生产者**（`enable.idempotence=true`，3.0 起默认开）给每个生产者分配 PID、每分区消息配单调递增序列号，broker 按 `(PID, 序列号)` 去重——网络重试在同一会话内不再产生重复记录。**事务**再往上走一步：`sendOffsetsToTransaction` 把"消费位点 + 产出消息 + 业务写入"包进一个跨分区原子单元，支撑流处理的端到端恰好一次。
+
+### 消费端：offset 的提交时机决定语义
+
+消费 = 读日志 + 推进 offset。语义的开关只有一个：**先提交还是先处理**：
+
+```text
+先提交 offset 再处理 → 处理中途崩溃，这条消息不会再被读到 → at-most-once
+先处理再提交 offset → 处理完崩溃未提交，重启后重读       → at-least-once（默认现实）
 ```
-磁盘 → 内核缓冲区 → 用户缓冲区 → socket 缓冲区 → 网卡
-```
 
-Kafka 使用 **sendfile()** 系统调用实现零拷贝：
-```
-磁盘 → 内核缓冲区（Page Cache）→ 网卡
-```
+所谓 exactly-once 在消费侧并不存在"开关"——它要求"处理结果与 offset 推进"原子化：要么 Kafka 事务（产出回 Kafka 的场景），要么业务侧幂等（结果写库时以业务主键去重，offset 与结果同事务提交到外部存储）。手动提交的骨架（未实测）：
 
-数据直接从 Page Cache 传到 socket 缓冲区，无需经过用户态。Linux 的 `transferTo()` 方法实现此优化，可将吞吐提升 2-3 倍。
-
-**零拷贝的数学约束**：sendfile() 要求数据在 Page Cache 中连续。若数据已被换出或分散在多处，零拷贝可能退化为普通拷贝。
-
-### 分区策略与消息顺序保证
-
-Kafka 只保证 **单个分区内消息有序**，跨分区无顺序保证。
-
-分区决策：
 ```java
-// 默认：按 key 的 hash 分配
-partition = Utils.abs(key.hashCode()) % partitions.size();
-
-// 自定义分区器可实现业务规则
-public class RegionPartitioner implements Partitioner {
-    public int partition(String topic, Object key, byte[] keyBytes,
-                         Object value, byte[] valueBytes,
-                         Cluster cluster) {
-        String region = extractRegion(key);
-        List<PartitionInfo> partitions = cluster.partitionsForTopic(topic);
-        // 按区域哈希到特定分区集合
-        return ...;
-    }
+props.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, false);
+while (true) {
+    var records = consumer.poll(Duration.ofMillis(500));
+    for (var r : records) process(r);        // 先处理
+    consumer.commitSync();                   // 再提交
 }
 ```
 
-**顺序保证的场景**：若需要全局顺序，只能用单分区 Topic——但这会成为性能瓶颈。
+### 再平衡：从全局停摆到服务端协调
 
-### 消费者组 offset 管理机制
+消费组成员变化（扩容、宕机、心跳超时）触发**再平衡（rebalance）**：分区在成员间重新分配。旧协议（ eager 协议）由消费者自行协商，过程是 stop-the-world——全员撤销全部分区、重新分配、再恢复，期间消费完全停顿；成员抖动会引发连续再平衡风暴。
 
-Consumer 提交 offset 表示"已成功处理到第 X 条消息"：
+Kafka 4.0 GA 的**新消费组协议（KIP-848）** 把协调权从消费者挪到 broker 的组协调器：分配由服务端增量计算，消费者只需上交/认领变动的分区，未变动的分区持续消费不停顿。这是 4.0 最值得升级的理由之一（另一个是下面一条）。
 
-**自动提交（`enable.auto.commit=true`）**：
-- `auto.commit.interval.ms` 间隔自动提交
-- 问题：Consumer 处理成功但提交前崩溃 → 重复消费
+### KRaft：元数据也是日志
 
-**手动提交（`enable.auto.commit=false`）**：
-- Consumer 显式调用 `consumer.commitSync()` 或 `commitAsync()`
-- **at-least-once**：先处理，再提交。若处理后崩溃，offset 未提交 → 重读
-- **exactly-once**：在事务内同时提交 offset 和业务结果
+3.x 之前 Kafka 的元数据（分区分配、controller 选举）寄存在 ZooKeeper——两套分布式系统、两倍的运维面。KRaft 模式把元数据本身做成一条内部日志（`__cluster_metadata`），由 controller 法定人数（quorum）用 Raft 复制。3.3 起 KRaft 可用于生产，4.0（2025-03）彻底删除 ZooKeeper 代码路径——仍在 ZK 模式的集群必须先经 3.x 迁移到 KRaft，才能升 4.0。这是"约束的产物"：不是 ZK 不好，是"一个系统的元数据寄存在另一个系统里"这条外部依赖本身就是故障与复杂度的源头。
 
-**offset 持久化存储**：
-- 默认：Kafka 内部 `__consumer_offsets` Topic
-- 可配置为外部存储（如数据库），支持 exactly-once 语义
+### 边界：Kafka、RocketMQ、Pulsar
 
-### 控制器（Controller）的选举机制
+三者都是持久化日志族，分化在调度策略：
 
-每个 Kafka 集群有一个 Controller（通过 ZK/RAFT 选举）。
+- **RocketMQ**（写作时 5.3.x）：为交易场景做了功能加料——定时/延迟消息、事务消息、按 tag 的 SQL92 过滤；单机海量 topic（万级）不劣化。中文电商生态的事实标准。
+- **Pulsar**（4.0 LTS 2024-10，写作时 4.x 线）：存算分离——broker 无状态，存储交给 BookKeeper bookie 集群，扩容和故障恢复不搬数据；原生多租户与分层存储（冷数据卸载到 S3）。代价是多一套 BookKeeper 集群。
+- **Kafka**：吞吐与生态的重心——Kafka Streams/Flink 流处理、Connect 连接器、KRaft 之后的运维简化；分区模型简单可预测，但分区即文件句柄，海量 topic（十万级）场景是其弱项。
 
-Controller 职责：
-1. 管理分区 Leader 选举
-2. 监控 Broker 存活
-3. 触发分区副本分配
-
-**Controller 选举的 Raft 共识**：
-
-Kafka 3.x+ 使用 KRaft（基于 Raft）替代 ZK：
-
-```
-节点状态：FOLLOWER / CANDIDATE / LEADER
-
-选举过程：
-1. 节点转为 CANDIDATE，给自己投票
-2. 向其他节点发送 RequestVote
-3. 若获得多数投票 → 成为 LEADER
-4. 若收到更高 term 的消息 → 转为 FOLLOWER
-
-数学保证：多数票决确保唯一 Leader
-```
-
-**Raft 的安全性不变量**：
- $\text{Leader} \Rightarrow \text{已提交日志条目复制到多数节点}$ 
+选型一句话：通用流数据管道默认 Kafka；交易消息语义选 RocketMQ；超大规模多租户与存算分离诉求选 Pulsar。
 
 ---
 
-## 参考存根
-
-```java
-// 展示 Kafka 事务的 exactly-once 语义（简化版）
-@Configuration
-public class KafkaTransactionConfig {
-    @Bean
-    public KafkaTemplate<String, String> kafkaTemplate(
-            ProducerFactory<String, String> pf) {
-        // 开启事务
-        pf.setTransactionIdPrefix("tx-");
-        return new KafkaTemplate<>(pf);
-    }
-}
-
-@Service
-public class OrderService {
-    private final KafkaTemplate<String, String> kafkaTemplate;
-
-    @Transactional
-    public void processOrder(Order order) {
-        // 1. 处理订单（写本地 DB）
-        orderRepository.save(order);
-
-        // 2. 发送消息到 Kafka（与本地 DB 操作原子）
-        kafkaTemplate.send("order-topic", order.getId().toString(),
-            objectMapper.writeValueAsString(order));
-
-        // 3. 业务操作 + Kafka 发送在事务提交时一起提交
-        // 若业务回滚，Kafka 消息也不会发送
-    }
-}
-
-// 展示幂等 Producer 的配置
-@Configuration
-public class IdempotentProducerConfig {
-    @Bean
-    public ProducerFactory<String, String> producerFactory() {
-        Map<String, Object> config = new HashMap<>();
-        config.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, "localhost:9092");
-        config.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
-        config.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
-        // 启用幂等生产者
-        config.put(ProducerConfig.ENABLE_IDEMPOTENCE_CONFIG, true);
-        // 确保幂等性的强一致性
-        config.put(ProducerConfig.ACKS_CONFIG, "all");
-        config.put(ProducerConfig.RETRIES_CONFIG, Integer.MAX_VALUE);
-        config.put(ProducerConfig.MAX_IN_FLIGHT_REQUESTS_PER_CONNECTION, 5);
-        return new DefaultKafkaProducerFactory<>(config);
-    }
-}
-```
+> 前置：[03-Redis](03-Redis.md) · 后续：[05-搜索与NoSQL](05-搜索与NoSQL.md)——消息日志之外，另一类专用存储：检索与文档

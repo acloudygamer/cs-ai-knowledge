@@ -1,554 +1,171 @@
-# Spring 框架
+# Spring 核心：IoC 容器与 AOP
 
-## 定义
+> 前置：[05-反射与动态代理](../03-JVM与运行时/05-反射与动态代理.md)（代理机制的语言层基础） · 后续：[02-持久化框架](02-持久化框架.md)
 
-Spring Framework 的本质是一个**控制反转（IoC）容器**，通过依赖注入（DI）实现对象生命周期的管理，将对象间依赖关系的构建责任从应用代码转移给容器。框架同时通过 AOP（面向切面编程）将横切关注点（事务、安全、日志）与业务逻辑解耦。
+> **版本基准**：Spring Framework 7.0 / Spring Boot 4.0（GA 2025-11-20，基线 Java 17+、Jakarta EE 11、Jackson 3）；写作时（2026-09）最新为 Spring Boot 4.1（GA 2026-06）。框架示例均为**骨架，未实测**；标注"实测"的段落以 Temurin JDK 25.0.4.1 编译运行（`javac --release 21`）验证。
 
-Spring Boot 的本质是 **约定优于配置** 的自动化框架，通过 `spring-boot-autoconfigure` 模块实现classpath 依赖的自动感知和 Bean 的条件注册，将原本需要手动配置的 Spring 应用转变为"添加依赖即可运行"的零配置体验。
+Spring Framework 的本质是一个**对象装配器**：业务对象之间"谁创建谁、按什么顺序创建、谁引用谁"这组连接关系，从各个类的构造代码里被抽走，集中到容器手中统一接线。Spring Boot 在此基础上加一层**条件化自动装配**：按 classpath 上的实际依赖决定装哪些 Bean。本篇只讲这两层地基——IoC 容器与 AOP；它们之上的持久化、Web、微服务设施见后续各篇。
 
-**核心价值**：
-- **解耦**：对象不再负责依赖的创建，依赖由外部注入
-- **可测性**：依赖可通过Mock替换，单元测试更简单
-- **可维护性**：对象关系在配置中显式声明，变更影响可追踪
-- **自动配置**：classpath检测 → 条件评估 → Bean注册
-- **starter依赖**：一键引入全套依赖栈
-- **嵌入式服务器**：无需部署WAR，直接运行JAR
-- **生产就绪**：健康检查、指标监控开箱即用
+## 本质
 
----
+**IoC 容器（Inversion of Control Container，控制反转容器）** 是一个 Bean 注册中心兼装配车间：它读取 Bean 定义（`BeanDefinition`：类名、作用域、依赖清单），按依赖关系排出实例化顺序，创建对象并注入依赖，最后把成品放进单例池。控制"反转"的落点：对象不再 `new` 自己的协作者，只声明需要什么——创建权从应用代码反转给容器。
 
-## 数学模型
+容器的上游是配置源（注解扫描、`@Configuration` 类、XML），下游是被装配好的业务对象图；中间隔着一条明确的流水线：
 
-### 依赖注入的图论建模
-
-将应用视为有向图 $G = (V, E)$ ，其中顶点集 $V$ 表示 Bean，边 $(a, b) \in E$ 表示 Bean $a$ 依赖 Bean $b$ 。IoC 容器的核心职责是 **拓扑排序**：确保所有依赖在被注入前已完成初始化。 ，其中顶点集 $V$ 表示 Bean，边 $(a, b) \in E$ 表示 Bean $a$ 依赖 Bean $b$ 。IoC 容器的核心职责是 **拓扑排序**：确保所有依赖在被注入前已完成初始化。 表示 Bean，边 $(a, b) \in E$ 表示 Bean $a$ 依赖 Bean $b$ 。IoC 容器的核心职责是 **拓扑排序**：确保所有依赖在被注入前已完成初始化。 表示 Bean $a$ 依赖 Bean $b$ 。IoC 容器的核心职责是 **拓扑排序**：确保所有依赖在被注入前已完成初始化。 依赖 Bean $b$ 。IoC 容器的核心职责是 **拓扑排序**：确保所有依赖在被注入前已完成初始化。 。IoC 容器的核心职责是 **拓扑排序**：确保所有依赖在被注入前已完成初始化。
-
-设 $\text{in-degree}(v)$ 表示节点 $v$ 的入度（依赖数量），则有效注入的必要条件是： 表示节点 $v$ 的入度（依赖数量），则有效注入的必要条件是： 的入度（依赖数量），则有效注入的必要条件是：
- $\forall (a, b) \in E: \text{init-order}(b) < \text{init-order}(a)$ 
-
-**循环依赖检测**：若图中存在环（循环依赖），拓扑排序不存在，容器启动失败。
-
-**Spring的循环依赖处理**：
-- 构造函数循环依赖：**无法解决**，启动失败
-- setter注入循环依赖：**通过三级缓存解决**
-
-### 三级缓存机制
-
-Spring解决setter循环依赖的三级缓存：
-
-```
-一级缓存（singletonObjects）：完全成熟的单例Bean
-二级缓存（earlySingletonObjects）：提前暴露的Bean（未完成属性注入）
-三级缓存（singletonFactories）：Bean工厂，解决循环依赖
+```text
+配置源 ──解析──> BeanDefinition 注册表 ──拓扑排序──> 实例化+注入 ──> 单例池
+                                        循环依赖在此期失败
 ```
 
-**循环依赖解决流程**：
-1. A创建中，属性注入B，发现缓存无B
-2. B创建中，属性注入A，从三级缓存获取A的工厂
-3. 工厂创建A的早期引用，存入二级缓存
-4. B完成创建，存入一级缓存
-5. A获取到B的引用，完成创建
-
-### Bean 作用域的资源约束
-
-| 作用域 | 实例数量上界 | 线程安全约束 |
-|--------|-------------|-------------|
-| singleton | 1 | 需要外部同步 |
-| prototype | $\infty$ | 每次新建，无共享状态 | | 每次新建，无共享状态 |
-| request | $\infty$ （按HTTP请求） | 线程局部，非线程安全 | （按HTTP请求） | 线程局部，非线程安全 |
-| session | $\infty$ （按HTTP会话） | 会话局部，非线程安全 | （按HTTP会话） | 会话局部，非线程安全 |
-| application | 1（ServletContext生命周期） | 需要外部同步 |
-| websocket | $\infty$ （WebSocket生命周期） | 非线程安全 | （WebSocket生命周期） | 非线程安全 |
-
-### Spring AOP 的切面优先级数学
-
-多个切面同时作用于同一连接点时，执行顺序由优先级决定：
-
- $\text{Order}(A_1) < \text{Order}(A_2) \Rightarrow A_1 \text{ 先于 } A_2 \text{ 执行（around 通知）}$ 
-
-**around 通知的栈模型**：
-```
-@Around("pcd()")
-public Object around(ProceedingJoinPoint pjp) {
-    // before logic
-    Object result = pjp.proceed(); // 调用链中下一个通知或目标方法
-    // after logic
-    return result;
-}
-```
-
-around 通知形成**嵌套调用栈**，与递归类似：
-
- $R_n \circ R_{n-1} \circ \cdots \circ R_1 \circ T$ 
-
-其中 $R_i$ 为第 $i$ 个 around 通知， $T$ 为目标方法。 为第 $i$ 个 around 通知， $T$ 为目标方法。 个 around 通知， $T$ 为目标方法。 为目标方法。
-
-### 自动配置的贝叶斯条件概率模型
-
-将每个 `@Conditional` 注解视为一个条件事件。设 $C_i$ 为"第 $i$ 个条件满足"事件， $B$ 为"某 AutoConfiguration 注册"事件。Spring Boot 计算后验概率： 为"第 $i$ 个条件满足"事件， $B$ 为"某 AutoConfiguration 注册"事件。Spring Boot 计算后验概率： 个条件满足"事件， $B$ 为"某 AutoConfiguration 注册"事件。Spring Boot 计算后验概率： 为"某 AutoConfiguration 注册"事件。Spring Boot 计算后验概率：
-
- $P(B | C_1, C_2, ..., C_n) = \prod_{i=1}^{n} P(C_i | B)$ 
-
-实际执行时，Spring 逐条件求值（AND 逻辑），任意一个 $P(C_i) = 0$ 则 $B$ 不注册。 则 $B$ 不注册。 不注册。
-
-**归约视角**：自动配置问题可归约为**布尔公式的可满足性（SAT）问题**——所有条件 conjuncts 必须同时为真。
-
-### 事件发布-订阅的有限状态机模型
-
-Spring ApplicationEvent 可以建模为 **有限状态自动机（FSA）**：
-
-- 状态集 $S = \{\text{NEW}, \text{PUBLISHED}, \text{MULTICASTING}, \text{DELIVERED}\}$ 
-- 事件 $E = \{\text{publish}, \text{multicast}, \text{deliver}\}$ 
-- 初始状态：NEW
-- 终止状态：DELIVERED
-
-状态转换函数 $\delta: S \times E \rightarrow S$ ： ：
-
-| 当前状态 | 事件 | 下一状态 |
-|---------|------|---------|
-| NEW | publish | PUBLISHED |
-| PUBLISHED | multicast | MULTICASTING |
-| MULTICASTING | deliver | DELIVERED |
-
-**FSA 不变量**：
- $\forall s \in S, \forall e \in E: \delta(s, e) \text{ 是良定义的（无未定义转换）}$ 
-
-`@TransactionalEventListener` 添加了一个 **guard condition**（事务提交后）：只有当发布线程的事务提交成功，才允许状态转换到 MULTICASTING。
-
-### Spring Boot 自动配置的偏序关系
-
-`@AutoConfigureBefore` 和 `@AutoConfigureAfter` 定义配置类的加载顺序：
-
-```
-@AutoConfigureAfter(DataSourceAutoConfiguration.class)
-public class MyAutoConfiguration { ... }
-```
-
-设配置类集合 $C$ ，偏序关系 $\prec$ ： ，偏序关系 $\prec$ ： ：
- $A \prec B \iff A \text{ 在 } B \text{ 之前加载}$ 
-
-若存在环形依赖（ $A \prec B \prec C \prec A$ ），Spring Boot 启动失败。 ），Spring Boot 启动失败。
-
-**约束检测算法**：检测偏序集中的环，等价于在有向图中检测环——可使用 Kahn 算法或 DFS。若拓扑排序后仍有未处理节点，则存在环。
-
----
-
-## 数据流
-
-<pre>
-Spring IoC 容器初始化
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-│  1. BeanDefinition 注册                                           │
-│     配置 → BeanDefinitionMap (ConcurrentHashMap)                  │
-│            ↓                                                      │
-│  2. 依赖解析 + 拓扑排序                                           │
-│     检查循环依赖 → 计算初始化顺序                                    │
-│            ↓                                                      │
-│  3. Bean 实例化（按拓扑序）                                        │
-│     singleton beans → 在容器刷新时全部实例化                       │
-│     prototype beans → 每次 getBean() 时新建                        │
-│            ↓                                                      │
-│  4. 属性注入（DI）                                                │
-│     Constructor Injection → 在构造时完成                           │
-│     Setter Injection → 实例化后调用 setter 完成                   │
-│            ↓                                                      │
-│  5. 生命周期回调                                                 │
-│     InitializingBean.afterPropertiesSet()                         │
-│     @PostConstruct                                               │
-│     init-method                                                  │
-└─────────────────────────────────────────────────────────────────┘
-
-AOP 代理创建时机
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-目标 Bean 实例化
-        ↓
-BeanPostProcessor.postProcessAfterInitialization()
-        ↓
-若匹配切面：
-  - JDK 动态代理：实现相同接口
-  - CGLIB：继承目标类
-        ↓
-返回代理对象（替换原始 Bean）
-
-客户端调用：
-  proxy.someMethod() → 拦截 → 通知链 → 目标方法
-
-SpringApplication.run() 执行路径
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-│
-├─[1] Bootstrap Context 初始化
-│   配置源优先级链生效（高→低）：
-│   命令行参数 > ServletConfigParam > ServletContextParam
-│    > application-{profile}.yml > application.yml > 默认值
-│
-├─[2] ApplicationContext 创建
-│   │
-│   └─[3] BeanDefinition 加载阶段
-│       │
-│       ├─ @ComponentScan → 扫描 + 注册
-│       ├─ @Import → 导入配置类
-│       └─ @EnableConfigurationProperties → 绑定配置属性
-│
-├─[4] 容器刷新（AbstractApplicationContext.refresh()）
-│   │
-│   ├─ prepareBeanFactory() — 填充 BeanFactory 预设
-│   ├─ invokeBeanFactoryPostProcessors() — 执行后置处理器
-│   │   └─ ConfigurationClassPostProcessor
-│   │       └─ 解析 @Bean, @ComponentScan, @Import
-│   ├─ registerBeanPostProcessors() — 注册后置处理器
-│   │   └─ 排序 + 注册到 BeanFactory
-│   ├─ initMessageSource() — i18n 消息源
-│   ├─ initApplicationEventMulticaster() — 事件广播器
-│   ├─ onRefresh() — 子类扩展（如 WebFlux 创建 Reactor)
-│   ├─ registerListeners() — 注册静态监听器
-│   ├─ finishBeanFactoryInitialization() — 单例预实例化
-│   │   └─ BeanFactory.preInstantiateSingletons()
-│   └─ finishRefresh() — 发送 ContextRefreshedEvent
-│
-└─[5] ApplicationRunner / CommandLineRunner 执行
-    └─ 按 @Order 排序，同 Order 内随机
-</pre>
-
----
+**AOP（Aspect-Oriented Programming，面向切面编程）** 的本质是**代理拦截**：事务、安全、缓存这类横切逻辑不写进业务方法，而是织入到包裹业务对象的代理里。Spring AOP 的实现就是 Java 动态代理（[05-反射与动态代理](../03-JVM与运行时/05-反射与动态代理.md)）的工业化封装——容器在 Bean 初始化后用代理对象替换原始对象，方法调用先经过通知链，再到真实方法。
 
 ## 机制
 
-### IoC 容器为何需要控制反转
+### 装配即拓扑排序
 
-传统程序中，对象通过 `new` 直接创建依赖：
+把应用看成一张有向图：顶点是 Bean，边 `A → B` 表示"A 依赖 B"。容器启动时做的事等价于对这张图做拓扑排序——B 必须先于 A 完成初始化。这解释了三个可观察行为：
+
+1. **循环依赖在启动期爆炸**（构造器注入时）：拓扑排序不存在，`BeanCurrentlyInCreationException`。这是好事——错误暴露在第 0 秒而不是第一次请求。
+2. **setter 注入的循环依赖可以幸存**：容器用三级缓存暴露"早期引用"——A 实例化后、属性填充前，先把 A 的引用放进缓存；B 装配时能拿到这个未完成但已存在的 A。代价是图上出现环这件事被静默放过，设计异味被技术兜底掩盖。
+3. **装配失败信息沿依赖链给出**：容器报错的本质是把拓扑排序失败的环或缺失顶点打印出来。
+
+### 依赖注入的三种方式
+
+同一根管子有三个接口位置，约束各不相同：
+
+| 方式 | 写法 | 不可变性 | 循环依赖 | 可测试性 |
+|---|---|---|---|---|
+| 构造器注入 | 依赖走构造参数 | 可声明 `final` | 启动期暴露（推荐） | new 出来即可单测 |
+| setter 注入 | `@Autowired` 标在 setter 上 | 否 | 三级缓存兜底 | 需先 new 再 set |
+| 字段注入 | `@Autowired` 标在字段上 | 否 | 运行期才暴露 | 离开容器无法注入（要反射） |
+
+构造器注入是当前的推荐写法（Spring Framework 4.3 起单构造器可省略 `@Autowired`）：`final` 字段保证依赖在对象诞生时就位，"部分初始化的对象"在编译期就被消灭。
+
+### Bean 生命周期：代理在何时换人
+
+一个单例 Bean 从注册表到单例池的完整路径：
+
+```text
+实例化（new）
+  → 属性填充（注入依赖）
+  → BeanPostProcessor.postProcessBeforeInitialization
+  → @PostConstruct / init-method
+  → BeanPostProcessor.postProcessAfterInitialization   ← AOP 代理在这里换人
+  → 放入单例池，对外服务
+  → 容器关闭：@PreDestroy / destroy-method
+```
+
+`BeanPostProcessor` 是容器的总扩展口：`@Autowired` 的解析、`@PostConstruct` 的执行、AOP 代理的创建，都是注册在容器里的后置处理器干的。AOP 的时机由此确定——**初始化完成后**，后置处理器检查该 Bean 是否命中切面，命中则返回代理对象而非原始对象。单例池里躺着的从一开始就是代理。
+
+### AOP 代理的两种实现与一条铁律
+
+| | JDK 动态代理 | CGLIB |
+|---|---|---|
+| 原理 | 运行时生成实现相同接口的类（`$Proxy0`） | 运行时生成目标类的子类 |
+| 前提 | 目标必须实现接口 | 目标类与方法不能 `final` |
+| Spring 默认 | 有接口时（Framework 传统默认） | Spring Boot 2.0 起默认 `proxyTargetClass=true`，统一走 CGLIB |
+
+无论哪种，都存在一条铁律：**拦截发生在代理边界上**。调用从外部穿过代理才会经过通知链；目标对象内部的 `this.xxx()` 自调用不经过代理，切面静默失效——同类中无注解方法调用 `@Transactional` 方法是这条铁律最著名的踩坑点。
+
+实测（Temurin 25.0.4.1，纯 JDK 动态代理复现该机制）：
+
 ```java
-// 紧耦合：UserService 直接创建自己的依赖
-public class UserService {
-    private UserRepository repo = new JdbcUserRepository();
+interface OrderService { void create(); void createThenAudit(); }
+
+class OrderServiceImpl implements OrderService {
+    public void create() { System.out.println("    [target] create 落库"); }
+    public void createThenAudit() {          // 自调用：audit() 不经过代理
+        create();
+        audit();
+    }
+    private void audit() { System.out.println("    [target] audit 落库"); }
 }
-```
 
-问题在于：`UserRepository` 的具体实现被硬编码在 `UserService` 中。若需要切换到 `JpaUserRepository`，必须修改 `UserService` 源码。
-
-**依赖倒置原则（DIP）**：
-- 高层模块不应依赖低层模块
-- 两者都应依赖抽象
-- 抽象不应依赖细节，细节应依赖抽象
-
-IoC 容器通过将依赖的实例化责任转移，使 `UserService` 只声明"我需要什么"，而不负责"如何获取"。
-
-### IoC 容器的归约模型
-
-IoC 容器可归约为**有向无环图（DAG）的拓扑排序问题**：
-
-1. **图构建阶段**：解析 `@Autowired`、`@Inject` 或构造函数参数，建立依赖图 $G = (V, E)$ 
-2. **拓扑排序阶段**：使用 Kahn 算法或深度优先后序遍历计算初始化顺序
-3. **实例化阶段**：按拓扑序实例化 Bean
-
-**Kahn 算法的不变量**：
- $\text{init-order}(v) = \text{topo-index}(v)$ 
-
-当图中存在环时，Kahn 算法的入度队列最终为空但未处理所有节点——这是 Spring 检测循环依赖的数学原理。
-
-### AOP 的本质：方法拦截的职责链
-
-AOP 切面的执行依赖于代理对象的拦截链。当客户端调用被代理方法时：
-
-```
-调用 proxy.someMethod()
-    ↓
-DelegatingMethod切面 → 前置通知 (Before)
-    ↓
-CGLIB/JDK Proxy 拦截 → 调用目标方法
-    ↓
-返回结果途经切面 → 后置通知 (AfterReturning)
-    ↓
-或异常途经切面 → 异常通知 (AfterThrowing)
-    ↓
-最终通知 (AfterFinally)
-```
-
-**约束条件**：
-- 代理方法必须是 `public`，protected/private 方法无法被拦截（除非通过 AspectJ 编译时/加载时织入）
-- 自调用（同一个 Bean 内部方法调用）不经过代理，因此切面无效——这是 Spring AOP 的著名陷阱
-
-**违反约束的后果**：若在同一 Bean 内调用带事务注解的方法，事务不会生效，因为绕过了代理。
-
-### 自动配置的条件判断机制
-
-`@Conditional` 系列注解在 `ConfigurationClassPostProcessor` 中逐个评估，决定 Bean 是否注册：
-
-- `@ConditionalOnClass`：检查 classpath 是否有某类——使可选依赖成为自动配置的前提
-- `@ConditionalOnMissingBean`：确保用户自定义 Bean 优先于自动配置——尊重用户意图
-- `@ConditionalOnProperty`：实现配置开关（如 `spring.rabbitmq.enabled=false` 可禁用某自动配置）
-- `@ConditionalOnBean`：检查某 Bean 是否存在
-- `@ConditionalOnMissingClass`：检查某类是否不存在
-
-**优先级链**：用户显式注册的 Bean > 用户自定义配置类 > Spring Boot 自动配置。
-
-### 构造函数注入为何是最佳实践
-
-| 注入方式 | 不可变性 | 可测试性 | 循环依赖检测 |
-|---------|---------|---------|-------------|
-| 构造函数注入 | ✅ final 可声明 | ✅ mock 传入 | ✅ 启动时失败 |
-| Setter 注入 | ❌ | ✅ | ❌ 运行时失败 |
-| 字段注入 | ❌ | ❌ 需要反射 | ❌ 运行时失败 |
-
-构造函数注入迫使依赖在对象构造时完全初始化。Java 编译器确保了构造函数的完整执行，使得部分初始化的对象无法存在。
-
-### BeanPostProcessor 的扩展机制
-
-`BeanPostProcessor` 是 Spring 框架最重要的扩展点之一：
-
-```java
-public interface BeanPostProcessor {
-    Object postProcessBeforeInitialization(Object bean, String beanName);
-    Object postProcessAfterInitialization(Object bean, String beanName);
-}
-```
-
-**执行时机**：
-- `postProcessBeforeInitialization`：在 `afterPropertiesSet` 和 init-method 之前
-- `postProcessAfterInitialization`：在 `afterPropertiesSet` 和 init-method 之后
-
-**常见用途**：
-- `AutowiredAnnotationBeanPostProcessor`：处理 `@Autowired` 和 `@Value`
-- `CommonAnnotationBeanPostProcessor`：处理 `@PostConstruct` 和 `@PreDestroy`
-- `AnnotationAwareAspectJAutoProxyCreator`：创建 AOP 代理
-
-### 条件装配的偏序关系
-
-`@Conditional` 注解之间存在隐式偏序：Spring Boot 2.x 的 `@EnableAutoConfiguration` 使用 `AutoConfigurationImportSelector`，读取 `META-INF/spring.factories`；Spring Boot 3.x 改为 `META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports`，结构更清晰。
-
-**隐式偏序的数学描述**：设条件集合 $C = \{c_1, c_2, ..., c_n\}$ ，求值顺序构成一个偏序集。偏序关系由条件间的依赖决定： ，求值顺序构成一个偏序集。偏序关系由条件间的依赖决定：
- $c_i \prec c_j \iff \text{求值 } c_i \text{ 是求值 } c_j \text{ 的前提}$ 
-
-### @ConfigurationProperties 的松散绑定数学本质
-
-Spring Boot 支持三种命名风格自动映射：
-- `app-name` (kebab-case)
-- `app_name` (snake_case)
-- `appName` (camelCase)
-
-设属性名为 $s$ ，字段名为 $f$ ，松散绑定关系 $s \approx f$ 由 `RelaxedDataBinder` 定义： ，字段名为 $f$ ，松散绑定关系 $s \approx f$ 由 `RelaxedDataBinder` 定义： ，松散绑定关系 $s \approx f$ 由 `RelaxedDataBinder` 定义： 由 `RelaxedDataBinder` 定义：
-
-| 风格转换 | 规则 |
-|---------|------|
-| kebab → camel | `app-name` → `appName` |
-| snake → camel | `app_name` → `appName` |
-| dot → underscore | `app.name` → `app_name` |
-
-**归约视角**：松散绑定本质上是**字符串重写系统的等价类划分**。每种命名风格是同一语义实体的不同表示，通过重写规则映射到规范形式（camelCase）。
-
-**数学定义**：设等价关系 $\sim$ ，则： ，则：
- $s \sim f \iff \text{normalize}(s) = \text{normalize}(f)$ 
-
-### @TransactionalEventListener 的事务边界语义
-
-```
-普通事件发布：
-    T1: publishEvent()
-            ↓
-        同步执行所有监听器（在发布者线程）
-            ↓
-        事务提交前监听器已执行完毕
-
-@TransactionalEventListener：
-    T1: publishEvent()
-            ↓
-        事件存入 TransactionSynchronizationManager 队列
-            ↓
-        T1: 业务逻辑执行 → 事务提交
-            ↓
-        T1: 事务提交后，触发 synchronization.afterCommit()
-            ↓
-        异步执行监听器（或按 transaction_manager 同步执行）
-```
-
-**约束条件**：
-- 若事务回滚，事件不发送——这是"业务成功才通知"的语义保证
-- 若事件监听器抛异常，不影响已提交的事务（监听器在事务外执行）
-
-**违反约束的后果**：若监听器内执行数据库写操作且未声明独立事务，该操作将在新事务中执行，与原业务操作不在同一原子范围内。
-
-### 懒加载的代价-收益分析
-
-设应用有 $N$ 个 Bean，其中 $k$ 个是启动时不需要的： 个 Bean，其中 $k$ 个是启动时不需要的： 个是启动时不需要的：
-
-**即时加载**：
-- 启动时间代价： $T_{\text{eager}} = \sum_{i=1}^{N} T_{\text{init}}(i)$ 
-- 首次请求时间： $T_{\text{first}} = O(1)$ 
-
-**懒加载**：
-- 启动时间代价： $T_{\text{lazy}} = \sum_{i=1}^{N-k} T_{\text{init}}(i)$ 
-- 首次请求时间： $T_{\text{first}} = \sum_{j \in \text{needed}} T_{\text{init}}(j)$ 
-
-若懒加载 Bean 在请求时才初始化，且应用启动后立即接收请求，则 $T_{\text{first}}$ 延迟增加。Spring Boot 2.2+ 的 `spring.main.lazy-initialization=true` 全局启用懒加载，适用于启动速度优先的场景。 延迟增加。Spring Boot 2.2+ 的 `spring.main.lazy-initialization=true` 全局启用懒加载，适用于启动速度优先的场景。
-
-**收益-代价权衡的不变量**：
- $T_{\text{eager}} - T_{\text{lazy}} = \sum_{j \in \text{lazy}} T_{\text{init}}(j)$ 
-
-### DevTools 的自动重启机制
-
-Spring Boot DevTools 使用 **类加载器替换** 实现快速重启：
-
-```
-标准重启：
-    停止 JVM → 重新加载所有类 → 重启应用（5-10s）
-
-DevTools 重启：
-    触发变更 → 杀死 DevTools 类加载器
-    → 创建新的 Base 类加载器（不重启）
-    → 保留 Restart 类加载器中的 Bean 实例
-    → 替换类引用 → 耗时 < 1s
-```
-
-**类加载器分离**：
-- **Base 类加载器**：第三方库（不重启）
-- **Restart 类加载器**：项目代码（重启时重新加载）
-
-**内存模型约束**：Restart 类加载器中的 Bean 实例持有旧类加载器的类引用。重启后，新类加载器加载的类与旧实例类型不兼容——因此 DevTools 只能重启应用，不能热替换。
-
-### 深度：自动配置的SPI机制
-
-#### SpringFactoriesLoader 的工作原理
-
-Spring Boot 使用 `SpringFactoriesLoader` 加载 `META-INF/spring.factories`（2.x）或 `META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports`（3.x）：
-
-```java
-// 加载流程
-List<String> factories = SpringFactoriesLoader.loadFactoryNames(
-    AutoConfiguration.class,
-    classLoader
-);
-// 返回所有自动配置类的全限定名
-```
-
-**文件格式（2.x）**：
-```properties
-# META-INF/spring.factories
-org.springframework.boot.autoconfigure.EnableAutoConfiguration=\
-  org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration,\
-  org.springframework.boot.autoconfigure.orm.jpa.HibernateJpaAutoConfiguration
-```
-
-**归约视角**：SPI 机制可归约为**配置文件解析 + 反射实例化**的组合模式，本质是利用 Java 的 ServiceLoader 规范实现运行时发现。
-
-#### 条件注解的求值顺序
-
-`@ConditionalOnClass` → `@ConditionalOnBean` → `@ConditionalOnProperty` → `@ConditionalOnMissingBean`
-
-**求值顺序的原因**：
-1. 先检查类是否存在（避免 ClassNotFoundException）
-2. 再检查Bean是否存在
-3. 最后检查配置属性
-
-**数学约束**：若改变求值顺序，可能导致：
-- `@ConditionalOnBean` 在类不存在时被误判为不满足（抛出 ClassNotFoundException 而非返回 false）
-- `@ConditionalOnProperty` 在 Bean 未注册时被误判
-
----
-
-## Spring循环依赖深度解析
-
-### 三级缓存解决循环依赖的数学证明
-
-设Bean A和Bean B互相依赖（setter注入），证明三级缓存可解决：
-
-**初始化状态**：
-- A创建中：放入三级缓存 `singletonFactories`
-- B创建中：需要A的依赖
-
-**获取早期引用**：
-- B从三级缓存获取A的ObjectFactory
-- 调用 `getObject()` 获取早期A引用
-- 早期A引用存入二级缓存 `earlySingletonObjects`
-- B完成创建，存入一级缓存
-
-**A获取B的引用**：
-- A从一级缓存获取B的完整引用
-- A完成创建，存入一级缓存
-
-**数学保证**：
-$$
-\exists \text{ path } A \rightarrow B \rightarrow A \implies \text{循环依赖可解}
-$$
-
-当且仅当依赖关系是**非构造函数依赖**时成立。
-
-**归约模型**：三级缓存机制可归约为**图的早期顶点暴露问题**。在标准拓扑排序中，只有当所有入边指向的顶点都已处理完毕后，顶点才能被暴露。三级缓存通过允许"早期暴露"打破此约束——在A尚未完全初始化时，即可提供一个代理引用给B。
-
-### 构造器循环依赖为何无法解决
-
-设A构造函数依赖B，B构造函数依赖A：
-
-```
-A() → new B()
-B() → new A()
-```
-
-**数学本质**：拓扑排序要求 $\text{init-order}(B) < \text{init-order}(A)$ 且 $\text{init-order}(A) < \text{init-order}(B)$ ，矛盾。 且 $\text{init-order}(A) < \text{init-order}(B)$ ，矛盾。 ，矛盾。
-
-**构造函数的不可变约束**：Java 构造函数必须在其执行完毕前返回对象引用。在此约束下，若构造函数A调用构造函数B，则A的对象引用在B的构造函数执行完毕前无法确定——形成逻辑上的死锁。
-
-**结论**：构造器循环依赖在数学上无解，是图环检测的必然失败情况。
-
----
-
-## 参考存根
-
-```java
-// 展示 AOP 代理的实际创建过程（简化版）
-public class AopProxyDemo {
+public class ProxyDemo {
     public static void main(String[] args) {
-        // 目标对象
-        TargetImpl target = new TargetImpl();
-
-        // JDK 动态代理
-        InvocationHandler handler = (proxy, method, args2) -> {
-            System.out.println("Before: " + method.getName());
-            Object result = method.invoke(target, args2);
-            System.out.println("After: " + method.getName());
-            return result;
-        };
-        Target proxy = (Target) Proxy.newProxyInstance(
-            Target.class.getClassLoader(),
-            new Class[]{Target.class},
-            handler
-        );
-        proxy.execute(); // 输出: Before: execute → Target.execute → After: execute
-    }
-}
-interface Target { void execute(); }
-class TargetImpl implements Target { public void execute() {} }
-
-// 展示事件发布的条件执行（简化版）
-@Configuration
-public class EventConfig {
-    @Bean
-    public ApplicationEventMulticaster multicaster(
-            SimpleApplicationEventMulticaster delegate) {
-        // 添加监听器到线程池，实现异步事件
-        delegate.setTaskExecutor(Executors.newCachedThreadPool());
-        return delegate;
-    }
-}
-
-// @TransactionalEventListener 使用示例
-@Service
-public class UserService {
-    private final ApplicationEventPublisher publisher;
-
-    public void createUser(User user) {
-        userRepository.save(user);
-        // 事件监听器将在事务提交后才执行
-        publisher.publishEvent(new UserCreatedEvent(this, user.getId()));
-    }
-}
-
-@Component
-@TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
-public class UserCreatedListener {
-    @EventListener
-    public void handle(UserCreatedEvent event) {
-        // 只有事务成功提交后，这里才会执行
-        notificationService.sendWelcome(event.getUserId());
+        OrderService target = new OrderServiceImpl();
+        OrderService proxy = (OrderService) Proxy.newProxyInstance(
+                ProxyDemo.class.getClassLoader(),
+                new Class<?>[]{OrderService.class},
+                (p, method, margs) -> {                     // 扮演"事务通知"
+                    System.out.println("  [tx] 开启事务 -> " + method.getName());
+                    Object r = method.invoke(target, margs);
+                    System.out.println("  [tx] 提交事务 <- " + method.getName());
+                    return r;
+                });
+        System.out.println("代理类: " + proxy.getClass().getName()
+                + " | 是接口实现: " + (proxy instanceof OrderService)
+                + " | 是目标子类: " + (proxy instanceof OrderServiceImpl));
+        proxy.create();
+        proxy.createThenAudit();
     }
 }
 ```
+
+输出：
+
+```text
+代理类: $Proxy0 | 是接口实现: true | 是目标子类: false
+  [tx] 开启事务 -> create
+    [target] create 落库
+  [tx] 提交事务 <- create
+  [tx] 开启事务 -> createThenAudit
+    [target] create 落库
+    [target] audit 落库          ← 自调用：audit 没有被 [tx] 包裹
+  [tx] 提交事务 <- createThenAudit
+```
+
+两行推论：代理类 `$Proxy0` 只实现接口、不是目标类的子类（JDK 动态代理的形状）；`audit()` 通过 `this` 直达目标，绕过了拦截器——Spring AOP 的自调用陷阱在这 20 行里完整复现。需要拦截自调用的场景只能换 AspectJ 编译期/加载期织入，那是把逻辑直接编进字节码，不再是代理模型。
+
+### Spring Boot 自动装配：条件化的 SPI
+
+Spring Boot 的"零配置"不是魔法，是一张三段式流水线：
+
+```text
+classpath 扫描到的 AutoConfiguration.imports 清单
+  → 逐个配置类评估 @Conditional 条件链
+  → 条件全过 → 注册 Bean；任一条不过 → 整个配置类跳过
+```
+
+**清单文件的演进**（版本敏感，需核实）：
+
+- Boot ≤ 2.6：自动配置类登记在 `META-INF/spring.factories` 的 `EnableAutoConfiguration` 键下；
+- Boot 2.7：引入专属文件 `META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports`（每行一个类名），两者并存过渡；
+- Boot 3.0（2022-11）起：只认 `.imports`，`spring.factories` 的自动配置通道被移除（该文件的其他键如 `EnvironmentPostProcessor` 仍可用）。
+
+**条件注解的语义**（骨架，未实测）：
+
+```java
+@AutoConfiguration(after = DataSourceAutoConfiguration.class)
+@ConditionalOnClass(DruidDataSource.class)        // classpath 上有这个类才装配
+@ConditionalOnMissingBean(DataSource.class)       // 用户没自己定义才出手
+public class DruidAutoConfiguration { ... }
+```
+
+`@ConditionalOnMissingBean` 是"用户优先"原则的落点：自动配置类排在用户配置之后评估，用户注册了同类 Bean，自动配置就退出。starter 依赖（如 `spring-boot-starter-jdbc`）的作用只是"把一组协调过的 jar 摆上 classpath"——装配的触发源始终是 classpath 检测，starter 本身不含逻辑。
+
+这个"清单文件 + 运行时扫描"的机制不是 Spring 发明，是 JDK 自带 SPI（Service Provider Interface）的同款思想。实测（Temurin 25.0.4.1）：classpath 上放 `META-INF/services/Greeter`（内容为实现类全名，每行一个），`ServiceLoader` 即可发现全部实现：
+
+```java
+ServiceLoader<Greeter> loader = ServiceLoader.load(Greeter.class);
+for (Greeter g : loader) {
+    System.out.println(g.name() + " -> " + g.greet());
+}
+// 输出：
+// chinese -> 你好
+// english -> hello
+```
+
+与 JDK SPI 的差异在**条件化**：`ServiceLoader` 发现即装载，Spring 在发现之后还要过 `@Conditional` 评估——自动装配 = SPI 发现 + 条件过滤 + 拓扑排序装配，三者都是本篇已讲的机制。
+
+### 版本线与边界
+
+- Spring Framework 6.x / Boot 3.x（2022-11）：基线抬到 Java 17，`javax.*` 迁移到 `jakarta.*`——升级的主要成本在包名替换而非 API 变化。
+- Spring Framework 7.0 / Boot 4.0（2025-11）：基线 Java 17+（官方推荐 21/25）、Jakarta EE 11、Jackson 3（包名迁至 `tools.jackson`）、Spring Security 7 收编 Authorization Server（见 [07-SpringSecurity](07-SpringSecurity.md)）。
+- Spring Boot 4.1（2026-06）：4.x 线上的增强版，新增 gRPC 自动装配等，4.0 → 4.1 迁移代价远小于 3.x → 4.0。
+
+**边界**：IoC 容器管的是对象图的装配，不管运行时性能——Bean 查找是哈希表 O(1)，但代理链每层反射调用仍有开销（微秒级，绝大多数场景可忽略）；AOP 只覆盖 Spring 管理的 Bean，`new` 出来的对象、静态方法、`final` 方法（CGLIB 下）都在切面之外。
+
+---
+
+> 前置：[05-反射与动态代理](../03-JVM与运行时/05-反射与动态代理.md) · 后续：[02-持久化框架](02-持久化框架.md)——容器装配好之后，第一批要接的外部资源就是数据库
