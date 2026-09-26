@@ -15,9 +15,10 @@ CLI 是 Python 最古老的交付形态（脚本、运维工具、CI 步骤全�
 
 ```python
 import argparse
+from pathlib import Path
 
 p = argparse.ArgumentParser(prog="count", description="统计日志级别分布")
-p.add_argument("path", type=Path_arg, help="日志文件")           # 位置参数
+p.add_argument("path", type=Path, help="日志文件")                 # 位置参数
 p.add_argument("-l", "--level", choices=["INFO", "ERROR"],       # 选项
                default="INFO", help="只统计该级别以上")
 p.add_argument("--json", action="store_true", help="输出 JSON lines")
@@ -29,6 +30,9 @@ args = p.parse_args()        # 解析失败自动打印用法并 exit 2（无需
 ### typer：注解即声明
 
 ```python
+from pathlib import Path
+from typing import Annotated
+
 import typer
 
 def main(path: Annotated[Path, typer.Argument(help="日志文件")],
@@ -50,7 +54,7 @@ if __name__ == "__main__":
 
 - stdout 只写数据（可 `|` 给下游）：`print(data)`；进度与人话写 stderr：`print(msg, file=sys.stderr)` 或 logging（[07-日志与调试](07-日志与调试.md) 默认走 stderr，正好合规）。
 - 退出码：0 成功、非零失败（惯例 2=用法错误，见 argparse 默认）；`sys.exit(1)` / `raise SystemExit(1)`——这是脚本被 CI/调度器消费的信号（[07-CI-CD集成](../04-测试与质量/07-CI-CD集成.md)）。
-- stdin 输入的管道友好形态：`- ` 约定（`cat x.log | app -`）；`sys.stdin` 本身可迭代（逐行流式，见 [06-迭代器与生成器](../01-语言核心/06-迭代器与生成器.md)）。
+- stdin 输入的管道友好形态：`-` 约定（`cat x.log | app -`）；`sys.stdin` 本身可迭代（逐行流式，见 [06-迭代器与生成器](../01-语言核心/06-迭代器与生成器.md)）。
 - `sys.stdin.reconfigure(encoding="utf-8")`（3.7+）应对 Windows 管道编码——[03-字符串与格式化](../01-语言核心/03-字符串与格式化.md) 的边界问题在管道场景的复现。
 
 ### 配置分层（收口）
