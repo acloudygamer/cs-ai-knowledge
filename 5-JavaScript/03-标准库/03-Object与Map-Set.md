@@ -1,249 +1,133 @@
-# Map 与 Set
+# Object 与 Map/Set
 
-## 定义
+> 前置：[02-数组](./02-数组.md) · 后续：[04-日期与时间](./04-日期与时间.md)
 
-Map 是键值对集合，键可以是任意类型（包括对象）；Set 是唯一值集合。两者都是 ES6 引入的内建对象，提供了比 Object 和 Array 更适合做字典和集合操作的数据结构。WeakMap 和 WeakSet 的键是弱引用，不阻止垃圾回收。
+> **版本基准**：Node 24 stable / Node 26 latest。本篇示例实测环境：Node v24.13.1（V8 13.6），Windows x64。
 
-## 数学模型
+## 本质
 
-### SameValueZero 算法
+`Object` 是 JavaScript 的通用容器，但它的"键"受限：**只能是字符串或符号**。任何其它类型的键都会被转成字符串——对象作键得到的是 `"[object Object]"`：
 
-Set 的去重使用 SameValueZero 算法：
-$$
-\text{SameValueZero}(a, b) = \begin{cases}
-\text{true} & a \approx b \text{（SameValueZero 等价）} \\
-\text{false} & \text{otherwise}
-\end{cases}
-$$
+```console
+$ node o.mjs
+对象作键 -> [object Object]
+```
 
-SameValueZero 等价关系：
-- $a === b$ 时， $\text{SameValueZero}(a, b) = \text{true}$ 时， $\text{SameValueZero}(a, b) = \text{true}$ 
-- $a = b = \text{NaN}$ 时， $\text{SameValueZero}(a, b) = \text{true}$ （与 `===` 不同，`===` 认为 `NaN !== NaN`） 时， $\text{SameValueZero}(a, b) = \text{true}$ （与 `===` 不同，`===` 认为 `NaN !== NaN`） （与 `===` 不同，`===` 认为 `NaN !== NaN`）
+```console
+$ node o.mjs
+Map.size = 2 | 取回: 值 | 数字键: 数字键
+```
 
-**归约终点**：SameValueZero 是 JavaScript 的等价关系，满足自反性、对称性、传递性，但与 `===` 的区别在于对 NaN 的处理。
+`Map` 是**真正的键值映射**：键可以是任意值（对象、函数、`NaN`），按引用（或 `SameValueZero`）比较，且提供 `size` 与稳定的遍历顺序。`Set` 是"只有键没有值"的 `Map`，用于去重与集合运算。
 
-### Map 的查找复杂度
-
-Map 的 `get`、`set`、`has`、`delete` 操作在 V8 中实现为哈希表：
-$$
-T_{\text{操作}} = O(1) \quad \text{平均时间复杂度}
-$$
-
-最坏情况 $O(n)$ （当发生哈希冲突时，退化为链表/红黑树遍历）。 （当发生哈希冲突时，退化为链表/红黑树遍历）。
-
-**归约终点**：Map 的查找可归约为**哈希表查找**，哈希函数质量决定碰撞概率。
-
-### WeakMap 的弱引用语义
-
-WeakMap 的键是**弱引用**：
-$$
-\text{weakref}(k) \Rightarrow \begin{cases}
-\text{可达} & \exists \text{其他引用持有 } k \\
-\text{可 GC} & \text{仅 WeakMap 持有 } k
-\end{cases}
-$$
-
-当键被 GC 后，WeakMap 中对应条目自动删除，无通知。
-
-**约束条件**：WeakMap 的键必须是对象或 Symbol，基本类型不能作为键。
-
-**违反约束的后果**：使用基本类型作为 WeakMap 键抛出 TypeError。
-
-## 数据流
-
-### Map 的操作数据流
-
-<pre>
-map.set(key, value)
-    │
-    ▼
-计算 key 的哈希值 h(key)
-    │
-    ▼
-哈希表桶索引：index = h(key) mod N
-    │
-    ▼
-查找/插入（处理哈希冲突）
-    │
-    ▼
-更新或新增条目
-    │
-    ▼
-返回 Map（支持链式调用）
-</pre>
-
-### WeakMap 的 GC 触发删除
-
-<pre>
-对象 obj 作为 WeakMap 键
-    │
-    ▼
-外部对 obj 的引用全部清除
-    │
-    ▼
-仅 WeakMap 持有 obj 的弱引用
-    │
-    ▼
-GC 运行时发现 obj 不可达
-    │
-    ▼
-WeakMap 条目自动删除（无通知）
-</pre>
+三者的分工不是"新旧"，而是**三种不同的数据结构**：`Object` 是有原型的记录（还承担着"定义类型"的职责），`Map` 是哈希表，`Set` 是唯一值集合。
 
 ## 机制
 
-### Map vs Object 的本质差异
+### 属性顺序：Object 有两条隐藏规则
 
-| 维度 | Map | Object |
-|------|-----|--------|
-| 键类型 | 任意类型（包括对象、函数） | 字符串或 Symbol |
-| 键顺序 | 严格保序（插入顺序） | 基本有序（整数键排前） |
-| 原型链 | 无原型污染 | 有原型链（需 `Object.create(null)` 避免） |
-| 迭代 | 原生迭代器（for...of） | 需 `Object.entries()` |
-| 性能 | 增删查 O(1) | 增删查 O(1)（但原型查找 O(h)） |
-| size 属性 | `map.size` | `Object.keys(obj).length` |
+`Object` 的键顺序**不完全是插入序**：
 
-**为什么 Map 更适合做字典**：
-- Object 的键被强制转字符串，对象键需要 `Map`
-- Map 有原生 size 属性，Object 需要手动维护
-- Map 迭代顺序就是插入顺序
-
-**约束条件**：
-- Map 的键通过 SameValueZero 比较，Object 的键通过 ToPropertyKey 转换后用 === 比较
-- `NaN` 作为 Map 键时被视为与自身相等（SameValueZero），但作为 Object 键时 `NaN !== NaN` 导致查找失败
-
-### Set 的唯一性保证
-
-SameValueZero 算法使 Set 可存储 NaN：
-```javascript
-const set = new Set([NaN, NaN, undefined, undefined]);
-set.size  // 2（NaN 和 undefined 各一个）
+```console
+$ node o.mjs
+1,2,b,a
 ```
 
-Set 的数学性质：
-$$
-\forall s \in \text{Set}: \quad |\{x \in s\}| = s.\text{size}
-$$
-每个元素在 Set 中最多出现一次。
+输入是 `{b:1, a:2, 2:3, 1:4}`，输出却是 `1,2,b,a`。规则是规范规定的三段式：
 
-**约束条件**：Set 的元素通过 SameValueZero 去重，与 `===` 的差异在于 NaN 处理。
+1. **整数索引键**（可转为 32 位无符号整数的字符串）按**数值升序**排在最前；
+2. 其余**字符串键**按插入序；
+3. **符号键**按插入序。
 
-### WeakMap 的应用场景
+`Map` 没有这条规则——**一律插入序**：
 
-**私有数据存储**（替代 Symbol 或闭包）：
-```javascript
-const privateData = new WeakMap();
-
-class User {
-    constructor(name) {
-        privateData.set(this, { name });  // this 作为键
-    }
-    getName() {
-        return privateData.get(this).name;
-    }
-}
+```console
+$ node o.mjs
+b,a,c
 ```
 
-当 User 实例被 GC 后，WeakMap 条目自动消失，无需手动清理。
+需要严格保持顺序（如序列化、日志、缓存淘汰）时，这是选 `Map` 的实质理由。
 
-**元数据关联**：
-```javascript
-const metadata = new WeakMap();
-metadata.set(element, { createdAt: Date.now() });
+### `Object` 的静态方法
+
+| 方法 | 作用 |
+|---|---|
+| `Object.keys` / `values` / `entries` | 取**自身可枚举**的键 / 值 / 键值对 |
+| `Object.fromEntries(iterable)` | 从键值对数组建对象（`entries` 的逆） |
+| `Object.assign(target, ...sources)` | 浅合并，改 `target` |
+| `{ ...a, ...b }` | 浅合并，返回新对象（推荐） |
+| `Object.hasOwn(o, k)` | 判断自身属性（替代 `hasOwnProperty`） |
+| `Object.groupBy(it, fn)` | 按返回值分组（ES2024） |
+| `Object.freeze` / `seal` | 见 [02-对象模型与运行时/04](../02-对象模型与运行时/04-属性描述符与元编程.md) |
+
+```console
+$ node o.mjs
+Object.fromEntries: {"x":1}
+Object.entries: [["x",1]]
+{"奇":[1,3],"偶":[2,4]}
 ```
 
-**约束条件**：WeakMap 不支持迭代（keys()、values()、entries()），size 属性也不可用。
+三个方法都只处理**自身可枚举**属性——原型链上的、不可枚举的（如 `class` 方法）都拿不到，这正是 [02-对象模型与运行时/04-属性描述符与元编程](../02-对象模型与运行时/04-属性描述符与元编程.md) 那条 `enumerable` 标志的用途。
 
-### WeakRef 的 deref 语义
+`Object.assign` 与展开的差异：前者**改第一个参数**并返回它，后者总是返回新对象。合并配置时用展开，避免意外修改源对象。
 
-`deref()` 的返回值：
-$$
-\text{deref}() = \begin{cases}
-\text{对象本身} & \text{对象未被 GC} \\
-\text{undefined} & \text{对象已被 GC}
-\end{cases}
-$$
-
-**应用**：实现缓存，缓存对象被 GC 后自动失效。
-
-**约束条件**：无法区分对象从未存在还是已被 GC（deref() 均返回 undefined）。
-
-**违反约束的后果**：
-- 依赖 deref() 判断对象是否存在可能导致逻辑错误
-- WeakRef 承诺的 GC 行为不保证及时执行
-
-### FinalizationRegistry 的回调时机
-
-FinalizationRegistry 回调**不保证及时执行**，且**不保证执行**：
-- GC 时机由 JavaScript 引擎决定
-- 进程退出时不保证回调
-
-**应用场景**：清理与对象生命周期绑定的资源（非内存），如：
-- 注销事件监听器
-- 关闭文件描述符
-- 断开网络连接
-
-**约束条件**：FinalizationRegistry 不阻止 GC，仅仅是 GC 发生时的通知机制。
-
-**违反约束的后果**：
-- 不能依赖 FinalizationRegistry 做关键清理逻辑
-- 回调可能永远不执行（进程异常退出、引擎优化跳过等）
-
-## 对比参照
-
-| 特性 | Map | WeakMap | Set | WeakSet |
-|------|-----|---------|-----|---------|
-| 键类型 | 任意 | 必须对象 | - | - |
-| 值类型 | 任意 | 任意 | 任意 | 必须对象 |
-| 可迭代 | 是 | 否 | 是 | 否 |
-| size 属性 | 有 | 无 | 有 | 无 |
-| GC 支持 | 否 | 是 | 否 | 是 |
-| 典型场景 | 字典映射 | 私有数据 | 去重集合 | 对象标记 |
-
-## 参考存根
+### `Map` 的接口
 
 ```javascript
-// Map 任意类型键
-const key = { id: 1 };
-const map = new Map();
-map.set(key, 'value');
-map.get(key);  // 'value'
-
-// Map 迭代
-const m = new Map([['a', 1], ['b', 2]]);
-for (const [k, v] of m) { console.log(k, v); }
-[...m.keys()];   // ['a', 'b']
-[...m.values()]; // [1, 2]
-
-// Set 的 NaN 处理
-const set = new Set([NaN, 1, NaN]);
-set.has(NaN);  // true
-
-// WeakMap 私有数据
-const pvt = new WeakMap();
-class Cache {
-    constructor() { pvt.set(this, new Map()); }
-    set(k, v) { pvt.get(this).set(k, v); }
-    get(k) { return pvt.get(this).get(k); }
-}
-
-// WeakRef 缓存
-function cached(fn) {
-    const cache = new Map();
-    return (arg) => {
-        const ref = cache.get(arg);
-        if (ref?.deref()) return ref.deref();
-        const result = fn(arg);
-        cache.set(arg, new WeakRef(result));
-        return result;
-    };
-}
-
-// FinalizationRegistry
-const registry = new FinalizationRegistry((held) => {
-    console.log(`Cleaned: ${held}`);
-});
-let obj = {};
-registry.register(obj, 'my-data');
-obj = null;  // GC 后可能输出 'Cleaned: my-data'
+const m = new Map([["b", 1], ["a", 2]]);
+m.set("c", 3);            // 返回 m 本身，可链式
+m.get("b");               // 1
+m.has("b");               // true
+m.delete("b");            // 返回是否删除成功
+m.size;                   // 属性，不是方法
+m.clear();
 ```
+
+- **`size` 是属性不是方法**（对比数组的 `length`，也是属性；`Set` 同）。
+- **键的相等用 `SameValueZero`**：`NaN` 可以作键（`===` 做不到，见 [02-数组](./02-数组.md) 里 `includes` 与 `indexOf` 的同一问题）；`+0` 与 `-0` 视为同一个键。
+- **遍历顺序恒为插入序**，且 `set` 一个已存在的键**不改变它的位置**（只更新值）。
+
+### `Set`：唯一性与集合运算
+
+`Set` 的构造器接收任何可迭代对象，自动去重：
+
+```console
+$ node o.mjs
+去重: 1,2
+交集: 2,3 | 并集: 1,2,3,4 | 差集: 1
+```
+
+`intersection` / `union` / `difference` / `symmetricDifference` 与 `isSubsetOf` / `isSupersetOf` / `isDisjointFrom` 是 **ES2025 新增的七个方法**，Node 24 已支持（ES2025 的十项特性之一，见 [13-版本演进](../13-版本演进/)）。在此之前需要手写循环。
+
+`Set` 的唯一性判定同样用 `SameValueZero`——`new Set([NaN, NaN]).size` 是 `1`。
+
+### 弱引用版本
+
+`WeakMap` / `WeakSet` 的键（或成员）是弱引用，不阻止垃圾回收，且**不可枚举、无 `size`**——正因为不可枚举，才能做到"不阻止回收"。用途与实测见 [02-对象模型与运行时/04-属性描述符与元编程](../02-对象模型与运行时/04-属性描述符与元编程.md)。
+
+## 连接：什么时候用谁
+
+| 需求 | 选择 | 理由 |
+|---|---|---|
+| 表示一条记录 / 定义类型 | `Object` | 有字面量语法、有原型、能表达"形状" |
+| 需要序列化（JSON） | `Object` | `JSON.stringify` 只认对象与数组 |
+| 键不是字符串 | `Map` | `Object` 会把键转成字符串 |
+| 频繁增删键值对 | `Map` | `Object` 的删除会退化为字典模式 |
+| 需要 `size` | `Map` / `Set` | `Object` 得先 `Object.keys().length` |
+| 需要严格插入序 | `Map` | `Object` 的整数键会被提前排序 |
+| 去重 | `Set` | `[...new Set(arr)]` |
+| 给外部对象挂私有数据 | `WeakMap` | 不污染对象、不阻止回收 |
+
+**判断标准不是"哪个更快"，而是"这个键是不是字符串"以及"要不要保持顺序"。** 需要哈希表语义就用 `Map`，需要记录语义就用 `Object`——两者混用是性能与正确性问题的常见来源。
+
+## 边界
+
+- **`Object` 的键会被字符串化**：数字键 `1` 与字符串键 `"1"` 是同一个键，对象键全部变成 `"[object Object]"`。
+- **`Object` 的整数键顺序被规范改写**：依赖"插入序"会出错，需要顺序就用 `Map`。
+- **`Map` / `Set` 不能直接 JSON 序列化**：`JSON.stringify(new Map())` 得到 `{}`，需要先转成数组或对象。
+- **`Map` 的键是引用**：两个内容相同的对象是两个不同的键，需要按值比较时先序列化为字符串或自定义 `Map` 子类。
+- **`WeakMap` 的键必须是对象**：不能是原始值。
+
+---
+
+> 前置：[02-数组](./02-数组.md) · 后续：[04-日期与时间](./04-日期与时间.md)——时间也是序列，但它的坑在别处

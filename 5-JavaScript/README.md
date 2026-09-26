@@ -2,7 +2,11 @@
 
 **运行在宿主环境中的动态类型、单线程语言**——ECMA-262 只定义语言本身，不定义任何 I/O：没有文件、没有网络、没有定时器、没有 DOM。一段源码在浏览器与 Node.js 里的含义不同，这是理解这门语言一切结构差异的起点。
 
-版本口径：**Node 24（stable）/ Node 26（latest）**。ES 版本口径见 [versions.json](../versions.json)，引擎支持矩阵见 [13-版本演进](./13-版本演进/)。规范定稿情况：ES2025 已于 2025-06-25 经第 129 届 Ecma GA 批准，ES2026 已于 2026-06-30 经第 131 届批准。
+版本口径：**stable = Node 24 + ES2025 + TypeScript 7.0 / latest = Node 26 + ES2026 + TypeScript 7.0**（见 [versions.json](../versions.json)）。
+
+- **引擎**：Node 24（V8 13.6）覆盖 ES2025 全部 10 项特性；Node 26（V8 14.6）覆盖 ES2026 除 `Math.sumPrecise` 外的 6 项。逐特性矩阵见 [13-版本演进](./13-版本演进/)。
+- **规范**：ES2025 于 2025-06-25 经第 129 届 Ecma GA 批准，ES2026 于 2026-06-30 经第 131 届批准。引擎落地可领先规范版本——`using`/`await using` 属 ES2027 而 Node 24 已支持，Temporal 属 ES2027 而 Node 26 已默认开启。
+- **类型层**：TypeScript 7.0 是 Go 重写的编译器（`tsgo`），**`strict` 默认为 `true`**（见 [08-TypeScript/04](./08-TypeScript/04-编译配置与严格模式.md)）；7.1 目前仅 nightly，故 latest 同 stable。
 
 ### 目录结构（依赖链顺序）
 

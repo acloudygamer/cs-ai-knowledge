@@ -1,344 +1,92 @@
-# JavaScript 语言简介
+# JavaScript 全景
 
-## 定义
+> 前置：无（全库起点） · 后续：[01-安装与第一个程序](../01-语言核心/01-安装与第一个程序.md)
 
-JavaScript 是一门基于**原型继承**的动态类型脚本语言，其核心执行模型是**事件循环驱动的单线程非阻塞 I/O**。它以函数为第一等公民，对象通过原型链而非类层次实现继承。1995 年 Brendan Eich 用 10 天设计，最初命名 Mocha，历经 LiveScript，最终因 Java 商业合作更名为 JavaScript。
+> **版本基准**：stable = Node 24 + ES2025 / latest = Node 26 + ES2026。Node 24 搭载 V8 13.6（首发 2025-05-06），Node 26 搭载 V8 14.6（首发 2026-05-05）。
 
-**ECMAScript**（ECMA-262）是 JavaScript 的语言规范，定义语法、类型、语义和内置对象；**JavaScript 引擎**（V8/SpiderMonkey/JavaScriptCore）是规范的实现，负责解析、JIT 编译和执行；**宿主环境**（浏览器/Node.js）在引擎之上提供 DOM、文件系统、网络等 API。
+本篇建立贯穿全库的三个锚点：JavaScript 由哪三层构成、一段源码从文本到机器码的链条、以及规范与引擎落地为何不同步。后续各篇的"为什么"几乎都能回溯到这里——原型链（[01-原型链与继承](../02-对象模型与运行时/01-原型链与继承.md)）是"对象模型由规范定义、隐藏类由引擎实现"这条分界线的展开；事件循环（[01-事件循环与任务队列](../04-异步与并发/01-事件循环与任务队列.md)）是"调度器由宿主提供"的展开；模块解析（[02-模块解析与产物格式](../09-工程化/02-模块解析与产物格式.md)）是"语言不含 I/O，因而加载规则属于宿主"的展开。
 
-## 数学模型
+## 本质
 
-### JIT 编译的热点检测与投机性优化
+JavaScript 是**动态类型、单线程、基于原型**的编程语言，由三层叠加而成，每层各有独立的规范与实现：
 
-JavaScript 引擎的即时编译（JIT）策略将函数从解释执行升级为优化机器码，基于调用频率和类型稳定性两个维度：
+| 层 | 规范 | 实现 | 换一层的实例 |
+|---|---|---|---|
+| 语言 | ECMA-262（`Intl` 另见 ECMA-402） | 各引擎按规范实现 | TypeScript：另一种语言，编译到 JavaScript |
+| 宿主 | HTML 规范（浏览器）／Node.js 文档 | 浏览器；Node.js | Deno：不同宿主，同一语言 |
+| 引擎 | 无规范约束 | V8（Chrome、Node.js、Deno）、JavaScriptCore（Safari、Bun）、SpiderMonkey（Firefox） | 换引擎：行为不变，性能变 |
 
-$$
-f_{\text{JIT}}(c_f, \sigma_T) = \begin{cases}
-\text{TurboFan优化编译} & c_f > T_{\text{hot}} \land \sigma_T < \tau_{\text{stable}} \\
-\text{解释执行} & c_f \le T_{\text{hot}} \\
-\text{回退字节码} & \text{类型反馈失效时}
-\end{cases}
-$$
+三层之间的接口是**源码文本**。这条链决定了 JavaScript 的一个反常事实：**ECMA-262 不定义任何 I/O**——规范里没有文件、网络、定时器、DOM，也没有 `setTimeout`。语言只定义语法、语义与一小撮内建对象（`Object`、`Array`、`Map`、`Promise`、`JSON` 等）；凡是要与外界交互的能力，都由宿主提供。
 
-其中 $c_f$ 为函数调用计数器， $\sigma_T$ 为类型反馈的方差（衡量类型稳定性）， $T_{\text{hot}}$ 为热点阈值（V8 典型值为 2）， $\tau_{\text{stable}}$ 为类型稳定性阈值。 为函数调用计数器， $\sigma_T$ 为类型反馈的方差（衡量类型稳定性）， $T_{\text{hot}}$ 为热点阈值（V8 典型值为 2）， $\tau_{\text{stable}}$ 为类型稳定性阈值。 为类型反馈的方差（衡量类型稳定性）， $T_{\text{hot}}$ 为热点阈值（V8 典型值为 2）， $\tau_{\text{stable}}$ 为类型稳定性阈值。 为热点阈值（V8 典型值为 2）， $\tau_{\text{stable}}$ 为类型稳定性阈值。 为类型稳定性阈值。
+由此推出三条贯穿全库的结论：
 
-**投机性优化**的核心假设：相同类型输入产生相同类型输出。一旦类型反馈失效（如忽然传入字符串代替整数），优化编译生成的机器码立即失效，引擎回退到解释执行（Deoptimization）。这种"乐观假设-快速失效"策略使 V8 在稳态下接近原生性能。
-
-### 隐藏类的结构化偏移查找
-
-V8 的隐藏类（Hidden Class / Shape）将动态属性访问建模为 $O(1)$ 偏移查找： 偏移查找：
-
-$$
-\text{offset}(p, k) = \text{lookup}(\text{HC}(p), k) = O(1)
-$$
-
-对象 $p$ 的隐藏类 $\text{HC}(p)$ 是该对象当前属性结构（名称→偏移量的映射表）。相同创建路径的对象共享同一隐藏类，V8 因此能生成定长机器码访问特定偏移量。 的隐藏类 $\text{HC}(p)$ 是该对象当前属性结构（名称→偏移量的映射表）。相同创建路径的对象共享同一隐藏类，V8 因此能生成定长机器码访问特定偏移量。 是该对象当前属性结构（名称→偏移量的映射表）。相同创建路径的对象共享同一隐藏类，V8 因此能生成定长机器码访问特定偏移量。
-
-**形状转换**：属性添加顺序改变时，对象的隐藏类发生转换（transition），原隐藏类记录转换边到新隐藏类。这导致属性访问从 $O(1)$ 退化为 $O(n)$ （需遍历转换链）。 退化为 $O(n)$ （需遍历转换链）。 （需遍历转换链）。
-
-### 事件循环的优先级模型
-
-令 $t$ 为事件循环任意时刻，各任务队列满足严格偏序： 为事件循环任意时刻，各任务队列满足严格偏序：
-
-$$
-\text{Microtask} \prec \text{Macrotask} \prec \text{Rendering}
-$$
-
-微任务队列（Promise.then、queueMicrotask、MutationObserver）必须**完全清空**才执行宏任务；渲染只在宏任务之间进行，且受 `requestAnimationFrame` 调度约束。
-
-### 原型链的链长建模
-
-原型继承可建模为有向链：
-
-$$
-\text{原型链长度}(o) = \sum_{i=0}^{n} \mathbb{I}[\text{getPrototypeOf}^i(o) \neq \text{null}]
-$$
-
-属性查找沿链向上直到 `Object.prototype`，最坏情况为 $O(n)$ 链长。V8 通过**内联缓存**（Inline Cache）将常见属性路径缓存为猜测类型，进一步将平均查找压缩为近 $O(1)$ 。 链长。V8 通过**内联缓存**（Inline Cache）将常见属性路径缓存为猜测类型，进一步将平均查找压缩为近 $O(1)$ 。 。
-
-## 数据流
-
-<pre>
-源代码 (文本字符串)
-    │
-    ▼
-┌──────────────────────────────┐
-│  Scanner (词法分析)          │ ──→ Token 流
-│  扫描 16 位 Unicode 码点      │
-└──────────────────────────────┘
-    │
-    ▼
-┌──────────────────────────────┐
-│  Parser (语法分析)            │ ──→ AST（抽象语法树）
-│  递归下降 / LR 变体           │
-└──────────────────────────────┘
-    │
-    ▼
-┌──────────────────────────────┐
-│  Ignition (解释器)             │ ──→ Bytecode + 类型反馈
-│  字节码执行 + 热点计数        │
-│  收集: 类型分布、调用频率      │
-└──────────────────────────────┘
-    │
-    ▼ (热点阈值触发)
-┌──────────────────────────────┐
-│  TurboFan (优化编译器)        │ ──→ 优化机器码
-│  投机性优化 (Speculative)     │   基于类型反馈假设
-│  逃逸分析、死代码消除、 内联   │
-└──────────────────────────────┘
-    │
-    ▼ (类型反馈失效 / 栈深度超限)
-┌──────────────────────────────┐
-│  Deoptimization              │ ──→ 回退字节码
-│  撤销优化，恢复 Ignition 执行  │
-└──────────────────────────────┘
-</pre>
-
-**所有权流转**：
-
-1. 源代码（字符串）→ Scanner → Token 流（所有权归引擎）
-2. Token 流 → Parser → AST（所有权归引擎）
-3. AST → Ignition → 字节码执行（热点函数标记写入反馈向量）
-4. 热点函数 + 类型稳定 → TurboFan → 优化机器码（存入代码缓存）
-5. 类型反馈失效 → Deoptimization → 回退字节码，清除优化状态
-
-**在 Node.js 环境中**，事件循环还桥接 libuv 的 I/O 轮询：
-
-<pre>
-  ┌──────────────────────────────┐
-  │  JavaScript 事件循环          │
-  │  (微任务 → 宏任务 → 渲染)    │
-  └──────────────┬───────────────┘
-                 │ C 调用边界
-                 ▼
-  ┌──────────────────────────────┐
-  │  libuv (C 库)                 │
-  │  线程池 (默认 4 线程)         │
-  │  epoll/kqueue/IOCP           │
-  └──────────────┬───────────────┘
-                 │ 异步 I/O 完成
-                 ▼
-  ┌──────────────────────────────┐
-  │  回调入队宏任务队列           │
-  │  setImmediate / 打开文件回调  │
-  └───────────────────────────────┘
-</pre>
+- **同一段源码，换宿主则能力全变。** `fetch` 由宿主提供；`document` 只有浏览器有；`process` 只有 Node.js 有。这是 [05-浏览器平台](../05-浏览器平台/) 与 [06-Node.js平台](../06-Node.js平台/) 必须并列成两个目录、而不是合成一个"标准库"目录的原因。
+- **"标准库"不是一套，是两套。** ECMA-262 内建对象之外，浏览器与 Node.js 各有一套宿主 API，交集只是一批被双方共同采纳的 Web 平台 API——`fetch`、`URL`、`Blob`、`EventTarget`、`AbortController`、Web Streams 等，连 `setTimeout` 也在此列（它由 HTML 规范定义，Node.js 采纳）。
+- **构建链不属于语言。** 浏览器直接执行源文本，没有 `javac` 的对应物；TypeScript、打包、转译全是外部工具。这是 [09-工程化](../09-工程化/) 分量重于其他语言同类目录的原因。
 
 ## 机制
 
-### 原型继承：对象系统的本质
+### 执行链：源码到机器码
 
-JavaScript 的对象系统基于**原型链**而非类层次。每个对象有一个内部槽 `[[Prototype]]`，指向其原型对象（或 null）。属性查找沿链向上，直到找到或到达 `Object.prototype`。
-
-```
-┌─────────────────────────┐
-│  普通对象               │
-│  { name: "Alice" }     │   ──[[Prototype]]──→ ┌──────────────────┐
-└─────────────────────────┘                      │ 原型对象 B        │
-                                                 │ { age: 30 }      │
-                                                 └──────────────────┘
-                                                      │
-                                          ──[[Prototype]]──→ ┌──────────────────┐
-                                                              │ Object.prototype │
-                                                              │ { toString... } │
-                                                              └──────────────────┘
-                                                                  │
-                                                      ──[[Prototype]]──→ null
+```text
+app.js ──扫描/解析──> AST ──Ignition──> 字节码 ──分层编译──> 机器码
+  文本                语法树      解释器+反馈        Sparkplug/Maglev/TurboFan
 ```
 
-**构造函数与原型**：
-```javascript
-function Person(name) { this.name = name; }
-Person.prototype.sayHi = function() {};
-const p = new Person("Alice");
-// p.[[Prototype]] === Person.prototype
-// Person.prototype.[[Prototype]] === Object.prototype
-```
+解析分两步：**预解析器**（Pre-parser）先跳过尚未调用的函数体，只记录其边界；函数被真正调用时才由完整解析器解析。这是"加载时不必解析全部代码"的代价转移——把解析成本从加载推迟到首次调用。
 
-**为什么要用原型链而非类继承**：原型链允许对象在运行时动态修改继承关系（`Object.setPrototypeOf`），实现更灵活的对象组合。类继承的静态层次在动态修改场景下代价更高。
+### 分层编译：按热度付编译成本
 
-**约束条件**：
-- 原型链过长（> 5 层）导致属性查找性能劣化
-- 修改 `Object.prototype` 会污染所有对象（除非通过 `Object.create(null)` 创建无原型对象）
-- `for...in` 枚举包括继承属性，需用 `hasOwnProperty` 过滤
+同一份代码在 V8 里有四档去处，热度越高、投入的编译成本越多：
 
-**违反约束的后果**：
-- 原型链过长时，属性查找从 $O(1)$ 退化为 $O(n)$ ，V8 的内联缓存失效 退化为 $O(n)$ ，V8 的内联缓存失效 ，V8 的内联缓存失效
-- `Object.prototype` 污染导致所有对象的 `for...in` 枚举结果被篡改，可能导致安全漏洞
+| 档 | 机制 | 编译耗时（量级） | 相对原生码速度 | 进入默认管线 |
+|---|---|---|---|---|
+| 0 | **Ignition** 解释字节码 | ~10 µs | 慢约 100 倍 | 2016 |
+| 1 | **Sparkplug** 基线编译器 | ~100 µs | 慢 5~10 倍 | 2021 |
+| 2 | **Maglev** 中级优化编译器 | 比 Sparkplug 慢约 20 倍 | 介于 1 与 3 之间 | 2023（Chrome M117） |
+| 3 | **TurboFan** 顶级优化编译器 | 比 Maglev 慢 10~100 倍 | 接近原生 | 2017 |
 
-### 事件循环的微任务与宏任务调度
+（编译耗时与倍数为 V8 官方文档给出的量级值，非精确常数。）
 
-JavaScript 事件循环是**基于调用栈的单线程调度器**，由以下阶段交替构成（以浏览器为例）：
+Ignition 在解释执行的同时收集**反馈**：变量的实际类型、哪些函数被频繁调用。上层编译器据此做**推测优化**——推测被后续运行推翻时，代码退回解释执行，称为**去优化**（deoptimization）。这条链的细节见 [07-引擎与性能](../07-引擎与性能/)。
 
-| 阶段 | 说明 | 典型任务 |
-|------|------|----------|
-| 1. 执行栈 | 同步代码 LIFO 执行 | 函数调用 |
-| 2. 微任务检查点 | 清空**全部**微任务 | Promise.then、queueMicrotask、MutationObserver |
-| 3. 宏任务 | 每次取**一个**宏任务执行 | setTimeout、setInterval、I/O、requestAnimationFrame |
-| 4. 渲染检查点 | Macrotask 完成后判断是否渲染 | DOM 更新、样式计算、合成 |
+### 事件循环：执行之外的调度链
 
-**关键约束**：
-- 微任务队列必须完全清空（drain）才进入下一个宏任务
-- Promise.resolve().then() 在 setTimeout(fn, 0) 之前执行，即使后者先入队
-- async 函数在 await 之后的部分隐式包装为微任务
+JavaScript 只有一个执行线程：一段代码运行期间，别的代码无法插进来。并发的来源不是线程，而是**事件循环**——宿主维护任务队列，把回调按顺序送进这个唯一线程执行。
 
-**违反约束的后果**：
-- 若微任务抛出异常且未被捕获，后续微任务继续执行，但会终止整个执行上下文
-- 微任务队列若被恶意代码无限填充（如递归 Promise.resolve()），将永久阻塞事件循环
+ECMA-262 只定义**微任务**（Promise 的 job 队列）；**宏任务**（定时器、I/O 完成、渲染）由宿主定义。所以"事件循环"这个名字对应两套实现：浏览器的 HTML 事件循环与 Node.js 的 libuv 循环。两者共享的抽象——当前任务跑完才清空微任务队列——足以解释绝大多数异步行为；细节差异见 [01-事件循环与任务队列](../04-异步与并发/01-事件循环与任务队列.md)。
 
-**Node.js 事件循环阶段**（libuv）与浏览器不同：
+### 版本节奏：规范每年一次，引擎落地不同步
 
-| 阶段 | 说明 | 对应 API |
-|------|------|----------|
-| timers | 过期定时器回调 | setTimeout、setInterval |
-| pending callbacks | 延迟的 I/O 回调 | — |
-| idle, prepare | 内部使用 | — |
-| poll | 获取新 I/O 事件 | fs.read、http.get |
-| check | setImmediate 回调 | setImmediate |
-| close callbacks | 关闭回调 | socket.on('close') |
+TC39 用分阶段流程管理提案，**只有到达 Stage 4 的特性才进入规范**：
 
-Node.js 中 `setImmediate` 与 `setTimeout` 的执行顺序不确定，取决于 I/O 上下文；在 I/O 回调内部，`setImmediate` 总是先于 `setTimeout`。
+| 阶段 | 名称 | 含义 |
+|---|---|---|
+| 0 | Strawman | 构想，尚未正式讨论 |
+| 1 | Proposal | 正式提案，需说明问题背景与 API 设计 |
+| 2 | Draft | 草案，语法与语义基本确定，有正式规范文本 |
+| 2.7 | — | 编写测试与实现验证（2023 年底引入；承担旧 Stage 3 的职责，编号取 2.7 以免全局重编号） |
+| 3 | Candidate | 候选，规范冻结，实现者开始集成 |
+| 4 | Finished | 完成，进入当年的规范版本 |
 
-### 内存模型与垃圾回收
+每年 6 月，Ecma 大会批准一个新版本，版本号与年份绑定（ES2015 起停止使用递增版本号）。**规范批准与引擎落地是两条不同步的时间线**，两个方向都会偏：
 
-JavaScript 堆内存分为**新生代**（Young Generation）和**老生代**（Old Generation），V8 采用分代垃圾回收策略：
+- **引擎落后于规范**：`Math.sumPrecise` 是 ES2026 特性，但截至 Node 26.7（V8 14.6）仍未实现。
+- **引擎领先于规范**：`using` / `await using` 与 `Temporal` 归属 ES2027，而前者 Node 24 已支持、后者 Node 26 已默认开启。
 
-**新生代：Scavenge（Cheney 算法）**
-- 空间分为 From 和 To 两半，空间利用率 50%
-- 每次 Scavenge 将活对象从 From 复制到 To
-$$
-T_{\text{Scavenge}} = O(N_{\text{live}})
-$$
-- 适合生命周期短的对象（大多数对象如此）
+所以本库的版本口径写成**二元组**（Node 版本 + ES 版本），而不是单一版本号：能用什么由引擎决定，能写什么由规范决定。逐特性矩阵见 [13-版本演进](../13-版本演进/)。
 
-**老生代：Mark-Sweep + Mark-Compact**
-- **标记**：三色标记法（白/灰/黑），增量标记（Incremental Marking）避免 Stop-the-World
-- **清理**：回收白色（不可达）对象
-- **压缩**：移动存活对象解决碎片，更新所有引用指针
+## 版图与边界
 
-**WeakRef 与终结机制**（ES2021+）：
-WeakRef 允许持有对象的弱引用，不阻止 GC 回收该对象：
-```javascript
-let ref = new WeakRef({ name: "Alice" });
-// 在 GC 之前：ref.deref() 返回对象
-// 在 GC 之后：ref.deref() 返回 undefined
-```
+**版图**。ECMA-262 覆盖 [01](../01-语言核心/)~[04](../04-异步与并发/)；两条宿主腿是 [05](../05-浏览器平台/) 与 [06](../06-Node.js平台/)；[07-引擎与性能](../07-引擎与性能/) 是规范之外的实现层；[08-TypeScript](../08-TypeScript/) 是编译到 JavaScript 的独立语言；[09](../09-工程化/)~[11](../11-前端框架与状态管理/) 是无编译语言必然外挂的工程与生态层。同一语言的其它宿主还有 Deno（复用 V8）与 Bun（复用 JavaScriptCore），差异全在宿主 API 一侧。
 
-FinalizationRegistry 提供对象被回收时的回调注册，用于资源释放模式。
+**边界**（JavaScript 不做什么）：
 
-**违反约束的后果**：
-- 持有不需要的对象引用（闭包、事件监听器、全局变量）导致内存泄漏，老生代快速填满，触发频繁 GC 停顿
-- 大对象直接进入老生代（> 512KB 或不适合新生代的结构）
-- 意外全局变量（未声明的赋值隐式创建）绕过函数作用域，增加 GC 压力
-- WeakRef.deref() 在 GC 后返回 undefined，但无法判断是因为对象被回收还是根本不存在
+- **无 I/O、无抢占式并发**——没有线程、没有锁、没有文件 API。能写浏览器应用与服务器，写不了操作系统内核；并发靠事件循环协作式调度，一个死循环即冻结整个线程。
+- **无静态类型**——类型在运行时确定，且允许隐式转换（`"1" + 1 === "11"`）。类型检查须外挂（[08-TypeScript](../08-TypeScript/)）。
+- **无整数类型**——数值只有 `number`（IEEE 754 双精度浮点）与 `bigint`；用 `number` 表示整数时超过 $2^{53}$ 即丢精度。
+- **无按值语义的复合类型**——除原始类型外一切皆引用，赋值即别名。
 
-### JavaScript 与 ECMAScript 的关系
+---
 
-| 层次 | 实体 | 职责 |
-|------|------|------|
-| ECMAScript | ECMA-262 标准 | 语法、类型、语义、内置对象（Object、Array、Promise...） |
-| JavaScript 实现 | V8 / SpiderMonkey / JavaScriptCore | 解析器 + 解释器 + JIT 编译器 + 运行时 |
-| 宿主环境 | 浏览器 / Node.js | 提供 DOM / fetch / fs 等宿主 API |
-
-ECMAScript 是语言规范，JavaScript 是主要实现。宿主 API（DOM、fetch、fs、Buffer）不在 ES 规范范围内，由各宿主环境自行定义。
-
-### 浏览器 JS vs Node.js JS 的本质差异
-
-两者核心引擎遵循相同 ES 规范，差异在于**宿主 API** 和**运行时初始化**：
-
-| 宿主 API | 浏览器 | Node.js |
-|----------|--------|---------|
-| DOM | document、DOM 树操作 | 无（无 DOM） |
-| BOM | window.location、navigator | globalThis、process |
-| 用户交互 | click、input 事件 | 无（无 UI） |
-| 网络 | fetch、WebSocket、XMLHttpRequest | http、net、node-fetch |
-| 文件系统 | 受限（File System Access API） | fs 模块（完整权限） |
-| 加密 | Web Crypto API | crypto 模块 |
-| 线程 | Web Worker（隔离地址空间） | worker_threads（共享 ArrayBuffer） |
-
-**模块系统**：
-- Node.js 默认 CommonJS（`require()`/`module.exports`），package.json 默认 `"type": "commonjs"`
-- ESM（`import`/`export`）需显式设置 `"type": "module"`
-- 浏览器原生支持 ESM，但需使用 `type="module"` 或 bundler（webpack、vite、esbuild）
-
-### <Node26+ES2026> Array.groupBy / Map.groupBy
-
-Array.groupBy 将数组元素按条件函数分组：
-
-$$
-\text{Array.groupBy}(arr, f) \rightarrow \{ k \mapsto [a \in arr \mid f(a) = k] \}
-$$
-
-返回值为 `Record<string, T[]>`，其中键为分组函数返回值。无需手动迭代遍历，引擎内部以单次 O(N) 遍历完成分组。
-
-```javascript
-const inventory = [
-    { name: 'asparagus', type: 'vegetables' },
-    { name: 'bananas',  type: 'fruit' },
-    { name: 'goat',     type: 'meat' },
-];
-Object.groupBy(inventory, x => x.type);
-// { vegetables: [asparagus], fruit: [bananas], meat: [goat] }
-```
-
-### <Node26+ES2026> Promise.withResolvers
-
-Promise.withResolvers 将 resolve/reject 控制权提取到外部作用域：
-
-$$
-\text{withResolvers}() \rightarrow \{ \text{promise}: P, \text{resolve}: P \rightarrow \top, \text{reject}: E \rightarrow \top \}
-$$
-
-适用于需要将 Promise 控制权传递给其他函数或模块的场景：
-
-```javascript
-const { promise, resolve, reject } = Promise.withResolvers();
-fetch('/api/data').then(resolve).catch(reject);
-```
-
-### <Node26+ES2026> Symbol.dispose / Symbol.asyncDispose
-
-Symbol.dispose 配合 `using` 声明实现确定性资源释放：
-
-$$
-\forall x \in \text{Disposable}: \quad \text{exitScope}(x) \Rightarrow \text{Symbol.dispose}(x)
-$$
-
-在块级作用域退出时隐式调用 `Symbol.dispose`，无论正常路径还是异常路径均触发，实现 RAII 语义。
-
-### JavaScript 优缺点的本质分析
-
-| 优点 | 本质原因 |
-|------|----------|
-| 无处不在 | 浏览器的唯一原生脚本语言，WASM 只是补充而非替代 |
-| 全栈能力 | Node.js 将 V8 引擎移植到服务器端，全栈复用同一语言和生态 |
-| 异步模型 | 事件循环天然适合 I/O 密集型（而非 CPU 密集型）场景 |
-| 生态丰富 | npm 的去中心化包管理 + package.json 锁定版本 |
-
-| 缺点 | 本质原因 |
-|------|----------|
-| 类型系统薄弱 | 弱类型 + 动态类型组合，设计哲学是"灵活优先"而非"安全优先" |
-| 回调地狱 | 异步回调的组合逻辑缺乏线性结构，Promise/async-await 解决了这个问题 |
-| 浮点精度 | IEEE 754 双精度浮点，`0.1 + 0.2 !== 0.3` 是规范行为而非 bug |
-| 并发模型单一 | 单线程事件循环无法真正并行 CPU 密集型任务（需 Web Worker 或 WASM） |
-
-### 适用场景
-
-JavaScript 的**设计边界**：
-
-- **擅长**：事件驱动 I/O、实时交互、跨平台脚本、同构渲染（SSR）、构建工具
-- **不擅长**：CPU 密集型计算（应使用 Web Worker/WASM/Worker Threads）、强类型安全场景（应使用 TypeScript）、大规模数值计算（应使用 Python/Rust）
-
-## 参考存根
-
-```javascript
-// 最小化事件循环演示：输出顺序 1, 2, 3
-console.log('1');                                    // 同步：立即执行（调用栈）
-setTimeout(() => console.log('3'), 0);             // 宏任务：0ms 后入队
-Promise.resolve().then(() => console.log('2'));     // 微任务：本轮清空
-
-// 执行顺序：
-// 1. 调用栈: log('1') → 输出 "1"
-// 2. 微任务检查点: Promise.then → 输出 "2"
-// 3. 宏任务: setTimeout 回调 → 输出 "3"
-```
+> 前置：无 · 后续：[01-安装与第一个程序](../01-语言核心/01-安装与第一个程序.md)——把本篇的执行链在你机器上跑一遍

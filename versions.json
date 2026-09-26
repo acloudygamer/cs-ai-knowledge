@@ -1,5 +1,5 @@
 {
-  "updated": "2026-09-02",
+  "updated": "2026-09-27",
   "versions": {
     "0-计算机基础/": {
       "stable": "universal",
@@ -24,8 +24,9 @@
       "latest": "Java 25"
     },
     "5-JavaScript/": {
-      "stable": "Node24+ES2024",
-      "latest": "Node26+ES2026"
+      "stable": "Node24+ES2025+TS7.0",
+      "latest": "Node26+ES2026+TS7.0",
+      "notes": "V8 13.6（Node 24）覆盖 ES2025 全部 10 项特性；V8 14.6（Node 26）覆盖 ES2026 除 Math.sumPrecise 外的 6 项（该 API 至 Node 26.7 仍未实现）。引擎落地领先规范版本的情形：using/await using 属 ES2027 而 Node 24 已支持，Temporal 属 ES2027 而 Node 26 已默认开启。TypeScript 7.0 为 Go 重写的编译器（tsgo），strict 默认为 true、target 默认提升至 esnext 之前的稳定 ES 版本、types 默认为 []；7.1 目前仅 nightly，故 latest 同 stable。"
     },
     "6-Go/": {
       "stable": "Go 1.24",
