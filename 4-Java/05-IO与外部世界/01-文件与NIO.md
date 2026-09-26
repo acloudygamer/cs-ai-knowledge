@@ -1,225 +1,70 @@
-# 文件操作
+# 文件与 NIO
 
-## 定义
+> 前置：[07-异常处理](../01-语言核心/07-异常处理.md)（I/O 是受检异常的主场） · 后续：[02-网络编程](./02-网络编程.md)
 
-Java I/O 是基于**装饰器模式**（Decorator Pattern）的字节流/字符流分层抽象，其中 `BufferedInputStream`/`BufferedReader` 通过缓冲减少系统调用次数，`FileInputStream` 本身**不**带缓冲；NIO（New I/O）以 Channel 和 Buffer 实现零拷贝可能。
+> **版本基准**：Java 21 stable / Java 25 latest（均为 LTS）。示例实测环境：Temurin JDK 25.0.4.1（Windows），示例以 `javac -encoding UTF-8 --release 21` 编译验证。
 
-从系统视角，文件 I/O 涉及**用户态-内核态切换**和**缓冲区复制**。Java 的流抽象隐藏了这些细节，但理解其模型有助于选择正确实现。
+文件 I/O 的物理路径是：应用缓冲区 →（系统调用，用户态/内核态切换）→ 内核页缓存 →（DMA）→ 磁盘。Java 的两代文件 API 是对这条路径的两种抽象：`java.io` 的**流**（一次一字节/一块，装饰器叠加功能），`java.nio` 的**通道与缓冲区**（块传输 + 选择器）。本篇按这条路径从老到新走一遍。
 
-## 数学模型
+## 本质
 
-### 缓冲区命中率的性能模型
+**流（Stream）** 是单向有序字节/字符序列的抽象：`InputStream`/`OutputStream` 管字节，`Reader`/`Writer` 管字符，中间隔着**编码**——`InputStreamReader` 就是字节流按指定字符集解码为字符的桥。四类基类只定义最小读写契约，功能靠**装饰器**叠加：`BufferedInputStream` 包一层加缓冲，`DataInputStream` 再包一层加类型化读取，每层持有下一层的引用并转发调用。
 
-设缓冲区大小为 $B$ 字节，读取操作大小为 $s$ 字节。若 $s \leq B$ ，且读取位置在缓冲区内，则一次系统调用即可返回： 字节，读取操作大小为 $s$ 字节。若 $s \leq B$ ，且读取位置在缓冲区内，则一次系统调用即可返回： 字节。若 $s \leq B$ ，且读取位置在缓冲区内，则一次系统调用即可返回： ，且读取位置在缓冲区内，则一次系统调用即可返回：
+**Channel（通道）** 是 NIO 的双工抽象：一个 `FileChannel` 同时可读可写，读写的对象是 `ByteBuffer`（一块显式管理的内存，`flip()` 在读/写模式间切换）。**Selector（选择器）** 让单个线程看管多个通道（详见 [02-网络编程](./02-网络编程.md)，文件通道不支持非阻塞，选择器是网络通道的配套）。
 
- $P(\text{hit}) = \frac{\text{连续读取覆盖的字节数}}{B}$ 
-
-无缓冲时，每次 `read()` 触发一次 syscall（用户态→内核态切换）。设 syscall 开销为 $C_{syscall}$ ，缓冲区填充带宽为 $W_{disk}$ ： ，缓冲区填充带宽为 $W_{disk}$ ： ：
-
- $T_{no\_buffer}(n) = n \cdot C_{syscall} + \frac{n \cdot s}{W_{disk}}$ 
-
- $T_{buffered}(n) = \lceil\frac{n \cdot s}{B}\rceil \cdot C_{syscall} + \frac{n \cdot s}{W_{disk}}$ 
-
-当 $B \gg s$ 时，缓冲区方案显著减少 syscall 次数。 时，缓冲区方案显著减少 syscall 次数。
-
-**归约终点**：缓冲区的本质是将多次用户态-内核态切换合并为更少次数的大数据传输，以空间换时间。
-
-### 内存映射的换页代价
-
-`FileChannel.map()` 使用 `mmap` 系统调用，将文件映射到进程地址空间。设页大小为 $P$ （通常 4KB），文件大小为 $F$ ： （通常 4KB），文件大小为 $F$ ： ：
-
-- 首次访问页触发 **page fault**
-- 每次 page fault 的代价： $C_{fault} \approx 1\!-\!10\,\mu s$ 
-- 若文件 hot（缓存命中）， $C_{fault}$ 接近 0 接近 0
-
-总 I/O 代价： $T_{mmap} = \lceil\frac{F}{P}\rceil \cdot C_{fault} \cdot (1 - \text{cache\_hit\_rate})$ 
-
-**约束边界**：文件越大，page fault 次数越多；连续访问时 cache hit rate 接近 1，随机访问则接近 0。
-
-## 数据流
-
-### 传统 I/O 数据流
-
-<pre>
-应用                    内核缓冲区               磁盘
-+------------------+    +---------------+    +--------+
-| UserBuffer       | ←  | KernelBuffer  | ←  |  DMA   |
-| (byte[]/char[])  |    | (page cache)  |    | buffer |
-+------------------+    +---------------+    +--------+
-      copy                  copy
-</pre>
-
-**步骤**：
-1. 应用调用 `read(fd, buf, n)`
-2. 若 page cache 未命中：DMA 从磁盘读取数据到内核缓冲区（阻塞）
-3. 内核将数据**复制**到用户缓冲区
-4. `read()` 返回
-
-零拷贝优化：使用 `FileChannel.transferTo()` 直接从内核缓冲区到 socket，绕过用户缓冲区。
-
-### 装饰器模式的装饰器链
-
-<pre>
-FileInputStream          BufferedInputStream        DataInputStream
-(节点流/原始)    ──包装──>  (装饰器/缓冲)     ──包装──>  (类型解析)
-     │                       │                              │
-     │ read()                │ read()                      │ readInt()
-     ▼                       ▼                              ▼
-  OS syscall            检查缓冲区                  解析多字节整数
-                       缓冲区空则填充              （无缓冲）
-</pre>
-
-每个装饰器在内部持有一个组件引用，形成**职责链**。数据逐层流经各装饰器，每层在内部缓冲区和原始流之间转发调用。
-
-**所有权流转**：
-- `FileInputStream` 持有 OS 文件描述符，负责底层读取
-- `BufferedInputStream` 持有 `byte[]` 缓冲区，所有权为自有
-- `DataInputStream` 不持有数据，仅做类型转换
-
-## 对比参照
-
-| 属性 | FileInputStream | BufferedInputStream | FileChannel |
-|------|-----------------|---------------------|-------------|
-| **缓冲** | 无 | 8KB 默认缓冲 | 可配 |
-| **系统调用** | 每次 read 一次 syscall | 缓冲满才 syscall | 内存映射 |
-| **适用场景** | 小文件、随机访问 | 大文件顺序读取 | 高性能场景 |
+**Path/Files**（java.nio.file，Java 7，俗称 NIO.2）是文件系统操作的现代入口：`Path` 是纯路径值对象（替代 `File`），`Files` 是静态工具集（读写、复制、遍历、属性）。
 
 ## 机制
 
-### 装饰器模式的设计动机
+### 缓冲：为什么装饰器里缓冲排第一
 
-继承 vs 组合：
+裸 `FileInputStream.read()` 每读一个字节就是一次系统调用。`BufferedInputStream` 内部垫一块 8 KB 数组（默认值），`read()` 先查缓冲区，空了才一次性向内核要 8 KB——系统调用次数除以 8192。
 
-| 方案 | 优点 | 缺点 |
-|------|------|------|
-| 继承（每种组合一个类） | 简单 | 类爆炸： $n$ 种数据源 $\times$ $m$ 种装饰 = $n \times m$ 个类 | 种数据源 $\times$ $m$ 种装饰 = $n \times m$ 个类 | $m$ 种装饰 = $n \times m$ 个类 | 种装饰 = $n \times m$ 个类 | 个类 |
-| 组合（装饰器包装） | 灵活可叠加 | 运行时委托链调用开销 |
+实测（Temurin 25.0.4.1，单字节读 1 MB 文件）：
 
-装饰器允许**按需叠加**缓冲、类型解析、压缩等行为，无需为每种组合创建独立类。
-
-**约束**：装饰器链必须在使用前完全构建，运行期修改需重新构建链。
-
-### 装饰器链的运行时委托开销
-
-装饰器链的每次 `read()` 调用涉及多层方法委派：
-
-```
-DataInputStream.readByte()
-    │
-    └── BufferedInputStream.read()
-            │
-            └── FileInputStream.read()
-                    │
-                    └── native readBytes() → syscall
+```text
+单字节读 1MB：裸 FileInputStream 1555 ms vs BufferedInputStream 21 ms
+校验和一致: true
 ```
 
-设装饰器链深度为 $D$ ，每次 I/O 的方法调用开销为 $C_{method}$ （约 10-50ns）。对于 $N$ 次字节读取： ，每次 I/O 的方法调用开销为 $C_{method}$ （约 10-50ns）。对于 $N$ 次字节读取： （约 10-50ns）。对于 $N$ 次字节读取： 次字节读取：
+~74 倍差距几乎全部来自用户态/内核态往返次数。推论：装饰器链里缓冲层要紧贴数据源，且**任何流都该垫缓冲**（`Files.newBufferedReader` 等 NIO 入口自带缓冲，这也是它成为主流的原因之一）。
 
- $T_{decorator}(N) = N \cdot (D \cdot C_{method} + C_{syscall})$ 
-
-当 $D=3$ 且 $N=1,000,000$ 时，方法调用开销累计约 30-150ms，相比 I/O 时间可忽略。但对于高频低延迟场景（如网络代理），这一开销不可忽视。 且 $N=1,000,000$ 时，方法调用开销累计约 30-150ms，相比 I/O 时间可忽略。但对于高频低延迟场景（如网络代理），这一开销不可忽视。 时，方法调用开销累计约 30-150ms，相比 I/O 时间可忽略。但对于高频低延迟场景（如网络代理），这一开销不可忽视。
-
-### 缓冲区的设计约束
-
-`BufferedInputStream` 内部维护一个 `byte[]` 缓冲区，大小默认 8KB。行为：
-
-- `read()`：先查缓冲区，有数据直接返回；缓冲区空则填满缓冲区
-- `read(byte[] b, int off, int len)`：尽量从缓冲区填满请求字节数
-
-**约束**：多线程共享同一个 `BufferedInputStream` 不安全，因为缓冲区是共享可变状态，且没有同步措施。正确的多线程方案是每个线程持有独立的流实例。
-
-### File vs Files 的设计差异
-
-| API | 设计 | 适用场景 |
-|-----|------|----------|
-| `File` | 面向对象，封装 OS 文件描述符 | 路径元数据操作（exists, mkdir, list） |
-| `Files` | 静态方法，NIO.2 | 文件内容读写、目录操作、符号链接 |
-
-`Files.readString()` 内部实现：
-1. 打开 `FileChannel`
-2. 分配 `ByteBuffer`
-3. 循环读取直到 EOF
-4. 解码为 String
-
-**版本约束**：`Files.readString()` 是 Java 11+ API，Java 8 需要使用 `Files.lines()` 或 `BufferedReader`。
-
-### 内存映射的适用场景
-
-内存映射适合**大文件随机访问**和**高性能场景**：
-- 数据库索引（MMAP B-Tree）
-- 日志处理（追加写 + 随机读）
-- 机器学习模型加载（参数文件）
-
-**不适用场景**：
-- 小文件（mmap overhead 不值得，启动开销约 1-10μs per page）
-- 频繁写入（页 dirty 会触发回写，且无法控制回写时机）
-- 顺序扫描（Page Cache 已经做了缓存，mmap 无额外收益）
-
-**违反约束后果**：
-- 对 mmap 写入后未调用 `force()`，数据可能丢失（系统崩溃）
-- 多进程映射同一文件无外部同步时，写入顺序不可预测
-
-### NIO Channel 的零拷贝原理
-
-`FileChannel.transferTo()` 实现零拷贝的底层机制：
-
-```pre>
-传统方式（4次拷贝）:
-应用缓冲区 → 内核缓冲区 → DMA buffer → 磁盘
-          copy         copy
-
-transferTo 方式（2次拷贝）:
-内核缓冲区 → DMA buffer → 磁盘
-      sendfile() 系统调用实现
-```
-
-`sendfile(2)` 系统调用将数据从文件描述符直接传输到 socket，避免了数据在用户空间和内核空间之间的复制。Java 层调用链：
+### Files：内容操作的一句话形态
 
 ```java
-FileChannel.transferTo(position, count,WritableByteChannel target)
-    │
-    └── native sendfile0() → sun.nio.ch.FileDispatcherImpl.sendfile0()
-            │
-            └── Linux: sendfile64(fd_out, fd_in, offset, count)
+Path p = Path.of("dir", "hello.txt");
+Files.writeString(p, "第一行\n", StandardOpenOption.CREATE);   // Java 11+
+String s = Files.readString(p);                                 // Java 11+
 ```
 
-**约束**：零拷贝要求目标 Channel 底层支持 `sendfile`，如网络 socket。对于管道或本地文件目标，可能回退到拷贝模式。
+实测（Temurin 25.0.4.1，含 APPEND 追加）：
 
-## 参考存根
-
-```java
-// 零拷贝文件复制（使用 transferTo）
-try (FileChannel in = FileChannel.open(Path.of("source.bin"));
-     FileChannel out = FileChannel.open(Path.of("dest.bin"),
-             StandardOpenOption.CREATE, StandardOpenOption.WRITE)) {
-    in.transferTo(0, in.size(), out);
-}
-
-// 内存映射文件
-try (FileChannel ch = FileChannel.open(Path.of("data.bin"))) {
-    MappedByteBuffer buf = ch.map(FileChannel.MapMode.READ_ONLY, 0, ch.size());
-    while (buf.hasRemaining()) {
-        byte b = buf.get();
-        // 处理字节
-    }
-}
+```text
+readString: 第一行|第二行|追加行|
+size = 30 字节, 目录? false
 ```
 
-```java
-// 装饰器链构建
-InputStream raw = new FileInputStream("data.txt");
-InputStream buffered = new BufferedInputStream(raw, 8192);
-DataInputStream typed = new DataInputStream(buffered);
-// 使用 typed.readInt() 等方法
-```
+`Files` 的方法直接报告失败原因——`NoSuchFileException`、`FileAlreadyExistsException`，而不像 `File.delete()` 那样只回一个 `boolean`。遍历目录用 `Files.walk(Path)`（返回 Stream，需 try-with-resources 关闭句柄）。
 
-```java
-// NIO 随机访问
-try (RandomAccessFile raf = new RandomAccessFile("data.bin", "rw");
-     FileChannel ch = raf.getChannel()) {
-    ByteBuffer buf = ByteBuffer.allocateDirect(1024);
-    ch.read(buf, 1024 * 10);  // 跳到第11个块读取
-    buf.flip();
-    // 处理 buf 中的数据
-}
-```
+### FileChannel：块传输与零拷贝
+
+`FileChannel` 对应一次 `open()` 得到的文件句柄，读写以 ByteBuffer 为单位。两个超出"普通读写"的能力：
+
+1. **`transferTo/transferFrom`**：数据在内核空间内直接从文件页缓存流向目标通道（Linux 底层是 `sendfile`），不经过应用缓冲区——省掉两次用户态拷贝。实测（1 MB 复制）：`transferTo 复制 1048576 字节，大小一致: true`。
+2. **`map()` 内存映射**：把文件区间映射进进程地址空间，读写变成内存访问，缺页由内核按需调入。适合大文件随机访问（数据库索引、模型文件加载）；代价是映射占虚拟地址空间、回写时机不受应用控制，小文件和顺序扫描没有收益。
+
+`ByteBuffer.allocateDirect()` 分配堆外缓冲，I/O 时省一次"堆→本地"拷贝，但分配/回收贵——只用于长寿命的大缓冲。
+
+### 选型
+
+| 需求 | 入口 |
+|---|---|
+| 读个小文件、按行处理 | `Files.readString` / `Files.lines`（NIO.2） |
+| 流式写大量文本 | `Files.newBufferedWriter`（自带缓冲） |
+| 大文件复制 | `FileChannel.transferTo` |
+| 大文件随机访问 | `FileChannel.map` 或带位置的 `read(buf, pos)` |
+| 网络高并发 | Channel + Selector，见 [02-网络编程](./02-网络编程.md) |
+
+---
+
+> 前置：[07-异常处理](../01-语言核心/07-异常处理.md) · 后续：[02-网络编程](./02-网络编程.md)——同一套 Channel/Selector 用在 socket 上
