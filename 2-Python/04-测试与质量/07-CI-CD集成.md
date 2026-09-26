@@ -25,8 +25,8 @@ jobs:
   lint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v4          # uv：解释器+依赖一步到位（见 02-开发环境与工具链）
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10        # uv：解释器+依赖一步到位（见 02-开发环境与工具链）
       - run: uv sync --frozen                 # 严格按锁安装——可复现是 CI 的前提
       - run: uv run ruff check . && uv run ruff format --check .
       - run: uv run mypy src/
@@ -36,21 +36,21 @@ jobs:
       fail-fast: false                        # 一个版本失败不取消其余——全貌优先
       matrix:
         os: [ubuntu-latest, windows-latest]   # 跨平台差异真实存在（路径/编码/进程模型）
-        python-version: ["3.12", "3.13"]
+        python-version: ["3.12", "3.14"]
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v4
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10
       - run: uv sync --frozen
       - run: uv run pytest -m "not slow" --cov=mylib --cov-branch
 ```
 
-要点：`uv sync --frozen` / `pip sync`（按锁精确安装）让 CI 与本地同构——"本地绿 CI 红"的第一嫌疑人就是环境漂移；矩阵覆盖 `requires-python` 承诺的**边界版本**（[04-打包与分发](../03-运行时与性能/04-打包与分发.md)），不是所有版本；缓存依赖（`setup-uv` 内建 / `actions/cache` 键含锁文件哈希）把分钟级安装压到秒级。
+要点：`uv sync --frozen` / `pip sync`（按锁精确安装）让 CI 与本地同构——"本地绿 CI 红"的第一嫌疑人就是环境漂移；矩阵覆盖 `requires-python` 承诺的**边界版本**（[04-打包与分发](../03-运行时与性能/04-打包与分发.md)），不是所有版本；缓存依赖（`setup-uv` 的 `enable-cache` / `actions/cache` 键含锁文件哈希）把分钟级安装压到秒级。
 
 ### 分层跑测试
 
 - PR 门禁：lint + 类型 + 快速测试（`-m "not slow"`，[01-pytest基础](01-pytest基础.md) 的 marker 分层）——目标是分钟内给结论。
-- 主干/夜间：全量（含 slow、集成、[03-Mock与替身](03-Mock与替身.md) 的契约测试、容器真库——`services:` 或 `containers:` 起依赖服务）。
+- 主干/夜间：全量（含 slow、集成、[03-Mock与替身](03-Mock与替身.md) 的契约测试、容器真库——`services:` 起依赖服务容器）。
 - 覆盖率上报与 diff 覆盖门禁的落点见 [05-覆盖率与测试策略](05-覆盖率与测试策略.md)。
 
 ### 发布流水线：tag 驱动
@@ -64,8 +64,8 @@ jobs:
       id-token: write            # Trusted Publishing：OIDC 免长期令牌
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v4
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10
       - run: uv build && uv publish    # wheel+sdist 构建+上传（见 04-打包与分发）
 ```
 
@@ -74,7 +74,7 @@ jobs:
 ### 分支保护与依赖安全
 
 - 分支保护规则把 CI 从"信息"变"门禁"：required checks + 禁止直推 main + PR 必须最新——这套配置是流程的最后一环，缺失则一切 lint 都是建议。
-- 依赖安全：`pip-audit` / `uv lock --audit`（锁文件对 OSV 漏洞库）、`dependabot`/`renovate`（升级 PR 自动化）周期任务；密钥只进 GitHub Secrets（[03-序列化与配置格式](../02-IO与工程实践/03-序列化与配置格式.md) 的密钥纪律在 CI 侧的镜像）。
+- 依赖安全：`pip-audit` / `uv audit`（锁文件对 OSV 漏洞库）、`dependabot`/`renovate`（升级 PR 自动化）周期任务；密钥只进 GitHub Secrets（[03-序列化与配置格式](../02-IO与工程实践/03-序列化与配置格式.md) 的密钥纪律在 CI 侧的镜像）。
 
 ## 连接
 

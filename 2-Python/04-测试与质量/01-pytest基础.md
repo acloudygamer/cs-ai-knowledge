@@ -40,7 +40,7 @@ def test_ratio():
 
 ### marker：测试的元数据
 
-`@pytest.mark.slow` 自定义分档（配合 `-m` 与 CI 分层跑）；内建四件：`skip`（无条件跳）、`skipif`（条件跳，如 Windows 差异）、`xfail`（已知失败——修复后 XPASS 提示你摘标记）、`filterwarnings`（把特定警告升格/降格，衔接 [08-错误与异常](../01-语言核心/08-错误与异常.md) 的 warning 通道）。自定义 marker 必须注册（配置里 `markers = [...]`），未注册的 marker 是拼写错误的温床——用 `--strict-markers` 关死。
+`@pytest.mark.slow` 自定义分档（配合 `-m` 与 CI 分层跑）；常用内建标记：`skip`（无条件跳）、`skipif`（条件跳，如 Windows 差异）、`xfail`（已知失败——修复后 XPASS 提示你摘标记）、`filterwarnings`（把特定警告升格/降格，衔接 [08-错误与异常](../01-语言核心/08-错误与异常.md) 的 warning 通道）。自定义 marker 必须注册（配置里 `markers = [...]`），未注册的 marker 是拼写错误的温床——用 `--strict-markers` 关死。
 
 ### 组织结构：conftest 与配置
 
