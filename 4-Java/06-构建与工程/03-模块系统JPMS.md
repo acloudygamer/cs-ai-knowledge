@@ -1,231 +1,102 @@
 # 模块系统（JPMS）
 
-## 定义
+> 前置：[Gradle](./02-Gradle.md) · 后续：[测试理论](../07-测试与质量/01-测试理论.md)
 
-Java 9引入的模块系统（Java Platform Module System, JPMS）的本质是**显式封装边界**——通过 `module-info.java` 声明模块名、导出包、依赖关系，让JAR从"一堆class文件的集合"升级为"有明确接口和依赖声明的计算单元"。
+> **版本基准**：JPMS 自 Java 9（2017）引入，本篇示例实测环境为 Temurin JDK 25.0.4.1（Windows），编译命令 `javac -encoding UTF-8 --release 21`。全部命令行示例均已实测。
 
-JPMS解决四个核心问题：
-- **JAR地狱**：多版本共存导致类冲突
-- **实现隐藏**：只暴露必要public类，隐藏内部实现
-- **隐式依赖显式化**：`requires` 替代 classpath 的无序扫描
-- **可重复构建**：模块图确保构建的确定性
+JPMS（Java Platform Module System，Java 平台模块系统）是给 JVM 增加的一层**模块级封装与依赖声明**：每个模块用一份 `module-info.java` 声明自己叫什么、依赖谁、导出哪些包，编译器和运行时据此检查访问合法性。它回应的约束是 classpath 的扁平结构：classpath 把所有 JAR 的所有包倒进同一个命名空间，public 即全局可见，依赖关系只在运行到 `NoClassDefFoundError` 那一刻才暴露。模块系统把"哪些包是 API、哪些是实现"从约定升格为编译期与运行期双重强制的边界。
 
-## 数学模型
+## module-info：模块的接口声明
 
-### 模块依赖图的可满足性
-
-令模块集合为 $M$ ，依赖关系为有向边 $d \subseteq M \times M$ ： ，依赖关系为有向边 $d \subseteq M \times M$ ： ：
-
-$$
-\forall (a, b) \in d \Rightarrow a \text{ requires } b
-$$
-
-构建系统必须验证模块依赖图的**可满足性**：
-- **无循环依赖**（强连通分量检测）
-- **所有依赖都有对应模块**（可来自模块路径或自动模块）
-- **可读性传递闭包**：`a` 能读取 `b` 当且仅当存在路径 $a \rightarrow^* b$ 
-
-$$
-\text{Readable}(a, b) \iff \exists \text{path}: a \Rightarrow^* b
-$$
-
-### 循环依赖检测：拓扑排序算法
-
-模块依赖图必须是有向无环图（DAG）。检测循环依赖的标准算法是 **Kahn算法**（BFS拓扑排序）：
-
-$$
-\text{Kahn算法}：
-\begin{cases}
-\text{计算每个节点的入度 } \text{in-degree}(v) \\
-\text{将入度为0的节点入队} \\
-\text{while 队非空：} & \text{弹出节点 } v，\text{将其加入拓扑序} \\
- & \text{对每个邻接点 } w：\text{in-degree}(w){-}{-} \\
- & \text{if } \text{in-degree}(w) == 0 \text{ then 入队}
-\end{cases}
-$$
-
-**若最终拓扑序列长度 $|V'| < |V|$ ，则图中存在环**——即有循环依赖。 ，则图中存在环**——即有循环依赖。
-
-算法复杂度：
-
-$$
-T_{\text{toposort}} = O(|V| + |E|)
-$$
-
-其中 $|V|$ 为模块数， $|E|$ 为依赖边数。JDK的模块解析在构建时即执行此检测。 为模块数， $|E|$ 为依赖边数。JDK的模块解析在构建时即执行此检测。 为依赖边数。JDK的模块解析在构建时即执行此检测。
-
-### 模块解析：本质是DAG遍历
-
-模块解析的递归查找过程本质是对依赖图的 **DFS 遍历**：
-
-$$
-T_{\text{resolve}} = O(|V| + |E|)
-$$
-
-每次 `requires` 解析需要：
-1. 在当前 Layer 的模块表中查找模块名（哈希查找， $O(1)$ 平均） 平均）
-2. 若未找到，递归查找依赖模块
-3. 验证可读性：检查导出包是否包含目标包
-
-**关键约束**：解析结果被缓存，避免重复解析同一模块。
-
-### 自动模块的隐式规则
-
-非模块化JAR放入模块路径后成为**自动模块**：
-
-$$
-\text{ModuleName}_{\text{auto}} = \text{JAR文件名（去除版本号）}
-$$
-
-$$
-\text{exports}_{\text{auto}} = \text{所有包} \quad \text{requires}_{\text{auto}} = \text{所有其他自动模块}
-$$
-
-这意味着自动模块是**全导出、全依赖**的宽松模块——作为向完全模块化迁移的过渡机制。
-
-## 数据流
-
-### 模块系统的解析与验证流程
-
-<pre>
-javac --module-source-path src ...
-    │
-    ├─ 解析 module-info.java
-    │       │
-    │       ▼
-    │   模块名、导出、依赖
-    │       │
-    │       ▼
-    ├─ 构建模块图
-    │       │
-    │       ▼
-    │   可读性传递闭包
-    │       │
-    │       ▼
-    ├─ 依赖解析
-    │       │
-    │       ├── 显式 requires ──> 依赖模块必须存在
-    │       ├── 隐式 requires java.base ──> 自动添加
-    │       └── static requires ──> 编译时需要，运行时可选
-    │       │
-    │       ▼
-    ├─ 可读性检查
-    │       │
-    │       ▼
-    │   a reads b? ──> 必须存在导出路径
-    │       │
-    │       ▼
-    └─ 编译产出
-            ├── .class 文件按模块组织
-            └── 模块化 JAR (module-info.class 在根目录)
-</pre>
-
-### 服务加载（ServiceLoader）的数据流
-
-<pre>
-服务接口模块 (exports Service)
-    │
-    │ provides Service with Impl
-    │
-    ▼
-使用模块 (uses Service)
-    │
-    │ ServiceLoader.load(Service.class)
-    │       │
-    │       ▼
-    │   在模块路径/类路径查找
-    │   实现模块的 provides 声明
-    │       │
-    │       ▼
-    │   ServiceLoader 发现所有实现
-    │       │
-    │       ▼
-    │   for (Plugin p : loader) { ... }
-    └─> 实例化并使用
-</pre>
-
-## 机制
-
-### exports vs opens：封装边界的两个维度
-
-| 指令 | 编译期可读 | 运行时反射 | 典型用途 |
-|------|------------|------------|----------|
-| `exports` | ✅ | ❌ | 公开API |
-| `opens` | ❌ | ✅（浅层） | 序列化/测试 |
-| `opens to` | ❌ | ✅（指定模块） | 框架反射 |
-| `opens`（类级别） | ❌ | ✅ | 深度反射 |
-
-**为何需要 opens**：`exports` 只允许编译时依赖访问，但 Spring、Hibernate 等框架需要在运行时深度反射（访问 private 字段、调用 private 方法）。
-
-`--add-opens` 是启动参数层面的等效操作，用于在启动时开放特定模块的反射权限。
-
-**违反约束的后果**：若框架尝试在运行时反射访问未导出的包，会收到 `IllegalAccessError`，导致框架功能失效。
-
-### 双亲委派在模块系统中的演化
-
-JDK 9之前：BootstrapClassLoader → ExtClassLoader → AppClassLoader
-
-JDK 9之后（模块化）：
-
-$$
-\text{ClassLoader} \Rightarrow \text{JPMS Layer} \Rightarrow \text{Module}
-$$
-
-模块系统引入**Layer**概念：每个类加载器拥有一个或多个Layer，每个Layer维护：
-- 模块名 → Module对象的映射
-- 模块的类加载器
-- 模块间的依赖关系
+一个最小模块（本节全部命令实测于 Temurin 25.0.4.1）：
 
 ```java
-ModuleLayer.boot()  // 启动类加载器的Layer
-ModuleLayer.defineModulesWith(classLoader, ...)
+// src/com.example.lib/module-info.java
+module com.example.lib {
+    exports com.example.lib.api;   // 只有这个包对外可见
+}
 ```
 
-### 服务加载的可插拔性原理
+指令全集按职责分四组：
 
-ServiceLoader的核心是**声明式发现**：
+| 指令 | 作用 | 连接的下游 |
+|---|---|---|
+| `requires M` | 依赖模块 M（可读其导出包） | 编译期与启动期校验 M 必须存在 |
+| `requires transitive M` | 依赖 M 并转授可读性 | 依赖我的模块自动可读 M——用于"我的公开 API 签名里出现了 M 的类型" |
+| `requires static M` | 编译期需要 M，运行期可选 | 注解处理、可选集成 |
+| `exports p` / `exports p to M` | 开放包 p 的编译期与运行期访问 | 限定 `to` 时仅指定模块可见 |
+| `opens p` / `opens p to M` | 开放包 p 的运行时**深反射** | Spring/Hibernate 等框架反射私有字段所需 |
+| `uses I` / `provides I with C` | 服务消费/提供声明 | `ServiceLoader` 在模块图上发现实现 |
 
-1. 提供者模块在 `module-info.java` 中声明：`provides ServiceInterface with ConcreteImpl`
-2. 使用者模块声明：`uses ServiceInterface`
-3. 运行时 `ServiceLoader.load(ServiceInterface.class)` 遍历模块路径，找到所有声明了对应 `provides` 的模块
-4. 实例化这些提供者（惰性加载）
+`exports` 与 `opens` 的分界是编译期访问与运行期反射的分界：`exports` 开放的包可以被正常 import 和调用，但私有成员的反射访问仍需 `opens`。
 
-**约束**：所有实现类必须拥有无参构造函数（ServiceLoader通过反射实例化）。若实现类没有无参构造器，抛出 `ServiceConfigurationError`。
+## 实测：编译、运行与强封装
 
-### 迁移策略：类路径 → 模块路径
+两模块项目：`com.example.lib` 导出 `api` 包（接口 `Greeting` 与工厂 `Greetings`），实现类 `DefaultGreeting` 放在未导出的 `internal` 包；`com.example.app` 依赖 lib 并调用工厂。
 
-| 阶段 | 类路径 | 模块路径 | 自动模块 |
-|------|--------|----------|----------|
-| 完全未迁移 | 所有JAR在类路径 | 无 | 无 |
-| 部分迁移 | 迁移后的模块在模块路径 | 迁移的模块 | 其他JAR |
-| 全部迁移 | 无 | 所有模块 | 无 |
+```bash
+# 编译（--module-source-path 让 javac 按模块组织源码树）
+javac -encoding UTF-8 --release 21 --module-source-path src -d out $(find src -name '*.java')
 
-自动模块作为桥梁：**自动模块可以读取所有其他模块，所有模块也可以读取自动模块**。
-
-**关键约束**：模块路径与类路径**不可混用**——同一个JAR不能同时出现在模块路径和类路径上。
-
-## 参考存根
-
-```java
-// 最小模块系统示例（≤30行）
-// src/com.example.app/module-info.java
-/*
-module com.example.app {
-    exports com.example.app.api;
-    requires com.example.lib;
-    uses com.example.app.api.Plugin;  // 可选：声明使用接口
-}
-*/
-
-// src/com.example.app/com/example/app/Main.java
-/*
-public class Main {
-    public static void main(String[] args) {
-        var loader = ServiceLoader.load(Plugin.class);
-        for (var plugin : loader) {
-            plugin.execute();
-        }
-    }
-}
-*/
+# 运行（模块路径取代 classpath，-m 指定 模块/主类）
+java --module-path out -m com.example.app/com.example.app.Main
+# 输出：hello, jpms
 ```
+
+**强封装的实测证据**：让 app 模块 `import com.example.lib.internal.DefaultGreeting`，编译直接失败：
+
+```text
+错误: 程序包 com.example.lib.internal 不可见
+  (该程序包已在模块 com.example.lib 中声明, 但该模块未导出它)
+```
+
+对比 classpath 世界：只要类是 public，`internal` 包名只是君子协定；模块世界里它是编译器强制。运行时反射越界同样被拦——`setAccessible` 访问未 `opens` 包的私有成员会抛 `InaccessibleObjectException`。JDK 自身是这套机制的最大用户：`jdk.internal.*`、`sun.misc.Unsafe` 等内部 API 正是靠模块封装在 Java 9 之后关上了门。
+
+**拆包（split package）约束**：同一个包不允许出现在两个模块中。模块图解析时发现两个模块含同名包即报错——这是"一个包一个归属"的强制，也是老代码迁移时最常见的撞墙点（典型：一个包被切成 api/impl 两个 JAR 的历史项目）。
+
+## 实测：jlink 定制运行时
+
+模块图的确定性带来一个 classpath 给不了的能力：既然每个模块声明了全部依赖，就能算出运行一个应用所需的最小 JDK 子集。`jdeps` 先分析，jlink 再裁剪：
+
+```bash
+# 打成模块化 JAR
+jar --create --file mods/com.example.lib.jar -C out/com.example.lib .
+jar --create --file mods/com.example.app.jar --main-class com.example.app.Main -C out/com.example.app .
+
+# jdeps 分析模块依赖（实测输出）
+jdeps --module-path mods -s -m com.example.app
+# com.example.app -> com.example.lib
+# com.example.app -> java.base
+
+# jlink 定制运行时镜像（--launcher 生成启动脚本 app）
+jlink --module-path mods;$JAVA_HOME/jmods --add-modules com.example.app \
+      --launcher app=com.example.app --output img \
+      --strip-debug --no-man-pages --no-header-files
+./img/bin/app   # 输出：hello, jpms
+```
+
+实测体积账（Temurin 25.0.4.1，Windows）：完整 JDK 291 MB，只含 `java.base` 加两个应用模块的定制镜像 **45 MB**。本例应用只用 `java.base`；需要 `java.sql`、`java.net.http` 等模块时按需 `--add-modules` 追加，体积随模块数增长。45 MB 里不含 `jmods`、不包含 javac——镜像是纯运行时，这正对容器部署场景（与 [11-GraalVM与云原生](../08-生态与框架/11-GraalVM与云原生.md) 的 AOT 路线是同一约束的两种解法）。
+
+## 迁移路径：unnamed module 与 automatic module
+
+JPMS 设计了兼容层，让未模块化的存量 JAR 与模块化代码共存：
+
+- **无名模块（unnamed module）**：classpath 上的一切归入一个无名模块，它可读所有模块、导出全部包——classpath 行为原样保留，老应用不改一行也能跑在 JDK 9+ 上。
+- **自动模块（automatic module）**：把普通 JAR 放上**模块路径**，它自动成为模块：导出全部包、可读所有其他模块，模块名从文件名推导（或由 JAR 清单的 `Automatic-Module-Name` 指定）。实测：
+
+```bash
+jar --file plain-old-lib-1.0.jar --describe-module
+# plain.old.lib@1.0 automatic      ← 文件名 plain-old-lib-1.0.jar 推导出模块名
+# requires java.base mandated
+# contains plainlib
+```
+
+文件名推导的名字不稳定（改名即断依赖），库作者的正确做法是先在清单里钉 `Automatic-Module-Name` 再发布。迁移的标准顺序是**自下而上**：用 `jdeps` 分析依赖图 → 叶子库先模块化（加 module-info）→ 上层应用最后迁移；拆包冲突在这一过程中逐一消除。
+
+## 版图与边界
+
+版图之内：JDK 自身的模块化（9 起 JDK 被切成约 70 个模块，`java --list-modules` 可见）、jlink 运行时裁剪、库作者的强封装。版图之外是现实：**应用侧采用率始终不高**——多数业务应用的全部价值在 classpath 上也能拿到，模块化的收益（封装、裁剪）抵不过迁移成本（拆包、反射框架的 opens 配置、生态依赖未模块化），Spring Boot 应用的主流交付形态仍是 classpath 上的 fat JAR。这是历史路径依赖，不是设计失败：JPMS 钉死了 JDK 内部封装与 jlink 这两个确定性收益，应用侧留作可选项。
+
+---
+
+> 前置：[Gradle](./02-Gradle.md) · 后续：[测试理论](../07-测试与质量/01-测试理论.md)——构建期之后是验证期

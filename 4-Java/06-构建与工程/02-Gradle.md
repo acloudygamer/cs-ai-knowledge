@@ -1,222 +1,101 @@
 # Gradle
 
-## 定义
+> 前置：[Maven](./01-Maven.md) · 后续：[模块系统 JPMS](./03-模块系统JPMS.md)
 
-Gradle 构建逻辑由**有向无环图（DAG）**驱动，每个 Task 节点代表一个原子构建操作（有输入、执行逻辑、输出），边代表任务依赖关系（有向边 $T_A \rightarrow T_B$ 表示 $T_B$ 依赖 $T_A$ 的输出）。执行引擎按 DAG 的拓扑排序决定任务并行度：无依赖或依赖已满足的任务可并行执行。 表示 $T_B$ 依赖 $T_A$ 的输出）。执行引擎按 DAG 的拓扑排序决定任务并行度：无依赖或依赖已满足的任务可并行执行。 依赖 $T_A$ 的输出）。执行引擎按 DAG 的拓扑排序决定任务并行度：无依赖或依赖已满足的任务可并行执行。 的输出）。执行引擎按 DAG 的拓扑排序决定任务并行度：无依赖或依赖已满足的任务可并行执行。
+> **版本基准**：Gradle 9.8.0（gradle.org 现行版本，2026 年口径）；Gradle 9 起运行守护进程要求 JVM 17+（编译目标仍可到更低版本）。本机无 Gradle，构建脚本示例为**骨架，未实测**，但 DSL API、配置名与版本均已网查核实。脚本一律用 Kotlin DSL（`build.gradle.kts`）——Gradle 官方自 2023 年起以 Kotlin DSL 为新建项目默认。
 
-## 数学模型
+Gradle 是任务图驱动的构建工具：构建脚本是一段可执行的程序，它在**配置阶段**构造出一张任务有向无环图（DAG），**执行阶段**按依赖拓扑序调度这张图。这与 Maven（[01-Maven](./01-Maven.md)）的本质差异在于骨架的形状：Maven 的生命周期是钉死的线性阶段序列，插件目标挂在固定槽位上；Gradle 没有这条骨架，只有任务与任务间的依赖边，阶段概念被"任务依赖"取代。形状差异回应的约束不同：Maven 押注"所有项目构建方式相同"换可维护性，Gradle 押注"构建即代码"换表达力与性能。
 
-### 任务 DAG 的拓扑排序
+## 三阶段：初始化、配置、执行
 
-设任务集合 $T = \{t_1, t_2, \ldots, t_n\}$ ，依赖关系构成偏序集合 $(T, \prec)$ ，其中 $t_a \prec t_b$ 表示 $t_b$ 依赖 $t_a$ 的输出。拓扑排序保证： ，依赖关系构成偏序集合 $(T, \prec)$ ，其中 $t_a \prec t_b$ 表示 $t_b$ 依赖 $t_a$ 的输出。拓扑排序保证： ，其中 $t_a \prec t_b$ 表示 $t_b$ 依赖 $t_a$ 的输出。拓扑排序保证： 表示 $t_b$ 依赖 $t_a$ 的输出。拓扑排序保证： 依赖 $t_a$ 的输出。拓扑排序保证： 的输出。拓扑排序保证：
- $\forall (t_a, t_b) \in \prec: \text{position}(t_a) < \text{position}(t_b)$ 
+每次 `gradle build` 都走三段：
 
-并行执行度上界：
- $\text{maxParallelism} = \min(|T|, \text{CPU\_cores})$ 
+1. **初始化**：读 `settings.gradle.kts`，确定本次构建包含哪些 project（单模块或子模块列表）。
+2. **配置**：执行各模块的 `build.gradle.kts`，注册任务、连依赖边，产出任务 DAG。这一阶段是纯图构造，不执行任何任务动作。
+3. **执行**：从请求的任务出发沿依赖边回溯，按拓扑序执行图中被需要的子集。
 
-实际上由于任务间存在文件锁、端口占用等资源竞争，实际并行度可能低于上界。
+一个最小 Java 项目的构建脚本：
 
-### 增量构建的指纹算法
+```kotlin
+// build.gradle.kts —— 骨架，未实测（本机无 Gradle）
+plugins {
+    `java-library`
+}
 
-设任务 $t$ 的输入指纹为 $F_{in}(t) = \text{hash}(\text{content\_hash}(f_1), \text{content\_hash}(f_2), \ldots)$ ，输出指纹为 $F_{out}(t) = \text{hash}(\text{content\_hash}(o_1), \text{content\_hash}(o_2), \ldots)$ 。 的输入指纹为 $F_{in}(t) = \text{hash}(\text{content\_hash}(f_1), \text{content\_hash}(f_2), \ldots)$ ，输出指纹为 $F_{out}(t) = \text{hash}(\text{content\_hash}(o_1), \text{content\_hash}(o_2), \ldots)$ 。 ，输出指纹为 $F_{out}(t) = \text{hash}(\text{content\_hash}(o_1), \text{content\_hash}(o_2), \ldots)$ 。 。
+repositories {
+    mavenCentral()
+}
 
-任务跳过条件：
- $F_{in}(t) = F_{in}^{\text{cached}} \land F_{out}(t) = F_{out}^{\text{cached}} \land \text{cacheValid}(t)$ 
+dependencies {
+    implementation("com.google.guava:guava:33.5.0-jre")
+    testImplementation("org.junit.jupiter:junit-jupiter:5.13.4")
+    testRuntimeOnly("org.junit.platform:junit-platform-launcher")
+}
 
-若任一条件不满足，任务重新执行。
-
-### cacheValid(t) 的判断逻辑
-
-`cacheValid(t)` 是任务缓存有效性的附加约束，由 Gradle 的构建缓存（Build Cache）决定：
-
- $\text{cacheValid}(t) = \text{buildCacheEnabled} \land \text{outputLocationsValid}(t)$ 
-
-其中 `outputLocationsValid(t)` 检查输出目标位置是否满足以下全部条件：
-
-1. **输出不存在冲突**：任务的输出文件未被其他任务声明为输入（防止输出污染）
-2. **构建缓存可访问**：本地构建缓存或远程构建缓存（Gradle Enterprise/Develocity）可读
-3. **输出完整性**：任务的全部输出文件均已就位（无部分写入）
-
-**远程构建缓存的场景**：当 `buildCacheEnabled=true` 且配置了远程缓存时，`cacheValid(t)` 还需满足：
- $\text{remoteCacheHit}(t) = \text{true} \land \text{artifactUpToDate}(t)$ 
-
-即 Gradle 从远程缓存下载产物后，会验证下载文件的 SHA-256 校验和与元数据中记录的值是否一致：
-
- $\text{verify}(artifact) = \text{SHA256}(\text{artifact}) \stackrel{?}{=} \text{meta.expectedHash}$ 
-
-指纹碰撞概率（SHA-256）：
- $P(\text{collision}) \approx 2^{-256} \approx 10^{-77}$ 
-
-### 依赖解析的版本冲突解决
-
-Maven 使用"最短路径优先"（nearest-first）原则：若 A→B→C→D@1.0 且 A→X→D@2.0，则选择 D@2.0（路径长度 2 < 3）。
-
-Gradle 使用"最新版本优先"（最新策略），但允许通过 `resolutionStrategy` 强制指定版本。
-
-**归约终点**：Gradle 的 DAG 执行模型可归约为**拓扑排序 + 并行调度**，是最优构建顺序的存在性证明。
-
-## 数据流
-
-<pre>
-构建初始化阶段:
-settings.gradle
-    │
-    ▼ 解析
-Project 对象树
-    │
-    ▼ 配置
-Task DAG 构建
-    │
-    ▼
-┌─────────────────────────────────────────────┐
-│                  Task DAG                     │
-│                                              │
-│   :compileJava ──► :processResources ──► :classes │
-│        │                                       │       │
-│        │     ┌────────────────────────────────┘       │
-│        ▼     ▼                                        │
-│   :compileTestJUnit ──► :test ──► :build              │
-│                              │                         │
-│                              ▼                         │
-│                       :bootJar (Spring Boot)           │
-└─────────────────────────────────────────────┘
-        │
-        ▼ 执行引擎按拓扑序调度
-任务并行执行（无依赖任务同时运行）
-        │
-        ▼
-构建缓存 (.gradle/caches/) 或 产物输出 (build/)
-</pre>
-
-### 增量构建数据流
-
-```
-输入文件 ──► 哈希计算 ──► 对比缓存指纹
-                              │
-                              ├── 匹配 ──► 跳过任务，跳过输出检查
-                              │
-                              └── 不匹配 ──► 执行任务 ──► 计算输出指纹 ──► 写入缓存
-```
-
-## 机制
-
-### 增量构建 vs 传统时间戳检查
-
-传统 Makefile：检查文件修改时间（mtime），精度为秒级，但存在时钟 skew 问题（ NFS 时钟不同步导致误判）。
-
-Gradle 指纹：计算文件内容哈希，精度为位级，仅在内容真正变化时触发重构建。
-
-### 任务并行执行的约束
-
-- 任务间无读写冲突（无共同输入/输出文件）时可安全并行
-- Gradle 的 worker API 提供进程隔离（`maxWorkers` 控制并发度）
-- 文件锁（Project.fileLock）防止同一文件被并发读写
-
-### 任务输出的文件锁机制
-
-当多个任务可能写入同一文件时（如多个 sourceSet 编译到同一 classpath），Gradle 通过文件锁协调：
-
-```groovy
-// 文件锁确保同一时刻只有一个任务写入
-fileLock.lock()  // 阻塞直到获取锁
-try {
-    // 写入操作
-} finally {
-    fileLock.unlock()
+tasks.test {
+    useJUnitPlatform()
 }
 ```
 
-锁的粒度是文件级别，高并发时仍可能成为瓶颈。
+上下游连接：`plugins` 块引入的 `java-library` 插件是任务图的来源——它注册了 `compileJava`、`processResources`、`classes`、`test`、`jar`、`build` 等任务并连好边（`jar` 依赖 `classes`，`classes` 依赖 `compileJava`）；`gradle build` 请求 `build` 任务，引擎沿边回溯出整条链。
 
-### 依赖配置的作用域
+## 性能机制：守护进程、增量、缓存
 
-- `implementation`：编译可见，传递依赖不暴露（消费者无法看到 B 的传递依赖 C）
-- `api`（等价于旧 `compile`）：编译可见，传递依赖暴露（消费者可以看到 C）
-- `compileOnly`：仅编译时存在，不打包不运行
+Gradle 相对 Maven 的性能优势来自三个机制，全部围绕"不重复干活"：
 
-`api` 配置解决的是"依赖泄漏"问题——库作者希望暴露某些传递依赖供消费者使用，但 `implementation` 会阻断这种传递性。
+- **守护进程（Daemon）**：构建跑在一个常驻 JVM 里，后续构建复用它——JVM 启动费、JIT 热身、类加载只付一次。配置缓存（configuration cache，Gradle 8 起逐步转正）进一步把配置阶段的图构造结果序列化复用。
+- **增量构建**：每个任务声明自己的 inputs（源文件、配置参数）与 outputs（产物目录）。执行前对输入做内容哈希指纹，与上次记录比对：不变则任务标记 `UP-TO-DATE` 直接跳过。与 Make 的 mtime 时间戳相比，内容哈希不受时钟漂移与 `touch` 误触发影响。
+- **构建缓存（Build Cache）**：任务输出按输入指纹的哈希值存入缓存（本地或远程节点），指纹命中时直接从缓存取产物而不执行。换台机器、CI 换 agent，只要输入指纹一致就能命中。
 
-### Gradle Wrapper 的原理
+这三个机制能成立，前提正是"任务图 + 显式输入输出声明"的形状——Maven 的固定阶段模型里插件各自为政，没有统一的输入输出声明面，这是两者性能差距的结构根源。
 
-`gradlew` 脚本在首次执行时检测本地是否有指定版本 Gradle，若无则从 `services.gradle.org` 下载。下载的 Gradle 安装在 `~/.gradle/wrapper/dists/` 目录下，所有后续构建使用统一的 Gradle 版本。
+## 依赖配置：implementation 与 api 的分界线
 
-### gradlew 校验和验证机制
+Gradle 的依赖声明挂在**配置**（configuration，一条具名 classpath）上，常用配置与 Maven scope 的对应：
 
-Gradle Wrapper 的校验和验证采用 SHA-256 哈希链机制，确保下载的 Gradle 发行版未被篡改：
+| Gradle 配置 | 编译主代码 | 打包/运行时 | 暴露给消费者 | 对应 Maven scope |
+|---|---|---|---|---|
+| `implementation` | 是 | 是 | 否 | 无精确对应（最接近 `compile` 但不泄漏） |
+| `api`（java-library 插件） | 是 | 是 | 是 | `compile` |
+| `compileOnly` | 是 | 否 | 否 | `provided` |
+| `runtimeOnly` | 否 | 是 | 否 | `runtime` |
+| `testImplementation` | 测试代码 | 测试 | — | `test` |
 
-**校验流程**：
-1. `gradle/wrapper/gradle-wrapper.properties` 中记录了下载 URL 和校验和：
-   ```properties
-   distributionUrl=https\://services.gradle.org/distributions/gradle-8.5-bin.zip
-   distributionSha256Sum=3168d2e0...  # Gradle 8.0+ 新增字段
-   ```
-2. `gradlew` 脚本首次下载 zip 后，计算本地文件的 SHA-256 摘要：
-   ```bash
-   sha256sum gradle-8.5-bin.zip
-   ```
-3. 将计算结果与 `distributionSha256Sum` 比对：
-   $\text{verify} = \begin{cases} \text{pass} & \text{SHA256}(\text{downloaded}) = \text{expected} \\ \text{fail} & \text{otherwise} \end{cases}$ 
-4. 校验失败时抛出异常，拒绝解压和使用该发行版
+`implementation` 与 `api` 的分界是 Gradle 6（2019）引入的关键设计：库的内部依赖用 `implementation`，不出现在消费者的编译 classpath 上——这既防止了依赖泄漏（消费者意外引用到库的内部类型），也让 Gradle 能跳过无关模块的重编译（内部依赖变化不影响消费者的编译指纹）。只有当库把自己的依赖类型写进公开 API 签名时，才必须用 `api`。
 
-**校验和更新的原子性**：Gradle 升级时，校验和由官方在发布时写入 `gradle-wrapper.properties`。若校验和不匹配，说明下载被劫持（中间人攻击）或 CDN 被污染。Gradle 8.0+ 原生支持此字段；旧版本可通过 `wrapper` 任务自动添加校验和。
+版本冲突调解规则与 Maven 相反：Gradle 默认**最新版本优先**（highest wins），无论路径深浅。强制钉版本用 `resolutionStrategy`：
 
-### 依赖解析的最新版本策略
-
-Gradle 默认使用"最新版本优先"策略，与 Maven 的"最短路径优先"不同：
-
-```groovy
-// 强制指定版本（覆盖所有路径）
+```kotlin
+// 骨架，未实测
 configurations.all {
     resolutionStrategy {
-        force 'org.slf4j:slf4j-api:2.0.9'
-    }
-}
-
-// 指定版本替换
-configurations.all {
-    resolutionStrategy {
-        eachDependency { details ->
-            if (details.requested.group == 'org.slf4j') {
-                details.useVersion '2.0.9'
-            }
-        }
+        force("org.slf4j:slf4j-api:2.0.17")
     }
 }
 ```
 
-**冲突示例**：
-```
-A → B:1.0 → C:2.0
-A → X:1.0 → C:1.0
-```
+排查入口是 `gradle dependencies --configuration runtimeClasspath`（对应 Maven 的 `dependency:tree`）。多模块项目的版本集中管理用 version catalog（`gradle/libs.versions.toml`），角色对应 Maven 的 BOM。
 
-Maven 选择 C:1.0（路径长度 2 < 3）
-Gradle 选择 C:2.0（最新版本）
+## Gradle Wrapper：把工具版本钉进仓库
 
-## 参考存根
+`gradlew` / `gradlew.bat` 是随项目提交的启动脚本，`gradle/wrapper/gradle-wrapper.properties` 里钉死发行版 URL：
 
-```groovy
-// build.gradle 增量构建验证（≤20行）
-tasks.register(' fingerprint') {
-    inputs.file("src/main/java/Main.java")
-    outputs.file("build/classes/java/main.class")
-    doLast {
-        println "Compiling..."
-    }
-}
+```properties
+distributionUrl=https\://services.gradle.org/distributions/gradle-9.8.0-bin.zip
 ```
 
-```groovy
-// 任务并行配置
-org.gradle.parallel=true
-org.gradle.workers.max=4  // 最多4个并行 worker
-```
+首次执行时按 URL 下载并缓存到 `~/.gradle/wrapper/dists/`，此后所有人、所有 CI 节点跑的是同一 Gradle 版本——构建工具的版本不再是环境变量，而是项目的一部分。可追加 `distributionSha256Sum` 字段校验下载完整性，防 CDN 污染与中间人篡改。
 
-```groovy
-// 依赖冲突解决
-configurations.all {
-    resolutionStrategy {
-        force 'org.slf4j:slf4j-api:2.0.9'
-    }
-}
-```
+## 版图与边界
+
+Gradle 的版图：Android 与 Kotlin 生态的事实标准，大型多模块项目与对构建速度敏感的团队的常见选择；Maven 与 Gradle 在 Spring 生态里是并列的一等公民。选择口径：
+
+- 团队大、项目形态标准、求稳求一致 → Maven 的强约定是资产；
+- 构建慢已成为瓶颈、需要自定义构建逻辑、Android/Kotlin 项目 → Gradle 的任务图与缓存是资产；
+- 代价要认：Gradle 脚本是代码，自由度即复杂度来源，DSL 写法随版本演进快（Groovy DSL 存量、Kotlin DSL 现行），升级大版本有迁移成本（Gradle 9 清理了大量弃用 API）。
+
+两者共同的边界：它们管理编译与打包期的依赖，不管运行期的封装与裁剪——把模块路径交给 JVM 的事，见 [03-模块系统JPMS](./03-模块系统JPMS.md)。
+
+---
+
+> 前置：[Maven](./01-Maven.md) · 后续：[模块系统 JPMS](./03-模块系统JPMS.md)——构建工具的下游：运行时模块图

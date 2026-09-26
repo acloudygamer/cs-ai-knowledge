@@ -1,313 +1,95 @@
-# Mock 与 Test Double
+# Mockito 与 Test Double
 
-## 定义
+> 前置：[JUnit 5](./02-JUnit5.md) · 后续：[集成测试](./04-集成测试.md)
 
-Test Double是用伪对象替代真实依赖以隔离被测单元（SUT，System Under Test）的模式。其本质是**依赖反转**——被测单元依赖抽象接口，测试时注入Mock实现，控制实验环境。
+> **版本基准**：Mockito 5.24.0（Maven Central 现行版本，本篇示例实测通过：mockito-core 5.24.0 + byte-buddy 1.17.7 + byte-buddy-agent 1.17.7 + objenesis 3.3，JUnit Platform Console 6.1.3，Temurin JDK 25.0.4.1）。Mockito 5（2023）起内联 mock maker 成为默认——final 类与 final 方法可直接 mock，不再需要单独的 `mockito-inline` 构件。
 
-**隔离的数学意义**：设被测单元 $U$ 依赖服务 $S$ ，则测试目标 $T(U)$ 受 $T(S)$ 影响。引入 Test Double $D$ 替代 $S$ 后， $T(U)$ 可独立验证： 依赖服务 $S$ ，则测试目标 $T(U)$ 受 $T(S)$ 影响。引入 Test Double $D$ 替代 $S$ 后， $T(U)$ 可独立验证： ，则测试目标 $T(U)$ 受 $T(S)$ 影响。引入 Test Double $D$ 替代 $S$ 后， $T(U)$ 可独立验证： 受 $T(S)$ 影响。引入 Test Double $D$ 替代 $S$ 后， $T(U)$ 可独立验证： 影响。引入 Test Double $D$ 替代 $S$ 后， $T(U)$ 可独立验证： 替代 $S$ 后， $T(U)$ 可独立验证： 后， $T(U)$ 可独立验证： 可独立验证：
- $T(U | D) \perp T(S)$ 
+Test Double（测试替身）是把被测单元的真实依赖换成可控实现的一组模式，术语与分类出自 Meszaros 的《xUnit Test Patterns》（2007）。动机来自 FIRST 的独立性与可重复性约束（[01-测试理论](./01-测试理论.md)）：被测单元若连着真实数据库、真实时钟、真实网络，测试就继承了这些依赖的慢与不确定性。替身把依赖变成测试手里的旋钮——上游是测试脚本，下游是被测单元（SUT，System Under Test），替身插在两者之间。
 
-测试结果与真实服务的实现细节解耦。
+## 五类替身：按"替到什么程度"分
 
-**依赖反转的形式化**：
+五类的区分轴是**实现多少真实逻辑**与**是否承担验证职责**：
 
-<pre>
-正常依赖（紧耦合）           依赖反转（测试）
-A → B                       A → I (接口)
-                            D → I (Mock实现)
-</pre>
+| 类型 | 真实逻辑 | 职责 | 典型形态 |
+|---|---|---|---|
+| **Dummy** | 无 | 只占参数位，从不被调用 | `null`、空对象 |
+| **Fake** | 简化的真实实现 | 能工作的轻量替代 | 内存版仓储（HashMap 实现 Repository 接口） |
+| **Stub** | 无 | 按预设查表返回值 | `when(...).thenReturn(...)` |
+| **Spy** | 全部真实逻辑 | 在真实对象外包裹调用记录 | `spy(realObject)` |
+| **Mock** | 无 | 验证交互本身（调了谁、几次、什么参数） | `verify(...)` |
 
-$$
-\forall u \in U, \forall s \in S: u \xrightarrow{\text{call}} s \iff u \xrightarrow{\text{call}} d, d \in D
-$$
+两个容易混淆的分界：
 
-其中 $D$ 实现了与 $S$ 相同的接口 $I$ 。 实现了与 $S$ 相同的接口 $I$ 。 相同的接口 $I$ 。 。
+- **Stub vs Fake**：Stub 是查表——给定输入返回预设值，没有逻辑；Fake 有真实逻辑的简化版（内存仓储真的能 save 再 find）。Fake 的维护成本随接口演化，Stub 随用例演化。
+- **Stub vs Mock**：Stub 服务**状态验证**（"返回值对不对"），Mock 服务**行为验证**（"该发生的调用发生了吗"）。Mockito 的 `mock()` 一物兼二职：`when` 让它当 Stub，`verify` 让它当 Mock。
 
----
+## Mockito 的机制：字节码代理 + 调用记录
 
-## 数学模型
-
-### Mock 验证的图论模型
-
-Mock 的行为验证可建模为**有向多重图**：
-
-<pre>
-顶点集 V = {方法调用}
-边 E = {(调用对, 次数)}
-权重 w : E → ℕ (调用次数)
-
-验证语义：
-- times(n)：检查边 e 的权重 w(e) = n
-- atLeast(n)：检查 w(e) ≥ n
-- atMost(n)：检查 w(e) ≤ n
-- inOrder：检查边的偏序关系（拓扑排序约束）
-</pre>
-
-**验证失败的几何解释**：
-- times(n) 失败：实际调用次数与预期不符
-- atLeast 失败：调用次数低于下界
-- inOrder 失败：拓扑约束被违反（调用序列不满足偏序）
-
-**偏序约束的形式化**：
-
-$$
-\text{inOrder}((e_1, e_2, \ldots, e_n)) \iff \forall i < j: e_i \xrightarrow{*} e_j
-$$
-
-其中 $\xrightarrow{*}$ 表示可达关系（传递闭包）。 表示可达关系（传递闭包）。
-
-### Stub 链式返回的状态机模型
-
-链式 `thenReturn()` 对应状态转移：
-
-```
-状态 S₀: 初始 → 调用1 → 返回 v₁ → 转移到 S₁
-状态 S₁: → 调用2 → 返回 v₂ → 转移到 S₂
-状态 S₂: → 调用3 → 返回 v₂（最后一个预设值重复）
-```
-
-数学表达：
- $S_{i+1} = \delta(S_i, \text{call})$ 
- $\text{output}(S_i) = v_i \quad \text{for } i < n$ 
- $\text{output}(S_i) = v_n \quad \text{for } i \geq n$ 
-
-最后预设值作为稳态输出。
-
-**归约终点**：Stub 的链式返回本质上是一个 **确定有限自动机（DFA）**，状态转移由方法调用触发，输出由当前状态决定。
-
-### Mockito 默认值的语义选择
-
-| 返回类型 | 默认值 | 语义依据 |
-|----------|--------|----------|
-| 对象/String | null | 最小化NPE风险的"空"行为 |
-| int/long/double | 0/0L/0.0 | 数值类型的幺元 |
-| boolean | false | 布尔类型的幺元 |
-| Collection | 空集合 | 最小化NPE + 遍历行为可预期 |
-| Optional | Optional.empty() | Option类型的安全表示 |
-
-**设计原则**：提供"可预测的空行为"，而非随机值或抛出异常。
-
-**幺元选择的经济学解释**：幺元（identity element）使得运算在缺少显式值时仍可预测地执行。例如 `int` 返回 `0` 使得算术表达式 `sum(mock.getX(), 5)` 不会因默认值而崩溃。
-
----
-
-## 数据流
-
-### Mockito 字节码拦截的数据流
-
-<pre>
-调用 mock.method(args)
-        │
-        ▼
-  ByteBuddy/CGLIB 生成的子类
-        │
-        ├──> 检查 InvocationContainer 是否有预设
-        │         │
-        │         ├── 有预设 → 返回预设值
-        │         │
-        │         └── 无预设 → 检查返回类型
-        │                    │
-        │                    ├── 对象类型 → 返回 null
-        │                    ├── 原始类型 → 返回默认值 (0/false/0.0)
-        │                    └── 集合类型 → 返回空集合
-        │
-        └──> 记录调用到 InvocationContainer (用于 verify)
-</pre>
-
-**所有权转移**：
-1. 调用者持有方法参数的所有权
-2. Mock 拦截层持有参数副本的"观测权"
-3. 预设返回值的所有权归调用者
-4. 调用记录归 `InvocationContainer`（用于验证）
-
-### @InjectMocks 的注入决策树
-
-```
-构造器参数全为 Mock？
-    ├── 是 → 使用反射创建实例，字段保留 null
-    └── 否 → 进入字段注入
-            │
-            字段类型匹配？
-                ├── 是 → 反射注入
-                └── 否 → 跳过该字段
-```
-
-**决策的数学表达**：
-
-$$
-\text{InjectionStrategy}(c, M) = \begin{cases}
-\text{Constructor} & \text{if } \forall p \in \text{params}(c): p \in M \\
-\text{Field} & \text{otherwise}
-\end{cases}
-$$
-
-### InvocationContainer 的内部结构
-
-<pre>
-InvocationContainer
-      │
-      ├──> MockObject ↔ List<Invocation>
-      │         │
-      │         ├──> 已匹配的调用记录
-      │         └──> 验证状态
-      │
-      └──> Stubbing ↔ List<Stubbing>
-                │
-                └──> (Method, args) → returnValue
-</pre>
-
-**关键不变量**：每次方法调用后，容器检查是否有对应的 stubbing；若有，返回预设值并记录该 stubbing 已被使用。
-
----
-
-## 机制
-
-### 五种类型的本质区别
-
-| 类型 | 调用真实实现 | 返回值来源 | 本质 |
-|------|-------------|------------|------|
-| **Dummy** | 否 | 从不调用 | 参数填充物 |
-| **Fake** | 部分 | 简化业务逻辑 | 真实实现的轻量替代 |
-| **Stub** | 否 | 预设查表 | 固定输入-输出映射 |
-| **Spy** | 是 | 真实或预设 | 部分受控的观测者 |
-| **Mock** | 否 | 预设期望 | 行为契约的验证器 |
-
-**Fake vs Stub 的核心差异**：
-- Stub：**查表表**——给定精确输入，返回固定输出，无计算逻辑
-- Fake：**简化业务逻辑**——包含真实逻辑的简化版本（如内存数据库的SQL解析）
-
-### Mockito 字节码生成机制
-
-Mockito通过**字节码生成（CGLIB/ByteBuddy）**创建Mock对象的子类：
-
-1. `mock(List.class)` 调用时，ByteBuddy生成 `List` 的子类
-2. 所有方法被重写为检查 `InvocationContainer` 的逻辑
-3. 若有预设值，返回预设值；否则返回默认值
-4. 每次方法调用被记录到 `InvocationContainer`（用于后续 `verify`）
-
-**技术选型**：
-- Mockito 2.x：ByteBuddy（更灵活的字节码操作）
-- Mockito 3.x+：默认 ByteBuddy，可配置使用CGLIB
-
-### doReturn().when() vs when().thenReturn() 的安全约束
-
-**危险操作**：对有副作用的真实方法使用 `when().thenReturn()`
-```java
-// 危险：sendEmail() 会被真实调用（即使预设了返回值）
-when(emailService.sendEmail(any())).thenReturn(true);
-```
-
-**安全操作**：使用 `doReturn().when()`
-```java
-// 安全：直接预设，不触发真实方法
-doReturn(true).when(emailService).sendEmail(any());
-```
-
-**约束**：对有副作用的真实方法使用 `doReturn().when()`，否则可能产生环境污染。
-
-**危险发生的机制**：当 `when().thenReturn()` 被调用时，Mockito 需要在调用点注册 stubbing。而这个调用本身会触发真实的方法执行（以获取返回值类型信息）。对于有副作用的方法，这就是"污染"。
-
-### 参数匹配器的冲突约束
-
-**约束**：精确值预设与通配符预设不能混用
-```java
-// 错误示例
-when(repo.findById(1L)).thenReturn(user);           // 精确值预设
-when(repo.findById(anyLong())).thenReturn(null);    // 通配符预设 → 冲突
-
-// 正确示例
-when(repo.findById(1L)).thenReturn(user);           // 精确值预设
-when(repo.findById(2L)).thenReturn(null);          // 另一个精确值
-```
-
-**原因**：Mockito 按声明顺序匹配，精确值声明在前会被通配符覆盖。
-
-**形式化约束**：
-
-$$
-\forall s_1, s_2 \in \text{Stubbing}: s_1.\text{pattern} \preceq s_2.\text{pattern} \implies s_1 \text{ 必须在 } s_2 \text{ 之前声明}
-$$
-
-其中 $\preceq$ 表示"比...更具体"。 表示"比...更具体"。
-
-### verifyNoMoreInteractions() 的门禁语义
-
-`verifyNoMoreInteractions()` 作为最终门禁，确保测试后无意外调用：
-
- $\forall m \in \text{MockMethods}: \text{callCount}(m) = \text{verifiedCount}(m)$ 
-
-若存在未验证的调用，测试失败。这防止"漏验证"——测试只验证了关心的调用，但没有检查是否有多余调用。
-
-**漏验证的几何解释**：
-
-<pre>
-实际调用序列: [A, B, A, C]
-验证的调用:   [A, B]    ← 漏验证了第二个 A 和 C
-未验证的调用: [A, C]    ← 这部分没有被检查
-</pre>
-
----
-
-## 深度：Mock 对象的行为验证图论
-
-Mock 的行为验证可以建模为**有向多重图**：
-
-```
-顶点：方法调用
-边：调用时序关系
-权重：调用次数
-
-验证语义：
-- times(n)：检查顶点的出度 = n
-- atLeast(n)：检查顶点的出度 ≥ n
-- inOrder：检查边的偏序关系
-```
-
-**验证失败的几何解释**：
-- times(n) 失败：实际出度与预期不符
-- atLeast 失败：出度低于下界
-- inOrder 失败：拓扑约束被违反
-
----
-
-## 与 Spring 的集成
-
-### @MockBean 的机制
-
-`@MockBean` 从 Spring 上下文移除原 Bean，注册 Mock 对象到上下文：
+`mock(ExchangeRate.class)` 的物理实体是 ByteBuddy 在运行时生成的子类实例（接口则是动态代理实现）：每个方法被改写为先查预设表（stubbing 记录），命中则返回预设值，未命中返回该类型的"安全的空"——对象返回 `null`、数值返回 `0`、boolean 返回 `false`、集合与 `Optional` 返回空容器。每次调用同时记入调用日志，供 `verify` 事后比对。objenesis 负责跳过构造器实例化（mock 对象不该执行真实构造逻辑）。
 
 ```java
-@MockBean
-private UserService userService;
-```
-
-**注入约束**：
-- 构造器注入优先于字段注入
-- 若构造器参数全为 Mock，则创建新实例；否则使用反射注入字段
-
-**Spring 测试上下文的所有权模型**：
-
-1. `@MockBean` 替换上下文中原有 Bean
-2. 替换后的 Mock 在整个测试类生命周期内有效
-3. 测试类结束时，Spring 恢复原 Bean（或在 `@DirtiesContext` 时重建上下文）
-
----
-
-## 参考存根
-
-```java
-// Stub 状态机的最小化演示
-public class StubStateMachine {
-    public static void main(String[] args) {
-        // 模拟链式返回：第一次 "first"，第二次 "second"，后续都是 "second"
-        String[] returns = {"first", "second"};
-        int state = 0;
-
-        for (int i = 1; i <= 5; i++) {
-            String result = returns[Math.min(state, returns.length - 1)];
-            System.out.println("调用 #" + i + " → 返回: " + result);
-            if (state < returns.length - 1) state++;
+// 实测通过（环境见版本基准）
+class PricingServiceTest {
+    interface ExchangeRate { double rate(String currency); }
+    record Order(String currency, double amount) {}
+    static class PricingService {
+        private final ExchangeRate rates;
+        PricingService(ExchangeRate rates) { this.rates = rates; }
+        double totalInCny(List<Order> orders) {
+            return orders.stream().mapToDouble(o -> o.amount() * rates.rate(o.currency())).sum();
         }
+    }
+
+    @Test
+    void stub_returnsPresetValue() {
+        ExchangeRate rates = mock(ExchangeRate.class);        // 生成代理
+        when(rates.rate("USD")).thenReturn(7.2);              // 预设查表
+        PricingService svc = new PricingService(rates);
+        assertEquals(72.0, svc.totalInCny(List.of(new Order("USD", 10.0))), 1e-9);
+        verify(rates, times(1)).rate("USD");                  // 行为验证
+    }
+
+    @Test
+    void spy_callsRealMethodUnlessStubbed() {
+        List<String> list = spy(new ArrayList<String>());
+        list.add("a");
+        assertEquals(1, list.size());                         // 走真实实现
+        doReturn(100).when(list).size();                      // 局部预设
+        assertEquals(100, list.size());
+    }
+
+    @Test
+    void inOrder_verifiesCallSequence() {
+        ExchangeRate rates = mock(ExchangeRate.class);
+        when(rates.rate(anyString())).thenReturn(1.0);
+        new PricingService(rates).totalInCny(List.of(new Order("USD", 1), new Order("EUR", 1)));
+        InOrder order = inOrder(rates);
+        order.verify(rates).rate("USD");                      // 调用时序也是可断言的
+        order.verify(rates).rate("EUR");
+        verifyNoMoreInteractions(rates);                      // 门禁：不允许未验证的调用
     }
 }
 ```
+
+三个测试实测全部通过（3 tests successful）。它们分别演示：Stub 查表 + 调用计数、Spy 的真实/预设混合、Mock 的时序与完备性验证。
+
+## 两条安全约束
+
+**spy 上必须用 `doReturn().when()`，不能用 `when().thenReturn()`**。机制原因：`when(spy.size())` 的写法里，`spy.size()` 是一次**真实调用**——参数先求值再进 `when`。对真实方法有副作用（发邮件、删文件）或抛异常的 spy，这一发真实调用就是测试环境污染。`doReturn(100).when(list).size()` 把方法引用推迟到代理内部，不触发真实调用。实测上面第二个测试用的正是 `doReturn` 形式。
+
+**参数匹配器不可与裸值混用**。`when(repo.find(anyLong(), eq("cn")))` 合法；`when(repo.find(anyLong(), "cn"))` 抛 `InvalidUseOfMatchersException`——匹配器通过副作用栈工作，一个参数用了匹配器，其余参数也必须用（裸值包成 `eq(...)`）。
+
+## 何时不用 Mockito：mock 过度使用的设计信号
+
+Mock 是隔离手段，不是默认动作。以下症状指向被测代码或测试的结构问题：
+
+- **mock 值对象/记录类**：`Money`、`LocalDate` 这类值没有协作者语义，直接 `new` 更便宜也更真。mock 值对象是纯浪费。
+- **mock 自己拥有的私有依赖**：想 mock 的东西不是从构造参数进来的，而是被测类自己 `new` 出来的——这不是测试问题，是设计问题：依赖没有反转入口。正确动作是给被测类加构造注入，而不是用反射或 `mockConstruction` 硬撬。
+- **测试里全是 stubbing、几乎没有断言**：被测方法的全部逻辑是"把调用转给别人"，这种 passthrough 代码用 mock 测出来的只是自身设下的迷宫——考虑简化设计，或升到集成层用真实协作者测（[04-集成测试](./04-集成测试.md)）。
+- **重构即红**：实现细节一变（私有方法的调用次序、内部协作的拆分），mock 验证全部失效。`verify` 断言的是实现而非行为，钉得越细，测试越脆——行为验证应保留给"必须发生的对外副作用"（发消息、写库），内部协作交给状态验证。
+
+边界：Mockito 管进程内的依赖隔离；跨进程依赖（数据库、HTTP 服务、消息队列）的"真实版本"测试属于集成测试的地界。
+
+---
+
+> 前置：[JUnit 5](./02-JUnit5.md) · 后续：[集成测试](./04-集成测试.md)——mock 到此为止，真实依赖登场

@@ -1,305 +1,113 @@
-# JUnit 5 深度用法
+# JUnit 5
 
-## 定义
+> 前置：[测试理论](./01-测试理论.md) · 后续：[Mockito 与 Test Double](./03-Mockito与TestDouble.md)
 
-JUnit 5是Java生态的第三代测试框架，由三个模块组成：`JUnit Platform`（测试引擎API + 测试发现/执行基础设施）、`JUnit Jupiter`（编程模型 + 引擎实现）、`JUnit Vintage`（兼容JUnit 3/4）。其核心创新是通过`TestEngine` SPI将测试框架与测试运行器解耦，使第三方测试框架（kotest、Spek）可接入同一平台。
+> **版本基准**：本篇以 Jupiter 编程模型为准，示例实测于 junit-platform-console-standalone 6.1.3 + Temurin JDK 25.0.4.1。版本脉络：JUnit 5 末代为 5.13.4；JUnit 6（2025-09 GA）统一了 Platform/Jupiter/Vintage 的版本号、基线升到 Java 17、Vintage 引擎正式弃用——Jupiter 的编程模型不变，本篇全部内容对两代版本同效。
 
-**架构哲学**：Platform负责"发现什么"和"如何执行"，Jupiter提供"如何编写测试"，Vintage负责向后兼容。关注点分离使框架核心保持稳定，扩展模型保持开放。
+JUnit 5 是 Java 生态的第三代测试框架，结构上不是一个框架而是三层：**JUnit Platform**（JVM 上的测试启动基础设施：发现、执行、报告）、**JUnit Jupiter**（新一代编程模型与测试引擎）、**JUnit Vintage**（跑 JUnit 3/4 旧测试的兼容引擎）。分层的收益在实测输出里直接可见——Platform 把不同引擎的测试汇成同一棵树：
 
-**SPI 解耦的数学意义**：通过接口继承 hierarchy，JUnit 5 将"测试定义"与"测试执行"解耦为正交维度：
-
-```
-TestEngine 接口
-    ↑
-    | 实现
-JUnit Jupiter TestEngine ←→ 第三方引擎（kotest, Spek, etc.）
+```text
+├─ JUnit Platform Suite ✔
+├─ JUnit Jupiter ✔          ← 本篇的测试在这里
+│  └─ PalindromeTest ✔
+└─ JUnit Vintage ✔          ← 旧 JUnit 4 测试若存在，挂这里
 ```
 
-这允许 $N$ 种测试定义 $\times$ $M$ 种执行器自由组合，而非 $N \times 1$ 的紧耦合。 种测试定义 $\times$ $M$ 种执行器自由组合，而非 $N \times 1$ 的紧耦合。 $M$ 种执行器自由组合，而非 $N \times 1$ 的紧耦合。 种执行器自由组合，而非 $N \times 1$ 的紧耦合。 的紧耦合。
+分层的连接意义：`TestEngine` 是 Platform 定义的 SPI，Jupiter 只是它的一个实现——任何引擎（Vintage、第三方）接入 Platform 后，构建工具与 IDE 无需为每个框架写适配。Maven Surefire / Gradle 的 `test` 任务（[01-Maven](../06-构建与工程/01-Maven.md)、[02-Gradle](../06-构建与工程/02-Gradle.md)）对接的都是 Platform 层。
 
----
+## 生命周期：钩子挂在哪个粒度上
 
-## 数学模型
+JUnit 5 默认**每个测试方法新建一个测试类实例**（`PER_METHOD`），测试间实例字段天然隔离——这是 FIRST 独立性原则（[01-测试理论](./01-测试理论.md)）在框架层的默认值。四个钩子注解对应两个粒度：
 
-### 测试生命周期状态机
+| 注解 | 粒度 | 要求 |
+|---|---|---|
+| `@BeforeAll` / `@AfterAll` | 每类一次 | 默认必须是 `static`（实例尚不存在） |
+| `@BeforeEach` / `@AfterEach` | 每个测试方法各一次 | 实例方法 |
 
-JUnit 5的测试生命周期可建模为有限状态自动机：
+`@AfterEach` 保证即使测试抛异常也会执行——资源清理的确定性由框架担保，不靠测试作者自觉。若初始化昂贵（如起内存数据库），`@TestInstance(Lifecycle.PER_CLASS)` 让全类共享一个实例，此时 `@BeforeAll` 可以是非 static——代价是隔离性失效，状态污染风险回到开发者手里。
 
-<pre>
-                        +------------------+
-                        |   INITIALIZED    |
-                        |  (实例已构造)    |
-                        +--------+---------+
-                                 |
-                                 | @BeforeAll (静态)
-                                 v
-                        +------------------+
-         +------------>|   READY_FOR_TEST  |
-         |            +--------+---------+
-         |                     |
-         |  @BeforeEach        | @AfterEach
-         v                     v
-+--------+--------+    +-------+-------+    +-------+-------+
-| TEST_EXECUTING | -> | TEST_COMPLETED | -> | CLEANUP_PENDING |
-+--------+--------+    +----------------+    +----------------+
-                              ^                        |
-                              |       @AfterEach      |
-                              +------------------------+
-</pre>
+实测（本篇测试类的真实输出节选，执行序与表格一致）：
 
-**状态转移约束**：
-- `@BeforeAll` 只能在 `INITIALIZED → READY_FOR_TEST` 时执行一次
-- 每个测试方法独立经历 `READY_FOR_TEST → TEST_EXECUTING → TEST_COMPLETED`
-- `@AfterEach` 在 `TEST_COMPLETED` 后执行，保证即使测试失败也清理
+```text
+[BeforeAll]
+  [BeforeEach] → @Test → [AfterEach]     ← 每个测试方法重复一轮
+[AfterAll]
+```
 
-**形式化约束**：
+## 断言：验证深度由断言决定
 
-| 约束 | 数学表达 |
-|------|----------|
-| `@BeforeAll` 单次执行 | $\forall m \in \text{@BeforeAll}: |\text{call}(m)| = 1$ | |
-| `@BeforeEach` 每次执行 | $\forall m \in \text{@BeforeEach}, \forall t \in \text{Tests}: |\text{call}(m, t)| = 1$ | |
-| 测试后清理保证 | $\text{TestComplete} \implies \Diamond \text{@AfterEach}$ | |
+断言是"测试即规格"的落点——覆盖工具只记录代码是否执行（[05-测试覆盖率与质量门](./05-测试覆盖率与质量门.md)），有没有验证全看断言：
 
-### 实例数量的数学关系
+- `assertEquals(expected, actual)`：约定**第一个参数是期望值**，反了不影响判定，但失败报告的"expected/actual"标签会误导读报告的人。
+- `assertThrows(IllegalArgumentException.class, () -> svc.of(-1))`：异常也是规格的一部分，负路径必须显式断言，不能靠"没崩"蒙混。
+- `assertAll("g", () -> ..., () -> ...)`：分组断言，组内全部执行再汇总失败——避免修一个失败撞下一个的往返。
+- `assertTimeout(d, ...)` 与 `assertTimeoutPreemptively(d, ...)`：前者超时后仍等执行完毕再判失败，后者在超时点直接中断线程——后者快，但被中断的代码若持锁可能留下脏状态，只应用于无副作用的纯计算。
 
-| 模式 | 实例数公式 | 适用场景 |
-|------|------------|----------|
-| **PER_METHOD** | $N_{\text{instance}} = N_{\text{method}}$ | 测试间完全隔离，无状态共享 | | 测试间完全隔离，无状态共享 |
-| **PER_CLASS** | $N_{\text{instance}} = 1$ | 减少创建开销，适合代价高昂的初始化 | | 减少创建开销，适合代价高昂的初始化 |
+## 参数化测试：一份逻辑 × N 组数据
 
-### 扩展调用的偏序关系
-
-多个`@ExtendWith`扩展组合时，调用顺序形成偏序：
-
-$$
-\forall e_i, e_j \in \text{Extensions}: i < j \implies \text{CallOrder}(e_i) < \text{CallOrder}(e_j)
-$$
-
-按声明顺序执行，先声明的扩展的`beforeEach`先执行，后声明的扩展的`afterEach`先执行（栈式弹出）。
-
-### assertAll 的逻辑语义
-
-`assertAll` 强制执行组内所有断言，不受短路影响：
-
-$$
-\text{assertAll}([a_1, a_2, \ldots, a_n]) = \bigwedge_{i=1}^{n} a_i
-$$
-
-所有断言的逻辑与——任一断言失败，整个组失败，但**所有断言都会被执行并报告**。
-
----
-
-## 数据流
-
-### 生命周期注解的执行流
-
-<pre>
-@BeforeAll (静态)
-      │
-      ▼
-外层 @BeforeEach
-      │
-      ▼
-内层 @BeforeEach (嵌套)
-      │
-      ▼
-   @Test 方法
-      │
-      ▼
-内层 @AfterEach (嵌套)
-      │
-      ▼
-外层 @AfterEach
-      │
-      ▼
-@AfterAll (静态)
-</pre>
-
-**所有权流转**：
-1. `@BeforeAll` 创建的资源归测试类所有
-2. `@BeforeEach` 为每次测试方法创建新的输入状态
-3. `@Test` 方法执行时持有该输入状态
-4. `@AfterEach` 释放/验证该次测试的状态变更
-5. `@AfterAll` 释放整个测试类的资源
-
-### TestEngine 的发现-执行流水线
-
-<pre>
-Classpath 扫描
-      │
-      ▼
-TestEngine.discover() → DiscoverySelector
-      │
-      ▼
-Launcher.execute() → ExecutionListener
-      │
-      ├──> beforeAll()
-      ├──> beforeEach()
-      ├──> execute()
-      │         │
-      │         ▼
-      │    DynamicTest 实例化
-      │
-      ├──> afterEach()
-      └──> afterAll()
-</pre>
-
-**关键接口**：
-- `TestEngine`：发现并执行测试
-- `DiscoverySelector`：定位要执行的测试
-- `ExecutionListener`：接收执行事件回调
-
-### 动态测试的生成模型
-
-`@TestFactory` 将测试生成建模为从配置空间到测试用例空间的映射：
-
-$$
-\text{DynamicTest} = f(\text{name}, \text{executable}) \quad \text{where } f: \text{String} \times \text{Executable} \rightarrow \text{DynamicTest}
-$$
-
-每个 `DynamicTest` 是独立的测试实例，有自己的显示名和执行逻辑。
-
-### ExtensionContext 的注册表模型
-
-<pre>
-ExtensionContext
-      │
-      ├──> putStore(namespace, key, value)
-      │         │
-      │         ▼
-      │    NamespacedStore
-      │         │
-      │         ├──> namespace: "com.example.extension-a"
-      │         └──> key: "shared-state" → Object
-      │
-      └──> getStore(namespace)
-            │
-            ▼
-         NamespacedStore.get(key)
-</pre>
-
-**归约终点**：ExtensionContext 本质上是一个 **namespace-keyed map**，允许扩展在保持隔离的同时共享数据。
-
----
-
-## 机制
-
-### @TestInstance 生命周期模式的选择依据
-
-**PER_METHOD（默认）**：
-- 每个测试方法获得一个**独立的被测对象实例**
-- 实例字段不共享状态，测试间无隐式依赖
-- 适用于：测试间可能共享可变状态、测试需要隔离的场景
-
-**PER_CLASS**：
-- 整个测试类生命周期内复用**同一个被测对象实例**
-- 适合：代价高昂的初始化（如数据库连接、文件IO）
-- 约束：测试方法间不得污染共享实例的状态
-
-**选择不当的后果**：PER_CLASS 下若测试间存在状态污染，会导致难以复现的间歇性失败，且失败模式随测试执行顺序变化。
-
-### assertTimeout vs assertTimeoutPreemptively 的本质差异
-
-| 方法 | 中断机制 | 语义 |
-|------|----------|------|
-| `assertTimeout` | **不中断**执行，测量总耗时 | 超时后仍继续执行完毕 |
-| `assertTimeoutPreemptively` | **Thread.interrupt()** 强制中断 | 超过阈值立即终止执行 |
-
-**中断语义的具体行为**：
-- `Thread.interrupt()` 设置中断标志，但若目标代码不检查中断状态（如阻塞在 native 方法、阻塞在 `Object.wait()`），中断不会生效
-- Java.io 的 `InterruptibleChannel` 上的阻塞操作可响应中断
-- 线程池中的任务被中断时，任务会收到 `InterruptedException`
-
-### 动态测试 vs 参数化测试的执行模型差异
-
-| 维度 | `@TestFactory` | `@ParameterizedTest` |
-|------|----------------|---------------------|
-| 测试逻辑 | N个**不同**逻辑 | 同一逻辑，N组**不同参数** |
-| 实例关系 | 每个 DynamicTest 独立实例 | 每个参数组合独立实例 |
-| 参数来源 | 运行时动态生成 | 编译时或配置指定 |
-| 使用场景 | 外部配置/数据库加载测试场景 | 数据驱动测试 |
-
-### 条件执行的语义
-
-`@EnabledIf` / `@DisabledIf` 基于条件表达式控制测试是否执行：
-
-$$
-\text{ExecutionCondition}(t) = \begin{cases}
-\text{ENABLED} & \text{if } \phi(t) = \text{true} \\
-\text{DISABLED} & \text{if } \phi(t) = \text{false}
-\end{cases}
-$$
-
-**典型条件**：操作系统、环境变量、系统属性、是否有孙某测试运行。
-
-### 标签（Tag）的过滤语义
-
-`@Tag` 允许在测试级别打标签，执行时过滤：
-
-$$
-\text{TestFilter}(T, \text{includeTags}, \text{excludeTags}) = \{ t \in T \mid \text{tag}(t) \in \text{includeTags} \land \text{tag}(t) \cap \text{excludeTags} = \emptyset \}
-$$
-
----
-
-## 扩展模型（Extension Model）
-
-JUnit 5的扩展通过`@ExtendWith`声明，替代JUnit 4的`@Rule`和`@ClassRule`：
-
-| JUnit 4 | JUnit 5 | 触发时机 |
-|---------|---------|----------|
-| `@Rule` | `BeforeEachCallback` | 每个测试方法前后 |
-| `@ClassRule` | `BeforeAllCallback` | 测试类前后 |
-| `@ExpectedException` | `ExecutionCondition` + 断言 | 异常验证 |
+`@ParameterizedTest` 把"同一逻辑、不同数据"从 N 个复制粘贴的测试方法压缩为一个方法加一个参数源。**每个参数组合是一次独立的测试实例**：有自己的显示名、独立的通过/失败记录——执行次数 = 参数组合数，多源组合时按笛卡尔积增长，参数源配大了执行数会失控，这是真实的成本约束。
 
 ```java
-public class TracingExtension implements BeforeEachCallback, AfterEachCallback {
-    @Override
-    public void beforeEach(ExtensionContext ctx) {
-        System.out.println("Before: " + ctx.getRequiredTestMethod().getName());
+// 实测通过（console-standalone 6.1.3，JDK 25）
+class PalindromeTest {
+    static boolean isPalindrome(String s) {
+        return s != null && new StringBuilder(s).reverse().toString().equals(s);
     }
 
-    @Override
-    public void afterEach(ExtensionContext ctx) {
-        System.out.println("After: " + ctx.getRequiredTestMethod().getName());
+    @ParameterizedTest(name = "[{index}] \"{0}\" 是回文")
+    @ValueSource(strings = {"level", "madam", "noon"})
+    void valueSource(String s) { assertTrue(isPalindrome(s)); }
+
+    @ParameterizedTest(name = "[{index}] {0} -> {1}")
+    @CsvSource({"level,true", "java,false", "'',true"})
+    void csvSource(String s, boolean expected) { assertEquals(expected, isPalindrome(s)); }
+
+    static Stream<Arguments> cases() {
+        return Stream.of(Arguments.of("abba", true), Arguments.of("abc", false));
     }
+    @ParameterizedTest
+    @MethodSource("cases")
+    void methodSource(String s, boolean expected) { assertEquals(expected, isPalindrome(s)); }
 }
 ```
 
-**扩展组合**：
-```java
-@ExtendWith({TracingExtension.class, DatabaseExtension.class, MockExtension.class})
-class MyTest { }
+实测输出（每个参数组合一行，`name` 占位符 `{index}`/`{0}` 展开为序号与参数值）：
+
+```text
+├─ valueSource(String) ✔
+│  ├─ [1] "level" 是回文 ✔
+│  ├─ [2] "madam" 是回文 ✔
+│  └─ [3] "noon" 是回文 ✔
+├─ csvSource(String, boolean) ✔
+│  ├─ [1] level -> true ✔
+│  ...
+└─ methodSource(String, boolean) ✔
 ```
+
+参数源按数据规模与维护位置选择：
+
+| 参数源 | 适用 | 数据位置 |
+|---|---|---|
+| `@ValueSource` | 单参数简单类型 | 代码内 |
+| `@CsvSource` / `@CsvFileSource` | 多参数表格数据 | 代码内 / CSV 文件 |
+| `@EnumSource` / `@NullSource` / `@EmptySource` | 枚举常量、null、空串——边界值的标准来源 | 框架提供 |
+| `@MethodSource` | 复杂对象、动态构造 | 返回 `Stream<Arguments>` 的工厂方法 |
+| `@ArgumentsSource` | 自定义来源（数据库、外部文件） | 实现 `ArgumentsProvider` |
+
+CSV 到参数的转换由内置转换器完成：数字字符串转数值类型、ISO 字符串转 `LocalDate`、枚举名转枚举常量；非常规类型实现 `ArgumentConverter`。边界值（`Integer.MAX_VALUE`、`-1`、`0`、空串、null）是参数化测试的首要候选——缺陷密度在边界最高，参数化恰好把"补一个边界用例"的成本降到加一行。
+
+与 `@TestFactory` 的分工：参数化是**同一份逻辑**配多组参数；`@TestFactory` 在运行时动态生成**多份不同逻辑**的 `DynamicTest`（如按外部配置文件每行生成一个测试）。参数化覆盖不了"逻辑本身要动态生成"的场景时才用后者。
+
+## 扩展模型与条件执行
+
+JUnit 4 的 `@Rule`/`@Runner` 被统一的扩展模型取代：`@ExtendWith(XxxExtension.class)` 注册扩展，扩展实现回调接口介入生命周期——`BeforeEachCallback`、`ParameterResolver`（参数注入）、`ExecutionCondition`（条件执行）等。Mockito 的 `MockitoExtension`（[03-Mockito与TestDouble](./03-Mockito与TestDouble.md)）与 Spring 的 `SpringExtension`（[04-集成测试](./04-集成测试.md)）都走这条通道。
+
+条件执行与筛选：`@Disabled("原因")` 显式关闭；`@EnabledOnOs(OS.LINUX)`、`@EnabledIfEnvironmentVariable` 等按环境裁剪；`@Tag("slow")` 打标签后由构建工具按标签过滤（如 CI 快速档排除 slow）。条件执行是把 FIRST 的"可重复"落到多环境现实上的机制——只在 Linux 有意义的测试不该在 Windows CI 上红。
+
+## 版图与边界
+
+JUnit 5 是 JVM 单测的事实标准，Maven Surefire / Gradle / 各 IDE 一等支持。边界：它只管"测试怎么写、怎么跑"，不管"测什么"——边界与采样策略是 [01-测试理论](./01-测试理论.md) 的事；不管依赖隔离——那是 [03-Mockito与TestDouble](./03-Mockito与TestDouble.md)；也不管"测得够不够"——那是 [05-测试覆盖率与质量门](./05-测试覆盖率与质量门.md)。
 
 ---
 
-## 参考存根
-
-```java
-// 生命周期状态机的最小化演示
-public class LifecycleDemo {
-    enum State { INITIALIZED, READY, RUNNING, COMPLETED }
-
-    public static void main(String[] args) {
-        State state = State.INITIALIZED;
-        System.out.println("初始状态: " + state);
-
-        // 模拟 @BeforeAll
-        state = State.READY;
-        System.out.println("执行 @BeforeAll 后: " + state);
-
-        // 模拟 @BeforeEach -> @Test -> @AfterEach 的循环
-        for (int i = 1; i <= 3; i++) {
-            state = State.RUNNING;
-            System.out.println("测试 #" + i + " 执行中: " + state);
-            state = State.COMPLETED;
-            System.out.println("测试 #" + i + " 完成: " + state);
-        }
-
-        // 模拟 @AfterAll
-        state = State.INITIALIZED;  // 恢复到初始状态
-        System.out.println("执行 @AfterAll 后: " + state);
-    }
-}
-```
+> 前置：[测试理论](./01-测试理论.md) · 后续：[Mockito 与 Test Double](./03-Mockito与TestDouble.md)——被测单元的依赖怎么隔离

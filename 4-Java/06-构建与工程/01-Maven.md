@@ -1,237 +1,92 @@
-# Maven 基础
+# Maven
 
-## 定义
+> 前置：[01-语言核心](../01-语言核心/) · 后续：[Gradle](./02-Gradle.md)
 
-Maven 是基于项目对象模型（POM）的构建自动化工具，核心是将项目构建定义为有向无环图（DAG）的拓扑排序过程。POM 声明依赖、插件、属性，Maven 通过依赖传递解析和生命周期阶段绑定，将声明转化为可执行的构建任务序列。
+> **版本基准**：Maven 3.9.16（现行稳定版，maven.apache.org 2026 年口径；Maven 4.0 处于 RC 阶段）。插件版本以 Maven Central 现行稳定版为准：maven-compiler-plugin 3.16.0、maven-surefire-plugin 3.6.0。本机无 Maven，XML 示例为**骨架，未实测**，但坐标、生命周期阶段名、插件名与版本均已网查核实。
 
-## 数学模型
+Maven 是约定驱动的构建工具：开发者用一份 `pom.xml`（POM，Project Object Model，项目对象模型）声明"这个项目是什么、依赖谁、怎么打包"，Maven 把声明翻译成一次具体构建——下载依赖、编译、跑测试、打 JAR。它要回应的约束是手工 `javac` 在多模块、多依赖下的失控：classpath 靠手工拼、依赖 JAR 靠手工下载、版本靠口头约定。Maven 的解法是三条约定——坐标寻址、固定生命周期、仓库缓存——本篇沿这三条展开。
 
-### 依赖解析的最短路径算法
+## 坐标：依赖的寻址方案
 
-Maven 使用最近声明优先（Nearest Definition）策略解析版本冲突。设依赖图 $G = (V, E)$ ， $V$ 为 artifact， $E$ 为依赖关系边。 ， $V$ 为 artifact， $E$ 为依赖关系边。 为 artifact， $E$ 为依赖关系边。 为依赖关系边。
+每个构件（artifact，一次发布产出的 JAR/POM 等文件）由三元组唯一寻址：
 
-对于 artifact $a$ ，其版本 $\text{ver}(a)$ 按以下规则确定： ，其版本 $\text{ver}(a)$ 按以下规则确定： 按以下规则确定：
+- **groupId**：发布组织，约定为反向域名，如 `org.apache.commons`；
+- **artifactId**：模块名，如 `commons-lang3`；
+- **version**：版本号，`3.18.0` 这样的定版，或 `1.0-SNAPSHOT` 这样的开发中快照（每次拉取都检查远程更新，定版则永久缓存）。
 
-$$\text{ver}(a) = \begin{cases}
-\text{from\_dependencyManagement}(a) & \text{if defined} \\
-\text{nearest}(a) & \text{else}
-\end{cases}$$
-
-其中 $\text{nearest}(a)$ 返回从根节点（当前项目）到 $a$ 的**最短路径**上的最后一个声明版本。若存在等长路径，选择声明顺序靠前的。 返回从根节点（当前项目）到 $a$ 的**最短路径**上的最后一个声明版本。若存在等长路径，选择声明顺序靠前的。 的**最短路径**上的最后一个声明版本。若存在等长路径，选择声明顺序靠前的。
-
-**形式化**：设 $P = \{p_1, p_2, ..., p_k\}$ 为所有从根到 $a$ 的路径， $|p_i|$ 为路径长度， $v_i$ 为 $p_i$ 末端的版本。则： 为所有从根到 $a$ 的路径， $|p_i|$ 为路径长度， $v_i$ 为 $p_i$ 末端的版本。则： 的路径， $|p_i|$ 为路径长度， $v_i$ 为 $p_i$ 末端的版本。则： 为路径长度， $v_i$ 为 $p_i$ 末端的版本。则： 为 $p_i$ 末端的版本。则： 末端的版本。则：
-
- $\text{nearest}(a) = v_j \text{ where } j = \arg\min_i |p_i|$ 
-
-**归约终点**：依赖冲突解决本质上是图论中的最短路径问题，路径长度定义为边数而非权重。
-
-### DAG 拓扑排序的构建顺序
-
-Maven 生命周期阶段（validate → compile → test → package → install → deploy）构成线性序。插件 goal 绑定到阶段，构建时按阶段顺序执行。
-
-多模块项目的模块构建顺序由 reactor 决定：
-
- $O = \text{topological\_sort}(M, D)$ 
-
-其中 $M$ 为模块集合， $D$ 为模块间依赖关系（`<module>` 声明）。若存在环形依赖，reactor 失败并报错。 为模块集合， $D$ 为模块间依赖关系（`<module>` 声明）。若存在环形依赖，reactor 失败并报错。 为模块间依赖关系（`<module>` 声明）。若存在环形依赖，reactor 失败并报错。
-
-### 依赖传递的图收缩
-
-传递依赖构成完全依赖图 $G_T$ 。排除（`exclusion`）操作将图中某些边移除： 。排除（`exclusion`）操作将图中某些边移除：
-
- $G_T' = (V, E_T \setminus \{ (u, v) \mid u \in \text{exclusions} \})$ 
-
-收缩后重新计算 $\text{nearest}$ ，可能导致原本被排除的 artifact 重新被解析（若存在其他路径）。 ，可能导致原本被排除的 artifact 重新被解析（若存在其他路径）。
-
-## 数据流
-
-<pre>
-Maven 构建数据流：
-
-    pom.xml 解析
-         │
-         ▼
-    ┌────────────────────────────────────┐
-    │  Project / Reactor                  │
-    │  - 当前项目                         │
-    │  - 模块列表（若有）                   │
-    │  - dependencyManagement            │
-    └────────────────────────────────────┘
-         │
-         ▼
-    依赖解析（Dependency Resolution）
-         │
-         ▼
-    ┌────────────────────────────────────┐
-    │  Artifact 节点                      │
-    │  [groupId:artifactId:version]       │
-    └────────────────────────────────────┘
-         │
-         ├──────────────────┬──────────────┐
-         ▼                  ▼              ▼
-    本地仓库缓存      远程仓库下载    依赖传递
-    (~/.m2/repository)  (Maven Central)  (transitive)
-
-         │
-         ▼
-    Reactor 拓扑排序
-         │
-         ▼
-    生命周期执行
-    ┌────────────────────────────────────┐
-    │  validate → compile → test          │
-    │  → package → verify → install      │
-    │  → deploy                          │
-    └────────────────────────────────────┘
-         │
-         ▼
-    构建产物（target/）
-</pre>
-
-**资源流转**：
-- `pom.xml` → 内存中的 Project 对象
-- 依赖坐标 → 本地仓库路径（`groupId/artifactId/version/artifactId-version.jar`）
-- 插件 goal → 绑定到生命周期的具体执行类
-
-## 机制
-
-### dependencyManagement 的作用域提升
-
-`<dependencyManagement>` 的作用是将版本号从子模块提升到父 POM：
+坐标决定了两端的连接：对上游，`groupId:artifactId:version` 是在仓库里发起 HTTP 下载的路径；对下游，它映射到本地仓库的文件位置 `~/.m2/repository/org/apache/commons/commons-lang3/3.18.0/commons-lang3-3.18.0.jar`——groupId 的 `.` 展开为目录层级。本地仓库是缓存层：已下载的构件不再走网络，这是 Maven 离线可重复构建的基础。
 
 ```xml
-<!-- 父 POM -->
-<dependencyManagement>
-    <dependencies>
-        <dependency>
-            <groupId>org.springframework</groupId>
-            <artifactId>spring-core</artifactId>
-            <version>6.1.0</version>
-        </dependency>
-    </dependencies>
-</dependencyManagement>
-
-<!-- 子模块 POM（无需声明 version） -->
-<dependencies>
-    <dependency>
-        <groupId>org.springframework</groupId>
-        <artifactId>spring-core</artifactId>
-        <!-- 版本从 dependencyManagement 继承 -->
-    </dependency>
-</dependencies>
+<!-- 骨架，未实测（本机无 Maven） -->
+<dependency>
+    <groupId>org.junit.jupiter</groupId>
+    <artifactId>junit-jupiter</artifactId>
+    <version>5.13.4</version>   <!-- JUnit 5 末代版本；JUnit 6 已发布，见 07-02 -->
+    <scope>test</scope>
+</dependency>
 ```
 
-**约束**：只有直接匹配的 `groupId:artifactId` 才从 `dependencyManagement` 继承版本，传递依赖不自动应用。
+## 依赖传递与冲突调解
 
-### scope 的传递闭包
+声明一个依赖，得到的是一棵依赖树：A 依赖 B，B 又依赖 C，C 被**传递**进 A 的 classpath。这带来冲突——同一个 artifact 可能从多条路径被拉入，且版本不同。Maven 的调解规则是**最近优先**（nearest wins）：从项目根到该 artifact 的所有路径中，深度最浅的版本胜出；深度并列时，POM 中声明顺序靠前的胜出。
 
-依赖 scope 在传递时按以下规则变换：
-
-| 依赖的 scope | 传递到依赖于该项目的 scope |
-|--------------|---------------------------|
-| `compile` | `compile` |
-| `provided` | `compile` |
-| `runtime` | `runtime` |
-| `test` | 不传递 |
-
-**关键约束**：`provided` 和 `test` 不传递。这意味着若 `A → B → C`，且 `B` 的 `spring-core` 为 `provided`，则 `A` 不会获得 `spring-core`（除非 `A` 直接声明）。
-
-### 插件 goal 的阶段绑定语义
-
-`mvn <phase>` 执行该阶段及之前的所有阶段。每个阶段绑定零个或多个插件 goal：
-
-```
-compile 阶段默认绑定:
-  └── maven-compiler-plugin:compile → 编译 src/main/java
-
-test 阶段默认绑定:
-  └── maven-compiler-plugin:testCompile → 编译 src/test/java
-  └── maven-surefire-plugin:test → 运行测试
+```text
+项目 A
+  ├── B:1.0            ← 深度 1，胜出
+  └── C:2.0
+       └── B:2.0       ← 深度 2，被淘汰
 ```
 
-自定义绑定通过 `<executions><execution>` 声明：
+规则之上还有两个显式干预手段，优先级高于"最近优先"：
+
+1. **直接声明**：当前 POM 里直接写的依赖，永远压过传递进来的版本（深度 0 vs 深度 ≥1，本质是最近优先的特例）。
+2. **`<dependencyManagement>`**：在父 POM 中集中锁定版本号，子模块声明依赖时不写版本。它只钉版本、不引入依赖；典型用法是导入 BOM（Bill of Materials，如 `spring-boot-dependencies`）一次锁定整组生态版本。
+
+排查冲突的标准工具是 `mvn dependency:tree`，它把整棵解析后的树连同"谁淘汰了谁"打印出来，是定位版本错位的入口。另一个常用手段是 `<exclusions>`：在某条依赖声明里排除掉它传递带入的特定 artifact，切断一条路径。
+
+scope（作用域）决定依赖出现在哪条 classpath 上，也决定它是否传递：
+
+| scope | 编译主代码 | 编译/跑测试 | 打入运行时 | 传递给下游 |
+|---|---|---|---|---|
+| `compile`（默认） | 是 | 是 | 是 | 是 |
+| `provided` | 是 | 是 | 否（由运行环境提供，如 Servlet 容器） | 否 |
+| `runtime` | 否 | 是 | 是 | 是（降为 runtime） |
+| `test` | 否 | 是 | 否 | 否 |
+
+`provided` 与 `test` 不传递，是刻意收窄：Servlet API 该不该出现在运行时，由部署目标决定，不能顺着依赖链污染别人。
+
+## 生命周期与插件：活都是插件干的
+
+Maven 有三套互相独立的生命周期：**clean**（pre-clean → clean → post-clean）、**default**（构建主线）、**site**（生成站点文档，实践中很少用）。default 生命周期的主干阶段：
+
+```text
+validate → compile → test → package → verify → install → deploy
+```
+
+执行语义是线性前缀：`mvn package` 会顺序跑完 validate 到 package 的全部阶段。这里有一个容易误解的结构事实——**阶段本身只是空槽位，真正干活的是插件目标（goal）**。`compile` 阶段绑定了 `maven-compiler-plugin:compile`，`test` 阶段绑定了 `maven-surefire-plugin:test`，`package` 阶段按 packaging 类型绑定 `maven-jar-plugin:jar` 等。绑定关系由 packaging 默认值决定，也可以在 `<build><plugins>` 里显式声明插件版本与额外绑定：
 
 ```xml
+<!-- 骨架，未实测；版本为 Maven Central 现行稳定版 -->
 <plugin>
-    <executions>
-        <execution>
-            <id>my-goal</id>
-            <phase>package</phase>
-            <goals><goal>myGoal</goal></goals>
-        </execution>
-    </executions>
+    <groupId>org.apache.maven.plugins</groupId>
+    <artifactId>maven-compiler-plugin</artifactId>
+    <version>3.16.0</version>
+    <configuration>
+        <release>21</release>   <!-- 等价于 javac --release 21 -->
+    </configuration>
 </plugin>
 ```
 
-### reactor 的环形依赖检测
+这条链的上下游是清楚的：命令行给阶段名 → Maven 展开为前缀阶段序列 → 每个阶段查绑定表得到 goal 列表 → 插件读写 `src/main/java`、`target/` 等约定目录。约定优于配置的含义就在这里：目录结构、阶段顺序、默认绑定全是定死的，POM 只声明差异。
 
-Maven reactor 在构建前检测模块依赖图中的环。若存在环形依赖：
+多模块项目用 parent POM 的 `<modules>` 聚合，Maven 的 **reactor** 对模块间依赖做拓扑排序决定构建顺序——被依赖的模块先构建；出现环（A 依赖 B、B 依赖 A）时 reactor 直接报错拒绝构建，因为拓扑序不存在。
 
-```
-A → B → C
-    └── D → C
-```
+## 仓库层级与 settings.xml
 
-构建顺序通过拓扑排序确定。若添加 `D → A` 形成环，reactor 抛出 `ProjectCycleException`。
-
-**检测算法**：深度优先搜索（DFS）+ 回溯标记，复杂度 $O(|V| + |E|)$ 。 。
-
-### 依赖解析的冲突解决实例
-
-考虑以下依赖图：
-
-```
-项目 A
-  ├── B:1.0
-  └── C:2.0
-       └── B:2.0
-```
-
-从 A 到 B 的路径：
-- A → B:1.0（长度 1）
-- A → C:2.0 → B:2.0（长度 2）
-
-按最近路径优先原则，选择 B:1.0。若 A 的 dependencyManagement 声明了 B:3.0，则优先使用 dependencyManagement 的版本。
-
-### 传递依赖的版本覆盖
-
-传递依赖的版本覆盖规则：
-
-1. 若直接在当前 POM 声明 → 使用当前 POM 的版本（无论 dependencyManagement 是否存在）
-2. 否则，若在 dependencyManagement 中声明 → 使用 dependencyManagement 的版本
-3. 否则，选择路径最近的传递依赖版本
-4. 若存在等长路径，选择 POM 中声明顺序靠前的
-
-这形成了一个优先级序列：
-
- $\text{direct} > \text{dependencyManagement} > \text{transitive (nearest)}$ 
-
-## 参考存根
+一次依赖下载沿三级查找：**本地仓库**（`~/.m2/repository`，命中即止）→ **settings.xml 配置的镜像/私服** → **Maven 中央仓库**（`repo.maven.apache.org`，默认远程）。`settings.xml`（位于 `~/.m2/`）是用户级配置，与项目无关：镜像、代理、私服凭证都在这里。国内常见配置是把中央仓库镜像到阿里云：
 
 ```xml
-<!-- 多模块 reactor（≤20行）-->
-<project>
-    <modelVersion>4.0.0</modelVersion>
-    <groupId>com.example</groupId>
-    <artifactId>parent</artifactId>
-    <version>1.0</version>
-    <packaging>pom</packaging>
-    <modules>
-        <module>api</module>
-        <module>impl</module>
-    </modules>
-</project>
-```
-
-```bash
-# 依赖树分析（定位冲突）
-mvn dependency:tree -Dverbose \
-    -Dincludes=com.example:problematic-artifact
-# 输出显示哪些路径引入该 artifact
-```
-
-```xml
-<!-- 阿里云镜像配置（settings.xml）-->
+<!-- 骨架，未实测 -->
 <mirrors>
     <mirror>
         <id>aliyun</id>
@@ -241,30 +96,20 @@ mvn dependency:tree -Dverbose \
 </mirrors>
 ```
 
-```xml
-<!-- dependencyManagement 版本锁定 -->
-<dependencyManagement>
-    <dependencies>
-        <dependency>
-            <groupId>com.google.guava</groupId>
-            <artifactId>guava</artifactId>
-            <version>32.1.3-jre</version>
-        </dependency>
-    </dependencies>
-</dependencyManagement>
-```
+`mirrorOf=central` 的含义：凡是本来要发往中央仓库的请求，改发到镜像。私服（Nexus、Artifactory）在同一层，承担企业内部构件的发布与代理缓存。
 
-```xml
-<!-- 传递依赖排除 -->
-<dependency>
-    <groupId>com.example</groupId>
-    <artifactId>legacy-lib</artifactId>
-    <version>1.0</version>
-    <exclusions>
-        <exclusion>
-            <groupId>org.slf4j</groupId>
-            <artifactId>slf4j-api</artifactId>
-        </exclusion>
-    </exclusions>
-</dependency>
-```
+## 版图与边界
+
+Maven 的版图：Java 后端企业开发的存量事实标准，Spring Boot 官方同时提供 Maven 与 Gradle 两套脚手架。它的强项恰是约束的产物——生命周期与目录约定钉死后，任何 Maven 项目的构建方式都一样，维护成本极低。
+
+代价同样是约束的产物：
+
+- **XML 声明式**表达不了条件逻辑与循环，复杂构建要靠堆插件配置绕；
+- **生命周期是固定线性骨架**，阶段间无法自由编排 DAG，并行与增量构建弱于 Gradle（见 [02-Gradle](./02-Gradle.md) 的对比）；
+- 传递依赖调解规则简单可预测，但"最近优先"在大依赖树下会选中出乎意料的版本，需要 `dependency:tree` 人工兜底。
+
+模块级的封装与运行时裁剪不归 Maven 管——那是 Java 9 引入的模块系统（[03-模块系统JPMS](./03-模块系统JPMS.md)）的职责，Maven/Gradle 只负责把模块路径准备好。
+
+---
+
+> 前置：[01-语言核心](../01-语言核心/) · 后续：[Gradle](./02-Gradle.md)——同一问题的另一种解法：任务图驱动
