@@ -11,7 +11,7 @@
 | 2-Python/ | Python 语言特性、标准库、工程实践 |
 | 3-C++/ | C++ 语言特性、现代 C++ 特性（20/23/26） |
 | 4-Java/ | Java 语言特性、JVM、生态系统 |
-| 5-JavaScript/ | JavaScript 语言特性、Node.js、前端工程 |
+| 5-JavaScript/ | 语言核心、对象模型、异步、浏览器/Node 双平台、TypeScript、工程化 |
 | 6-Go/ | Go 语言特性、并发、工具链 |
 
 ## 版本参考
