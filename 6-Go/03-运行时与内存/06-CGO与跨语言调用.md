@@ -120,11 +120,14 @@ func goDouble(x C.int) C.int { return x * 2 }
 
 ```console
 $ go test -bench=. -benchmem -run=^$
-BenchmarkPureGo-12     	1000000000	         0.2358 ns/op	       0 B/op	       0 allocs/op
-BenchmarkCgoCall-12    	27947077	        43.31 ns/op	       0 B/op	       0 allocs/op
+BenchmarkPureGo-12        	 3000000	         1.180 ns/op	       0 B/op	       0 allocs/op
+BenchmarkPureGoNoInline-12	3000000	         1.177 ns/op	       0 B/op	       0 allocs/op
+BenchmarkCgoCall-12       	 3000000	        43.22 ns/op	       0 B/op	       0 allocs/op
 ```
 
-**一次 cgo 调用 43.31 ns，一次 Go 函数调用 0.2358 ns——差 184 倍。**
+**一次 cgo 调用 43.22 ns，一次 Go 函数调用 1.18 ns——差约 37 倍。**
+
+**约束**：**测这个比值时，Go 那一侧的基准极易测错**。写成 `pureAdd(2, 3)` 的话，常量参数会被编译器折叠，整个调用消失——测出来是空循环的耗时（0.2 ns 量级，**比一个时钟周期还短**），比值被凭空放大好几倍。要测到真实的调用成本，**参数必须是变量**，且结果要落到编译器无法消除的地方（全局变量或 sink）。上面内联与非内联两条测得几乎一样（1.180 vs 1.177），说明 ~1.2 ns 就是一次真实 Go 调用的成本，与是否内联无关。
 
 **约束的由来**：这个开销来自四件事——
 
@@ -155,7 +158,7 @@ BenchmarkCgoCall-12    	27947077	        43.31 ns/op	       0 B/op	       0 allo
 | Java | JNI | 几十纳秒 | 需要本地库，破坏可移植性 |
 | Python | `ctypes` / C 扩展 | 微秒级（ctypes） | C 扩展要编译 |
 | Rust | `extern "C"` + `bindgen` | 接近零（无运行时切换） | 静态链接仍可行 |
-| **Go** | **cgo** | **43 ns（184×）** | **破坏静态链接与交叉编译** |
+| **Go** | **cgo** | **43 ns（37×）** | **破坏静态链接与交叉编译** |
 
 **Rust 的 FFI 比 Go 便宜得多**，因为 Rust 没有自己的栈模型——`extern "C"` 就是普通调用。**Go 的 cgo 贵在栈切换**，这是 goroutine 模型的固有代价。
 
