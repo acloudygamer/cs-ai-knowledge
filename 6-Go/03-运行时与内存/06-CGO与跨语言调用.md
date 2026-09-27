@@ -1,275 +1,162 @@
-# CGO 专题
+# CGO 与跨语言调用
 
-> **版本关系**：Go 1.24（stable）→ Go 1.26（<latest>）。CGO 核心机制不变，Go 1.26 增强了错误诊断。
+> 前置：[05-unsafe与内存布局](./05-unsafe与内存布局.md) · 后续：[07-性能剖析与调优](./07-性能剖析与调优.md)
 
-## 定义
+> **版本基准**：Go 1.27（stable = latest）。本篇示例实测环境：go1.27.1 windows/amd64（gcc 来自 MinGW-w64），Intel i7-10750H。
 
-CGO 允许 Go 程序调用 C 代码，通过 FFI（外部函数接口）实现 Go 与 C 的互操作——本质是在 Go 和 C 两套运行时之间建立桥梁。Go goroutine 调度器与 C 的同步执行模型**不兼容**，CGO 调用会阻塞整个 goroutine 的调度，导致 CGO 调用开销比纯 Go 高 1-2 个数量级（~100ns/call）。
+## 本质
 
-**归约终点**：CGO 开销可归结为**两次运行时切换**（Go↔C），每次切换涉及栈帧保存/恢复和上下文切换。
-
-## 数学模型
-
-### CGO 调用开销的分解
-
-```
-总耗时 T_cgo = T_switch_go2c + T_c_exec + T_switch_c2go
-
-其中：
-  T_switch_go2c  ≈ 跨运行时切换开销（~50-100ns）
-  T_c_exec       ≈ C 函数执行时间（依赖具体逻辑）
-  T_switch_c2go  ≈ 跨运行时切换开销（~50-100ns）
-
-纯 Go 函数调用开销：
-  T_go ≈ 函数调用 + 栈帧创建（~5-10ns）
-```
-
-当 C 函数执行时间 $T_{c\_exec}$ 很短（如单个数学运算）时，切换开销成为主导因素，CGO 调用可能比纯 Go 慢 10-20 倍。 很短（如单个数学运算）时，切换开销成为主导因素，CGO 调用可能比纯 Go 慢 10-20 倍。
-
-### 内存管理边界的所有权模型
-
-```
-谁分配谁释放（Ownership Rule）：
-  ┌─────────────────────────────────────────────┐
-  │ C 分配内存 → C.free() 释放                  │
-  │   Go 持有指针但不拥有所有权                  │
-  │   若 Go 尝试 free() → 未定义行为             │
-  ├─────────────────────────────────────────────┤
-  │ Go 分配内存（make/new）→ Go GC 回收          │
-  │   C 持有指针但 Go GC 不知道 C 在用           │
-  │   若 C 持有指针跨越 Go GC → 需手动保留根      │
-  └─────────────────────────────────────────────┘
-```
-
-**所有权传递的数学约束**：
-
-- 若 C 分配内存传给 Go：Go 无法 GC 该内存（C 分配不由 Go 追踪）
-- 若 Go 分配内存传给 C：Go GC 可能回收该内存（C 持有的只是指针值）
-
-**所有权不匹配的数学表示**：
-
-设 $M_c$ 为 C 分配的内存， $M_g$ 为 Go 分配的内存： 为 C 分配的内存， $M_g$ 为 Go 分配的内存： 为 Go 分配的内存：
- $M_c \notin \text{Go GC 追踪} \implies \text{Go 可能误判为垃圾}$ 
- $M_g \text{ 传给 C 后} \implies \text{Go GC 可能回收（若 C 未被追踪）}$ 
-
-### 字符串转换的数据流
-
-<pre>
-Go string                    C char* (C 分配)
-┌──────────────┐            ┌──────────────────┐
-│ DataPtr      │──────>────│ 独立分配的内存   │
-│ Len          │  C.CString │ (malloc 复制)    │
-└──────────────┘            └──────────────────┘
-     │                              │
-     │                              │ defer C.free()
-     │                              ▼
-     │                       释放由 Go 管理
-     ▼
-返回的 cStr 必须调用 C.free() 释放
-否则内存泄漏（malloc 的内存不在 Go GC 管理范围内）
-</pre>
-
-## 数据流
-
-### CGO 调用全链路
-
-<pre>
-Go 代码
-    │
-    │ C.add(1, 2) 调用
-    ▼
-CGO 桥接层（go build 自动生成）
-    │
-    ├── 保存 Go 栈状态（SP, PC, 通用的 callee-saved 寄存器）
-    ├── 切换到 C 栈（或复用 Go 栈的 unsafe area）
-    │
-    ▼
-C 编译器生成的机器码
-    │
-    ├── 符号解析（PLT/GOT）
-    └── 执行 C 函数
-    │
-    ├── 切换回 Go 栈
-    ├── 恢复 Go 栈状态（寄存器）
-    │
-    ▼
-返回 Go 值（可能涉及 marshal/unmarshal）
-</pre>
-
-### 回调函数（Go → C → Go）的数据流
-
-<pre>
-Go 函数（export goCallback）
-    │
-    │ //export 注释导出到 C 命名空间
-    ▼
-C 函数 call_callback 持有 Go 函数指针
-    │
-    │ 调用回调时：
-    │   C 运行时 ──► Go 调度器 ──► 唤醒等待的 goroutine
-    │
-    ▼
-Go goroutine 恢复执行
-    │
-    │ 回调期间：
-    │   Go goroutine 被标记为 "在 C 中执行"
-    │   GC 可能阻塞直到回调返回（保守式 GC）
-    ▼
-回调返回，C 继续执行
-</pre>
-
-## 机制
-
-### 为什么 CGO 调用开销这么大？
-
-**goroutine 调度模型与 C 执行模型的不兼容**是根本原因：
-
-1. Go 调度器以 goroutine 为单位调度，不感知 C 栈帧
-2. 当 goroutine 在 C 中执行时，调度器无法抢占（因为不知道 C 函数何时完成）
-3. 这意味着**一个 CGO 调用会阻塞整个 P（Processor）**，其他 runnable goroutine 必须等待
-4. 即使 C 函数执行很快，切换开销也无法被调度器并行掩盖
-
-**阻塞 P 的数学影响**：
-
-若 GOMAXPROCS=8，其中 1 个 P 在 CGO 调用中阻塞，则有效调度容量降为 7/8 = 87.5%：
- $\text{有效容量} = \frac{N_{P} - N_{blocked}}{N_{P}}$ 
-
-### 回调函数的约束
-
-C 函数调用 Go 导出函数（通过 `//export`）时存在以下约束：
-
-| 约束 | 原因 |
-|------|------|
-| 回调不能持有 Go 指针超过 C 函数返回 | Go GC 不知道 C 持有指针，需要程序员保证 |
-| 回调不能分配 Go 对象 | 分配可能被 GC 清理，而 C 还在引用 |
-| 回调必须是外部可链接的 C 函数 | 通过 //export 生成 C 符号 |
-
-**违反约束的后果**：
-- 悬挂指针访问 → 程序崩溃
-- use-after-free → 未定义行为
-
-### 跨运行时内存管理的深层问题
-
-Go 的 GC 是**并发、保守式**的。它假设所有在 Go 堆上分配的内存只要有指针引用就不会被回收。但当：
-
-```
-C 代码持有 Go 分配的对象地址
-  → Go GC 运行时，如果只有 C 代码中的 "整数" 持有地址（而不是 Go 指针类型）
-  → GC 无法追踪到这个引用
-  → 对象被错误回收
-  → C 访问已释放内存 → use-after-free
-```
-
-这是为什么 Go 的 `runtime.KeepAlive` 和 CGO 的 `C.free` 是一对需要**配对调用**的核心机制。
-
-### runtime.KeepAlive 的作用
-
-```go
-p := C.malloc(100)
-defer C.free(p)
-// 注意：p 在这里只是 uintptr，不被 GC 追踪
-runtime.KeepAlive(p)  // 确保 p 指向的内存在此调用前不被 GC
-```
-
-**KeepAlive 的数学语义**：
-
- $KeepAlive(x) \implies GC \text{ 必须认为 } x \text{ 仍然可达，直到 } KeepAlive \text{ 返回}$ 
-
-**KeepAlive 的约束**：
-
-KeepAlive 调用点必须在所有使用该指针的代码之后：
- $\forall \text{use}(p): \text{KeepAlive}(p) \text{ 在 use 之后}$ 
-
-## 参考存根
+**cgo 让 Go 程序调用 C 代码，方式是 `import "C"` 这个伪包——紧邻它的注释块里的 C 代码会被编译进程序。**
 
 ```go
 /*
-#include <stdio.h>
 #include <stdlib.h>
-
-double square(double x) { return x * x; }
+static int add(int a, int b) { return a + b; }
 */
 import "C"
 
 func main() {
-    // 基本调用
-    result := C.square(5.0)
-    _ = result
-
-    // 字符串转换（谁分配谁释放）
-    goStr := "Hello"
-    cStr := C.CString(goStr)    // C 分配
-    defer C.free(unsafe.Pointer(cStr)) // C 释放
-
-    // C 回调 Go
-    /*
-    void call_callback(void (*cb)(int), int value) {
-        cb(value);
-    }
-    */
-    //export goCallback
-    func goCallback(value C.int) {
-        println("Callback:", int(value))
-    }
+	fmt.Println(C.add(2, 3))   // 5
 }
 ```
 
-## 类型映射表
+`import "C"` **不是真的导入一个包**——它是给 cgo 工具的指令。注释块里的内容是 C 代码，`C.xxx` 是 cgo 生成的包装。
 
-| Go 类型 | C 类型 | 备注 |
-|---------|--------|------|
-| bool | bool | |
-| byte | char | |
-| int32 | int | |
-| int64 | long long | |
-| uintptr | uintptr_t | 指针用 |
-| unsafe.Pointer | void* | 通用指针 |
+**约束的由来（也是最要紧的一条）**：**cgo 让 Go 失去"静态单二进制"这个核心特性**（[00-概览/01](../00-概览/01-Go全景.md)）。
 
-## 性能注意事项
-
-```
-CGO 调用开销：~100ns（不含 C 函数执行）
-纯 Go 函数调用：~5ns
-
-避免热路径频繁调用：
-  不好：  for i := 0; i < 1000000; i++ { C.process(i) }
-  好：    C.process_batch(data, len(data))  // 批量处理
-
-替代方案选择：
-  高性能计算 → Go 原生 + SIMD（无需 CGO）
-  系统调用  → syscall 包（纯 Go）
-  现有 C 库 → CGO（不可避免）
-  移动端    → golang.org/x/mobile
+```console
+$ CGO_ENABLED=0 go build .
+package cgo1: build constraints exclude all Go files in ...
 ```
 
-## pkg-config 集成
+**导入 `"C"` 的文件在 `CGO_ENABLED=0` 时被整个排除**——不是编译失败，是"没有可编译的文件"。这意味着：
+
+| 能力 | `CGO_ENABLED=0` | `CGO_ENABLED=1` |
+|---|---|---|
+| 静态链接 | 是 | 依赖 C 库的链接方式 |
+| 交叉编译 | **一条命令** | **需要目标平台的 C 工具链** |
+| 编译速度 | 快 | 慢（C 代码要过 gcc） |
+| 二进制体积 | 小 | 大 |
+
+交叉编译的实测对照：
+
+```console
+$ CGO_ENABLED=1 GOOS=linux go build .
+# runtime/cgo
+gcc_mmap.c:10:10: fatal error: sys/mman.h: No such file or directory
+```
+
+**`CGO_ENABLED=1` 时交叉编译直接失败**——本机是 Windows 的 MinGW gcc，没有 Linux 的 `sys/mman.h`。要在 Windows 上编译 Linux 的 cgo 程序，必须装 `x86_64-linux-gnu-gcc` 交叉工具链并设 `CC`。
+
+**判据**：**能用纯 Go 就不用 cgo**。需要 cgo 的典型场景只有三个——调用只有 C 实现的库（数据库驱动、图像处理、加密硬件）、与已有 C/C++ 代码库集成、需要 C 的 ABI 或性能特性。
+
+## 机制
+
+### 类型映射
+
+```console
+$ go run .
+C.int=4 字节  Go int=8 字节
+C.long=4  C.longlong=8  C.char=1
+```
+
+**`C.int` 是 4 字节，`Go int` 是 8 字节**——这是最常见的错误来源。类型映射表：
+
+| C | Go | 大小（windows/amd64） |
+|---|---|---|
+| `char` | `C.char` | 1 |
+| `short` | `C.short` | 2 |
+| `int` | `C.int` | **4** |
+| `long` | `C.long` | **4**（Windows LLP64） |
+| `long long` | `C.longlong` | 8 |
+| `float`/`double` | `C.float`/`C.double` | 4/8 |
+| `size_t` | `C.size_t` | 8 |
+| `void*` | `unsafe.Pointer` | 8 |
+
+**`C.long` 在 Windows 上是 4 字节，在 Linux x64 上是 8 字节**。这是平台差异（Windows 用 LLP64 模型，Linux/macOS 用 LP64）。**跨平台代码必须用固定宽度的类型**（`int32_t`/`int64_t`），不要用 `long`。
+
+### 字符串与内存
+
+```console
+$ go run .
+cgo add(2,3) = 5
+cgo greet: hello, 世界
+C 调用 Go 回调: 42
+```
+
+**Go 字符串与 C 字符串不通用**：
+
+| 方向 | 函数 | 谁负责释放 |
+|---|---|---|
+| Go → C | `C.CString(s)` | **调用方**（`C.free`） |
+| C → Go | `C.GoString(cs)` | 无（Go 字符串由 GC 管） |
+| C → Go（带长度） | `C.GoStringN(cs, n)` | 无 |
 
 ```go
-/*
-#cgo pkg-config: openssl
-#include <openssl/ssl.h>
-*/
-import "C"
-
-// Go 1.18+ 支持 CGO_FLAGS
-// #cgo darwin linux  CFLAGS: -Wall
-// #cgo windows LDFLAGS: -lws2_32
+cs := C.CString("世界")
+defer C.free(unsafe.Pointer(cs))   // 必须手动释放
 ```
 
-## CGO 的图灵等价性扩展
+**`C.CString` 用 `malloc` 分配，GC 完全不管**——不释放就是内存泄漏。这是 cgo 代码里最常见的 bug。
 
-**定理**：CGO 将 Go 的能力扩展到**可调用任意 C 库函数**，包括系统调用、硬件加速、专有算法库等。
+**约束：Go 指针不能传给 C 长期持有**。cgo 的指针传递规则（Go 1.6 起由运行时强制检查）规定：
 
-**推论**：通过 CGO，Go 可以：
-- 调用任何 C ABI 兼容的库
-- 访问系统调用（直接映射到内核）
-- 使用 SIMD 指令（通过汇编或 C 包装）
+- **可以**把 Go 指针传给 C 函数，**前提是 C 不保存它**。
+- **不可以**把含 Go 指针的内存传给 C 长期保存——因为 Go 的 GC 会移动对象（实际上 Go 的 GC 不移动堆对象，但栈会拷贝），且 cgo 检查器会 panic。
+- 违反时会得到 `panic: runtime error: cgo argument has Go pointer to Go pointer`。
 
-**约束**：CGO 不能调用 C++（需要 name mangling），不能直接使用 C++ 类（需要 C 包装）。
+### 回调：C 调用 Go
 
-**CGO 的不可归约性**：
+```go
+//export goDouble
+func goDouble(x C.int) C.int { return x * 2 }
+```
 
-CGO 调用无法被完全归约到 Go 的调度模型中，因为：
- $T_{cgo} = T_{go2c} + T_{c\_exec} + T_{c2go}$ 
+**`//export` 注释必须紧邻函数**，且函数**必须现在 C 的前导注释里声明**（`extern int goDouble(int x);`）——否则 cgo 找不到它。
 
-其中 $T_{c\_exec}$ 是纯 C 代码执行，Go 调度器无法感知其内部状态。 是纯 C 代码执行，Go 调度器无法感知其内部状态。
+回调的开销与普通 cgo 调用同量级，且**Go 侧的栈会被切换**。
+
+### 调用开销：实测
+
+```console
+$ go test -bench=. -benchmem -run=^$
+BenchmarkPureGo-12     	1000000000	         0.2358 ns/op	       0 B/op	       0 allocs/op
+BenchmarkCgoCall-12    	27947077	        43.31 ns/op	       0 B/op	       0 allocs/op
+```
+
+**一次 cgo 调用 43.31 ns，一次 Go 函数调用 0.2358 ns——差 184 倍。**
+
+**约束的由来**：这个开销来自四件事——
+
+1. **栈切换**：goroutine 的栈是 Go 自己管的（[01](./01-运行时总览与调度器.md)），调用 C 前必须切到**系统栈**（C 代码不认识 goroutine 栈）。
+2. **不能内联**：`C.add` 是外部调用，编译器无法内联。
+3. **调度器记账**：cgo 调用期间 P 可能被解绑（如果 C 代码阻塞）。
+4. **参数封送**：类型转换与指针检查。
+
+**判据**：**cgo 的调用次数比调用内容更重要**。43 ns 的单次开销意味着：
+
+- 每秒调 100 万次 = 43 ms 纯开销（可接受）
+- 每秒调 1 亿次 = 4.3 秒（不可接受）
+
+**优化手法是批量**：把 N 次小调用合并成一次大调用（传数组进去、循环在 C 侧做）。这是所有 cgo 性能问题的通用解法。
+
+**边界**：`-race` 检测器与 cgo 一起用时开销更大；`GODEBUG=cgocheck=2` 会打开完整的指针检查（调试用，生产不要开）。
+
+## 连接
+
+**上游**：[05](./05-unsafe与内存布局.md) 的类型大小与对齐是类型映射的基础；[01](./01-运行时总览与调度器.md) 的 goroutine 栈模型解释了为什么要栈切换。
+
+**下游**：[05-IO与外部世界/04](../05-IO与外部世界/04-数据库访问.md) 里的 `github.com/mattn/go-sqlite3` 是 cgo 驱动（对照 `modernc.org/sqlite` 是纯 Go 重写）；[06-工程与工具链/05](../06-工程与工具链/05-构建交叉编译与发布.md) 的交叉编译与静态链接策略直接受 `CGO_ENABLED` 影响。
+
+**与其它语言对照**：
+
+| | FFI 机制 | 开销 | 对构建的影响 |
+|---|---|---|---|
+| Java | JNI | 几十纳秒 | 需要本地库，破坏可移植性 |
+| Python | `ctypes` / C 扩展 | 微秒级（ctypes） | C 扩展要编译 |
+| Rust | `extern "C"` + `bindgen` | 接近零（无运行时切换） | 静态链接仍可行 |
+| **Go** | **cgo** | **43 ns（184×）** | **破坏静态链接与交叉编译** |
+
+**Rust 的 FFI 比 Go 便宜得多**，因为 Rust 没有自己的栈模型——`extern "C"` 就是普通调用。**Go 的 cgo 贵在栈切换**，这是 goroutine 模型的固有代价。
+
+这也解释了一个生态现象：**Go 社区强烈偏好纯 Go 实现**。SQLite 有 `modernc.org/sqlite`（用工具把 C 翻译成 Go）、DNS 解析有纯 Go 版本、加密库多数有纯 Go 实现——**所有这些重写的动机都是"摆脱 cgo 以保住静态单二进制与交叉编译"**。

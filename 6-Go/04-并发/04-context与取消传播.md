@@ -1,319 +1,161 @@
-# Context 专题
+# context 与取消传播
 
-> **版本关系**：Go 1.24（stable）→ Go 1.26（<latest>）。Context 核心接口不变，错误处理在 Go 1.26 略有增强。
+> 前置：[03-sync与原子操作](./03-sync与原子操作.md) · 后续：[05-并发模式与竞态诊断](./05-并发模式与竞态诊断.md)
 
-## 定义
+> **版本基准**：Go 1.27（stable = latest）。本篇示例实测环境：go1.27.1 windows/amd64。
 
-context 是 Go 中传递请求作用域的截止时间、取消信号和共享值的标准接口——其本质是携带截止时间链和取消信号链的上下文容器。
+## 本质
 
-**归约终点**：Context 树是**不可变的有向无环图（DAG）**，每次 WithX 操作创建新节点，父节点保持不变，这保证了并发安全——无锁访问。
-
-## Context 接口
-
-### 定义
-
-Context 接口定义了四个方法，分别对应截止时间、取消信号、取消原因和请求级共享值。
-
-### 数学模型
-
-**Context 的数学本质是有向无环图（DAG）**：
-- 根 Context： $C_0$ （`Background` 或 `TODO`） （`Background` 或 `TODO`）
-- 子 Context： $C_i = \text{With\_X}(C_{parent}, \dots)$ 
-- 每个 Context 节点携带：
-  - Deadline $D$ （截止时间，可能为空） （截止时间，可能为空）
-  - Done channel $Ch_{done}$ （关闭时发出信号） （关闭时发出信号）
-  - Values $V$ （键值对 map） （键值对 map）
-
-**继承语义**：
-
- $Deadline(C_i) = \begin{cases} D_{new} & \text{若 } \text{With\_Deadline} \\ Deadline(C_{parent}) & \text{否则} \end{cases}$ 
-
- $Done(C_i) = \begin{cases} Ch_{new} & \text{若 } \text{With\_Cancel/Timeout} \\ Done(C_{parent}) & \text{否则} \end{cases}$ 
-
-**Context 树的不变性**：
-
-Context 树是**不可变的**，每次 WithX 都创建新节点，父节点保持不变：
- $\forall C_i: \text{parent}(C_i) \text{ 在创建后永不改变}$ 
-
-这保证了并发安全——无锁访问。
-
-### 数据流
-
-<pre>
-Context 树结构：
-
-background (根 Context)
-  │
-  ├─ WithCancel(parent)
-  │    │
-  │    └─ ctx, cancel := ...
-  │         │
-  │         └─ ctx.Done() 在 cancel() 时关闭
-  │
-  ├─ WithTimeout(parent, 5s)
-  │    │
-  │    └─ ctx, cancel := ...
-  │         │
-  │         └─ ctx.Done() 在超时(5s) 或 parent cancel 时关闭
-  │
-  ├─ WithDeadline(parent, t)
-  │    │
-  │    └─ ctx, cancel := ...
-  │         │
-  │         └─ ctx.Done() 在截止时间(t) 或 parent cancel 时关闭
-  │
-  └─ WithValue(parent, key, value)
-       │
-       └─ ctx := ...
-            │
-            └─ ctx.Value(key) 返回 value（继承自父）
-</pre>
-
-## WithCancel
-
-### 定义
-
-创建一个可手动取消的 Context，调用 `cancel()` 时 Done() channel 关闭。
-
-### 数据流
-
-<pre>
-WithCancel 生命周期：
-
-ctx, cancel := context.WithCancel(parentCtx)
-  │
-  ├─ 创建新的 Done channel
-  ├─ 将 cancel 函数绑定到 ctx
-  └─ 返回 ctx 和 cancel
-
-调用 cancel():
-  │
-  └─ 关闭 Done channel
-       │
-       ├─ 所有 select <-ctx.Done() 解除阻塞
-       ├─ ctx.Err() 返回 context.Canceled
-       └─ 子 Context 的 Done 也关闭（级联取消）
-</pre>
-
-### 机制
-
-**级联取消的数学语义**：
-
- $\text{cancel}(C_i) \implies \forall C_j \in \text{descendants}(C_i): Done(C_j) \text{ 关闭}$ 
-
-这由 Context 树的父子关系保证。
-
-**cancel 的幂等性**：
-
- $\forall C: \text{cancel}(C) \implies \text{cancel}(C) = \text{cancel}(C)$ 
-
-多次调用 cancel() 的效果等价于一次调用。
-
-## WithTimeout
-
-### 定义
-
-创建带超时时间的 Context，超时自动取消——常用于 HTTP 请求、数据库查询等有明确时间限制的场景。
-
-### 数学模型
-
-**Timeout 计算**：
-
- $T_{deadline} = T_{now} + T_{timeout}$ 
- $T_{remaining} = T_{deadline} - T_{now}$ 
-
-当 $T_{remaining} \leq 0$ 时，自动调用 cancel。 时，自动调用 cancel。
-
-**超时精度**：由于调度延迟，实际超时可能略晚于设定值。对于需要精确超时的场景，应使用 `WithDeadline` 而非 `WithTimeout`。
-
-**超时触发的数学约束**：
-
-设 $T_{start}$ 为 WithTimeout 调用时刻， $T_{deadline} = T_{start} + T_{timeout}$ ： 为 WithTimeout 调用时刻， $T_{deadline} = T_{start} + T_{timeout}$ ： ：
- $\forall t > T_{deadline}: Done(ch) \text{ 已关闭}$ 
-
-## WithValue
-
-### 定义
-
-在 Context 中存储键值对，用于在 goroutine 之间传递请求级别的元数据（如 requestID、userID）。
-
-### 机制
-
-**为什么 key 要用自定义类型**：Context 的 Value 查找基于类型和值的相等性。若使用 `string` 作为 key，不同包可能使用相同的 key 导致冲突。使用自定义类型（如 `type requestIDKey struct{}`）确保唯一性。
-
-**Context Value 的查找路径**：从当前 Context 向上逐级查找 key，直到找到或到达根 Context。
-
-**约束条件**：
-- Value 查找是 O(depth) 的，树过深时可能影响性能
-- 不应存储大量数据到 Context（应只存元数据）
-- key 必须是不可变的（否则相等性判断可能失效）
-
-### 数据流
-
-<pre>
-WithValue 查找：
-
-ctx := context.Background()
-ctx = context.WithValue(ctx, requestIDKey, "req-123")
-ctx = context.WithValue(ctx, userIDKey, "user-456")
-
-processRequest(ctx)
-
-func processRequest(ctx context.Context) {
-    requestID, _ := ctx.Value(requestIDKey).(string)
-    // 沿着 Context 树向上查找
-    // requestIDKey 找到，返回 "req-123"
-    // userIDKey 继续向上找，返回 "user-456"
-}
-</pre>
-
-## 错误处理
-
-### 定义
-
-ctx.Err() 返回 context.Canceled 或 context.DeadlineExceeded。
-
-### 数学模型
-
-**错误语义**：
-- `context.Canceled`：主动取消（调用 cancel()）
-- `context.DeadlineExceeded`：时间耗尽（超时或截止时间到达）
-
-**错误判定的数学形式**：
-
-$$Err(ctx) = \begin{cases}
-\text{Canceled} & \text{if } cancel \text{ called} \\
-\text{DeadlineExceeded} & \text{if } T_{now} > Deadline(ctx) \\
-\text{nil} & \text{otherwise}
-\end{cases}$$
-
-**Deadline vs Timeout 的区别**：
-
-| 类型 | 触发条件 | 精度 |
-|------|---------|------|
-| WithDeadline | 绝对时间点 | 取决于调度器 |
-| WithTimeout | 相对时间长度 | 更低（取决于测量误差）|
-
-## 最佳实践
-
-### Context 作为第一个参数
-
-### 机制
-
-将 Context 作为函数的第一个参数是 Go 的惯用约定，使调用者可以控制超时和取消。
-
-**为什么作为第一个参数**：Context 语义上类似于"请求元数据"，与方法参数平起平坐比藏在结构体里更显式。
-
-### 不要在结构体中存储 Context
-
-### 机制
-
-Context 应该作为方法参数传递，而非存储在结构体中。因为 Context 代表请求的生命周期，存储在结构体中可能导致请求结束后 Context 被误用。
-
-**违反约束的后果**：使用已取消或过期的 Context 可能导致静默失败（操作正常返回但实际未生效）。
-
-### 及时取消 Context
-
-### 机制
-
-子 Context 的超时应该短于父 Context，避免子任务超时后父任务仍在运行。
-
-**约束条件**：
-
- $T_{deadline}(C_{child}) \leq T_{deadline}(C_{parent})$ 
-
-若子任务超时但父任务继续，可能导致资源泄漏或不一致状态。
-
-**资源泄漏的场景**：
-
-若子任务超时后继续运行（父任务未取消）：
-1. 子任务可能继续占用数据库连接
-2. 子任务可能继续写入共享资源
-3. 子任务的结果可能被忽略但仍在计算
-
-### 不要传递 nil Context
-
-### 机制
-
-nil Context 的行为未定义，可能导致死锁。应始终使用 `context.Background()` 或 `context.TODO()`。
-
-## 常见模式
-
-### 超时重试
+**`context.Context` 是一个四方法的接口，它承载"这次操作该不该继续"这一个信息，并沿调用链传播。**
 
 ```go
-func retryWithTimeout(ctx context.Context, fn func() error) error {
-    for {
-        if err := fn(); err == nil {
-            return nil
-        }
-        select {
-        case <-ctx.Done():
-            return ctx.Err()
-        case <-time.After(time.Second):
-            // 重试
-        }
-    }
+type Context interface {
+	Deadline() (deadline time.Time, ok bool)
+	Done() <-chan struct{}
+	Err() error
+	Value(key any) any
 }
 ```
 
-### 并发取消
+**它是 Go 里唯一的"取消信号"标准载体**——标准库的 `net/http`、`database/sql`、`os/exec`、gRPC 全都接受 `context.Context` 作为第一个参数。
+
+**约束的由来**：Go 的 goroutine **不能被外部杀死**（[01-goroutine与生命周期](./01-goroutine与生命周期.md)）。因此"让一个正在运行的 goroutine 停下来"只能靠**它自己检查并退出**。`context` 提供的就是这个检查点——`Done()` 返回的 channel 关闭即表示"该停了"。
+
+**这条约束决定了一切**：取消是**协作式的**（cooperative），不是抢占式的。
+
+## 机制
+
+### 取消传播：向下不向上
+
+```console
+$ go run .
+10) 父取消后：parent=context canceled child=context canceled grandchild=context canceled
+11) 子取消后：parent=<nil> child=context canceled
+```
+
+`WithCancel(parent)` 建立**父子关系**，方向是单向的：
+
+| 事件 | 父 | 子 |
+|---|---|---|
+| 父取消 | 取消 | **跟着取消** |
+| 子取消 | **不受影响** | 取消 |
+
+**约束的由来**：这个方向性是**资源释放的语义**——父代表更大范围的操作（一个 HTTP 请求），子代表它派生的子任务。父结束了，所有子任务就没有存在的理由；但一个子任务失败不该让整个请求失败（那由 `errgroup` 之类的机制决定，见 [05](./05-并发模式与竞态诊断.md)）。
+
+### 取消是协作式的
+
+```console
+$ go run .
+12) 不检查 ctx.Done() 的 goroutine 照常跑完: true
+```
+
+那个 goroutine **完全不看 `ctx`**，因此 `cancel()` 对它毫无影响——它照常跑完。
+
+**这是 context 最重要的性质**：`cancel()` **不终止任何东西**，它只是关闭一个 channel。**被取消方必须自己检查**：
 
 ```go
-ctx, cancel := context.WithCancel(ctx)
-defer cancel()
-
-results := make(chan result, len(urls))
-for _, url := range urls {
-    go func(url string) {
-        resp, err := http.Get(url)
-        if err != nil {
-            cancel()  // 快速失败，取消其他 goroutine
-            return
-        }
-        results <- result{data: resp}
-    }(url)
+select {
+case <-ctx.Done():
+	return ctx.Err()          // 主动退出
+case v := <-work:
+	handle(v)
 }
 ```
 
-### Context 与请求追踪
+**约束**：一个不检查 `ctx.Done()` 的 goroutine 泄漏是必然的（[01](./01-goroutine与生命周期.md)）。**每个可能长时间运行的 goroutine 都要有退出路径**。
 
-<pre>
-Trace 传播：
+**边界**：`ctx.Done()` 只在**阻塞点**有用。一个纯 CPU 的死循环即使检查 `ctx.Done()` 也不会立刻响应——它要跑到检查点才行。这与 [03-运行时与内存/01](../03-运行时与内存/01-运行时总览与调度器.md) 讲的"抢占需要安全点"是同一个道理。
 
-Client                   Server
-  │                         │
-  │── HTTP Request ────────►│
-  │   Header: trace-id      │
-  │                         │── WithValue(traceID, xxx)
-  │                         │   │
-  │                         │   └─── DB Query (trace-id 传播)
-  │                         │   │
-  │                         │   └─── External Call (trace-id 传播)
-  │                         │
-  │◄── HTTP Response ───────│
-</pre>
+### 四种派生方式
 
-## Context 取消的数学证明
+| 构造 | 用途 | 何时取消 |
+|---|---|---|
+| `context.Background()` | **根 context** | 永不取消（除 `WithCancel` 派生） |
+| `context.TODO()` | 占位，语义待定 | 同上 |
+| `WithCancel(parent)` | 手动取消 | 调用 `cancel()` |
+| `WithTimeout(parent, d)` | 超时取消 | d 之后或调用 `cancel()` |
+| `WithDeadline(parent, t)` | 绝对时间取消 | t 时刻或调用 `cancel()` |
+| `WithValue(parent, k, v)` | **携带请求作用域数据** | 随父取消 |
 
-**定理**：若 Context 树满足以下条件，则 Context 取消是安全的：
+**`Background` 与 `TODO` 的区别只是意图**——前者表示"我确定这里该用根 context"，后者表示"我还没想好该接哪个"。两者行为完全相同。
 
-1. 每个子 Context 的截止时间 ≤ 父 Context 的截止时间
-2. 取消操作是幂等的（多次取消等价于一次）
+### `ctx.Err()` 的两种值
 
-**证明**：
-- 由条件1，父 Context 取消时，所有子 Context 必然已到期或将被通知
-- 由条件2，取消操作的幂等性保证了并发安全的取消语义
+| 值 | 触发 |
+|---|---|
+| `context.Canceled` | 显式 `cancel()`，或父被取消 |
+| `context.DeadlineExceeded` | 超时/截止时间到达 |
 
-**推论**：使用 `WithTimeout` 时，应确保子任务的超时时间短于父任务。
+**判据**：`errors.Is(err, context.Canceled)` 通常表示**调用方主动放弃**（用户断开连接），不需要记 error 日志；`context.DeadlineExceeded` 通常表示**下游太慢**，需要告警。把两者混为一谈是常见的可观测性错误。
 
-**Context 的公平性**：
+**约束**：`WithTimeout` 返回的 `cancel` 函数**必须被调用**，即使超时已经发生——`context` 内部会注册到父节点，不调用 `cancel` 会让父节点持有子节点的引用直到父自己取消。**惯用写法是 `defer cancel()`**：
 
-Context 取消不保证 goroutine 的公平调度。取消只是关闭 Done channel，goroutine 是否立即响应取决于调度器。
+```go
+ctx, cancel := context.WithTimeout(parent, 5*time.Second)
+defer cancel()      // 即使提前返回也要释放
+```
 
-**死锁风险的形式化**：
+`go vet` 的 `lostcancel` 检查会报出忘记调用的情况。
 
-若以下条件同时满足，可能死锁：
- $\exists G_1, G_2: \text{G1 持有 R1 等待 R2} \land \text{G2 持有 R2 等待 R1} \land \text{取消信号到达 G1/G2}$ 
+### `WithValue` 的边界
 
-即死锁发生在资源依赖环与 Context 取消的交叉点。
+```go
+ctx = context.WithValue(ctx, requestIDKey, "abc123")
+```
+
+**`WithValue` 只用于请求作用域的数据**——跨 API 边界传递、与请求同生命周期的信息：请求 ID、追踪 span、认证主体、租户标识。
+
+**它不是"可选参数"的替代品**：
+
+```go
+// ❌ 错误用法：把业务参数藏进 context
+ctx = context.WithValue(ctx, "userID", 42)
+doSomething(ctx)
+
+// ✅ 正确：业务参数就是参数
+doSomething(ctx, userID)
+```
+
+**约束的由来**：`WithValue` 的值是 `any`，**编译器完全无法检查**。用错 key 类型或忘记设置，都是运行时问题。而且链式查找是 $O(n)$ 的线性扫描。
+
+**判据**（官方博客的立场）：**如果这个值不是"每个请求都该有的横切关注点"，就不该放 context**。
+
+**键类型必须是自定义类型**，防止不同包的键冲突：
+
+```go
+type ctxKey struct{}
+var requestIDKey ctxKey          // ✅ 未导出类型，外部无法构造同类型键
+```
+
+用 `string` 作键会让任意包都能读写——`"userID"` 这种键必然冲突。
+
+### 作为第一个参数
+
+```go
+func DoSomething(ctx context.Context, arg Arg) error
+```
+
+**惯例是 `ctx` 必须是第一个参数**，命名为 `ctx`，**不作为 struct 字段存储**。
+
+**约束的由来**：`ctx` 是**一次调用的作用域**，不是对象的状态。把它存进 struct 会让"这个 struct 的方法该用哪个 context"变得含混。唯一的例外是 `http.Request` 这类"请求对象"——`req.Context()` 是访问器，不是字段。
+
+**边界**：`context.Background()` **不该出现在库代码里**——库函数应当接受调用方传入的 `ctx`。只有 `main`、`Test` 函数、顶层初始化才该创建根 context。
+
+## 连接
+
+**上游**：[02-channel与select](./02-channel与select.md)——`ctx.Done()` **本身就是一个 channel**，取消机制与本篇讲的 channel 语义完全一致；[01-goroutine与生命周期](./01-goroutine与生命周期.md) 的"goroutine 不可强杀"是 context 存在的根本原因。
+
+**下游**：[05-并发模式与竞态诊断](./05-并发模式与竞态诊断.md) 的 `errgroup.WithContext` 是 context 与并发控制的结合；[05-IO与外部世界/03](../05-IO与外部世界/03-HTTP服务与客户端.md) 的 `req.WithContext` 是 HTTP 客户端的取消入口；[05-IO与外部世界/04](../05-IO与外部世界/04-数据库访问.md) 的 `QueryContext`/`ExecContext` 是数据库的取消入口。
+
+**与其它语言对照**：
+
+| | 取消机制 | 是否强制 | 跨 API 传播 |
+|---|---|---|---|
+| Java | `Future.cancel()` / 线程中断 | 中断是协作式（同 Go） | 需显式传 `Future` |
+| Python | `asyncio.CancelledError` | **异常，会强制抛出** | 沿 await 链自动 |
+| C# | `CancellationToken` | 协作式（同 Go） | 显式传参 |
+| **Go** | **`context.Context`** | **协作式** | **显式传参（约定为第一个参数）** |
+
+**C# 的 `CancellationToken` 与 Go 的 `context` 最像**——都是协作式、都显式传参。差别在 Go 把 `context` 塞进了标准库每一个 I/O API 的签名里，形成了**生态级的统一约定**；C# 的 `CancellationToken` 也是标准做法，但没有 Go 这样"不接受 ctx 的库就是不合格的"这种强度。
+
+**Python 的 `asyncio` 是唯一的例外**——它用异常传播取消，`await` 链上任何一点都会被强制中断。这更"自动"，但代价是取消可能在任何地方抛出，`finally` 块必须处理得极其小心。**Go 选了显式检查，代码更长但控制流更清楚**。

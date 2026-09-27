@@ -1,286 +1,146 @@
-# unsafe 包专题
+# unsafe 与内存布局
 
-> **版本关系**：Go 1.24（stable）→ Go 1.26（<latest>）。unsafe 包行为稳定，但跨版本使用需谨慎。
+> 前置：[04-反射](./04-反射.md) · 后续：[06-CGO与跨语言调用](./06-CGO与跨语言调用.md)
 
-## 定义
+> **版本基准**：Go 1.27（stable = latest）。本篇示例实测环境：go1.27.1 windows/amd64，Intel i7-10750H。
 
-`unsafe` 包提供绕过 Go 类型系统的操作，本质是允许不同类型的指针互相转换——这打破了 Go 的内存安全保证，用于高性能场景和标准库内部实现。其核心价值在于**零拷贝类型转换**和**精确内存布局控制**，代价是失去 Go 的内存安全承诺。
+## 本质
 
-**归约终点**：unsafe 包的本质是**所有权归属的显式控制**——GC 追踪的对象永远安全，不被追踪的对象在 GC 后可能失效。
+**`unsafe` 包提供三种能力：查内存布局（`Sizeof`/`Alignof`/`Offsetof`）、做无类型指针转换（`unsafe.Pointer`）、做零拷贝的字符串/切片转换（`unsafe.String`/`unsafe.Slice`）。**
 
-## 数学模型
+前两者是**只读的观察**，第三者**主动放弃内存安全**。
 
-### 指针转换的代数约束
+**约束的由来**：Go 的类型系统保证了几件事——切片访问不越界、接口断言要么成功要么 panic、`string` 不可变。`unsafe` 让这些保证**在特定代码段里失效**。官方文档的措辞是：
 
-`unsafe.Pointer` 本质是一个**类型的通用中介**，其类型转换规则可描述为：
+> Package unsafe ... allows a program to defeat the type system and read and write arbitrary memory. It should be used with extreme care.
 
-```
-允许的转换路径（满足结合律）：
-  *T1 ──► unsafe.Pointer ──► *T2
+**判据**：`unsafe` 只该出现在**类型系统确实表达不了的地方**——与 C 的 ABI 边界（[06](./06-CGO与跨语言调用.md)）、零拷贝的热路径、序列化的字节布局。**用了 `unsafe` 的代码必须能回答"我为什么不能不用它"**。
 
-转换律（双向）：
-  (*T1)(unsafe.Pointer(p)) ≡ p   （当且仅当 p 已是 *T1）
-
-禁止的组合：
-  unsafe.Pointer → uintptr（悬挂指针风险）
-  uintptr → unsafe.Pointer（GC 时对象可能已移动）
-```
-
-### uintptr vs unsafe.Pointer 的本质区别
-
-```
-unsafe.Pointer：逻辑指针，持有对象的 GC 根，GC 会追踪
-uintptr：纯整数，不持有 GC 根，GC 不知道它引用了哪个对象
-```
-
-设对象地址为 `addr`，存活概率 $P_{alive}(t)$ 随 GC 轮次递减。`uintptr` 持有的地址在下一轮 GC 后可能指向已释放对象——这是**悬挂指针**的数学根源。 随 GC 轮次递减。`uintptr` 持有的地址在下一轮 GC 后可能指向已释放对象——这是**悬挂指针**的数学根源。
-
-**悬挂指针的概率模型**：
-
-设 $P_{gc}(t)$ 为 $t$ 时刻发生 GC 的概率： 为 $t$ 时刻发生 GC 的概率： 时刻发生 GC 的概率：
- $P_{悬挂} = P(\text{uintptr 指向已释放对象}) = \sum_{t} P_{gc}(t) \cdot P_{\text{对象已死|gc}}(t)$ 
-
-## 数据流
-
-<pre>
-指针类型 *T1
-    │
-    │ 强制转换（编译时检查绕过）
-    ▼
-unsafe.Pointer（通用中介，无类型信息）
-    │
-    ├──► uintptr（算术运算：+offset）
-    │         │
-    │         │ 警告：uintptr 不被 GC 追踪
-    │         ▼
-    │     悬挂指针风险区
-    │
-    ├──► *T2（重新获得类型，运行时有效）
-    │
-    └──► *byte（用于内存逐字节操作）
-</pre>
-
-### String 与 []byte 零拷贝转换的数据流
-
-<pre>
-string（只读）
-┌─────────────────────────────────────┐
-│ DataPtr: *base of underlying array  │
-│ Len:     number of bytes             │
-└─────────────────────────────────────┘
-    │  unsafe.StringData() 获取原始指针
-    ▼
-*byte ── unsafe.Slice ──► []byte（共享底层数组，无拷贝）
-    │                      │
-    │                      └── 写入 []byte 会触发 panic（string 只读语义）
-    ▼
-若需写时拷贝：bytes.Clone() 或手动 make + copy
-</pre>
-
-**零拷贝的所有权约束**：
-
-```go
-// string 和 []byte 共享底层数组
-s := "hello"
-b := unsafe.Slice((*byte)(unsafe.StringData(s)), len(s))
-// b 指向 s 的底层数组，不拷贝
-// 写入 b 会导致未定义行为
-```
-
-### Sizeof/Alignof/Offsetof 的内存布局模型
-
-<pre>
-struct MemoryLayout {
-    size:     总占用字节数（含 padding）
-    align:    对齐要求（max(字段对齐)）
-    offsets:  各字段起始偏移（编译期确定）
-}
-
-Example: struct{ a bool; b int64; c bool }
-
-without padding:
-  a @ 0 (1 byte) + b @ 1 (8 bytes) + c @ 9 (1 byte)
-  → size = 10, align = 8
-
-with padding (Go 实际行为):
-  a @ 0 (1 byte) + padding 0-7 + b @ 8 (8 bytes) + c @ 16 (1 byte) + padding 16-23
-  → size = 24, align = 8
-  字段偏移：a=0, b=8, c=16
-</pre>
+**边界**：`unsafe` 的操作**不受 `go vet` 之外的任何检查**。写错了不会编译报错，只会段错误或静默的数据损坏。
 
 ## 机制
 
-### 为什么 unsafe.Pointer 存在？
+### 内存布局：`Sizeof` / `Alignof` / `Offsetof`
 
-Go 的类型系统禁止 `*int` 直接转为 `*bool`，因为两者语义不同。但标准库和高效代码存在**合理的类型混写需求**：
-
-1. **string 和 []byte 内部结构完全相同**（指针 + 长度），互转不应有拷贝代价
-2. **系统调用**需要 `*byte` 而 Go 的 `[]byte` 底层就是 `*byte`
-3. **内存映射文件**需要直接操作原始字节
-4. **特殊数据结构**（如环形缓冲区）需要精确布局控制
-
-`unsafe` 包是将这些需求**显式化**而非隐式化——程序员必须承认"我在绕过类型系统"。
-
-### uintptr 悬挂指针的深层机制
-
+```console
+$ go run .
+A  Size=24 Align=8
+   B1 偏移=0  I 偏移=8  B2 偏移=16
+Packed Size=16 Align=8  （重排后省 8 字节）
 ```
-GC 标记阶段：
-  从 GC Root（全局变量、goroutine 栈）出发
-  标记所有可达对象
-
-GC 清理阶段：
-  释放不可达对象，更新堆布局
-  对象可能移动（copy-and-sweep）
-
-uintptr 问题：
-  若代码持有 uintptr(old_addr)，GC 后该地址内容已无效
-  但 uintptr 本身不触发任何 GC 追踪
-  → 悬挂读可能返回垃圾数据，悬挂写可能破坏错误对象
-```
-
-**约束条件**：
-- uintptr 算术运算必须在同一个表达式内完成 `unsafe.Pointer(p) + offset`
-- 禁止将 uintptr 存储到变量中跨 GC 调用
-
-**违反约束的数学后果**：
-
-设 $addr_{original}$ 为对象原始地址， $addr_{moved}$ 为 GC 后新地址： 为对象原始地址， $addr_{moved}$ 为 GC 后新地址： 为 GC 后新地址：
- $addr_{uintptr} = addr_{original}$ 
- $addr_{moved} \neq addr_{original} \implies addr_{uintptr} \text{ 指向已释放内存}$ 
-
-### 结构体字段偏移的运行时确定性
-
-Go 编译器为每个 struct 类型生成**编译期固定的偏移表**。`unsafe.Offsetof` 是编译器内部已知信息的运行时查询接口：
-
-- 偏移量取决于字段声明顺序和 Go 的**数据对齐规则**
-- 不同架构（amd64 vs arm64）的偏移可能不同
-- Go 版本升级可能改变布局（虽然 Go 1 承诺横向兼容，但 experimental packages 不保证）
-
-### 对齐约束的数学模型
-
-**对齐要求**：字段偏移必须是字段大小的整数倍，或结构体对齐要求（二者取小）。
-
-**结构体大小公式**：
-
- $Size(T) = \sum_{i} (Align(Field_i) - 1 + Size(Field_i)) \approx \sum_{i} Size(Field_i) + Padding_i$ 
-
-这保证了任意字段的地址都是该字段大小或结构体对齐的倍数。
-
-**对齐的约束**：
-
-| 字段类型 | 大小 | 对齐要求 |
-|---------|------|---------|
-| bool | 1 | 1 |
-| int8 | 1 | 1 |
-| int16 | 2 | 2 |
-| int32 | 4 | 4 |
-| int64 | 8 | 8 |
-| float32 | 4 | 4 |
-| float64 | 8 | 8 |
-| *T | 8 | 8 |
-
-**padding 的计算**：
-
-设字段 $i$ 的起始偏移为 $offset_i$ ，大小为 $size_i$ ，对齐为 $align_i$ ： 的起始偏移为 $offset_i$ ，大小为 $size_i$ ，对齐为 $align_i$ ： ，大小为 $size_i$ ，对齐为 $align_i$ ： ，对齐为 $align_i$ ： ：
- $offset_i = \lceil offset_{i-1} + size_{i-1} \rceil_{align_i}$ 
-
-## 参考存根
 
 ```go
-// 零拷贝 string ↔ []byte（Go 1.20+ 使用标准库更安全）
-func stringToBytes(s string) []byte {
-    if s == "" {
-        return nil
-    }
-    return unsafe.Slice((*byte)(unsafe.StringData(s)), len(s))
-}
+type A struct {
+	B1 bool    // 偏移 0，占 1 字节
+	I  int64   // 偏移 8（1..7 是填充，int64 要 8 字节对齐）
+	B2 bool    // 偏移 16
+}              // Size = 24（16..23 是尾部填充，整个 struct 要 8 字节对齐）
 
-func bytesToString(b []byte) string {
-    if len(b) == 0 {
-        return ""
-    }
-    return unsafe.String(&b[0], len(b))
-}
-
-// 字段偏移计算
-type User struct {
-    name string  // offset 0
-    age  int     // offset 16 or 24 (arch-dependent)
-}
-
-u := &User{name: "Tom", age: 30}
-agePtr := (*int)(unsafe.Pointer(uintptr(unsafe.Pointer(u)) + unsafe.Offsetof(u.age)))
-_ = *agePtr // 30
-
-// 内存布局验证
-_ = unsafe.Sizeof(User{})    // 48 or 56
-_ = unsafe.Alignof(User{})  // 8
+type Packed struct {
+	I  int64   // 偏移 0
+	B1 bool    // 偏移 8
+	B2 bool    // 偏移 9
+}              // Size = 16
 ```
 
-## 注意事项
+**`Sizeof` 是编译期常量**，不是运行时调用——`unsafe.Sizeof(x)` 里的 `x` 不会被求值。
 
-### 内存安全
+**各类型的大小**（64 位平台实测）：
 
-| 操作 | 安全性 | 原因 |
-|------|--------|------|
-| `*T → unsafe.Pointer → *T2` | 类型安全 | 运行时仍是有效指针 |
-| `*T → uintptr → 算术 → unsafe.Pointer → *T2` | 不安全 | GC 可能在算术运算期间移动对象 |
-| `unsafe.StringData` + 写操作 | 不安全 | string 底层是只读的 |
+```console
+$ go run .
+Sizeof(int)=8 Sizeof(string)=16 Sizeof([]int)=24 Sizeof(map[string]int)=8
+Sizeof(chan int)=8 Sizeof(interface{})=16 Sizeof(func())=8 Sizeof(*int)=8
+```
 
-**安全操作的数学保证**：
+| 类型 | 大小 | 构成 |
+|---|---|---|
+| `string` | **16** | 指针 + 长度（2 字） |
+| `[]T` | **24** | 指针 + 长度 + 容量（3 字） |
+| `map` | **8** | **只是一个指针** |
+| `chan` | **8** | 只是一个指针 |
+| `func` | **8** | 只是一个指针 |
+| `interface{}` | **16** | 类型指针 + 数据指针 |
+| `*T` | 8 | 一个指针 |
 
-`*T → unsafe.Pointer → *T2` 是安全的，因为：
- $\text{unsafe.Pointer 持有 GC 根} \implies \text{对象在 GC 期间保持可达}$ 
+**`map` 只有 8 字节**这一点值得注意——它是 [01-语言核心/03](../01-语言核心/03-切片与映射.md) 里"map 描述符是指针、slice 描述符是值"的量化确认。`map` 变量赋值只拷贝一个指针，因此函数内增删元素调用方可见；`slice` 赋值拷贝 24 字节，因此函数内 `append` 不影响调用方。
 
-### 跨平台兼容
+### 对齐与填充
 
-不同架构的字段偏移可能不同，必须使用 `unsafe.Offsetof` 获取**运行时偏移**，而非硬编码常量。
+**填充规则**：每个字段的对齐要求是它自身大小的整数倍（`int64` 要 8 字节对齐、`int32` 要 4 字节），编译器在字段之间插入填充字节；整个 struct 的大小是**最大字段对齐的整数倍**。
 
-**偏移的架构差异**：
+**约束**：填充是**空间换访问速度**——CPU 访问未对齐的内存需要多次读取（x86 上性能下降，某些架构上直接不支持）。Go 不提供 `#pragma pack` 那样的强制紧凑手段，需要精确布局时必须用 `[N]byte` 手工编码。
 
-| 架构 | int 大小 | 指针大小 | 典型对齐 |
-|------|---------|---------|---------|
-| amd64 | 8 | 8 | 8 |
-| arm64 | 8 | 8 | 8 |
-| 386 | 4 | 4 | 4 |
+**判据**：**不要为了省填充随便调字段顺序**。上面的 `A` 与 `Packed` 差 8 字节，但 `A` 的字段顺序（bool/int64/bool）读起来更自然。省下的内存只有在**高频分配的小对象**上才值得——一个 1 MB 的结构体数组里，8 字节 × 125000 个元素才有意义。
 
-### 升级兼容性
+### 零拷贝转换
 
-Go 版本升级可能导致结构体布局变化。使用 `unsafe` 操作结构体字段的项目必须在每次 Go 升级后重新测试。
+**Go 1.20 起，官方推荐用 `unsafe.String` / `unsafe.Slice` / `unsafe.StringData` 取代旧的 `reflect.StringHeader` / `reflect.SliceHeader` 写法**。旧写法的问题是把 header 结构体当普通 struct 用，容易被 GC 误判，且 `SliceHeader` 的字段布局被文档标记为"不保证"。
 
-**Go 1 兼容性承诺的边界**：
+```console
+$ go run .
+[]byte(s) 长度=36  unsafe.Slice 长度=36
+两者内容相同: true
+unsafe.String 结果 = "mutable bytes"
+```
 
-Go 1 承诺：
-- 旧版本编译的二进制兼容新版本
-- 但结构体布局可能在不同版本间变化
+| 方向 | 拷贝写法 | 零拷贝写法 |
+|---|---|---|
+| `string` → `[]byte` | `[]byte(s)` | `unsafe.Slice(unsafe.StringData(s), len(s))` |
+| `[]byte` → `string` | `string(b)` | `unsafe.String(&b[0], len(b))` |
 
-使用 `unsafe` 访问结构体字段意味着：
- $V_{go升级} \implies \text{必须重新编译并测试}$ 
+代价实测：
 
-## 性能与安全权衡
+```console
+$ go test -bench=. -benchmem -run=^$
+BenchmarkCopyBytesToString-12        	 5420841	       240.7 ns/op	    1024 B/op	       1 allocs/op
+BenchmarkZeroCopyBytesToString-12    	1000000000	         0.8880 ns/op	       0 B/op	       0 allocs/op
+BenchmarkCopyStringToBytes-12        	 5011944	       244.2 ns/op	    1024 B/op	       1 allocs/op
+BenchmarkZeroCopyStringToBytes-12    	1000000000	         0.7452 ns/op	       0 B/op	       0 allocs/op
+```
 
-| 场景 | 推荐 | 原因 |
-|------|------|------|
-| 常规代码 | 不使用 unsafe | 安全更重要 |
-| 标准库内部 | 可以使用 | 性能关键，团队维护 |
-| CGO 交互 | 必须使用 | 无法避免 |
-| 序列化热点 | 可考虑 | 性能收益显著 |
-| 跨版本库 | 慎用 | Go 版本不兼容 |
+转换 1 KiB 的数据：
 
-## unsafe 的图灵等价性
+| | ns/op | 分配 | 加速 |
+|---|---|---|---|
+| `string(b)` | 240.7 | 1024 B，1 次 | 1× |
+| `unsafe.String` | **0.8880** | **0** | **271×** |
+| `[]byte(s)` | 244.2 | 1024 B，1 次 | 1× |
+| `unsafe.Slice` | **0.7452** | **0** | **328×** |
 
-**定理**：`unsafe` 包使 Go 获得了绕过类型系统的能力，这等价于获得了**等价于 C 的内存操作能力**。
+**271 到 328 倍**。拷贝版本的开销几乎全在分配与内存拷贝上——1024 字节的 `memmove` 加上一次堆分配。
 
-**推论**：使用 `unsafe` 可以在 Go 中实现：
-- 任意类型转换
-- 内存对齐控制
-- 直接内存 I/O
+### 必须遵守的三条约束
 
-**代价**：失去 Go 的内存安全保证，程序行为完全依赖程序员正确性。
+**一、`unsafe.Slice` 的结果是只读的。** `unsafe.Slice(unsafe.StringData(s), len(s))` 得到的 `[]byte` **指向字符串的底层数组**。Go 的字符串可能被多个变量共享、可能位于只读内存段——**写它会破坏不可变性，且行为未定义**。
 
-**形式化安全性**：
+**二、`unsafe.String` 的结果与源 `[]byte` 共享内存。** 源切片后续被修改，字符串跟着变——这**违反了 `string` 不可变的假设**，会让 map 的键、接口比较等依赖不变性的机制出错。
 
-设程序使用 `unsafe` 的操作集合为 $U$ ： ：
- $安全 \iff \forall u \in U: u \text{ 满足 unsafe 的约束}$ 
+**三、生命周期必须自己保证。** 零拷贝的字符串/切片**不持有源对象的引用**（就 GC 而言），如果源被回收，得到的就是悬垂引用。要保证源在所有使用者之前存活——通常靠把源放在同一个作用域里，或用 `runtime.KeepAlive`。
 
-违反任一约束即导致未定义行为。
+**判据**：**零拷贝只适合"转换后立刻使用、且不修改、源在作用域内"的场景**——比如从缓冲区解析协议、把只读数据传给 `io.Writer`。**跨函数返回零拷贝结果是不安全的**。
+
+### Go 1.27 的 `unsafefuncs` modernizer
+
+`go fix` 在 1.27 新增了 `unsafefuncs` 规则，**自动把旧的 `reflect.StringHeader` / `reflect.SliceHeader` 用法迁移到 `unsafe.String` / `unsafe.Slice`**。升级旧代码时可以直接跑：
+
+```console
+$ go fix ./...
+```
+
+## 连接
+
+**上游**：[01-语言核心/02](../01-语言核心/02-类型与变量.md) 的指针规则（无算术、可寻址性）；[03-垃圾回收](./03-垃圾回收.md) 的对象可达性——零拷贝绕过了 GC 的引用追踪，因此要自己管生命周期。
+
+**下游**：[06-CGO与跨语言调用](./06-CGO与跨语言调用.md) 的类型映射依赖精确的内存布局；[07-性能剖析与调优](./07-性能剖析与调优.md) 里零拷贝是热路径优化的一类手段。
+
+**与其它语言对照**：
+
+| | 底层手段 | 能做什么 |
+|---|---|---|
+| C/C++ | `reinterpret_cast`、指针算术、union | 任意内存操作 |
+| Java | `sun.misc.Unsafe` / `VarHandle` | 任意内存操作（需要 `--add-opens`） |
+| Rust | `unsafe` 块 | 受限的底层操作，**但编译器仍做别名检查** |
+| **Go** | **`unsafe` 包** | 指针转换 + 布局查询 + 零拷贝，**无指针算术** |
+
+**Go 的 `unsafe` 比 C 的 `reinterpret_cast` 安全得多**：`unsafe.Pointer` 没有指针算术，转换规则被限制在文档列出的六种模式里，且**不能绕过类型系统的对齐检查**。它换不来 C 那种"任意地址读写"的能力——需要那个能力必须走 cgo（[06](./06-CGO与跨语言调用.md)）。这是有意的：**Go 给了一条逃生通道，但把它修得很窄**。
