@@ -1,304 +1,223 @@
-# 单元测试
+# 单元测试与 mock
 
-## 定义
+> 前置：[01-测试基础](./01-测试基础.md) · 后续：[03-集成测试](./03-集成测试.md)
 
-单元测试是通过**隔离验证**每个代码单元正确性的机制。Go 的 `testing` 包是标准库内置测试框架，其核心约定：以 `_test.go` 结尾的文件中，以 `Test` 开头的函数由 `go test` 自动发现并执行，失败时通过 `*testing.T` 报告。
+> **版本基准**：Go 1.27（stable = latest）。本篇示例实测环境：go1.27.1 windows/amd64。
 
-单元测试的本质是验证 SUT（System Under Test）在给定输入下是否产生预期输出。其**隔离性由 Mock 对象而非语言机制保证**——这与进程隔离不同，测试间的边界完全由程序员的约定维护。
+## 本质
 
-## 数学模型
+**Go 的 mock 不需要框架——接口隐式满足（[01-语言核心/08](../01-语言核心/08-接口.md)）让"写一个假实现"变成十几行代码。**
 
-### 表驱动测试的覆盖率
-
-设测试用例集合 $C = \{c_1, c_2, \ldots, c_k\}$ ，每个用例 $c_i$ 包含： ，每个用例 $c_i$ 包含： 包含：
-- $\text{name}_i$ ：用例名称（字符串标识符） ：用例名称（字符串标识符）
-- $\text{input}_i$ ：输入参数元组 ：输入参数元组
-- $\text{expected}_i$ ：期望输出 ：期望输出
-
-执行语义为全域量化验证：
- $\forall c_i \in C : \text{Test}(c_i.\text{input}) \stackrel{?}{=} c_i.\text{expected}$ 
-
-**覆盖率的形式化定义**：设程序分支点集合 $B = \{b_1, b_2, \ldots, b_m\}$ ，执行路径集合 $E = \{e_1, e_2, \ldots, e_n\}$ ，分支覆盖率为： ，执行路径集合 $E = \{e_1, e_2, \ldots, e_n\}$ ，分支覆盖率为： ，分支覆盖率为：
- $\text{cov}_{\text{branch}} = \frac{|\{b_j \in B \mid \exists e_i \in E : b_j \text{ 的两个出口均被覆盖}\}|}{m}$ 
-
-若 cases 覆盖了所有分支，则 $\text{cov}_{\text{branch}} = 1$ （100%）。 （100%）。
-
-**表驱动测试的复杂度**：
- $T_{\text{table-driven}} = O\!\left(\sum_{i=1}^{k} T(c_i)\right) = O(k \cdot T_{\text{avg}})$ 
-空间复杂度 $O(k)$ 存储测试用例。时间复杂度与用例数线性相关。 存储测试用例。时间复杂度与用例数线性相关。
-
-### Mock 的接口隔离模型
-
-依赖关系的形式化描述：
- $\text{SUT} \xrightarrow{\text{依赖}} I \xrightarrow{\text{实现}} \text{RealImpl} \mid \text{MockImpl}$ 
-
-其中 $I$ 为接口类型，RealImpl 和 MockImpl 均为该接口的实现。 为接口类型，RealImpl 和 MockImpl 均为该接口的实现。
-
-Mock 的数学本质是一个**受限函数**：
- $\text{Mock}_I : I \rightarrow \Sigma^*$ 
-
-其中 $\Sigma^*$ 表示 Mock 可能产生的所有可能输出序列空间。Mock 将 SUT 的调用映射到预设的返回值序列，而非执行真实逻辑。 表示 Mock 可能产生的所有可能输出序列空间。Mock 将 SUT 的调用映射到预设的返回值序列，而非执行真实逻辑。
-
-**Mock 的组合爆炸问题**：设 SUT 有 $n$ 个依赖接口，每个接口有 $k$ 种 Mock 行为配置，则可能的 Mock 组合数为 $k^n$ 。实践中通过关键路径测试（Critical Path Testing）选择少数代表性组合，而非全组合。 个依赖接口，每个接口有 $k$ 种 Mock 行为配置，则可能的 Mock 组合数为 $k^n$ 。实践中通过关键路径测试（Critical Path Testing）选择少数代表性组合，而非全组合。 种 Mock 行为配置，则可能的 Mock 组合数为 $k^n$ 。实践中通过关键路径测试（Critical Path Testing）选择少数代表性组合，而非全组合。 。实践中通过关键路径测试（Critical Path Testing）选择少数代表性组合，而非全组合。
-
-### go test 执行语义的形式化
-
-`TestXxx(t *testing.T)` 的执行是一个状态机：
-
-<pre>
-状态机：TestState
-─────────────────────────────
-状态集：{READY, RUNNING, PASSED, FAILED}
-初始状态：READY
-
-READY ──[调用 TestXxx]──► RUNNING
-RUNNING ──[t.Fail / t.Error]──► RUNNING (继续执行)
-RUNNING ──[t.Fatal / t.Fatalf]──► FAILED (立即终止)
-RUNNING ──[正常返回]──► PASSED
-RUNNING ──[panic]──► FAILED (panic 捕获)
-
-defer 语句在状态转换前执行（cleanup）
-</pre>
-
-**子测试 t.Run 的语义**：t.Run 在独立 goroutine 中执行，由 go test 的工作池调度：
- $\text{并行执行数} = \min\!\left(n,\ \text{GOMAXPROCS}\right)$ 
-
-理想并行时间：
- $T_{\text{parallel}} = \max(T_1, T_2, \ldots, T_n)$ 
-
-实际并行时间（含调度开销）：
- $T_{\text{actual}} = T_{\text{parallel}} + T_{\text{overhead}}$ 
-
-### 测试隔离的约束模型
-
-单元测试隔离性由三大约束维护，违反任一约束均导致 flaky test：
-
-**约束 1：无共享可变状态**
- $\forall \text{test}_i, \text{test}_j : \text{state}(\text{test}_i) \cap \text{state}(\text{test}_j) = \emptyset$ 
-
-测试间不共享全局变量或可修改的包级变量。使用局部变量或显式参数传递数据。
-
-**约束 2：确定性执行**
- $\forall \text{test}_i : \text{output}(\text{test}_i) = f(\text{input}(\text{test}_i))$ 
-
-其中 $f$ 为纯函数，无时间依赖（无 sleep、timeout）、无随机输入（固定 seed）。 为纯函数，无时间依赖（无 sleep、timeout）、无随机输入（固定 seed）。
-
-**约束 3：资源释放**
- $\text{Acquire}(r) \implies \exists \text{test}_i : \text{Release}(r, \text{test}_i)$ 
-
-每个测试获取的资源必须在测试结束前释放。违反此约束导致资源泄漏，累积表现为内存持续增长或连接池耗尽。
-
-## 数据流
-
-### go test 的完整执行流
-
-<pre>
-源代码树
-    │
-    ├── 编译 *_test.go 文件
-    │
-    ├── 发现 TestMain（若存在）
-    │       │
-    │       ├── 执行 m.Run() 前setup
-    │       │
-    │       ├── m.Run() 执行所有 Test*
-    │       │       │
-    │       │       ├── 按包并行执行（-p=N）
-    │       │       │
-    │       │       ├── -run 过滤（正则）
-    │       │       │
-    │       │       └── t.Run(name, func(t *testing.T))
-    │       │               │
-    │       │               ├── 创建子 *testing.T
-    │       │               ├── 调度到 goroutine 执行
-    │       │               ├── 捕获 panic → FAILED
-    │       │               └── 报告结果到父测试
-    │       │
-    │       └── defer cleanup → os.Exit(exitCode)
-    │
-    └── 汇总结果：PASS / FAIL / race 检测报告
-</pre>
-
-### 表驱动测试的执行模型
-
-<pre>
-cases = []struct{
-    name     string
-    a, b     int
-    expected int
-}{
-    {"正数", 2, 3, 5},
-    {"负数", -1, -1, -2},
-    {"零", 0, 0, 0},
+```go
+type fakeRepo struct {
+	users map[int64]*User
+	err   error
+	calls int
 }
 
-for _, tc := range cases {
-    t.Run(tc.name, func(t *testing.T) {
-        got := Add(tc.a, tc.b)
-        if got != tc.expected {
-            t.Errorf("Add(%d, %d) = %d; want %d",
-                tc.a, tc.b, got, tc.expected)
-        }
-    })
+func (f *fakeRepo) Get(ctx context.Context, id int64) (*User, error) {
+	f.calls++
+	if f.err != nil {
+		return nil, f.err
+	}
+	u, ok := f.users[id]
+	if !ok {
+		return nil, ErrNotFound
+	}
+	return u, nil
 }
+```
 
-执行语义：
-- 父测试等待所有子测试完成（通过 sync.WaitGroup）
-- 子测试执行顺序不确定（go test 并行调度）
-- 每个子测试内部顺序确定（单 goroutine）
-</pre>
+**这个 struct 满足 `UserRepo` 接口**，不需要 `implements`、不需要代码生成、不需要 `gomock`。
 
-### Mock 注入的数据流
+**约束的由来**：Java 需要 Mockito 是因为 `implements` 是显式的——你不能凭空给一个已有类型"补上"接口实现。Go 的隐式满足让"在测试包里定义假实现"天然可行，**而且假实现可以定义在测试文件里**，不污染生产代码。
 
-<pre>
-生产代码：                    测试代码：
-func NewService(s Store)      mockStore := &MockStore{
-    *Service{s}               GetFunc: func(key string) ([]byte, error) {
-}                                 return []byte("test"), nil
-                                },
-func (s *Service) Do() error {  }
-    data, err := s.store.Get("key")
-    if err != nil {              svc := NewService(mockStore)  // 注入点
-        return err              // 调用链：SUT → Mock
-    }                           // mockStore.GetFunc 被调用
-    return process(data)        // 验证：mockStore.Calls[0]...
-}
-
-依赖注入前：SUT → RealImpl（真实存储）
-依赖注入后：SUT → MockImpl（预设行为）
-</pre>
+**边界**：手写 mock 的代价是**样板代码**。一个十方法的接口要写十个方法——这时才值得考虑 `gomock`（代码生成）或 `mockery`。
 
 ## 机制
 
-### 为什么表驱动测试是 Go 的惯用模式
+### 接口定义在使用方
 
-**传统 if/else 模式 vs 表驱动模式**：
-
-传统模式中，测试逻辑 $L$ 与具体值耦合： 与具体值耦合：
 ```go
-// 扩展需要修改 L 本体
-if a == 2 && b == 3 { expect(5) }
-if a == -1 && b == -1 { expect(-2) }
-```
-
-表驱动模式中， $L$ 与具体值解耦： 与具体值解耦：
-```go
-// L 是通用逻辑，cases 是参数化
-for _, tc := range cases {
-    got := Add(tc.a, tc.b)
-    if got != tc.expected { t.Errorf(...) }
+// user.go（生产代码）
+type UserRepo interface {
+	Get(ctx context.Context, id int64) (*User, error)
 }
-```
 
-**扩展成本的形式化**：
+type Service struct {
+	repo UserRepo
+	mail Mailer
+}
 
-| 模式 | 扩展方式 | 扩展成本 |
-|------|----------|----------|
-| 传统 if/else | 修改 L 本体 | $O(n)$ 需找到第 n 个分支 | 需找到第 n 个分支 |
-| 表驱动 | 添加 case | $O(1)$ 只需 append | 只需 append |
-
-**失败定位复杂度**：传统模式 $O(n)$ 线性搜索；表驱动模式 $O(1)$ 直接通过 tc.name 定位。 线性搜索；表驱动模式 $O(1)$ 直接通过 tc.name 定位。 直接通过 tc.name 定位。
-
-### t.Fatal vs t.Error 的语义差异
-
-| 方法 | 行为 | 状态转换 | 后续执行 |
-|------|------|----------|----------|
-| `t.Error` / `t.Errorf` | 记录失败 | RUNNING → RUNNING | 继续执行当前测试函数 |
-| `t.Fatal` / `t.Fatalf` | 记录失败并终止 | RUNNING → FAILED | 立即终止当前测试函数 |
-
-**为什么需要两种语义**：
-- `t.Error`：收集多个失败（"继续执行，发现所有问题"）
-- `t.Fatal`：遇到不可恢复错误（"后续验证依赖前面结果"）
-
-### TestMain 的必要性与 os.Exit
-
-`TestMain` 是包级别测试入口，其存在是因为 `go test` 编译为独立的测试可执行文件，该文件的 `main` 函数由 testing 包生成。TestMain 允许在 `m.Run()` 前后执行 setup/teardown。
-
-**关键约束**：`os.Exit(exitCode)` 是必须的。`m.Run()` 返回后，程序流程不会自动结束——必须显式将退出码传递给 go test 进程。
-
-```go
-func TestMain(m *testing.M) {
-    setup()              // 在所有测试前执行
-    exitCode := m.Run()  // 执行所有 Test*
-    teardown()           // 在所有测试后执行
-    os.Exit(exitCode)   // 必须：传递结果码
+func NewService(repo UserRepo, mail Mailer) *Service {
+	return &Service{repo: repo, mail: mail}
 }
 ```
 
-### 子测试并行的死锁风险
+**接口定义在 `Service` 所在的包里，而不是 `UserRepo` 的实现所在的包里**。这是 Go 与 Java 的关键差别（[06-工程与工具链/04](../06-工程与工具链/04-项目布局.md) 也提过）：
 
-并行子测试共享父测试的资源（如数据库连接），若子测试间有隐式依赖：
-- 串行执行：依赖被掩盖（测试 A 持有连接 1，等待连接 2；测试 B 持有连接 2，等待连接 1 → 永远不会发生）
-- 并行执行：死锁立即暴露
+| | 接口在哪 | 依赖方向 |
+|---|---|---|
+| Java 惯例 | **被调用方**的包（`UserRepository` 在 repository 包） | service → repository |
+| **Go 惯例** | **调用方**的包（`UserRepo` 在 service 包） | **实现 → 接口定义处** |
 
-**结论**：并行子测试可能暴露串行执行未发现的隐式依赖。应优先确保测试间无状态共享。
+**收益**：依赖方向天然正确。`Service` 只依赖自己定义的接口，`UserRepo` 的实现（无论在哪）去满足它。**测试时可以注入任意假实现，不需要改生产代码**。
 
-### 覆盖率的认知局限
+**约束**：接口应当**只包含使用方真正需要的方法**。`Service` 只用 `Get`，接口就只声明 `Get`——不要照抄实现的全部方法。这条让假实现足够小（一个方法），也让耦合最小。
 
-**语句覆盖率**：
- $\text{cov}_{\text{stmt}} = \frac{|\{\text{stmt} \mid \text{executed}\}|}{D:\cs-ai-knowledge\{\text{stmt}\}}$ 
-
-**分支覆盖率**：
- $\text{cov}_{\text{branch}} = \frac{|\{b \in B \mid \text{both exits reached}\}|}{D:\cs-ai-knowledge\{B\}}$ 
-
-**关键局限**：100% 分支覆盖率不等于 100% 正确性。考虑：
-```go
-if x > 0 { A } else { B }  // 分支覆盖要求 A 和 B 都被执行
-// 但若 x == 0 是合法的，这已经覆盖
-// 然而 x == INT_MIN 时 x > 0 可能溢出——这不在分支覆盖范围内
-```
-
-**覆盖率作为必要非充分条件**：高覆盖率降低 bug 存活概率，但不保证无 bug。测试应优先覆盖边界条件和错误处理路径。
-
-## 验证标准
-
-- 每个测试函数无状态、无副作用
-- 测试间互不依赖，可任意顺序执行
-- 失败信息包含实际值和期望值
-- 使用 table-driven 模式组织多用例测试
-- Mock 替代所有外部依赖（网络、数据库、文件系统）
-
-## 参考存根
+### 依赖注入：构造函数传参
 
 ```go
-// 表驱动测试
-func TestAdd(t *testing.T) {
-    cases := []struct {
-        name     string
-        a, b     int
-        expected int
-    }{
-        {"正数", 2, 3, 5},
-        {"负数", -1, -1, -2},
-        {"零", 0, 0, 0},
-    }
-
-    for _, tc := range cases {
-        t.Run(tc.name, func(t *testing.T) {
-            got := Add(tc.a, tc.b)
-            if got != tc.expected {
-                t.Errorf("Add(%d, %d) = %d; want %d",
-                    tc.a, tc.b, got, tc.expected)
-            }
-        })
-    }
-}
-
-// Mock 实现
-type Store interface {
-    Get(id string) (string, error)
-}
-
-type MockStore map[string]string
-
-func (m MockStore) Get(id string) (string, error) {
-    return m[id], nil
-}
-
-// TestMain
-func TestMain(m *testing.M) {
-    flag.Parse()
-    exitCode := m.Run()
-    os.Exit(exitCode)
-}
+svc := NewService(tt.repo, &fakeMailer{})
 ```
+
+**依赖通过构造函数传入，而不是在内部 `new`**。这样测试时替换成假实现（[08-生态与框架/05](../08-生态与框架/05-依赖注入.md) 展开工程化的 DI）。
+
+**约束**：**不要在函数内部创建依赖**——`func (s *Service) Greet() { repo := NewPostgresRepo() }` 这样的代码无法测试。**依赖必须是字段**。
+
+### mock 的两类验证
+
+```console
+$ go test -v ./...
+=== RUN   TestGreet
+=== RUN   TestGreet/找到用户
+=== RUN   TestGreet/用户不存在
+=== RUN   TestGreet/仓库报错
+--- PASS: TestGreet (0.00s)
+=== RUN   TestNotifyCallsMailer
+--- PASS: TestNotifyCallsMailer (0.00s)
+=== RUN   TestWithCleanup
+    user_test.go:116: 清理：repo 调用次数 = 1
+--- PASS: TestWithCleanup (0.00s)
+```
+
+| 验证类型 | 测什么 | 例子 |
+|---|---|---|
+| **状态验证** | 返回值对不对 | `TestGreet` 检查 `"hello 张三"` |
+| **行为验证** | **有没有调用、调用了几次、参数是什么** | `TestNotifyCallsMailer` 检查 `mail.sent` 与 `repo.calls` |
+
+**行为验证的价值**：`Notify` 的返回值只有 `error`，**光看返回值无法知道邮件有没有发出去**。上面的 mock 记录了 `sent` 切片与 `calls` 计数，才能验证这一点。
+
+**约束**：**行为验证容易过度**。测"调用了 `repo.Get` 恰好 1 次"会把实现细节写进测试——重构时（比如加缓存导致 0 次调用）测试会失败，但行为其实是对的。**判据**：验证**对外可观察的副作用**（邮件发了、消息入了队列），不验证**内部调用序列**。
+
+### 错误路径必须测
+
+```go
+{
+	name:    "仓库报错",
+	repo:    &fakeRepo{err: errors.New("db down")},
+	id:      1,
+	wantErr: errors.New("db down"),
+},
+```
+
+**表驱动测试的价值在这里最明显**——三个用例（成功、未找到、依赖报错）共享同一段测试逻辑，加一个错误场景只需加一行。
+
+**约束**：**错误路径的覆盖率往往远低于成功路径**，而生产环境里出问题的通常是错误路径。`go tool cover -func` 能看出哪些 `if err != nil` 分支没被覆盖（[01-测试基础](./01-测试基础.md)）。
+
+### `t.Cleanup` 与测试生命周期
+
+```go
+t.Cleanup(func() {
+	t.Log("清理：repo 调用次数 =", repo.calls)
+})
+```
+
+| | `defer` | `t.Cleanup` |
+|---|---|---|
+| 执行时机 | **当前函数返回时** | **测试（含所有子测试）结束时** |
+| 子测试中注册 | 子测试函数返回时执行 | 父测试结束时执行 |
+
+**判据**：**在 `t.Run` 的子测试里注册清理用 `t.Cleanup`**——`defer` 会在子测试函数返回时就执行，而 `t.Cleanup` 会累积到测试结束。`httptest.NewServer` 配 `defer srv.Close()` 在子测试里是常见错误。
+
+**约束**：`t.Cleanup` 按**后进先出**执行（与 `defer` 一致）。
+
+### `httptest`：HTTP 层的 mock
+
+HTTP handler 的测试**不需要 mock `http.Client`**——用真实的服务：
+
+```go
+srv := httptest.NewServer(handler)
+defer srv.Close()
+
+resp, _ := srv.Client().Get(srv.URL + "/users/1")
+```
+
+**约束的由来**：mock `http.Client` 需要实现 `Do(*http.Request) (*http.Response, error)`，且要手工构造 `http.Response`（含 body、header、状态码）——**极其繁琐且容易与真实行为不符**。`httptest.NewServer` 起一个真实的本地服务（随机端口），测的是真实的 HTTP 语义。
+
+**两种形态**：
+
+| | 起网络 | 用途 |
+|---|---|---|
+| `httptest.NewServer` | 是（随机端口） | **测客户端代码**、端到端 |
+| `httptest.NewRecorder` | 否 | **测 handler 本身**（检查状态码与响应体） |
+
+```go
+// 测 handler：不起网络
+req := httptest.NewRequest("GET", "/users/1", nil)
+w := httptest.NewRecorder()
+handler.ServeHTTP(w, req)
+if w.Code != 200 { t.Errorf("状态码 = %d", w.Code) }
+```
+
+**Go 1.27 新增 `httptest.NewTestServer`**——与 `testing/synctest` 配合的内存网络，不起真实端口。
+
+### 外部依赖的替换
+
+| 依赖 | 替换方式 |
+|---|---|
+| **数据库** | 接口 + 假实现（本篇）／ `go-sqlmock`／**内存 SQLite**（[05-IO与外部世界/04](../05-IO与外部世界/04-数据库访问.md)） |
+| **HTTP 服务** | `httptest.NewServer` |
+| **文件系统** | **`fstest.MapFS`**（[05-IO与外部世界/01](../05-IO与外部世界/01-文件与文件系统.md)） |
+| **时间** | **注入 `now func() time.Time`** 字段 |
+| **随机数** | 注入 `io.Reader`（`math/rand.New(src)`） |
+
+**时间与随机数是最常被忽略的两个**——它们的"不可控"让测试不稳定（flaky）。标准手法是**把它们变成可注入的依赖**：
+
+```go
+type Clock interface{ Now() time.Time }
+
+type Service struct {
+	clock Clock
+}
+
+// 生产：clock: systemClock{}
+// 测试：clock: fakeClock{t: time.Date(2026, 1, 1, ...)}
+```
+
+**约束**：**不要在测试里 `time.Sleep` 等真实时间**——那让测试变慢且不稳定。注入假时钟后可以立即"推进"时间。
+
+### 第三方 mock 工具
+
+| 工具 | 形态 | 何时用 |
+|---|---|---|
+| **手写 fake** | 测试文件里的 struct | **默认选择**（接口方法少时） |
+| `gomock` | 代码生成（`mockgen`） | 接口方法多、调用验证复杂 |
+| `mockery` | 代码生成 | 同上 |
+| `testify` | 断言库 + `mock` 包 | 想要断言 DSL |
+
+**判据**：**先用假实现（fake），不够再用 mock**。区别是：
+
+- **fake**：有真实行为的简化实现（内存 map 当数据库）——**测试关注"结果对不对"**
+- **mock**：只记录调用、由测试预设返回值——**测试关注"有没有按预期调用"**
+
+**Go 社区更倾向 fake**，因为它让测试更像"真的在用这个依赖"，重构时更不容易碎。
+
+**约束**：`gomock` 生成的文件需要与接口保持同步——接口改了要重新生成。**在 CI 里加一步"重新生成后 `git diff` 应为空"**能防止不一致。
+
+## 连接
+
+**上游**：[01-测试基础](./01-测试基础.md) 的表驱动与子测试是 mock 测试的组织形式；[01-语言核心/08](../01-语言核心/08-接口.md) 的隐式满足是手写 mock 能成立的根本。
+
+**下游**：[03-集成测试](./03-集成测试.md) 处理 mock 覆盖不到的部分（真实数据库、真实网络）；[08-生态与框架/05](../08-生态与框架/05-依赖注入.md) 把依赖注入工程化。
+
+**与其它语言对照**：
+
+| | mock 手段 | 是否需要框架 |
+|---|---|---|
+| Java | Mockito / JMockit | **是**（`implements` 显式，需字节码增强） |
+| Python | `unittest.mock`（**标准库**） | 否 |
+| JavaScript | Jest 内置 mock / sinon | 部分（Jest 自带） |
+| **Go** | **手写 struct + 接口** | **否** |
+
+**Java 是四者中唯一"必须用框架"的**——因为 `implements` 是显式的，不能给已有类型凭空补接口实现，所以 Mockito 要用字节码生成（CGLIB/ByteBuddy）。**Go 的隐式满足让这个问题不存在**，这是"接口是结构性约束"（[01-语言核心/08](../01-语言核心/08-接口.md)）在测试领域的直接红利。
