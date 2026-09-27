@@ -4,7 +4,7 @@
 
 版本口径：**stable = latest = Go 1.27**（见 [versions.json](../versions.json)）。
 
-- **无 LTS，只维护最近两个次版本**。Go 每 6 个月发一个次版本（2 月、8 月），官方支持窗口是当前版本加前一个。本次写作时 go.dev/dl 上只有 go1.27.1 与 go1.26.8，Go 1.24 已停止支持——因此本库对 Go 只设单档口径，不设 stable/latest 双档。
+- **无 LTS，只维护最近两个次版本**。Go 每 6 个月发一个次版本（2 月、8 月），官方支持窗口是"当前版本加前一个"（原文：supported until there are two newer major releases）。本次写作时 go.dev/dl 上只有 go1.27.1 与 go1.26.8——**Go 1.25 的支持随 1.27 的发布终止**，故本库对 Go 只设单档口径，不设 stable/latest 双档。
 - **Go 1 兼容性承诺**：Go 1.0 之后没有破坏性语言变更。这是本节 [10-版本演进](./10-版本演进/) 能按"增量"写法组织的前提，也是 `go.mod` 里 `go 1.x` 指令只升不降的原因。
 - **实测环境**：go1.27.1 windows/amd64。文中所有 `$ go run` 代码块的回显均在此环境实测。
 
