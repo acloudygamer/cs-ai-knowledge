@@ -2,7 +2,7 @@
 
 > 前置：[05-IO与外部世界/03](../05-IO与外部世界/03-HTTP服务与客户端.md) · 后续：[02-gRPC与ProtocolBuffers](./02-gRPC与ProtocolBuffers.md)
 
-> **版本基准**：Go 1.27（stable = latest）。本篇示例实测环境：go1.27.1 windows/amd64，`github.com/gin-gonic/gin v1.12.0`、`github.com/labstack/echo/v4 v4.15.4`、`modernc.org/sqlite v1.59.0`（分页实测用）。
+> **版本基准**：Go 1.27（stable = latest）。本篇示例实测环境：go1.27.1 windows/amd64，Intel i7-10750H（6 核 12 线程），`github.com/gin-gonic/gin v1.12.0`、`github.com/labstack/echo/v4 v4.15.4`、`modernc.org/sqlite v1.59.0`（分页实测用）。
 
 ## 本质
 
@@ -12,17 +12,20 @@
 
 ```console
 $ go run .
-net/http   : 200 "user 42" | 依赖: 0
-gin        : 200 "user 42" | 依赖: 35
-echo       : 200 "user 42" | 依赖: 25
+net/http   : 200 "user 42" | 第三方模块: 0
+gin        : 200 "user 42" | 第三方模块: 55
+echo       : 200 "user 42" | 第三方模块: 19
 ```
 
 **三者产出的行为完全一样**。差别在于：
 
-| | 依赖闭包（含标准库） | 相对 `net/http` |
-|---|---|---|
-| `net/http` | **190** | — |
-| `gin` | **317** | **+127 个包** |
+| | 依赖闭包（含标准库，不含 main） | 第三方模块数 | 相对 `net/http` |
+|---|---|---|---|
+| `net/http` | **190** | **0** | — |
+| `gin` | **317** | 55 | **+127 个包** |
+| `echo` | **222** | 19 | **+32 个包** |
+
+**两个口径要分清**：**依赖闭包**是 `go list -deps . | grep -v '^<main>$' | wc -l`——编译这个程序实际要过的包数（含标准库）；**第三方模块数**是 `go list -m all | tail -n +2 | wc -l`——构建列表里的模块数。前者决定编译时间，后者决定供应链扫描面与 `go.sum` 的规模。
 
 **约束的由来**：`net/http` 已经提供了 HTTP 的全部能力（[05-IO与外部世界/03](../05-IO与外部世界/03-HTTP服务与客户端.md)），框架增加的是**开发体验**——参数绑定、校验、分组路由、中间件生态。
 
@@ -94,7 +97,8 @@ func (e *APIError) Error() string { return e.Message }
 
 | | Gin | Echo |
 |---|---|---|
-| 依赖数 | **35** | 25 |
+| 第三方模块数 | 55 | **19** |
+| 依赖闭包 | 317 | **222** |
 | 性能 | 略快（用 sonic 做 JSON） | 接近 |
 | API 风格 | `c.JSON(200, obj)`，无返回值 | **`return c.JSON(200, obj)`**，显式返回 error |
 | 校验 | 内置（`binding` tag） | 内置（`validate` tag） |
@@ -188,7 +192,7 @@ $ go run .
 
 **约束**：**`code` 是给程序看的，`message` 是给人看的**——只有 `message` 时，客户端只能靠字符串匹配判断错误类型（一改文案就崩）；只有 `code` 时，排障要查表。**两者都要**。
 
-**状态码的映射要固定**（[05-IO与外部世界/03](../05-IO与外部世界/03-HTTP服务与客户端.md) 的 `writeError` 就是干这个的）：
+**状态码的映射要固定**——上面「不用框架的写法」里那个 `writeError` 就是干这个的：
 
 | 业务情况 | 状态码 |
 |---|---|

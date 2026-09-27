@@ -2,7 +2,7 @@
 
 > 前置：[05-unsafe与内存布局](./05-unsafe与内存布局.md) · 后续：[07-性能剖析与调优](./07-性能剖析与调优.md)
 
-> **版本基准**：Go 1.27（stable = latest）。本篇示例实测环境：go1.27.1 windows/amd64（gcc 来自 MinGW-w64），Intel i7-10750H。
+> **版本基准**：Go 1.27（stable = latest）。本篇示例实测环境：go1.27.1 windows/amd64（gcc 来自 MinGW-w64），Intel i7-10750H（6 核 12 线程）。
 
 ## 本质
 
