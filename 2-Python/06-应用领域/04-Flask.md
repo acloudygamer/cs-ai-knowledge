@@ -69,6 +69,9 @@ Flask 生态以同步为主（WSGI，[01-Web开发总览](01-Web开发总览.md)
 ```python
 """应用工厂 + 测试配置的完整小服务（Flask 的标准骨架）"""
 from flask import Flask, jsonify
+from flask_sqlalchemy import SQLAlchemy
+
+db = SQLAlchemy()                     # 扩展实例先于 app 存在，工厂里再绑定
 
 def create_app(config: dict | None = None) -> Flask:
     app = Flask(__name__)

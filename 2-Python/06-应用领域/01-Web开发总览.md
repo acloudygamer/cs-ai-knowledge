@@ -7,7 +7,7 @@ Python Web 的一切框架差异都汇到两条协议与一个选型问题：**W
 ## 本质
 
 - **WSGI**（PEP 3333，同步时代）：`app(environ, start_response) -> iterable[bytes]`——一个同步可调用即一个应用；一个请求占一个 worker（线程/进程），并发能力 = worker 数。Flask、Django（传统栈）生长于此。
-- **ASGI**（异步时代）：`async def app(scope, receive, send)`——原生 async 的三层协程接口；事件循环下单进程可承数千并发连接，长连接（WebSocket/SSE）与高并发 IO 是它的主场（[03-并发与异步](../03-运行时与性能/03-并发与异步.md) 的 asyncio 模型）。FastAPI、Django（ASGI 模式）、Litestar 生长于此。
+- **ASGI**（异步时代）：`async def app(scope, receive, send)`——原生 async 的三参数协程可调用；事件循环下单进程可承数千并发连接，长连接（WebSocket/SSE）与高并发 IO 是它的主场（[03-并发与异步](../03-运行时与性能/03-并发与异步.md) 的 asyncio 模型）。FastAPI、Django（ASGI 模式）、Litestar 生长于此。
 - 两协议都是"框架与服务器之间的插座"：应用实现协议，服务器（gunicorn/uvicorn）实现进程管理——**应用代码从不直接监听端口**。
 
 ## 机制
@@ -29,7 +29,7 @@ Python Web 的一切框架差异都汇到两条协议与一个选型问题：**W
 
 | 形态 | 机制 | 适用 |
 |---|---|---|
-| ASGI 服务器直跑 | `uvicorn app:app --workers 4` | 简单服务、容器内单进程 |
+| ASGI 服务器直跑 | `uvicorn app:app --workers 4` | 简单服务、容器内直跑（不套 gunicorn） |
 | gunicorn + uvicorn workers | 进程管理（优雅重启/超时杀）+ 每 worker 事件循环 | 生产默认 |
 | 容器/编排 | Docker 镜像（[02-开发环境与工具链](../00-概览/02-开发环境与工具链.md) 的 Docker 档） | K8s/云平台 |
 | 平台托管 | 无服务器容器（Cloud Run 等） | 低运维 |
@@ -62,13 +62,13 @@ Python Web 的一切框架差异都汇到两条协议与一个选型问题：**W
 ```python
 """同一个极简 API 在两协议下的最小形态——插座而非框架的证明"""
 # WSGI（Flask 内核同构）
-def app(environ, start_response):
+def wsgi_app(environ, start_response):
     body = b'{"ok": true}'
     start_response("200 OK", [("Content-Type", "application/json")])
     return [body]
 
 # ASGI（FastAPI 内核同构）
-async def app(scope, receive, send):
+async def asgi_app(scope, receive, send):
     assert scope["type"] == "http"
     await send({"type": "http.response.start", "status": 200,
                 "headers": [(b"content-type", b"application/json")]})

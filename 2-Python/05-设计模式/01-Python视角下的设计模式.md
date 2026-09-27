@@ -10,8 +10,8 @@ GoF（1994）的 23 个模式写于 C++/Smalltalk 时代，回应的是 C++ 一�
 
 | 判决 | 含义 | 数量感 | 例 |
 |---|---|---|---|
-| 语言已内建 | 直接用语法，别手写结构 | 约 1/4 | Iterator、Observer（回调）、Decorator（@） |
-| 一行替代 | 核心机制（函数/协议）让样板消失 | 约 1/2 | Strategy=传函数、Command=可调用对象 |
+| 语言已内建 | 直接用语法，别手写结构 | 约 1/4 | Iterator、Decorator（@） |
+| 一行替代 | 核心机制（函数/协议）让样板消失 | 约 1/2 | Strategy=传函数、Command=可调用对象、Observer=回调注册 |
 | 仍需手写 | 结构复杂度是本质的，语言帮不上 | 少数 | Composite、责任链（中间件） |
 | 通常不需要 | 动态性使问题本身消失 | 少数 | Abstract Factory、Memento |
 

@@ -29,14 +29,14 @@ pytest -n auto                                # xdist 并行（测试相互独�
 import pytest
 
 def test_bad_config():
-    with pytest.raises(ConfigError, match="missing key"):   # 类型 + 消息正则（见 02-正则）
+    with pytest.raises(ConfigError, match="missing key"):   # 类型 + 消息正则（见 02-正则与文本处理）
         load_config({})
 
 def test_ratio():
     assert 0.1 + 0.2 == pytest.approx(0.3)     # 浮点永远 approx，别埋精确断言
 ```
 
-`pytest.raises` 的 `match=` 用 `re.search`——异常消息是接口的一部分（[08-错误与异常](../01-语言核心/08-错误与异常.md) 的自定义异常规范），只断类型不断消息会让重构悄悄破坏契约。
+`pytest.raises` 的 `match=` 用 `re.search`（正则语法见 [02-正则与文本处理](../02-IO与工程实践/02-正则与文本处理.md)）——异常消息是接口的一部分（[08-错误与异常](../01-语言核心/08-错误与异常.md) 的自定义异常规范），只断类型不断消息会让重构悄悄破坏契约。
 
 ### marker：测试的元数据
 

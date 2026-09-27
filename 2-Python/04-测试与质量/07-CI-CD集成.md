@@ -41,17 +41,19 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: astral-sh/setup-uv@v10
+        with:
+          python-version: ${{ matrix.python-version }}   # 矩阵变量在此接线——不接则两腿跑同一解释器
       - run: uv sync --frozen
       - run: uv run pytest -m "not slow" --cov=mylib --cov-branch
 ```
 
-要点：`uv sync --frozen` / `pip sync`（按锁精确安装）让 CI 与本地同构——"本地绿 CI 红"的第一嫌疑人就是环境漂移；矩阵覆盖 `requires-python` 承诺的**边界版本**（[04-打包与分发](../03-运行时与性能/04-打包与分发.md)），不是所有版本；缓存依赖（`setup-uv` 的 `enable-cache` / `actions/cache` 键含锁文件哈希）把分钟级安装压到秒级。
+要点：`uv sync --frozen` / `uv pip sync`（requirements 流则是 pip-tools 的 `pip-sync`——pip 本身没有 `sync` 子命令）按锁精确安装，让 CI 与本地同构——"本地绿 CI 红"的第一嫌疑人就是环境漂移；矩阵覆盖 `requires-python` 承诺的**边界版本**（[04-打包与分发](../03-运行时与性能/04-打包与分发.md)），不是所有版本；缓存依赖（`setup-uv` 的 `enable-cache` / `actions/cache` 键含锁文件哈希）把分钟级安装压到秒级。
 
 ### 分层跑测试
 
 - PR 门禁：lint + 类型 + 快速测试（`-m "not slow"`，[01-pytest基础](01-pytest基础.md) 的 marker 分层）——目标是分钟内给结论。
 - 主干/夜间：全量（含 slow、集成、[03-Mock与替身](03-Mock与替身.md) 的契约测试、容器真库——`services:` 起依赖服务容器）。
-- 覆盖率上报与 diff 覆盖门禁的落点见 [05-覆盖率与测试策略](05-覆盖率与测试策略.md)。
+- 覆盖率落点：测试步加 `--cov-report=xml` 产出 `coverage.xml` 上报覆盖率平台；diff 覆盖门禁用 `diff-cover coverage.xml --compare-branch=origin/main --fail-under=85`——只对 PR 改动的行设卡（"为什么 diff 优于总量门禁"的口径见 [05-覆盖率与测试策略](05-覆盖率与测试策略.md)）。
 
 ### 发布流水线：tag 驱动
 

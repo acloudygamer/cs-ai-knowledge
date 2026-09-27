@@ -23,9 +23,13 @@ class JobIn(BaseModel):
     name: str = Field(min_length=1, max_length=64)
     priority: int = Field(default=5, ge=1, le=9)      # 约束即校验：越界自动 422
 
+class JobOut(BaseModel):
+    name: str
+    priority: int
+
 @app.post("/jobs", response_model=JobOut, status_code=201)
 async def create_job(job: JobIn) -> JobOut:
-    return await store.add(job)                        # 入口已类型化，处理函数拿到的直接是可信对象
+    return await store.add(job)                        # store=数据层句柄（片段，略）；入口已类型化，处理函数拿到的直接是可信对象
 ```
 
 `response_model` 不只是文档：返回值过模型过滤（多余字段/敏感字段剔除）——**出参白名单**的声明式写法。
@@ -56,7 +60,7 @@ async def me(user: User = Depends(current_user)) -> User:
 
 - 生命期：`@asynccontextmanager async def lifespan(app)` 管连接池/缓存的全局 setup/teardown（[09-上下文管理器](../01-语言核心/09-上下文管理器.md) 的 async 形态）。
 - 后台任务：`BackgroundTasks`（轻量、同 worker）；真队列（重试/持久）用 Celery/ARQ/dramatiq——判据：任务丢不丢得起。
-- 测试：`TestClient`（基于 httpx）同进程内打请求，配 `dependency_overrides` 与 `tmp_path`/事务回滚隔离（[02-Fixture](../04-测试与质量/02-Fixture.md)）。
+- 测试：`TestClient`（starlette 提供，基于 httpx；新版 starlette 正迁往 httpx2）同进程内打请求，配 `dependency_overrides` 与 `tmp_path`/事务回滚隔离（[02-Fixture](../04-测试与质量/02-Fixture.md)）。
 
 ## 连接
 
