@@ -5,7 +5,7 @@
 | 篇目 | 一句话 |
 |---|---|
 | [01-文件操作](01-文件操作.md) | fstream 与 std::filesystem（C++17）：路径、遍历、原子写 |
-| [02-网络编程](02-网络编程.md) | 标准库无网络：Asio/Boost.Beast、cpp-httplib 的选型与形态 |
+| [02-网络编程](02-网络编程.md) | 标准库无网络：Asio、cpp-httplib、cpr/libcurl 的选型与形态 |
 | [03-序列化与JSON](03-序列化与JSON.md) | JSON（nlohmann/json）与二进制序列化（protobuf/flatbuffers）的取舍轴 |
 | [04-正则表达式](04-正则表达式.md) | std::regex 的语法族与性能现实；何时换 RE2 |
-| [05-数据库操作](05-数据库操作.md) | 原生驱动（sqlite3/libpq）与封装层（soci/sqlite_modern_cpp）的分工 |
+| [05-数据库操作](05-数据库操作.md) | 原生 C API（sqlite3）与封装层（sqlite_modern_cpp/soci/sqlpp11）的分工 |

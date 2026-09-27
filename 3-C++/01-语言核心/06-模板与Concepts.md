@@ -51,7 +51,7 @@ type traits（`<type_traits>`，C++11）是编译期的类型查询与变换函�
 
 Concept 是对模板实参的编译期谓词。`requires` 表达式直接试探一组操作的合法性——`requires(T a, T b) { a + b; }` 意为"T 支持加法"；`concept` 定义把谓词命名，模板以 `template<Integral T>` 或尾部 `requires` 子句施加约束。
 
-约束之间有**偏序**：concept A 的定义若在逻辑上蕴含 concept B（A = B 再加条件），A 就比 B **更具体**（subsumes）；两个受约束的重载同时满足时，更具体者胜出（见示例 `kind()`）。偏序只发生在 concept 层级——把同样条件裸写成两个 `requires` 表达式的重载不参与偏序，会得到歧义错误。
+约束之间有**偏序**（subsumption）：先把约束归约为**原子约束**（不可再分的单个谓词）的合取/析取，再逐原子比对——只有同形（同一表达式、同一模板实参映射）的原子约束才算同一个；A 的原子集合蕴含 B 的，A 就比 B **更具体**，两个受约束的重载同时满足时更具体者胜出（见示例 `kind()`）。偏序与是否写成具名 concept 无关：两个裸 `requires` 子句只要由同形原子约束构成照样偏序（GCC 14.2 实测 `requires std::integral<T>` 对 `requires (std::integral<T> && sizeof(T) >= 4)` 正常分派）；真正歧义的是**逻辑等价但写法不同**的约束——`sizeof(T) >= 4` 与 `sizeof(T) > 3` 是两个不同形的原子约束，互不蕴含，重载报歧义。
 
 与 SFINAE 是**替代关系而非叠加**：SFINAE 把约束藏在替换失败的副作用里，失败时错误从实例化深处连带着模板栈炸出；concepts 在候选筛选阶段就报"约束不满足"，一行指认违反的 concept——错误信息质量是它最大的实际收益。type traits 并未退场：标准 concept（`std::integral` 等）底层仍由 type traits 组合而成。
 
