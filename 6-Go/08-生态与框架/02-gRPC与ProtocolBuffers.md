@@ -1,189 +1,197 @@
-# gRPC 专题
+# gRPC 与 Protocol Buffers
 
-## 定义
+> 前置：[01-Web框架](./01-Web框架.md) · 后续：[03-命令行工具](./03-命令行工具.md)
 
-gRPC 是基于 HTTP/2 和 Protocol Buffers 的高性能 RPC 框架，其核心差异于 REST 是：**方法命名即服务契约**（`.proto` 文件定义）、**传输层二进制**（而非 JSON 文本）、**流是语言级一等公民**。
+> **版本基准**：Go 1.27（stable = latest）。本篇示例实测环境：go1.27.1 windows/amd64，`google.golang.org/grpc v1.84.0`、`google.golang.org/protobuf v1.36.12`、`buf`。
 
-## Protocol Buffers 编码机制
+## 本质
 
-### 定义
-Protobuf 编码是**字段编号 + 类型长度前缀**的二进制格式。字段编号（1-N）替代字段名，实现比 JSON 小 3-10 倍的体积；类型信息由 wire type 隐含，无需自描述。
+**Protocol Buffers 是"用 schema 定义数据结构，编译生成序列化代码"的机制；gRPC 是"用 protobuf 定义服务，编译生成客户端与服务端桩代码"的 RPC 框架。**
 
-### 数学模型
+两者的关系是**递进**的：
 
-**Varint 编码体积**：Varint 使用 7 bits 表示数据，1 bit 表示是否还有更多字节：
-- 对于整数 $V$ ，编码字节数 $N_{bytes} = \lceil \frac{\log_2(V+1)}{7} \rceil$ ，编码字节数 $N_{bytes} = \lceil \frac{\log_2(V+1)}{7} \rceil$ 
-- 小值（0-127）只需 1 字节；int32/int64 在 $[0, 2^{31}-1]$ 范围内通常 1-5 字节 范围内通常 1-5 字节
+| | 定义什么 | 生成什么 |
+|---|---|---|
+| **Protobuf** | `message`（数据结构） | 结构体 + 序列化/反序列化 |
+| **gRPC** | `service` + `rpc`（接口） | 客户端桩 + 服务端接口 + 传输层 |
 
-**消息编码体积**：对于字符串字段 $V$ ： ：
- $L_{encoded} = 1 + \lceil \log_{128}(|V|+1) \rceil + 1 + |V|$ 
-其中第一项是 tag（字段编号 + wire type），第二项是 Varint 长度前缀，第三项是字符串内容长度，第四项是实际内容。
+**约束的由来**：与 JSON 相比，protobuf 用 **schema 换体积与速度**——编码里不带字段名（只有字段号），因此更小更快，但**没有 schema 就读不懂**。
 
-**压缩比推导**：设 JSON 平均字段名长度 $L_{name}$ ，字符串内容长度 $|V|$ ： ，字符串内容长度 $|V|$ ： ：
- $R_{compression} = \frac{L_{JSON}}{L_{Protobuf}} = \frac{L_{name} + |V| + 3}{1 + \lceil \log_{128}(|V|+1) \rceil + 1 + |V|}$ 
+**边界**：protobuf 的"向前兼容"有严格规则——字段号一旦发布**不能改用途**，删除的字段号要保留（`reserved`）。违反会让新旧版本之间的数据静默错位。
 
-实际测量：典型场景 $R \approx 3\!-\!10\times$ 。 。
+## 机制
 
-**归约终点**：Protobuf 的压缩效率来源于**消除冗余的字段名字符串**，用固定长度的字段编号替代，可归结为信息论中的"字典编码"思想。
+### schema 与代码生成
 
-### 数据流（消息编码）
+```protobuf
+syntax = "proto3";
 
-<pre>
-User{name:"Tom", age:30} 编码分解：
+package user.v1;
 
-字段1 (name, string):
-  tag=1, wire_type=2 → 0x0A (0000 1010)
-  length = Varint(3) → 0x03
-  content = "Tom"    → 54 6f 6d
+option go_package = "grpc1/gen/userv1;userv1";
 
-字段2 (age, int32):
-  tag=2, wire_type=0 → 0x10 (0001 0000)
-  value = Varint(30) → 0x1E
+message User {
+  int64  id    = 1;
+  string name  = 2;
+  string email = 3;
+  repeated string tags = 4;
+  optional string nickname = 5;
+}
 
-完整字节流：0A 03 54 6f 6d 10 1E
-
-对比：
-  JSON: {"name":"Tom","age":30} = 25 bytes
-  Protobuf: 8 bytes (压缩比 ~3.1x)
-</pre>
-
-**字段 tag 解构**：
-- `field_number << 3 | wire_type` 构成 tag
-- wire_type: 0=Varint, 2=Length-delimited (string/bytes), 5=32-bit
-
-### 机制
-
-**为什么 wire type 内嵌于 tag 而非独立字段**：tag 的低 3 位存储 wire type，与 field_number 合并为单一字节，避免了独立的类型字节开销。这在字段数多时显著节省空间。
-
-**Protocol Buffers 的局限性**：无自描述意味着接收端必须先知道 `.proto` 定义才能解析。JSON 的自我描述性在调试和跨语言动态场景中仍是优势。
-
-## HTTP/2 多路复用
-
-### 定义
-HTTP/2 的多路复用允许在**单一 TCP 连接**上并发多个请求/响应。gRPC 利用此特性，每个 RPC 调用复用同一连接，无需像 HTTP/1.1 那样为每个请求新建连接（队首阻塞问题）。
-
-### 数学模型
-
-**队首阻塞（Head-of-Line Blocking）量化**：
-- HTTP/1.1：请求 $i$ 的响应被请求 $i-1$ 阻塞，假设单请求处理时间 $T_{req}$ ， $N$ 个请求的最小总时间  $T_{total} \approx N \times T_{req}$（串行） 的响应被请求 $i-1$ 阻塞，假设单请求处理时间 $T_{req}$ ， $N$ 个请求的最小总时间  $T_{total} \approx N \times T_{req}$（串行） 阻塞，假设单请求处理时间 $T_{req}$ ， $N$ 个请求的最小总时间  $T_{total} \approx N \times T_{req}$（串行） ， $N$ 个请求的最小总时间  $T_{total} \approx N \times T_{req}$（串行） 个请求的最小总时间  $T_{total} \approx N \times T_{req}$ （串行）（串行）
-- HTTP/2： $N$ 个请求时间重叠，  $T_{total} \approx \max(T_{req,1}, T_{req,2}, \dots, T_{req,N})$（并行） 个请求时间重叠，  $T_{total} \approx \max(T_{req,1}, T_{req,2}, \dots, T_{req,N})$ （并行）（并行）
-
-**帧复用开销**：HTTP/2 将消息拆分为多个 DATA 帧交织发送，每帧含 stream ID 标识归属。切换成本仅为解析 9 字节帧头的 O(1) 操作。
-
-### 数据流
-
-<pre>
-TCP 连接（单一连接复用）
-
-Stream 1 (GETList RPC)          Stream 2 (GetUser RPC)
-├─ HEADERS frame (stream=1)     ├─ HEADERS frame (stream=3)
-├─ DATA frame (stream=1, part1) ├─ DATA frame (stream=3)
-├─ DATA frame (stream=1, part2) ├─ DATA frame (stream=3, last)
-├─ DATA frame (stream=1, last) └─ HEADERS frame (stream=3, last)
-└─ HEADERS frame (stream=1, last)
-
-物理层：所有帧写入同一 TCP 字节流
-传输层：HTTP/2 根据 stream ID 重组
-应用层：gRPC 解析为独立 RPC 调用
-</pre>
-
-### 机制
-
-**HTTP/2 为什么能避免队首阻塞**：HTTP/1.1 的队首阻塞源于请求-响应必须成对且按序完成。HTTP/2 引入 stream 概念，每对请求/响应拥有独立 stream ID，帧可以交织传输，接收端根据 stream ID 重组。这本质上是**时分复用**在应用层的实现。
-
-**队首阻塞的残余**：HTTP/2 在 TCP 层仍受队首阻塞影响——TCP 保证有序交付，一个丢包会阻塞所有 stream。HTTP/3 (QUIC) 通过 UDP + stream 级别重传解决此问题。
-
-了解了 gRPC 的传输层基础后，可以根据以下决策树选择通信协议：
-
-### gRPC vs REST 决策树
-
-```
-客户端是浏览器？
-├─ 是 → REST（gRPC-Web 支持有限）
-└─ 否 → 服务间通信？
-       ├─ 否 → REST（调试简单、工具丰富）
-       └─ 是 → 需要流式？
-              ├─ 是 → gRPC（原生支持双向流）
-              └─ 否 → 性能敏感？
-                     ├─ 是 → gRPC（二进制、HTTP/2）
-                     └─ 否 → REST（生态更广）
+service UserService {
+  rpc GetUser(GetUserRequest) returns (GetUserResponse);
+  rpc ListUsers(GetUserRequest) returns (stream GetUserResponse);
+}
 ```
 
-## 四种 RPC 模式
+**每个字段的编号（`= 1`、`= 2`）是编码的一部分**——它取代了 JSON 里的字段名。这是体积优势的来源。
 
-### 定义
-gRPC 在 `.proto` 中定义了四种 RPC 模式：普通 RPC（1:1）、服务端流（1:N）、客户端流（N:1）、双向流（N:N）。流不是 HTTP 长连接，而是将消息切分为多个 frame 在同一 HTTP/2 流上发送。
+**生成代码用 `buf`**（protoc 的现代替代，纯 Go 实现）：
 
-### 数据流（双向流）
-
-<pre>
-Client                              Server
-   │                                   │
-   │ ── HEADERS (stream=5, bidirection) │
-   │                                   │
-   ├─ DATA frame (stream=5, msg_1) ──→ │
-   │                                   │ ─→ 处理 msg_1
-   │ ←── DATA frame (stream=5, resp_1) ┤
-   │                                   │ ─→ 处理 msg_2
-   ├─ DATA frame (stream=5, msg_2) ──→ │
-   │                                   │
-   │ ←── DATA frame (stream=5, resp_2) ┤
-   │                                   │
-   │ ── HEADERS (stream=5, last) ──────→ │
-   │ ←── HEADERS (stream=5, last) ┘    │
-</pre>
-
-**关键约束**：双向流的语义是"异步消息交换"而非"同步调用"。客户端和服务端可以各自按任意顺序发送消息，stream ID 确保帧的归属和重组。
-
-### 机制
-
-**流式 vs 普通 RPC 的本质差异**：普通 RPC 是单个请求-响应对，HTTP/2 的一帧即可承载。流式 RPC 需要在单一 TCP 连接上长时间维护 stream 上下文，gRPC 通过 stream ID + 消息边界标记实现逻辑上的持久连接，而 HTTP/2 底层可能随时关闭底层 TCP（流控或超时）。
-
-**流式 RPC 的背压（Backpressure）**：当接收方处理速度低于发送方时：
-- 有缓冲 channel：发送方在缓冲满时阻塞
-- 无缓冲 channel：发送方在接收方就绪前阻塞
-这避免了接收方内存被无限撑大。
-
-## 错误处理
-
-### 定义
-gRPC 错误通过状态码（`codes.NotFound` 等）传播，而非 HTTP 状态码。状态码 + 详情消息 + 结构化错误信息（`errdetails`）构成完整的错误语义。
-
-### 数据流
-
-<pre>
-服务端生成错误：
-  status.Errorf(codes.NotFound, "user %s not found", id)
-         │
-         ├──→ HTTP/2 trailers-only 响应
-         │     (HEADERS frame with :status: 200, grpc-status: 5)
-         │
-         └──→ 客户端接收
-               grpc-status: 5 (NotFound)
-               grpc-message: "user xxx not found"
-               (可选) error details (BadRequest, RetryInfo, etc.)
-</pre>
-
-### 机制
-
-**为什么 gRPC 用应用层状态码而非 HTTP 状态码**：HTTP 状态码设计用于 HTTP 语义（404=资源不存在），但 RPC 失败原因远比这丰富（如认证失败、限流、超时、权限不足）。gRPC 定义了 17 个应用层状态码，解耦于传输层语义。
-
-**error details 的作用**：通过 Google RPC Error Details 提供结构化错误信息（如 `RetryInfo` 包含重试时间、`BadRequest` 包含字段验证错误），使客户端可程序化处理错误而非依赖字符串匹配。
-
-### 参考存根
-
-```go
-import "google.golang.org/grpc/codes"
-import "google.golang.org/grpc/status"
-
-return nil, status.Errorf(codes.NotFound, "user %s not found", id)
-
-// 附加结构化错误信息
-st, _ := status.New(codes.InvalidArgument, "validation failed")
-.WithDetails(&errdetails.BadRequest{
-    FieldViolations: []*errdetails.BadRequest_FieldViolation{
-        {Field: "email", Description: "invalid format"},
-    },
-})
-return nil, st.Err()
+```yaml
+# buf.gen.yaml
+version: v2
+plugins:
+  - local: protoc-gen-go
+    out: gen
+    opt: paths=source_relative
+  - local: protoc-gen-go-grpc
+    out: gen
+    opt: paths=source_relative
 ```
+
+```console
+$ buf generate
+$ ls gen/
+user.pb.go  user_grpc.pb.go
+```
+
+**约束**：**生成的文件必须提交到版本库**（或由 CI 生成后校验一致性）。它们不提交会让"clone 下来直接构建"失败；它们被手改会让下次生成覆盖掉改动。
+
+### 体积：protobuf vs JSON 实测
+
+```console
+$ go run ./cmd
+protobuf 二进制: 38 字节 [8 42 18 6 229 188 160 228 184 137 26 13 122 64 101 120 97 109 112 108 101 46 99 111 109 34 3 118 105 112 34 6 97 99 116 105 118 101]
+protojson:       75 字节 {"id":"42","name":"张三","email":"z@example.com","tags":["vip","active"]}
+encoding/json:   73 字节 {"email":"z@example.com","id":42,"name":"张三","tags":["vip","active"]}
+```
+
+同一个 `User{id:42, name:"张三", email:"z@example.com", tags:["vip","active"]}`：
+
+| 编码 | 字节数 |
+|---|---|
+| **protobuf 二进制** | **38** |
+| protojson | 75 |
+| `encoding/json` | 73 |
+
+**protobuf 只有 JSON 的一半**（38 vs 73）。差距来自三处：**没有字段名**（只有编号）、**没有引号与括号**、**变长整数编码**（`42` 只占 1 字节而不是 `"42"` 的 2 字节）。
+
+**字段越多、名字越长，差距越大**——上面只有 4 个字段且名字很短。
+
+**约束**：protobuf 的二进制里**没有自描述信息**——`[8 42 18 6 ...]` 里看不出哪个字节是哪个字段，必须有 `.proto` 才能解码。这是"体积换可读性"的直接代价。
+
+**边界**：**小消息时 protobuf 可能不占优势**——单个 `int32` 字段的 JSON 是 `{"id":42}`（9 字节），protobuf 是 `[8 42]`（2 字节），但加上 HTTP 头、TLS 握手后差别可忽略。**protobuf 的收益在高频、大消息的场景**（微服务间调用、大数据量传输）。
+
+### protojson：`int64` 为什么变成字符串
+
+```console
+protojson:       75 字节 {"id":"42","name":"张三",...}
+encoding/json:   73 字节 {"email":"z@example.com","id":42,...}
+```
+
+**protojson 把 `int64` 序列化成字符串 `"42"`**——这是**有意的设计**，不是 bug。
+
+**原因**：JSON 的数字是 IEEE 754 双精度（[01-语言核心/02](../01-语言核心/02-类型与变量.md)），**精确表示的上限是 $2^{53}-1$**。而 protobuf 的 `int64` 支持到 $2^{63}-1$。如果直接输出数字，JavaScript 客户端会丢精度（[02-标准库/05](../02-标准库/05-序列化与编码.md) 讲过同一个问题）。
+
+**约束**：因此 **protojson 与 `encoding/json` 的输出不兼容**——`{"id":42}` 与 `{"id":"42"}` 是两种格式。跨系统对接时这是必须处理的差异。
+
+### gRPC 的四种通信模式
+
+```protobuf
+rpc GetUser(Req) returns (Resp);                    // 一元
+rpc ListUsers(Req) returns (stream Resp);           // 服务端流
+rpc Upload(stream Req) returns (Resp);              // 客户端流
+rpc Chat(stream Req) returns (stream Resp);         // 双向流
+```
+
+实测（一元 + 服务端流）：
+
+```console
+$ go run ./client
+GetUser(42) → 用户42, err=<nil>
+GetUser(999) → code=NotFound(5) msg="用户不存在"
+GetUser(-1)  → code=InvalidArgument msg="id 必须为正数，收到 -1"
+ListUsers(3) → 用户1 用户2 用户3
+```
+
+**gRPC 的错误是状态码 + 消息**，不是 HTTP 状态码：
+
+| gRPC 状态码 | 含义 | 对应 HTTP |
+|---|---|---|
+| `OK` | 成功 | 200 |
+| `InvalidArgument` | 参数错 | 400 |
+| `NotFound` | 不存在 | 404 |
+| `PermissionDenied` | 无权限 | 403 |
+| `Unauthenticated` | 未认证 | 401 |
+| `Unavailable` | 服务不可用 | 503 |
+| `DeadlineExceeded` | 超时 | 504 |
+
+**约束**：**gRPC 的错误处理必须用 `status.Error(codes.X, msg)`**——直接 `errors.New` 会被包装成 `Unknown`，客户端无法按类别处理。
+
+**边界**：gRPC 的错误码是**有限的 17 个**，业务错误要放在 `details` 里（`status.WithDetails`，用 protobuf message 承载）。
+
+### gRPC 与 HTTP 的关系
+
+**gRPC 建立在 HTTP/2 之上**——这带来三样东西：
+
+| 特性 | 来源 |
+|---|---|
+| 多路复用（一个连接并发多个请求） | HTTP/2 |
+| 流式（四种通信模式） | HTTP/2 的 stream |
+| 头部压缩（HPACK） | HTTP/2 |
+
+**约束**：**HTTP/2 需要 TLS 或明文（h2c）**。生产环境的 gRPC 应当用 TLS——gRPC 的"明文"模式（`insecure.NewCredentials()`）只适合内网或测试。
+
+**边界**：**gRPC 对浏览器不友好**——浏览器不能直接发 gRPC 请求（无法控制 HTTP/2 帧）。要用 `grpc-web` 代理，或者同时暴露一个 REST/JSON 网关。
+
+### 与 REST 的取舍
+
+| | gRPC | REST/JSON |
+|---|---|---|
+| 契约 | **`.proto` 强制** | OpenAPI（可选） |
+| 代码生成 | **内置** | 需要工具 |
+| 体积 | **小** | 大 |
+| 可读性 | 差（二进制） | **好** |
+| 浏览器支持 | **需要代理** | 原生 |
+| 流式 | **四种模式** | 有限（SSE/WebSocket） |
+| 调试 | 需要专用工具 | **curl 即可** |
+
+**判据**：
+
+| 场景 | 选择 |
+|---|---|
+| **服务间调用**（内部微服务） | **gRPC** |
+| **对外 API**（给浏览器/第三方） | **REST/JSON** |
+| 需要流式或低延迟 | gRPC |
+| 需要人肉调试或简单对接 | REST |
+
+**约束**：**同时暴露两套**是常见做法——gRPC 给内部服务，通过 `grpc-gateway` 自动生成 REST 端点给外部。代价是多一层维护。
+
+## 连接
+
+**上游**：[02-标准库/05](../02-标准库/05-序列化与编码.md) 的 `encoding/json` 是 protobuf 的对照物；[05-IO与外部世界/02](../05-IO与外部世界/02-网络编程.md) 的 TCP 与 [05-IO与外部世界/03](../05-IO与外部世界/03-HTTP服务与客户端.md) 的 HTTP 是 gRPC 的传输层基础。
+
+**下游**：[05-依赖注入](./05-依赖注入.md) 负责装配 gRPC 客户端；[06-认证授权](./06-认证授权.md) 的拦截器接在 gRPC 的 `UnaryServerInterceptor` 上（与 HTTP 中间件同构）。
+
+**与其它语言对照**：
+
+| | IDL | 代码生成 | 传输 |
+|---|---|---|---|
+| Java | protobuf / Thrift | 有 | gRPC / Thrift |
+| Python | protobuf | 有 | gRPC |
+| **Go** | **protobuf** | **有（buf/protoc）** | **gRPC** |
+
+**protobuf 与 gRPC 都是 Google 的产物**，Go 是一等公民——`protoc-gen-go` 与 `protoc-gen-go-grpc` 都是官方维护，生成代码的质量与性能都是最好的之一。
+
+**Go 的独特优势在 `buf`**：它是**纯 Go 实现**的 protobuf 工具链（[06-工程与工具链/05](../06-工程与工具链/05-构建交叉编译与发布.md) 的静态单二进制），替代了 `protoc`（C++ 实现，需要单独安装）。这让 Go 项目的 protobuf 工具链**可以用 `tools.go` 管理版本**（[06-工程与工具链/05](../06-工程与工具链/05-构建交叉编译与发布.md)），而不是靠开发者本地装对版本的 `protoc`。
