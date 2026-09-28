@@ -4,7 +4,7 @@
 
 > **版本基准**：Java 21 stable / Java 25 latest（均为 LTS）。本篇示例均为**骨架，未实测**（Jackson/Gson 为第三方库，本机无依赖环境）。
 
-先钉死一个事实：**JDK 没有内置 JSON API**。`java.base` 里没有 JSON 包；JEP 198（Light-Weight JSON API）曾列入计划后被搁置撤回。Jakarta EE 阵营有规范级 API——JSON-P（`jakarta.json`，流式/树模型）与 JSON-B（`jakarta.json.bind`，对象绑定）——但二者只定义接口，仍需引入实现（Yasson 等）。事实标准是 **Jackson**（Spring 默认），其次是 **Gson**。
+先钉死一个事实：**JDK 没有内置 JSON API**。`java.base` 里没有 JSON 包；JEP 198（Light-Weight JSON API）曾列入计划后被搁置撤回，其位置由 JEP 540（Simple JSON API，Incubator）接续——JDK 内置 JSON 仍在路上，但截至 Java 25 尚未落地。Jakarta EE 阵营有规范级 API——JSON-P（`jakarta.json`，流式/树模型）与 JSON-B（`jakarta.json.bind`，对象绑定）——但二者只定义接口，仍需引入实现（Yasson 等）。事实标准是 **Jackson**（Spring 默认），其次是 **Gson**。
 
 ## 本质
 

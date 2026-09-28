@@ -2,7 +2,7 @@
 
 > 前置：[测试理论](./01-测试理论.md) · 后续：[Mockito 与 Test Double](./03-Mockito与TestDouble.md)
 
-> **版本基准**：本篇以 Jupiter 编程模型为准，示例实测于 junit-platform-console-standalone 6.1.3 + Temurin JDK 25.0.4.1。版本脉络：JUnit 5 末代为 5.13.4；JUnit 6（2025-09 GA）统一了 Platform/Jupiter/Vintage 的版本号、基线升到 Java 17、Vintage 引擎正式弃用——Jupiter 的编程模型不变，本篇全部内容对两代版本同效。
+> **版本基准**：本篇以 Jupiter 编程模型为准，示例实测于 junit-platform-console-standalone 6.1.3 + Temurin JDK 25.0.4.1。版本脉络：JUnit 6（2025-09 GA）统一了 Platform/Jupiter/Vintage 的版本号、基线升到 Java 17、Vintage 引擎正式弃用；JUnit 5 并未随 6.0 定格，仍以 5.14.x 维护线更新（现行 5.14.4，2026-04）。Jupiter 的编程模型不变，本篇全部内容对两代版本同效。
 
 JUnit 5 是 Java 生态的第三代测试框架，结构上不是一个框架而是三层：**JUnit Platform**（JVM 上的测试启动基础设施：发现、执行、报告）、**JUnit Jupiter**（新一代编程模型与测试引擎）、**JUnit Vintage**（跑 JUnit 3/4 旧测试的兼容引擎）。分层的收益在实测输出里直接可见——Platform 把不同引擎的测试汇成同一棵树：
 
@@ -45,7 +45,7 @@ JUnit 5 默认**每个测试方法新建一个测试类实例**（`PER_METHOD`�
 
 ## 参数化测试：一份逻辑 × N 组数据
 
-`@ParameterizedTest` 把"同一逻辑、不同数据"从 N 个复制粘贴的测试方法压缩为一个方法加一个参数源。**每个参数组合是一次独立的测试实例**：有自己的显示名、独立的通过/失败记录——执行次数 = 参数组合数，多源组合时按笛卡尔积增长，参数源配大了执行数会失控，这是真实的成本约束。
+`@ParameterizedTest` 把"同一逻辑、不同数据"从 N 个复制粘贴的测试方法压缩为一个方法加一个参数源。**每个参数组合是一次独立的测试实例**：有自己的显示名、独立的通过/失败记录——执行次数 = 参数组合数，参数源配大了执行数会失控，这是真实的成本约束。注意原生 `@ParameterizedTest` 挂多个参数源注解时取的是并集，不是笛卡尔积；要按维度做笛卡尔积展开，得用 JUnit Pioneer 的 `@CartesianTest`。
 
 ```java
 // 实测通过（console-standalone 6.1.3，JDK 25）
@@ -71,15 +71,15 @@ class PalindromeTest {
 }
 ```
 
-实测输出（每个参数组合一行，`name` 占位符 `{index}`/`{0}` 展开为序号与参数值）：
+实测输出（每个参数组合一行，`name` 占位符 `{index}`/`{0}` 展开为序号与参数值；控制台对字符串参数自动加引号，与 name 模式里手写的引号叠印出双引号）：
 
 ```text
 ├─ valueSource(String) ✔
-│  ├─ [1] "level" 是回文 ✔
-│  ├─ [2] "madam" 是回文 ✔
-│  └─ [3] "noon" 是回文 ✔
+│  ├─ [1] ""level"" 是回文 ✔
+│  ├─ [2] ""madam"" 是回文 ✔
+│  └─ [3] ""noon"" 是回文 ✔
 ├─ csvSource(String, boolean) ✔
-│  ├─ [1] level -> true ✔
+│  ├─ [1] "level" -> "true" ✔
 │  ...
 └─ methodSource(String, boolean) ✔
 ```

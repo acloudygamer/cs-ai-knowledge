@@ -32,7 +32,7 @@ Hello.java ──javac──> Hello.class ──类加载──> JVM ──解�
   文本                 字节码         验证/链接      执行引擎
 ```
 
-实测（Temurin 25.0.4.1）：4 行源码编译出 414 字节的 `Hello.class`，`javap -c` 反汇编可见 `main` 的字节码只有 4 条指令：
+实测（Temurin 25.0.4.1）：传统形式（`public class Hello` 包裹 `public static void main`）编译出 414 字节的 `Hello.class`——简化 main 形式的产物是 389 字节，两种写法的口径对照见 [01-安装与第一个程序](../01-语言核心/01-安装与第一个程序.md)。`javap -c` 反汇编可见 `main` 的字节码只有 4 条指令：
 
 ```text
 0: getstatic     #7   // 取 System.out（静态字段）
@@ -53,27 +53,19 @@ JVM（HotSpot）的执行引擎是三层流水线：解释器立即开始执行�
 
 ### 版本节奏
 
-2017 年起 Java 改为**每半年一个特性版本**（3 月、9 月），其中每两年一个 **LTS**（Long-Term Support，长期支持版，厂商提供多年更新）：
+2017 年起 Java 改为**每半年一个特性版本**（3 月、9 月）；**LTS**（Long-Term Support，长期支持版，厂商提供多年更新）最初三年一版（8→11→17），2021 年起改为两年一版（17→21→25）。本库的两个口径就是其中最近两个 LTS——Java 21 stable、Java 25 latest；LTS 节奏的来历与逐版本特性清单归 [10-版本演进](../10-版本演进/) 管，本篇不复述。
 
-| LTS | 发布 | 标志性特性 |
-|---|---|---|
-| Java 8 | 2014-03 | Lambda、Stream API（函数式入场） |
-| Java 11 | 2018-09 | HttpClient、`var`（局部变量类型推断） |
-| Java 17 | 2021-09 | 密封类、record 转正 |
-| **Java 21** | 2023-09 | 虚拟线程、模式匹配转正——本库 stable 口径 |
-| **Java 25** | 2025-09 | 简化 main、模块导入、Scoped Values 转正——本库 latest 口径 |
-
-非 LTS 版本（22、23、24……）是通往下一个 LTS 的试验田：特性以**预览**（preview）身份入场，收集反馈后在后续版本转正或修改。逐版本的特性清单见 [10-版本演进](../10-版本演进/)。
+非 LTS 版本（22、23、24……）是通往下一个 LTS 的试验田：特性以**预览**（preview）身份入场，收集反馈后在后续版本转正或修改。
 
 ## 版图与边界
 
-**版图**。Java SE 是核心（本库 01~07 目录覆盖）；其上是 Jakarta EE（企业级规范，Servlet/JPA 等，2008 年后由 Eclipse 基金会接管）与 Spring 生态（事实标准的企业开发栈，见 [08-生态与框架](../08-生态与框架/)）；Android 用 Java 语言但跑在 ART（Android Runtime）上，类库与运行时都不同，不算 JVM 阵营。Kotlin/Scala 等 JVM 语言共享字节码与类库生态。
+**版图**。Java SE 是核心（本库 01~07 目录覆盖）；其上是 Jakarta EE（企业级规范，Servlet/JPA 等；2017 年 9 月 Oracle 宣布将 Java EE 移交 Eclipse 基金会，遂改现名）与 Spring 生态（事实标准的企业开发栈，见 [08-生态与框架](../08-生态与框架/)）；Android 用 Java 语言但跑在 ART（Android Runtime）上，类库与运行时都不同，不算 JVM 阵营。Kotlin/Scala 等 JVM 语言共享字节码与类库生态。
 
 **边界**（Java 不做什么）：
 
 - 无裸指针、无手动内存管理——写不了内核驱动，也免掉了悬垂引用这一整类 bug。
 - 无运算符重载（`+` 的字符串拼接是唯一例外）、无类的多继承（接口可多重实现）——刻意收窄的表达力，换代码的可读性下限。
-- 启动时间与内存常驻高于原生编译语言——微服务冷启动场景的短板，GraalVM 与 CRaC 在补。
+- 启动时间与内存常驻高于原生编译语言——微服务冷启动场景的短板，GraalVM 与 CRaC（Coordinated Restore at Checkpoint，检查点协调恢复：把预热后的 JVM 状态快照存档、启动时直接恢复）在补。
 
 ---
 

@@ -28,7 +28,7 @@ HTTP 请求
   → DispatcherServlet → Controller
 ```
 
-链条的关键性质：**任一过滤器拒绝，后续不再执行**——认证失败的请求到不了业务代码。配置即声明规则（Boot 3 起只有 Lambda DSL 一种写法，骨架未实测）：
+链条的关键性质：**任一过滤器拒绝，后续不再执行**——认证失败的请求到不了业务代码。配置即声明规则（Boot 4 / Security 7 起 Lambda DSL 为唯一写法，Boot 3 时代的旧链式写法已废弃；骨架未实测）：
 
 ```java
 @Bean

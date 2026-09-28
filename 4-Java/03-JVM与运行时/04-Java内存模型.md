@@ -40,7 +40,7 @@ JMM 的核心关系是 **happens-before**（HB）：若操作 A happens-before �
 4. **线程启动与终止**：`thread.start()` 之前的操作 happens-before 该线程内的一切；线程内的一切 happens-before 其他线程从它的 `join()` 返回。
 5. **传递性**：A→B 且 B→C 则 A→C——HB 链靠这条拼接。
 
-上面两个失败例套用此框架立即可判：`while(!stop)` 里写 `stop=true` 与读 `stop` 之间没有任何 HB 边（无锁、无 volatile），可见性无保证；`plain++` 的三步之间对别的线程同样无 HB，读到中间态合法。修复方式就是把对应规则接上：标志位加 `volatile`（规则 3），计数用锁（规则 2）或 `AtomicInteger`（CAS 的 HB 由 `java.util.concurrent.atomic` 包文档单独承诺）。
+上面两个失败例套用此框架立即可判：`while(!stop)` 里写 `stop=true` 与读 `stop` 之间没有任何 HB 边（无锁、无 volatile），可见性无保证；`plain++` 的三步之间对别的线程同样无 HB，读到中间态合法。修复方式就是把对应规则接上：标志位加 `volatile`（规则 3），计数用锁（规则 2）或 `AtomicInteger`（底层是 CAS——Compare-And-Swap，CPU 原子比较-交换指令；其 HB 保证由 `java.util.concurrent.atomic` 包文档单独承诺）。
 
 ## volatile 的语义边界
 

@@ -25,7 +25,7 @@ Test Double（测试替身）是把被测单元的真实依赖换成可控实现
 
 ## Mockito 的机制：字节码代理 + 调用记录
 
-`mock(ExchangeRate.class)` 的物理实体是 ByteBuddy 在运行时生成的子类实例（接口则是动态代理实现）：每个方法被改写为先查预设表（stubbing 记录），命中则返回预设值，未命中返回该类型的"安全的空"——对象返回 `null`、数值返回 `0`、boolean 返回 `false`、集合与 `Optional` 返回空容器。每次调用同时记入调用日志，供 `verify` 事后比对。objenesis 负责跳过构造器实例化（mock 对象不该执行真实构造逻辑）。
+`mock(ExchangeRate.class)` 的物理实体是 ByteBuddy 在运行时生成的子类实例（mock 接口时则生成实现该接口的类，不走 JDK 动态代理）：每个方法被改写为先查预设表（stubbing 记录），命中则返回预设值，未命中返回该类型的"安全的空"——对象返回 `null`、数值返回 `0`、boolean 返回 `false`、集合与 `Optional` 返回空容器。每次调用同时记入调用日志，供 `verify` 事后比对。objenesis 负责跳过构造器实例化（mock 对象不该执行真实构造逻辑）。
 
 ```java
 // 实测通过（环境见版本基准）

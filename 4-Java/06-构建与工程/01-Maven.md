@@ -12,16 +12,16 @@ Maven 是约定驱动的构建工具：开发者用一份 `pom.xml`（POM，Proj
 
 - **groupId**：发布组织，约定为反向域名，如 `org.apache.commons`；
 - **artifactId**：模块名，如 `commons-lang3`；
-- **version**：版本号，`3.18.0` 这样的定版，或 `1.0-SNAPSHOT` 这样的开发中快照（每次拉取都检查远程更新，定版则永久缓存）。
+- **version**：版本号，`3.20.0` 这样的定版，或 `1.0-SNAPSHOT` 这样的开发中快照（默认按日检查远程更新，updatePolicy 可调；定版则永久缓存）。
 
-坐标决定了两端的连接：对上游，`groupId:artifactId:version` 是在仓库里发起 HTTP 下载的路径；对下游，它映射到本地仓库的文件位置 `~/.m2/repository/org/apache/commons/commons-lang3/3.18.0/commons-lang3-3.18.0.jar`——groupId 的 `.` 展开为目录层级。本地仓库是缓存层：已下载的构件不再走网络，这是 Maven 离线可重复构建的基础。
+坐标决定了两端的连接：对上游，`groupId:artifactId:version` 是在仓库里发起 HTTP 下载的路径；对下游，它映射到本地仓库的文件位置 `~/.m2/repository/org/apache/commons/commons-lang3/3.20.0/commons-lang3-3.20.0.jar`——groupId 的 `.` 展开为目录层级。本地仓库是缓存层：已下载的构件不再走网络，这是 Maven 离线可重复构建的基础。
 
 ```xml
 <!-- 骨架，未实测（本机无 Maven） -->
 <dependency>
     <groupId>org.junit.jupiter</groupId>
     <artifactId>junit-jupiter</artifactId>
-    <version>5.13.4</version>   <!-- JUnit 5 末代版本；JUnit 6 已发布，见 07-02 -->
+    <version>5.14.4</version>   <!-- JUnit 5 维护线现行版（2026-04）；JUnit 6 已发布，见 07-02 -->
     <scope>test</scope>
 </dependency>
 ```

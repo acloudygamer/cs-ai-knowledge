@@ -61,7 +61,7 @@ Gradle 的依赖声明挂在**配置**（configuration，一条具名 classpath�
 | `runtimeOnly` | 否 | 是 | 否 | `runtime` |
 | `testImplementation` | 测试代码 | 测试 | — | `test` |
 
-`implementation` 与 `api` 的分界是 Gradle 6（2019）引入的关键设计：库的内部依赖用 `implementation`，不出现在消费者的编译 classpath 上——这既防止了依赖泄漏（消费者意外引用到库的内部类型），也让 Gradle 能跳过无关模块的重编译（内部依赖变化不影响消费者的编译指纹）。只有当库把自己的依赖类型写进公开 API 签名时，才必须用 `api`。
+`implementation` 与 `api` 的分界随 java-library 插件在 Gradle 3.4（2017-02）引入；Gradle 6（2019）弃用了旧 `compile` 配置（Gradle 7 移除），此后这条分界成为唯一正道：库的内部依赖用 `implementation`，不出现在消费者的编译 classpath 上——这既防止了依赖泄漏（消费者意外引用到库的内部类型），也让 Gradle 能跳过无关模块的重编译（内部依赖变化不影响消费者的编译指纹）。只有当库把自己的依赖类型写进公开 API 签名时，才必须用 `api`。
 
 版本冲突调解规则与 Maven 相反：Gradle 默认**最新版本优先**（highest wins），无论路径深浅。强制钉版本用 `resolutionStrategy`：
 

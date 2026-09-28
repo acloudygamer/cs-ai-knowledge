@@ -2,7 +2,7 @@
 
 > 前置：[05-搜索与NoSQL](05-搜索与NoSQL.md)、[01-Spring核心](01-Spring核心.md)（自动装配是所有 starter 的入口机制） · 后续：[07-SpringSecurity](07-SpringSecurity.md)
 
-> **版本基准**：Spring Cloud 2025.1 "Oakwood"（2025-11 发布，配套 Spring Boot 4.0.x，写作时最新 2025.1.3）；上一代 2025.0 "Northfields" 配套 Boot 3.5.x，OSS 支持已于 2026-06 结束。Resilience4j 写作时最新 2.4.0（2026-03）。示例均为**骨架，未实测**。
+> **版本基准**：Spring Cloud 2025.1 "Oakwood"（2025-11 发布，配套 Spring Boot 4.0.x，写作时最新 2025.1.3）；上一代 2025.0 "Northfields" 配套 Boot 3.5.x，随 Boot 3.5 进入支持末期。Resilience4j 写作时最新 2.4.0（2026-03）。示例均为**骨架，未实测**。
 
 Spring Cloud 的本质是**一组分布式系统惯用设施的 Spring 化封装规范**：服务发现、配置中心、负载均衡、熔断、网关——每个问题定义一套抽象接口，再各接若干实现。它自己不实现这些能力；理解它的关键是先理解单机进程变成多实例网络后，到底多出了哪些必须有人回答的问题。
 
