@@ -2,7 +2,7 @@
 
 > 前置：[04-异步与并发/06-流](../04-异步与并发/06-流.md) · 后续：[02-渲染管线与动画](./02-渲染管线与动画.md)
 
-> **版本基准**：Node 24 stable / Node 26 latest。
+> **版本基准**：Node 24 stable / Node 26 latest。本篇示例实测环境：Node v24.13.1（V8 13.6），Windows x64。
 > **实测范围说明**：本篇的**事件模型**部分在本机 Node v24.13.1 实测（`EventTarget` 是 Web 平台 API，Node 已实现，见 [00-概览/01-JavaScript 全景](../00-概览/01-JavaScript全景.md) 的"标准库两套、交集是共同采纳的 Web API"）。**DOM 树与事件传播路径**无法在 Node 中运行，依据 DOM 标准与 WHATWG HTML 规范陈述，未标注实测。
 
 ## 本质
