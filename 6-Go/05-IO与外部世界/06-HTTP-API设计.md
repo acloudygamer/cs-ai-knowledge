@@ -2,7 +2,7 @@
 
 > 前置：[05-日志与可观测性](./05-日志与可观测性.md) · 后续：[06-工程与工具链](../06-工程与工具链/)
 
-> **版本基准**：Go 1.27（stable = latest）。本篇示例实测环境：go1.27.1 windows/amd64，Intel i7-10750H（6 核 12 线程），`modernc.org/sqlite v1.59.0`。
+> **版本基准**：Go 1.27（stable = latest）。本篇示例实测环境：go1.27.1 windows/amd64，Intel i7-10750H（6 核 12 线程），`modernc.org/sqlite v1.60.1`。
 
 ## 本质
 

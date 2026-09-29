@@ -17,7 +17,7 @@ type Context interface {
 }
 ```
 
-**它是 Go 里唯一的"取消信号"标准载体**——标准库的 `net/http`、`database/sql`、`os/exec`、gRPC 全都接受 `context.Context` 作为第一个参数。
+**它是 Go 里唯一的"取消信号"标准载体**——标准库的 `net/http`、`database/sql`、`os/exec` 全都接受 `context.Context` 作为第一个参数，gRPC 等第三方框架同样如此。
 
 **约束的由来**：Go 的 goroutine **不能被外部杀死**（[01-goroutine与生命周期](./01-goroutine与生命周期.md)）。因此"让一个正在运行的 goroutine 停下来"只能靠**它自己检查并退出**。`context` 提供的就是这个检查点——`Done()` 返回的 channel 关闭即表示"该停了"。
 

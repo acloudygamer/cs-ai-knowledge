@@ -2,7 +2,7 @@
 
 > 前置：[05-IO与外部世界/03](../05-IO与外部世界/03-HTTP服务与客户端.md) · 后续：[02-gRPC与ProtocolBuffers](./02-gRPC与ProtocolBuffers.md)
 
-> **版本基准**：Go 1.27（stable = latest）。本篇示例实测环境：go1.27.1 windows/amd64，Intel i7-10750H（6 核 12 线程），`github.com/gin-gonic/gin v1.12.0`、`github.com/labstack/echo/v4 v4.15.4`、`modernc.org/sqlite v1.59.0`（分页实测用）。
+> **版本基准**：Go 1.27（stable = latest）。本篇示例实测环境：go1.27.1 windows/amd64，Intel i7-10750H（6 核 12 线程），`github.com/gin-gonic/gin v1.12.0`、`github.com/labstack/echo/v4 v4.16.0`、`modernc.org/sqlite v1.60.1`（分页实测用）。
 
 ## 本质
 
@@ -89,7 +89,7 @@ if err := c.ShouldBindJSON(&req); err != nil {
 func (e *APIError) Error() string { return e.Message }
 ```
 
-框架提供 `c.Error(err)` 或 Echo 的 `return err` 机制，配合统一的错误处理中间件把业务错误映射成 HTTP 状态码（[05-IO与外部世界/03](../05-IO与外部世界/03-HTTP服务与客户端.md) 讲过 `sql.ErrNoRows` → 404 的映射）。
+框架提供 `c.Error(err)` 或 Echo 的 `return err` 机制，配合统一的错误处理中间件把业务错误映射成 HTTP 状态码（[05-IO与外部世界/04](../05-IO与外部世界/04-数据库访问.md) 讲过 `sql.ErrNoRows` → 404 的映射）。
 
 **四、中间件生态**：CORS、限流、请求 ID、恢复 panic、Gzip——框架生态里有现成实现，`net/http` 要自己写（[09-设计模式/03](../09-设计模式/03-结构型.md) 的装饰器）。
 
