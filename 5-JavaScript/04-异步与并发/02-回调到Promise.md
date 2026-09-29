@@ -89,9 +89,9 @@ $ node -e 'console.log("之前"); Promise.resolve().then(()=>console.log("微任
 | `Promise.any` | 第一个**兑现**的；全部拒绝才拒绝 | 那个值，或 `AggregateError` |
 
 ```console
-$ node -e '…'
+$ node -e 'Promise.allSettled([Promise.resolve(1),Promise.reject(new Error())]).then(r=>console.log("allSettled:",JSON.stringify(r))); Promise.any([Promise.reject("a"),Promise.reject("b")]).catch(e=>console.log("any: AggregateError",e.errors)); Promise.race([new Promise(r=>setTimeout(r,50,"慢")),Promise.resolve("快")]).then(v=>console.log("race:",v))'
 allSettled: [{"status":"fulfilled","value":1},{"status":"rejected","reason":{}}]
-any: AggregateError ["a","b"]
+any: AggregateError [ 'a', 'b' ]
 race: 快
 ```
 

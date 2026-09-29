@@ -39,8 +39,8 @@ $ node router.mjs
 
 ```console
 $ node router.mjs
-  history  pathname="/users/42"              hash="#top"                     → 路由串 "/users/42?tab=posts"
-  hash     pathname="/"                      hash="#/users/42?tab=posts"     → 路由串 "/users/42?tab=posts"
+  history  pathname="/users/42"  search="?tab=posts"  hash="#top"              → 路由串 "/users/42?tab=posts"
+  hash     pathname="/"                        hash="#/users/42?tab=posts"     → 路由串 "/users/42?tab=posts"
 ```
 
 两者提取出的**路由串完全相同**，差别在于 URL 长什么样：
