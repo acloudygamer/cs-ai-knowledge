@@ -1,7 +1,0 @@
-{
-  "updated": "2026-09-27",
-  "directory": "2-Python/",
-  "stable": "Python 3.12",
-  "latest": "Python 3.14",
-  "notes": "与根 versions.json 口径一致：3.12 stable / 3.14 latest；3.13/3.14 特性在各篇行内以增量标注"
-}

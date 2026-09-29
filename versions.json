@@ -24,14 +24,19 @@
       "latest": "Java 25"
     },
     "5-JavaScript/": {
-      "stable": "Node24+ES2025+TS7.0",
-      "latest": "Node26+ES2026+TS7.0",
-      "notes": "V8 13.6（Node 24）覆盖 ES2025 全部 10 项特性；V8 14.6（Node 26）覆盖 ES2026 除 Math.sumPrecise 外的 6 项（该 API 至 Node 26.7 仍未实现）。引擎落地领先规范版本的情形：using/await using 属 ES2027 而 Node 24 已支持，Temporal 属 ES2027 而 Node 26 已默认开启。TypeScript 7.0 为 Go 重写的编译器（tsgo），strict 默认为 true、target 默认提升至 esnext 之前的稳定 ES 版本、types 默认为 []；7.1 目前仅 nightly，故 latest 同 stable。"
+      "stable": "Node 24 + ES2025",
+      "latest": "Node 26 + ES2026",
+      "notes": "V8 13.6（Node 24）覆盖 ES2025 全部 10 项特性；V8 14.6（Node 26）覆盖 ES2026 除 Math.sumPrecise 外的 6 项（该 API 至 Node 26.7 仍未实现）。引擎落地领先规范版本的情形：using/await using 属 ES2027 而 Node 24 已支持，Temporal 属 ES2027 而 Node 26 已默认开启。"
     },
     "6-Go/": {
       "stable": "Go 1.27",
       "latest": "Go 1.27",
       "notes": "Go 无 LTS，官方只维护最近两个次版本（每 6 个月一个，2 月/8 月发布）。写作时 go.dev/dl 上只有 go1.27.1 与 go1.26.8，Go 1.24 已停止支持，故本库对 Go 只设单档口径。Go 1 兼容性承诺：Go 1.0 之后无破坏性语言变更。实测环境 go1.27.1 windows/amd64。"
+    },
+    "7-TypeScript/": {
+      "stable": "TypeScript 7.0",
+      "latest": "TypeScript 7.0",
+      "notes": "7.0 为 Go 重写的编译器（tsgo），strict 默认为 true、target 默认提升至 esnext 之前的稳定 ES 版本、types 默认为 []；7.1 目前仅 nightly，故 latest 同 stable。实测环境 npx typescript@7.0.2，Node v24.13.1。"
     }
   }
 }
