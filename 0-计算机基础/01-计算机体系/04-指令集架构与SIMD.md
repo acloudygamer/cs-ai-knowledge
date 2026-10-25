@@ -40,7 +40,7 @@
 
 ---
 
-### 4.2 指令集的设计哲学：CISC 与 RISC
+### 4.2 指令集的设计哲学：CISC（Complex Instruction Set Computer，复杂指令集）与 RISC（Reduced Instruction Set Computer，精简指令集）
 
 在 ISA 的演进史上，围绕“指令应该设计得复杂还是简单”，诞生了两大阵营：
 
