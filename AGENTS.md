@@ -258,12 +258,11 @@ PML4E.PPN_PDPT（PML4E 中指向 PDPT 的物理页号字段）：
 6. **闸门分结构与机械两层。** 结构验收只看开头、标题与段首，检查能否复述主链；成稿验收连续阅读，检查回读、对象偷换、节内换题与图表重复。每篇再按四.3 先做事实与论证审查，后查硬错。每章收尾，由本章写手运行：
 
    ```bash
-   python .agents/skills/gfm-math/math_fix.py "<当前篇.md>"
    python -m tools.markdown_checks.check_terms "<当前章目录>"
    python -m tools.markdown_checks.check_numbering --require-numbered "<当前章目录>"
    ```
 
-   公式按篇逐个运行，后两项按章运行。参数口径与退出码见 `tools/markdown_checks/README.md`。交稿分别列出通过项、既有失败与未验证项，不把本地检查通过写成远端渲染通过。
+   两项均按章运行。参数口径与退出码见 `tools/markdown_checks/README.md`。交稿分别列出通过项、既有失败与未验证项。
 
 7. **主 agent 验收章间契约。** 检查跨篇引用是否三样齐全、被引用篇是否真实提供该结论、术语首现是否撞车。撞车以先写的那章为准。结构或节号变化造成的断链必须同批消除，范围外的既有问题单列交接。
 

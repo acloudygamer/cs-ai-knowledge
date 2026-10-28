@@ -30,7 +30,7 @@ description: Helps users discover and install agent skills when they ask questio
 1. 一方官方仓库——策展过，质量下限最高
 2. skills.sh 排行榜——真实使用流行度
 3. GitHub 直接搜 `path:SKILL.md`——长尾覆盖，无质量信号，必须人工审
-4. 自己写（用 skill-creator）——私有事实类技能（如本仓库 gfm-math）全网搜不到，价值最耐久
+4. 自己写（用 skill-creator）——私有事实类技能全网搜不到，价值最耐久
 
 ## 备注
 
