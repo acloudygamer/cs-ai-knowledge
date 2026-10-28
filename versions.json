@@ -9,7 +9,7 @@
     "1-数据结构与算法/": {
       "stable": "universal",
       "latest": null,
-      "notes": "代码示例同时使用 Python 3.12 和 C++20, 代码在功能完整情况下最简和最优原则，模块化分割，注释清晰，便于理解和学习。"
+      "notes": "复杂度量级与摊还界为口径，算法本身不随版本漂移。代码片段内联于机制节点，以 Python 3.12 为主；C++20 只在标准库行为处作对照（libstdc++ 的 std::sort 小区间阈值 16、std::priority_queue 默认大顶堆），不贴完整实现。涉及实现细节的数值标运行时或库版本（如 CPython 3.12 的 int 对象 28 B、Redis 7 的跳表 p=0.25）。"
     },
     "2-Python/": {
       "stable": "Python 3.12",

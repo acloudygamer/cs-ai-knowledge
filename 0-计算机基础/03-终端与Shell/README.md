@@ -2,29 +2,31 @@
 
 > **版本基准**: universal（PowerShell 7.6.7 / Git Bash 5.3.15 / GNU Bash 5.2.21（WSL 3.0.3））
 
-本章建立在 02-操作系统 之上：消费其进程、文件描述符、用户态/内核态机制，回答"人如何通过终端与 Shell 驱动操作系统"。三种 Shell 生态全程对照：PowerShell 7.6.7、Git Bash 5.3.15（Windows）、GNU Bash 5.2.21（WSL 3.0.3）。
+本章建立在 02-操作系统 之上，回答"人如何通过终端与 Shell 驱动操作系统"。按依赖拓扑，本章消费前章的以下机制：02 章 **07** 的登录会话建立与 init/`getty` 打开 `/dev/tty*` 并把 fd 0/1/2 交给 Shell（本篇 01 的起点），02 章 **06** 的字符设备、tty 驱动分层与内核缓冲阻塞唤醒（01 的 PTY 与行规程），02 章 **03** 的会话/进程组与 `fork`/`execve`/写时复制（01 的作业控制、02 的 fork-exec 账本），02 章 **05** 的 fd 表、`open` 标志与路径解析（02 的重定向、04 的 9P 路径），02 章 **02** 的 `read`/`write`/`ioctl`/`pipe`/`dup2`/`waitpid` 语义（01~03 的全部系统调用计数）。
+
+三种壳生态全程对照：PowerShell 7.6.7（对象管道与 `ValueFromPipeline`，见 03）、Git Bash 5.3.15（MSYS2 用户态 POSIX 仿真，见 03）、WSL GNU Bash 5.2.21（真内核 + 9P 文件桥，见 04）；WSL 平台锚 3.0.3 在 04 落地。
 
 ## 目录
 
 ### [01-终端与伪终端](./01-终端与伪终端.md)
-电传打字机到终端模拟器、PTY 机制、ConPTY vs Linux PTY、转义序列
+TTY 三层栈、PTY 的 master/slave 两跳复制、行规程 `termios` 标志位投影、`TIOCSPGRP` 作业控制、转义序列与 `$TERM`、ConPTY 的第三跳
 
 ### [02-Shell工作机制](./02-Shell工作机制.md)
-Shell 即用户态进程、解析/展开/执行、fork/exec 与 fd 重定向、环境变量继承
+Shell 的 fd 0/1/2 与 REPL 循环、七级展开瀑布、重定向的 `dup2` 与打开标志投影、管道 fd 拓扑、fork-exec 账本与内建零 fork、`environ` 继承与进程组
 
 ### [03-三壳生态对照](./03-三壳生态对照.md)
-PowerShell 对象管道、Git Bash 的 POSIX 仿真层、WSL bash 真 Linux、翻译断层
+对象单位 vs 字节单位的分叉、PowerShell 7.6.7 的 `begin/process/end` 逐对象事务、`|` 只是 fd、对象↔字节编解码投影、Git Bash 的 MSYS2 翻译层、5.3.15 与 5.2.21 差异行、五条翻译断层总账
 
 ### [04-WSL与跨平台环境](./04-WSL与跨平台环境.md)
-WSL 3.0.3 架构、文件系统互访与性能税、跨系统进程互调
+WSL 3.0.3 的真内核轻量 VM、`wsl.exe`→VM→init→壳的冷热启动链、`/mnt/c` 的 9P 一次 `open` 往返、转换税放大倍数、`wslpath` 三域投影、`WSLInterop` 互调、`WSLENV` 后缀位
 
 ### [05-Shell编程](./05-Shell编程.md)
-shebang 与退出码、变量/控制流/函数、grep/sed/awk 工具链
+shebang 单参数边界与 8 位退出码、变量三档属性位、数组与 `IFS` 的字节保真、函数的退出码返回通道、管道子壳与 `trap` 覆盖范围、heredoc 临时对象、内建展开 vs `grep`/`sed`/`awk` 进程账本
 
 ## 学习路径
 
-1. **先终端与伪终端**：理解字符如何进出内核
-2. **再 Shell 工作机制**：理解 Shell 如何借 OS 机制工作
-3. **再三壳生态对照**：定位自己每天用的 Shell 在哪一层
-4. **再 WSL**：理解 Windows 与 Linux 如何共处
-5. **最后 Shell 编程**：把机制变成脚本能力
+1. **先终端与伪终端（01）**：字符如何经 tty 三层栈进出内核，行规程如何把字节分流为数据与信号，前台权属如何转移
+2. **再 Shell 工作机制（02）**：Shell 作为普通用户态进程，如何用展开、`dup2`、`pipe`、`fork/exec` 把一行文本变成进程树
+3. **再三壳生态对照（03）**：同一份机制在对象管道、字节管道与 MSYS2 仿真层三种实现下的数据单位与进程账本差异
+4. **再 WSL 与跨平台环境（04）**：真内核与 9P 文件桥如何把"跨界"变成可核算的往返成本
+5. **最后 Shell 编程（05）**：把前四篇的机制固化为脚本，并明确每条语法糖背后的 fork 次数与状态丢失边界
