@@ -15,9 +15,9 @@ import time
 import webbrowser
 from pathlib import Path
 
-from scripts.generate_report import generate_html
-from scripts.improve_description import improve_description
-from scripts.run_eval import find_project_root, run_eval
+from scripts.experimental.generate_report import generate_html
+from scripts.experimental.improve_description import improve_description
+from scripts.experimental.run_eval import find_project_root, run_eval
 from scripts.utils import parse_skill_md
 
 
